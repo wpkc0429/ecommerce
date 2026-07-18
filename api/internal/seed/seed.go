@@ -46,6 +46,8 @@ type Options struct {
 // user.*, theme.*).
 var PermissionCatalog = []struct{ Name, Description string }{
 	{"shop.view", "檢視商家設定與全域內容"},
+	{"shop.create", "建立商家（平台層）"},
+	{"shop.list", "列出所有商家（平台層）"},
 	{"shop.update", "更新商家全域內容與切換主題"},
 	{"shop.manage_domains", "管理站點網域與 site-shop 綁定（平台層）"},
 	{"page.view", "檢視頁面"},

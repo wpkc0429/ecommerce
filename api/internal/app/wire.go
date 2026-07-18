@@ -93,6 +93,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
 	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
+	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

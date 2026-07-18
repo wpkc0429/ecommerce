@@ -25,6 +25,7 @@ type Deps struct {
 	MemberAuth *MemberAuthHandler
 	Roles      *RolesHandler
 	Sites      *SitesHandler
+	Shops      *ShopsHandler
 	Themes     *ThemesHandler
 	Pages      *PagesHandler
 	Render     *RenderHandler
@@ -97,6 +98,9 @@ func New(d Deps) http.Handler {
 					}
 					if d.Sites != nil {
 						d.Sites.MountPlatform(pr)
+					}
+					if d.Shops != nil {
+						d.Shops.MountPlatform(pr)
 					}
 					if d.Themes != nil {
 						d.Themes.MountPlatform(pr)

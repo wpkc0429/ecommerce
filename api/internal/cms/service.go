@@ -10,6 +10,8 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
+	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
+	entsite "ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/events"
 )
@@ -533,4 +535,219 @@ func (s *Service) GetShopContent(ctx context.Context, shopID int) (json.RawMessa
 		}
 	}
 	return shop.ContentJSON, schema, nil
+}
+
+// ── shops (platform, this change) ─────────────────────────────────
+
+// validShopStatus reports whether v is one of the shops.status values defined
+// by spec multi-tenancy/Shop status gating (0 停用/1 啟用/2 審核中).
+func validShopStatus(v int16) bool {
+	return v == 0 || v == 1 || v == 2
+}
+
+// ShopInput is the payload of platform shop creation (design D4).
+type ShopInput struct {
+	Name    string `json:"name"`
+	ThemeID *int   `json:"theme_id"`
+	Status  *int16 `json:"status"`
+}
+
+// createHomePage idempotently creates the shop's auto-created home page
+// (spec page-management/Auto-created home page). It does not validate
+// content against a page_schema — the shop may not have a theme applied yet
+// (design D4) — so a minimal empty-sections payload is used; normal editing
+// goes through the existing PagesHandler once a theme is applied.
+func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
+	exists, err := tx.Page.Query().
+		Where(entpage.ShopIDEQ(shopID), entpage.SlugEQ("home")).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("cms: query home page: %w", err)
+	}
+	if exists {
+		return nil
+	}
+	_, err = tx.Page.Create().
+		SetShopID(shopID).
+		SetTypeKey("home").
+		SetTitle("首頁").
+		SetSlug("home").
+		SetStatus(0).
+		SetContentJSON(json.RawMessage(`{"sections":[]}`)).
+		SetMeta(json.RawMessage("{}")).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("cms: create home page: %w", err)
+	}
+	return nil
+}
+
+// CreateShop creates a shop and its auto-created home page in one
+// transaction (design D4). theme_id is optional: a shop can be created
+// without a theme and have one applied later via the existing theme-switch
+// flow.
+func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, error) {
+	name := strings.TrimSpace(in.Name)
+	if name == "" {
+		return nil, &ValidationError{
+			Message: "name is required",
+			Details: []Detail{{Pointer: "/name", Message: "required"}},
+		}
+	}
+	status := int16(1)
+	if in.Status != nil {
+		if !validShopStatus(*in.Status) {
+			return nil, &ValidationError{
+				Message: "invalid status",
+				Details: []Detail{{Pointer: "/status", Message: "must be 0, 1 or 2"}},
+			}
+		}
+		status = *in.Status
+	}
+	if in.ThemeID != nil {
+		if _, err := s.Client.Theme.Get(ctx, *in.ThemeID); err != nil {
+			return nil, &ValidationError{
+				Message: "theme does not exist",
+				Details: []Detail{{Pointer: "/theme_id", Message: "unknown theme"}},
+			}
+		}
+	}
+
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cms: begin tx: %w", err)
+	}
+	create := tx.Shop.Create().SetName(name).SetStatus(status)
+	if in.ThemeID != nil {
+		create.SetThemeID(*in.ThemeID)
+	}
+	shop, err := create.Save(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		if ent.IsConstraintError(err) {
+			return nil, &ValidationError{Message: "shop could not be created"}
+		}
+		return nil, err
+	}
+	if err := createHomePage(ctx, tx, shop.ID); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("cms: commit shop creation: %w", err)
+	}
+	return shop, nil
+}
+
+// ShopListParams are the (validated/normalized) pagination inputs of
+// ListShops (design D3).
+type ShopListParams struct {
+	Page     int
+	PageSize int
+}
+
+// ShopPage is a page of shops plus pagination metadata (design D3).
+type ShopPage struct {
+	Shops    []*ent.Shop
+	Total    int
+	Page     int
+	PageSize int
+}
+
+// ListShops returns a page of shops ordered by id (design D3). Out-of-range
+// pagination inputs are normalized rather than rejected.
+func (s *Service) ListShops(ctx context.Context, params ShopListParams) (*ShopPage, error) {
+	page := params.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := params.PageSize
+	switch {
+	case pageSize <= 0:
+		pageSize = 20
+	case pageSize > 100:
+		pageSize = 100
+	}
+
+	total, err := s.Client.Shop.Query().Count(ctx)
+	if err != nil {
+		return nil, err
+	}
+	shops, err := s.Client.Shop.Query().
+		Order(entshop.ByID()).
+		Limit(pageSize).
+		Offset((page - 1) * pageSize).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &ShopPage{Shops: shops, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// GetShop returns a single shop by id.
+func (s *Service) GetShop(ctx context.Context, shopID int) (*ent.Shop, error) {
+	shop, err := s.Client.Shop.Get(ctx, shopID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return shop, nil
+}
+
+// ShopUpdate is a partial update of a shop's platform-managed fields
+// (design D2 — name/status/meta; content_json stays the merchant-facing
+// editor's responsibility via UpdateShopContent).
+type ShopUpdate struct {
+	Name   *string         `json:"name"`
+	Status *int16          `json:"status"`
+	Meta   json.RawMessage `json:"meta"`
+}
+
+// UpdateShop applies a partial update. If status actually changes, the route
+// resolution cache of every domain bound to this shop is invalidated so the
+// new gating takes effect immediately (design D5) instead of waiting out the
+// route cache TTL.
+func (s *Service) UpdateShop(ctx context.Context, shopID int, in ShopUpdate) (*ent.Shop, error) {
+	shop, err := s.Client.Shop.Get(ctx, shopID)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	upd := shop.Update()
+	statusChanged := false
+	if in.Name != nil {
+		name := strings.TrimSpace(*in.Name)
+		if name == "" {
+			return nil, &ValidationError{
+				Message: "name cannot be empty",
+				Details: []Detail{{Pointer: "/name", Message: "required"}},
+			}
+		}
+		upd.SetName(name)
+	}
+	if in.Status != nil {
+		if !validShopStatus(*in.Status) {
+			return nil, &ValidationError{
+				Message: "invalid status",
+				Details: []Detail{{Pointer: "/status", Message: "must be 0, 1 or 2"}},
+			}
+		}
+		if *in.Status != shop.Status {
+			statusChanged = true
+			upd.SetStatus(*in.Status)
+		}
+	}
+	if len(in.Meta) > 0 {
+		upd.SetMeta(in.Meta)
+	}
+	shop, err = upd.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if statusChanged {
+		// Best-effort: even if the domain lookup fails, still publish with
+		// ShopIDs so the render cache version bump (design D8) is not
+		// skipped — only the route-cache host invalidation degrades.
+		domains, _ := shop.QuerySites().Select(entsite.FieldDomain).Strings(ctx)
+		s.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: domains, ShopIDs: []int{shopID}})
+	}
+	return shop, nil
 }
