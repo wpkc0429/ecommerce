@@ -46,6 +46,10 @@ type Tx struct {
 	RolePermission *RolePermissionClient
 	// RoleUser is the client for interacting with the RoleUser builders.
 	RoleUser *RoleUserClient
+	// Shipment is the client for interacting with the Shipment builders.
+	Shipment *ShipmentClient
+	// ShippingMethod is the client for interacting with the ShippingMethod builders.
+	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
 	// ShopMember is the client for interacting with the ShopMember builders.
@@ -213,6 +217,8 @@ func (tx *Tx) init() {
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.RoleUser = NewRoleUserClient(tx.config)
+	tx.Shipment = NewShipmentClient(tx.config)
+	tx.ShippingMethod = NewShippingMethodClient(tx.config)
 	tx.Shop = NewShopClient(tx.config)
 	tx.ShopMember = NewShopMemberClient(tx.config)
 	tx.ShopUser = NewShopUserClient(tx.config)

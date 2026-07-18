@@ -27,6 +27,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
+	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -83,6 +85,10 @@ type Client struct {
 	RolePermission *RolePermissionClient
 	// RoleUser is the client for interacting with the RoleUser builders.
 	RoleUser *RoleUserClient
+	// Shipment is the client for interacting with the Shipment builders.
+	Shipment *ShipmentClient
+	// ShippingMethod is the client for interacting with the ShippingMethod builders.
+	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
 	// ShopMember is the client for interacting with the ShopMember builders.
@@ -130,6 +136,8 @@ func (c *Client) init() {
 	c.Role = NewRoleClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
 	c.RoleUser = NewRoleUserClient(c.config)
+	c.Shipment = NewShipmentClient(c.config)
+	c.ShippingMethod = NewShippingMethodClient(c.config)
 	c.Shop = NewShopClient(c.config)
 	c.ShopMember = NewShopMemberClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
@@ -248,6 +256,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Role:               NewRoleClient(cfg),
 		RolePermission:     NewRolePermissionClient(cfg),
 		RoleUser:           NewRoleUserClient(cfg),
+		Shipment:           NewShipmentClient(cfg),
+		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
 		ShopMember:         NewShopMemberClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
@@ -293,6 +303,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Role:               NewRoleClient(cfg),
 		RolePermission:     NewRolePermissionClient(cfg),
 		RoleUser:           NewRoleUserClient(cfg),
+		Shipment:           NewShipmentClient(cfg),
+		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
 		ShopMember:         NewShopMemberClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
@@ -334,9 +346,9 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.Order,
 		c.OrderItem, c.Page, c.Payment, c.Permission, c.Product, c.ProductCategory,
-		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shop, c.ShopMember,
-		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
+		c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser, c.Site, c.SiteShop,
+		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -348,9 +360,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.Order,
 		c.OrderItem, c.Page, c.Payment, c.Permission, c.Product, c.ProductCategory,
-		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shop, c.ShopMember,
-		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
+		c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser, c.Site, c.SiteShop,
+		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -391,6 +403,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.RolePermission.mutate(ctx, m)
 	case *RoleUserMutation:
 		return c.RoleUser.mutate(ctx, m)
+	case *ShipmentMutation:
+		return c.Shipment.mutate(ctx, m)
+	case *ShippingMethodMutation:
+		return c.ShippingMethod.mutate(ctx, m)
 	case *ShopMutation:
 		return c.Shop.mutate(ctx, m)
 	case *ShopMemberMutation:
@@ -3125,6 +3141,320 @@ func (c *RoleUserClient) mutate(ctx context.Context, m *RoleUserMutation) (Value
 	}
 }
 
+// ShipmentClient is a client for the Shipment schema.
+type ShipmentClient struct {
+	config
+}
+
+// NewShipmentClient returns a client for the Shipment from the given config.
+func NewShipmentClient(c config) *ShipmentClient {
+	return &ShipmentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shipment.Hooks(f(g(h())))`.
+func (c *ShipmentClient) Use(hooks ...Hook) {
+	c.hooks.Shipment = append(c.hooks.Shipment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shipment.Intercept(f(g(h())))`.
+func (c *ShipmentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Shipment = append(c.inters.Shipment, interceptors...)
+}
+
+// Create returns a builder for creating a Shipment entity.
+func (c *ShipmentClient) Create() *ShipmentCreate {
+	mutation := newShipmentMutation(c.config, OpCreate)
+	return &ShipmentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Shipment entities.
+func (c *ShipmentClient) CreateBulk(builders ...*ShipmentCreate) *ShipmentCreateBulk {
+	return &ShipmentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShipmentClient) MapCreateBulk(slice any, setFunc func(*ShipmentCreate, int)) *ShipmentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShipmentCreateBulk{err: fmt.Errorf("calling to ShipmentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShipmentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShipmentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Shipment.
+func (c *ShipmentClient) Update() *ShipmentUpdate {
+	mutation := newShipmentMutation(c.config, OpUpdate)
+	return &ShipmentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShipmentClient) UpdateOne(_m *Shipment) *ShipmentUpdateOne {
+	mutation := newShipmentMutation(c.config, OpUpdateOne, withShipment(_m))
+	return &ShipmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShipmentClient) UpdateOneID(id int) *ShipmentUpdateOne {
+	mutation := newShipmentMutation(c.config, OpUpdateOne, withShipmentID(id))
+	return &ShipmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Shipment.
+func (c *ShipmentClient) Delete() *ShipmentDelete {
+	mutation := newShipmentMutation(c.config, OpDelete)
+	return &ShipmentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShipmentClient) DeleteOne(_m *Shipment) *ShipmentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShipmentClient) DeleteOneID(id int) *ShipmentDeleteOne {
+	builder := c.Delete().Where(shipment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShipmentDeleteOne{builder}
+}
+
+// Query returns a query builder for Shipment.
+func (c *ShipmentClient) Query() *ShipmentQuery {
+	return &ShipmentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShipment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Shipment entity by its id.
+func (c *ShipmentClient) Get(ctx context.Context, id int) (*Shipment, error) {
+	return c.Query().Where(shipment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShipmentClient) GetX(ctx context.Context, id int) *Shipment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a Shipment.
+func (c *ShipmentClient) QueryShop(_m *Shipment) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shipment.Table, shipment.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shipment.ShopTable, shipment.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOrder queries the order edge of a Shipment.
+func (c *ShipmentClient) QueryOrder(_m *Shipment) *OrderQuery {
+	query := (&OrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shipment.Table, shipment.FieldID, id),
+			sqlgraph.To(order.Table, order.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shipment.OrderTable, shipment.OrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShipmentClient) Hooks() []Hook {
+	return c.hooks.Shipment
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShipmentClient) Interceptors() []Interceptor {
+	return c.inters.Shipment
+}
+
+func (c *ShipmentClient) mutate(ctx context.Context, m *ShipmentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShipmentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShipmentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShipmentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShipmentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Shipment mutation op: %q", m.Op())
+	}
+}
+
+// ShippingMethodClient is a client for the ShippingMethod schema.
+type ShippingMethodClient struct {
+	config
+}
+
+// NewShippingMethodClient returns a client for the ShippingMethod from the given config.
+func NewShippingMethodClient(c config) *ShippingMethodClient {
+	return &ShippingMethodClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shippingmethod.Hooks(f(g(h())))`.
+func (c *ShippingMethodClient) Use(hooks ...Hook) {
+	c.hooks.ShippingMethod = append(c.hooks.ShippingMethod, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shippingmethod.Intercept(f(g(h())))`.
+func (c *ShippingMethodClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShippingMethod = append(c.inters.ShippingMethod, interceptors...)
+}
+
+// Create returns a builder for creating a ShippingMethod entity.
+func (c *ShippingMethodClient) Create() *ShippingMethodCreate {
+	mutation := newShippingMethodMutation(c.config, OpCreate)
+	return &ShippingMethodCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShippingMethod entities.
+func (c *ShippingMethodClient) CreateBulk(builders ...*ShippingMethodCreate) *ShippingMethodCreateBulk {
+	return &ShippingMethodCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShippingMethodClient) MapCreateBulk(slice any, setFunc func(*ShippingMethodCreate, int)) *ShippingMethodCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShippingMethodCreateBulk{err: fmt.Errorf("calling to ShippingMethodClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShippingMethodCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShippingMethodCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShippingMethod.
+func (c *ShippingMethodClient) Update() *ShippingMethodUpdate {
+	mutation := newShippingMethodMutation(c.config, OpUpdate)
+	return &ShippingMethodUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShippingMethodClient) UpdateOne(_m *ShippingMethod) *ShippingMethodUpdateOne {
+	mutation := newShippingMethodMutation(c.config, OpUpdateOne, withShippingMethod(_m))
+	return &ShippingMethodUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShippingMethodClient) UpdateOneID(id int) *ShippingMethodUpdateOne {
+	mutation := newShippingMethodMutation(c.config, OpUpdateOne, withShippingMethodID(id))
+	return &ShippingMethodUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShippingMethod.
+func (c *ShippingMethodClient) Delete() *ShippingMethodDelete {
+	mutation := newShippingMethodMutation(c.config, OpDelete)
+	return &ShippingMethodDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShippingMethodClient) DeleteOne(_m *ShippingMethod) *ShippingMethodDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShippingMethodClient) DeleteOneID(id int) *ShippingMethodDeleteOne {
+	builder := c.Delete().Where(shippingmethod.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShippingMethodDeleteOne{builder}
+}
+
+// Query returns a query builder for ShippingMethod.
+func (c *ShippingMethodClient) Query() *ShippingMethodQuery {
+	return &ShippingMethodQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShippingMethod},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShippingMethod entity by its id.
+func (c *ShippingMethodClient) Get(ctx context.Context, id int) (*ShippingMethod, error) {
+	return c.Query().Where(shippingmethod.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShippingMethodClient) GetX(ctx context.Context, id int) *ShippingMethod {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a ShippingMethod.
+func (c *ShippingMethodClient) QueryShop(_m *ShippingMethod) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shippingmethod.Table, shippingmethod.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shippingmethod.ShopTable, shippingmethod.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShippingMethodClient) Hooks() []Hook {
+	return c.hooks.ShippingMethod
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShippingMethodClient) Interceptors() []Interceptor {
+	return c.inters.ShippingMethod
+}
+
+func (c *ShippingMethodClient) mutate(ctx context.Context, m *ShippingMethodMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShippingMethodCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShippingMethodUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShippingMethodUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShippingMethodDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShippingMethod mutation op: %q", m.Op())
+	}
+}
+
 // ShopClient is a client for the Shop schema.
 type ShopClient struct {
 	config
@@ -4779,14 +5109,16 @@ type (
 	hooks struct {
 		Cart, CartItem, Category, Member, MemberRefreshToken, Order, OrderItem, Page,
 		Payment, Permission, Product, ProductCategory, ProductSKU, Role,
-		RolePermission, RoleUser, Shop, ShopMember, ShopUser, Site, SiteShop, Theme,
-		ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
+		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopMember, ShopUser,
+		Site, SiteShop, Theme, ThemePage, User, UserPermission,
+		UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		Cart, CartItem, Category, Member, MemberRefreshToken, Order, OrderItem, Page,
 		Payment, Permission, Product, ProductCategory, ProductSKU, Role,
-		RolePermission, RoleUser, Shop, ShopMember, ShopUser, Site, SiteShop, Theme,
-		ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
+		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopMember, ShopUser,
+		Site, SiteShop, Theme, ThemePage, User, UserPermission,
+		UserRefreshToken []ent.Interceptor
 	}
 )
 

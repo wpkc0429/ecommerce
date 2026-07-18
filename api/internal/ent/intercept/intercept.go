@@ -24,6 +24,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
+	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -526,6 +528,60 @@ func (f TraverseRoleUser) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.RoleUserQuery", q)
 }
 
+// The ShipmentFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShipmentFunc func(context.Context, *ent.ShipmentQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShipmentFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShipmentQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShipmentQuery", q)
+}
+
+// The TraverseShipment type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShipment func(context.Context, *ent.ShipmentQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShipment) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShipment) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShipmentQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShipmentQuery", q)
+}
+
+// The ShippingMethodFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShippingMethodFunc func(context.Context, *ent.ShippingMethodQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShippingMethodFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShippingMethodQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShippingMethodQuery", q)
+}
+
+// The TraverseShippingMethod type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShippingMethod func(context.Context, *ent.ShippingMethodQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShippingMethod) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShippingMethod) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShippingMethodQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShippingMethodQuery", q)
+}
+
 // The ShopFunc type is an adapter to allow the use of ordinary function as a Querier.
 type ShopFunc func(context.Context, *ent.ShopQuery) (ent.Value, error)
 
@@ -831,6 +887,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.RolePermissionQuery, predicate.RolePermission, rolepermission.OrderOption]{typ: ent.TypeRolePermission, tq: q}, nil
 	case *ent.RoleUserQuery:
 		return &query[*ent.RoleUserQuery, predicate.RoleUser, roleuser.OrderOption]{typ: ent.TypeRoleUser, tq: q}, nil
+	case *ent.ShipmentQuery:
+		return &query[*ent.ShipmentQuery, predicate.Shipment, shipment.OrderOption]{typ: ent.TypeShipment, tq: q}, nil
+	case *ent.ShippingMethodQuery:
+		return &query[*ent.ShippingMethodQuery, predicate.ShippingMethod, shippingmethod.OrderOption]{typ: ent.TypeShippingMethod, tq: q}, nil
 	case *ent.ShopQuery:
 		return &query[*ent.ShopQuery, predicate.Shop, shop.OrderOption]{typ: ent.TypeShop, tq: q}, nil
 	case *ent.ShopMemberQuery:

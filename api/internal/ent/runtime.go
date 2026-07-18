@@ -18,6 +18,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/schema"
+	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -651,6 +653,98 @@ func init() {
 	roleDescScope := roleFields[1].Descriptor()
 	// role.ScopeValidator is a validator for the "scope" field. It is called by the builders before save.
 	role.ScopeValidator = roleDescScope.Validators[0].(func(string) error)
+	shipmentMixin := schema.Shipment{}.Mixin()
+	shipmentMixinFields0 := shipmentMixin[0].Fields()
+	_ = shipmentMixinFields0
+	shipmentFields := schema.Shipment{}.Fields()
+	_ = shipmentFields
+	// shipmentDescCreatedAt is the schema descriptor for created_at field.
+	shipmentDescCreatedAt := shipmentMixinFields0[0].Descriptor()
+	// shipment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shipment.DefaultCreatedAt = shipmentDescCreatedAt.Default.(func() time.Time)
+	// shipmentDescUpdatedAt is the schema descriptor for updated_at field.
+	shipmentDescUpdatedAt := shipmentMixinFields0[1].Descriptor()
+	// shipment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	shipment.DefaultUpdatedAt = shipmentDescUpdatedAt.Default.(func() time.Time)
+	// shipment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	shipment.UpdateDefaultUpdatedAt = shipmentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// shipmentDescCarrier is the schema descriptor for carrier field.
+	shipmentDescCarrier := shipmentFields[2].Descriptor()
+	// shipment.CarrierValidator is a validator for the "carrier" field. It is called by the builders before save.
+	shipment.CarrierValidator = func() func(string) error {
+		validators := shipmentDescCarrier.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(carrier string) error {
+			for _, fn := range fns {
+				if err := fn(carrier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shipmentDescTrackingNumber is the schema descriptor for tracking_number field.
+	shipmentDescTrackingNumber := shipmentFields[3].Descriptor()
+	// shipment.TrackingNumberValidator is a validator for the "tracking_number" field. It is called by the builders before save.
+	shipment.TrackingNumberValidator = shipmentDescTrackingNumber.Validators[0].(func(string) error)
+	shippingmethodMixin := schema.ShippingMethod{}.Mixin()
+	shippingmethodMixinFields0 := shippingmethodMixin[0].Fields()
+	_ = shippingmethodMixinFields0
+	shippingmethodFields := schema.ShippingMethod{}.Fields()
+	_ = shippingmethodFields
+	// shippingmethodDescCreatedAt is the schema descriptor for created_at field.
+	shippingmethodDescCreatedAt := shippingmethodMixinFields0[0].Descriptor()
+	// shippingmethod.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shippingmethod.DefaultCreatedAt = shippingmethodDescCreatedAt.Default.(func() time.Time)
+	// shippingmethodDescUpdatedAt is the schema descriptor for updated_at field.
+	shippingmethodDescUpdatedAt := shippingmethodMixinFields0[1].Descriptor()
+	// shippingmethod.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	shippingmethod.DefaultUpdatedAt = shippingmethodDescUpdatedAt.Default.(func() time.Time)
+	// shippingmethod.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	shippingmethod.UpdateDefaultUpdatedAt = shippingmethodDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// shippingmethodDescName is the schema descriptor for name field.
+	shippingmethodDescName := shippingmethodFields[1].Descriptor()
+	// shippingmethod.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	shippingmethod.NameValidator = func() func(string) error {
+		validators := shippingmethodDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shippingmethodDescCarrier is the schema descriptor for carrier field.
+	shippingmethodDescCarrier := shippingmethodFields[2].Descriptor()
+	// shippingmethod.CarrierValidator is a validator for the "carrier" field. It is called by the builders before save.
+	shippingmethod.CarrierValidator = func() func(string) error {
+		validators := shippingmethodDescCarrier.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(carrier string) error {
+			for _, fn := range fns {
+				if err := fn(carrier); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shippingmethodDescIsActive is the schema descriptor for is_active field.
+	shippingmethodDescIsActive := shippingmethodFields[4].Descriptor()
+	// shippingmethod.DefaultIsActive holds the default value on creation for the is_active field.
+	shippingmethod.DefaultIsActive = shippingmethodDescIsActive.Default.(bool)
 	shopMixin := schema.Shop{}.Mixin()
 	shopMixinFields0 := shopMixin[0].Fields()
 	_ = shopMixinFields0

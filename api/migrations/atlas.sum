@@ -1,7 +1,8 @@
-h1:WzpUUE+1CaWfO6mlwJBkA+pMDqiLN8qHFYPslg+fCfQ=
+h1:8Xr4Lw5987RgMq4Ub0JpZUj3jXTnAbeWf940+2HA9T4=
 20260718063844_init_schema.up.sql h1:wv7KzKfeUwzPi6/BwJcp4vrf5O6TNNAtRXO5YhJVxWI=
 20260718063900_rbac_unique_nulls_not_distinct.up.sql h1:yi40MEFUEo5OLvMs7yGfitQ76iHbyaOtoWNuug3VnB0=
 20260718102453_add_product_catalog.up.sql h1:sJopT0LbEaOTx+rd4I3Gwd4VL43iE2EIx0yAi07DV+0=
 20260718123918_add_shopping_cart.up.sql h1:gFTd2T/RG/7jjpdR0nvnAF8j2hPmhJWqCnYkKBldoTA=
 20260718131711_add_order_management.up.sql h1:STNA99zUSXd2wF5GHdERvuJ4whJwIc518caurBTuHiI=
 20260718135227_add_payment_integration.up.sql h1:28Y9DEqM3ROQfoAVMVZEZWgd6lmcb/AvGbWV1+FCd88=
+20260718142317_add_shipping_logistics.up.sql h1:X6/NlhQK3wCtn0LC/Zr8/QxoBXpR9V97Rwd3bCfQzts=

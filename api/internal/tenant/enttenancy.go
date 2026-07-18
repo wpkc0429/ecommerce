@@ -40,6 +40,11 @@ var tenantOwned = map[string]bool{
 	// and by the shop_id/order_id read off the located row, not by this
 	// interceptor.
 	"Payment": true,
+	// change shipping-logistics: both tables carry a direct shop_id column
+	// (design D1/D10 — ShippingMethod mirrors Category's shape, Shipment
+	// mirrors Payment's shape).
+	"ShippingMethod": true,
+	"Shipment":       true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

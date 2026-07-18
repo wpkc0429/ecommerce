@@ -617,6 +617,83 @@ var (
 			},
 		},
 	}
+	// ShipmentsColumns holds the columns for the "shipments" table.
+	ShipmentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "carrier", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "tracking_number", Type: field.TypeString, Nullable: true, Size: 191, SchemaType: map[string]string{"postgres": "varchar(191)"}},
+		{Name: "status", Type: field.TypeInt16},
+		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
+		{Name: "delivered_at", Type: field.TypeTime, Nullable: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "order_id", Type: field.TypeInt},
+	}
+	// ShipmentsTable holds the schema information for the "shipments" table.
+	ShipmentsTable = &schema.Table{
+		Name:       "shipments",
+		Columns:    ShipmentsColumns,
+		PrimaryKey: []*schema.Column{ShipmentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shipments_shops_shop",
+				Columns:    []*schema.Column{ShipmentsColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipments_orders_order",
+				Columns:    []*schema.Column{ShipmentsColumns[9]},
+				RefColumns: []*schema.Column{OrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shipment_order_id",
+				Unique:  true,
+				Columns: []*schema.Column{ShipmentsColumns[9]},
+			},
+			{
+				Name:    "shipment_shop_id_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentsColumns[8], ShipmentsColumns[9]},
+			},
+		},
+	}
+	// ShippingMethodsColumns holds the columns for the "shipping_methods" table.
+	ShippingMethodsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "carrier", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "flat_rate", Type: field.TypeInt64},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ShippingMethodsTable holds the schema information for the "shipping_methods" table.
+	ShippingMethodsTable = &schema.Table{
+		Name:       "shipping_methods",
+		Columns:    ShippingMethodsColumns,
+		PrimaryKey: []*schema.Column{ShippingMethodsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shipping_methods_shops_shop",
+				Columns:    []*schema.Column{ShippingMethodsColumns[7]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shippingmethod_shop_id_is_active",
+				Unique:  false,
+				Columns: []*schema.Column{ShippingMethodsColumns[7], ShippingMethodsColumns[6]},
+			},
+		},
+	}
 	// ShopsColumns holds the columns for the "shops" table.
 	ShopsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -950,6 +1027,8 @@ var (
 		RolesTable,
 		RolePermissionTable,
 		RoleUserTable,
+		ShipmentsTable,
+		ShippingMethodsTable,
 		ShopsTable,
 		ShopMemberTable,
 		ShopUserTable,
@@ -1052,6 +1131,19 @@ func init() {
 	RoleUserTable.ForeignKeys[2].RefTable = ShopsTable
 	RoleUserTable.Annotation = &entsql.Annotation{
 		Table: "role_user",
+	}
+	ShipmentsTable.ForeignKeys[0].RefTable = ShopsTable
+	ShipmentsTable.ForeignKeys[1].RefTable = OrdersTable
+	ShipmentsTable.Annotation = &entsql.Annotation{}
+	ShipmentsTable.Annotation.Checks = map[string]string{
+		"shipments_status_check": "status IN (1, 2, 3)",
+	}
+	ShippingMethodsTable.ForeignKeys[0].RefTable = ShopsTable
+	ShippingMethodsTable.Annotation = &entsql.Annotation{
+		Table: "shipping_methods",
+	}
+	ShippingMethodsTable.Annotation.Checks = map[string]string{
+		"shipping_methods_flat_rate_check": "flat_rate >= 0",
 	}
 	ShopsTable.ForeignKeys[0].RefTable = ThemesTable
 	ShopsTable.Annotation = &entsql.Annotation{}

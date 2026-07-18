@@ -19,6 +19,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
+	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
@@ -132,6 +133,14 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		DefaultProvider: mockProvider.Name(),
 	}
 	deps.Payments = &httpapi.PaymentHandler{Client: client, Service: paymentService, Authz: authz, Log: a.log}
+
+	// Shipping logistics (change shipping-logistics): shipping methods CRUD
+	// + shipment records, no external carrier integration (design D9 — no
+	// new config values needed, unlike payment's mock webhook secret).
+	// Member/admin routes reuse orderService as the sole controlled entry
+	// point for advancing orders.fulfillment_status (design D4/D6).
+	shippingService := &shipping.Service{Client: client, Orders: orderService}
+	deps.Shipping = &httpapi.ShippingHandler{Client: client, Service: shippingService, Authz: authz, Log: a.log}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,
