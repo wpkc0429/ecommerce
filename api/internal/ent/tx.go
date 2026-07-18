@@ -24,6 +24,10 @@ type Tx struct {
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
 	MemberRefreshToken *MemberRefreshTokenClient
+	// Order is the client for interacting with the Order builders.
+	Order *OrderClient
+	// OrderItem is the client for interacting with the OrderItem builders.
+	OrderItem *OrderItemClient
 	// Page is the client for interacting with the Page builders.
 	Page *PageClient
 	// Permission is the client for interacting with the Permission builders.
@@ -196,6 +200,8 @@ func (tx *Tx) init() {
 	tx.Category = NewCategoryClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)
+	tx.Order = NewOrderClient(tx.config)
+	tx.OrderItem = NewOrderItemClient(tx.config)
 	tx.Page = NewPageClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)

@@ -212,6 +212,100 @@ var (
 			},
 		},
 	}
+	// OrdersColumns holds the columns for the "orders" table.
+	OrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "payment_status", Type: field.TypeInt16, Default: 0},
+		{Name: "fulfillment_status", Type: field.TypeInt16, Default: 0},
+		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "total_amount", Type: field.TypeInt64},
+		{Name: "shipping_address", Type: field.TypeJSON},
+		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "member_id", Type: field.TypeInt},
+	}
+	// OrdersTable holds the schema information for the "orders" table.
+	OrdersTable = &schema.Table{
+		Name:       "orders",
+		Columns:    OrdersColumns,
+		PrimaryKey: []*schema.Column{OrdersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "orders_shops_shop",
+				Columns:    []*schema.Column{OrdersColumns[10]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "orders_members_member",
+				Columns:    []*schema.Column{OrdersColumns[11]},
+				RefColumns: []*schema.Column{MembersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "order_shop_id_member_id",
+				Unique:  false,
+				Columns: []*schema.Column{OrdersColumns[10], OrdersColumns[11]},
+			},
+			{
+				Name:    "order_shop_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{OrdersColumns[10], OrdersColumns[3]},
+			},
+		},
+	}
+	// OrderItemsColumns holds the columns for the "order_items" table.
+	OrderItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "product_id", Type: field.TypeInt, Nullable: true},
+		{Name: "product_title", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "sku_id", Type: field.TypeInt, Nullable: true},
+		{Name: "sku_code", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "quantity", Type: field.TypeInt32},
+		{Name: "price_amount", Type: field.TypeInt64},
+		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "order_id", Type: field.TypeInt},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// OrderItemsTable holds the schema information for the "order_items" table.
+	OrderItemsTable = &schema.Table{
+		Name:       "order_items",
+		Columns:    OrderItemsColumns,
+		PrimaryKey: []*schema.Column{OrderItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "order_items_orders_items",
+				Columns:    []*schema.Column{OrderItemsColumns[10]},
+				RefColumns: []*schema.Column{OrdersColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "order_items_shops_shop",
+				Columns:    []*schema.Column{OrderItemsColumns[11]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "orderitem_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{OrderItemsColumns[10]},
+			},
+			{
+				Name:    "orderitem_shop_id",
+				Unique:  false,
+				Columns: []*schema.Column{OrderItemsColumns[11]},
+			},
+		},
+	}
 	// PagesColumns holds the columns for the "pages" table.
 	PagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -800,6 +894,8 @@ var (
 		CategoriesTable,
 		MembersTable,
 		MemberRefreshTokensTable,
+		OrdersTable,
+		OrderItemsTable,
 		PagesTable,
 		PermissionsTable,
 		ProductsTable,
@@ -846,6 +942,24 @@ func init() {
 	}
 	MemberRefreshTokensTable.ForeignKeys[0].RefTable = MembersTable
 	MemberRefreshTokensTable.ForeignKeys[1].RefTable = ShopsTable
+	OrdersTable.ForeignKeys[0].RefTable = ShopsTable
+	OrdersTable.ForeignKeys[1].RefTable = MembersTable
+	OrdersTable.Annotation = &entsql.Annotation{}
+	OrdersTable.Annotation.Checks = map[string]string{
+		"orders_fulfillment_status_check": "fulfillment_status >= 0",
+		"orders_payment_status_check":     "payment_status >= 0",
+		"orders_status_check":             "status IN (0, 1)",
+		"orders_total_amount_check":       "total_amount >= 0",
+	}
+	OrderItemsTable.ForeignKeys[0].RefTable = OrdersTable
+	OrderItemsTable.ForeignKeys[1].RefTable = ShopsTable
+	OrderItemsTable.Annotation = &entsql.Annotation{
+		Table: "order_items",
+	}
+	OrderItemsTable.Annotation.Checks = map[string]string{
+		"order_items_price_amount_check": "price_amount >= 0",
+		"order_items_quantity_check":     "quantity > 0",
+	}
 	PagesTable.ForeignKeys[0].RefTable = ShopsTable
 	PagesTable.Annotation = &entsql.Annotation{}
 	PagesTable.Annotation.Checks = map[string]string{

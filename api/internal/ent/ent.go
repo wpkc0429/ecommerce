@@ -11,6 +11,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/order"
+	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/product"
@@ -100,6 +102,8 @@ func checkColumn(t, c string) error {
 			category.Table:           category.ValidColumn,
 			member.Table:             member.ValidColumn,
 			memberrefreshtoken.Table: memberrefreshtoken.ValidColumn,
+			order.Table:              order.ValidColumn,
+			orderitem.Table:          orderitem.ValidColumn,
 			page.Table:               page.ValidColumn,
 			permission.Table:         permission.ValidColumn,
 			product.Table:            product.ValidColumn,

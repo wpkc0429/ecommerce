@@ -14,6 +14,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
@@ -109,6 +110,12 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// events involved (design D9 — no ConflictError, no cache to invalidate).
 	cartService := &cart.Service{Client: client}
 	deps.Cart = &httpapi.CartHandler{Client: client, Service: cartService, Log: a.log}
+
+	// Order management (change order-management): checkout consumes the
+	// active cart directly via ent (design D9); member routes are RBAC-free
+	// like Cart, admin routes reuse the same authz engine as Products.
+	orderService := &order.Service{Client: client}
+	deps.Orders = &httpapi.OrderHandler{Client: client, Service: orderService, Authz: authz, Log: a.log}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

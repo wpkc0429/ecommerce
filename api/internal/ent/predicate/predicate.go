@@ -21,6 +21,12 @@ type Member func(*sql.Selector)
 // MemberRefreshToken is the predicate function for memberrefreshtoken builders.
 type MemberRefreshToken func(*sql.Selector)
 
+// Order is the predicate function for order builders.
+type Order func(*sql.Selector)
+
+// OrderItem is the predicate function for orderitem builders.
+type OrderItem func(*sql.Selector)
+
 // Page is the predicate function for page builders.
 type Page func(*sql.Selector)
 

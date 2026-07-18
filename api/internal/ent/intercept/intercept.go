@@ -12,6 +12,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/order"
+	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
@@ -224,6 +226,60 @@ func (f TraverseMemberRefreshToken) Traverse(ctx context.Context, q ent.Query) e
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.MemberRefreshTokenQuery", q)
+}
+
+// The OrderFunc type is an adapter to allow the use of ordinary function as a Querier.
+type OrderFunc func(context.Context, *ent.OrderQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f OrderFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.OrderQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.OrderQuery", q)
+}
+
+// The TraverseOrder type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseOrder func(context.Context, *ent.OrderQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseOrder) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseOrder) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.OrderQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.OrderQuery", q)
+}
+
+// The OrderItemFunc type is an adapter to allow the use of ordinary function as a Querier.
+type OrderItemFunc func(context.Context, *ent.OrderItemQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f OrderItemFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.OrderItemQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.OrderItemQuery", q)
+}
+
+// The TraverseOrderItem type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseOrderItem func(context.Context, *ent.OrderItemQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseOrderItem) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseOrderItem) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.OrderItemQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.OrderItemQuery", q)
 }
 
 // The PageFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -725,6 +781,10 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.MemberQuery, predicate.Member, member.OrderOption]{typ: ent.TypeMember, tq: q}, nil
 	case *ent.MemberRefreshTokenQuery:
 		return &query[*ent.MemberRefreshTokenQuery, predicate.MemberRefreshToken, memberrefreshtoken.OrderOption]{typ: ent.TypeMemberRefreshToken, tq: q}, nil
+	case *ent.OrderQuery:
+		return &query[*ent.OrderQuery, predicate.Order, order.OrderOption]{typ: ent.TypeOrder, tq: q}, nil
+	case *ent.OrderItemQuery:
+		return &query[*ent.OrderItemQuery, predicate.OrderItem, orderitem.OrderOption]{typ: ent.TypeOrderItem, tq: q}, nil
 	case *ent.PageQuery:
 		return &query[*ent.PageQuery, predicate.Page, page.OrderOption]{typ: ent.TypePage, tq: q}, nil
 	case *ent.PermissionQuery:

@@ -9,6 +9,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/order"
+	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/product"
@@ -215,6 +217,120 @@ func init() {
 	memberrefreshtokenDescCreatedAt := memberrefreshtokenFields[6].Descriptor()
 	// memberrefreshtoken.DefaultCreatedAt holds the default value on creation for the created_at field.
 	memberrefreshtoken.DefaultCreatedAt = memberrefreshtokenDescCreatedAt.Default.(func() time.Time)
+	orderMixin := schema.Order{}.Mixin()
+	orderMixinFields0 := orderMixin[0].Fields()
+	_ = orderMixinFields0
+	orderFields := schema.Order{}.Fields()
+	_ = orderFields
+	// orderDescCreatedAt is the schema descriptor for created_at field.
+	orderDescCreatedAt := orderMixinFields0[0].Descriptor()
+	// order.DefaultCreatedAt holds the default value on creation for the created_at field.
+	order.DefaultCreatedAt = orderDescCreatedAt.Default.(func() time.Time)
+	// orderDescUpdatedAt is the schema descriptor for updated_at field.
+	orderDescUpdatedAt := orderMixinFields0[1].Descriptor()
+	// order.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	order.DefaultUpdatedAt = orderDescUpdatedAt.Default.(func() time.Time)
+	// order.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	order.UpdateDefaultUpdatedAt = orderDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// orderDescStatus is the schema descriptor for status field.
+	orderDescStatus := orderFields[2].Descriptor()
+	// order.DefaultStatus holds the default value on creation for the status field.
+	order.DefaultStatus = orderDescStatus.Default.(int16)
+	// orderDescPaymentStatus is the schema descriptor for payment_status field.
+	orderDescPaymentStatus := orderFields[3].Descriptor()
+	// order.DefaultPaymentStatus holds the default value on creation for the payment_status field.
+	order.DefaultPaymentStatus = orderDescPaymentStatus.Default.(int16)
+	// orderDescFulfillmentStatus is the schema descriptor for fulfillment_status field.
+	orderDescFulfillmentStatus := orderFields[4].Descriptor()
+	// order.DefaultFulfillmentStatus holds the default value on creation for the fulfillment_status field.
+	order.DefaultFulfillmentStatus = orderDescFulfillmentStatus.Default.(int16)
+	// orderDescCurrency is the schema descriptor for currency field.
+	orderDescCurrency := orderFields[5].Descriptor()
+	// order.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	order.CurrencyValidator = func() func(string) error {
+		validators := orderDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	orderitemMixin := schema.OrderItem{}.Mixin()
+	orderitemMixinFields0 := orderitemMixin[0].Fields()
+	_ = orderitemMixinFields0
+	orderitemFields := schema.OrderItem{}.Fields()
+	_ = orderitemFields
+	// orderitemDescCreatedAt is the schema descriptor for created_at field.
+	orderitemDescCreatedAt := orderitemMixinFields0[0].Descriptor()
+	// orderitem.DefaultCreatedAt holds the default value on creation for the created_at field.
+	orderitem.DefaultCreatedAt = orderitemDescCreatedAt.Default.(func() time.Time)
+	// orderitemDescUpdatedAt is the schema descriptor for updated_at field.
+	orderitemDescUpdatedAt := orderitemMixinFields0[1].Descriptor()
+	// orderitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	orderitem.DefaultUpdatedAt = orderitemDescUpdatedAt.Default.(func() time.Time)
+	// orderitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	orderitem.UpdateDefaultUpdatedAt = orderitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// orderitemDescProductTitle is the schema descriptor for product_title field.
+	orderitemDescProductTitle := orderitemFields[3].Descriptor()
+	// orderitem.ProductTitleValidator is a validator for the "product_title" field. It is called by the builders before save.
+	orderitem.ProductTitleValidator = func() func(string) error {
+		validators := orderitemDescProductTitle.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(product_title string) error {
+			for _, fn := range fns {
+				if err := fn(product_title); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// orderitemDescSkuCode is the schema descriptor for sku_code field.
+	orderitemDescSkuCode := orderitemFields[5].Descriptor()
+	// orderitem.SkuCodeValidator is a validator for the "sku_code" field. It is called by the builders before save.
+	orderitem.SkuCodeValidator = func() func(string) error {
+		validators := orderitemDescSkuCode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(sku_code string) error {
+			for _, fn := range fns {
+				if err := fn(sku_code); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// orderitemDescCurrency is the schema descriptor for currency field.
+	orderitemDescCurrency := orderitemFields[8].Descriptor()
+	// orderitem.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	orderitem.CurrencyValidator = func() func(string) error {
+		validators := orderitemDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	pageMixin := schema.Page{}.Mixin()
 	pageMixinFields0 := pageMixin[0].Fields()
 	_ = pageMixinFields0

@@ -32,6 +32,7 @@ type Deps struct {
 	Categories *CategoriesHandler // change product-catalog
 	Products   *ProductsHandler   // change product-catalog (merchant CRUD + public read)
 	Cart       *CartHandler       // change shopping-cart (member self-service, no RBAC)
+	Orders     *OrderHandler      // change order-management (member self-service + merchant back office)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
@@ -100,6 +101,9 @@ func New(d Deps) http.Handler {
 						if d.Products != nil {
 							d.Products.MountShop(sh)
 						}
+						if d.Orders != nil {
+							d.Orders.MountShopAdmin(sh)
+						}
 					})
 					// Platform-level resources.
 					if d.Roles != nil {
@@ -149,6 +153,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Cart != nil {
 							d.Cart.MountShop(mr)
+						}
+						if d.Orders != nil {
+							d.Orders.MountShop(mr)
 						}
 					})
 				}
