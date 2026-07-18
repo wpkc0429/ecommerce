@@ -1,4 +1,5 @@
-h1:qo2iI3og0mfACHUIJshziA3uAuRqp8HhiXQlz4eT5r0=
+h1:htEBc6Ang2ej2QFOCxxBqq8QJvc3kozQ0/en31vEsxg=
 20260718063844_init_schema.up.sql h1:wv7KzKfeUwzPi6/BwJcp4vrf5O6TNNAtRXO5YhJVxWI=
 20260718063900_rbac_unique_nulls_not_distinct.up.sql h1:yi40MEFUEo5OLvMs7yGfitQ76iHbyaOtoWNuug3VnB0=
 20260718102453_add_product_catalog.up.sql h1:sJopT0LbEaOTx+rd4I3Gwd4VL43iE2EIx0yAi07DV+0=
+20260718123918_add_shopping_cart.up.sql h1:gFTd2T/RG/7jjpdR0nvnAF8j2hPmhJWqCnYkKBldoTA=

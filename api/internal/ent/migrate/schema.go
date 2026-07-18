@@ -9,6 +9,101 @@ import (
 )
 
 var (
+	// CartsColumns holds the columns for the "carts" table.
+	CartsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "member_id", Type: field.TypeInt},
+	}
+	// CartsTable holds the schema information for the "carts" table.
+	CartsTable = &schema.Table{
+		Name:       "carts",
+		Columns:    CartsColumns,
+		PrimaryKey: []*schema.Column{CartsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "carts_shops_shop",
+				Columns:    []*schema.Column{CartsColumns[5]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "carts_members_member",
+				Columns:    []*schema.Column{CartsColumns[6]},
+				RefColumns: []*schema.Column{MembersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "carts_one_active_per_member",
+				Unique:  true,
+				Columns: []*schema.Column{CartsColumns[5], CartsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status = 0",
+				},
+			},
+			{
+				Name:    "cart_member_id",
+				Unique:  false,
+				Columns: []*schema.Column{CartsColumns[6]},
+			},
+		},
+	}
+	// CartItemsColumns holds the columns for the "cart_items" table.
+	CartItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "quantity", Type: field.TypeInt32},
+		{Name: "price_amount", Type: field.TypeInt64},
+		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "cart_id", Type: field.TypeInt},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "sku_id", Type: field.TypeInt, Nullable: true},
+	}
+	// CartItemsTable holds the schema information for the "cart_items" table.
+	CartItemsTable = &schema.Table{
+		Name:       "cart_items",
+		Columns:    CartItemsColumns,
+		PrimaryKey: []*schema.Column{CartItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "cart_items_carts_items",
+				Columns:    []*schema.Column{CartItemsColumns[6]},
+				RefColumns: []*schema.Column{CartsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "cart_items_shops_shop",
+				Columns:    []*schema.Column{CartItemsColumns[7]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "cart_items_product_skus_sku",
+				Columns:    []*schema.Column{CartItemsColumns[8]},
+				RefColumns: []*schema.Column{ProductSkusColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "cartitem_cart_id",
+				Unique:  false,
+				Columns: []*schema.Column{CartItemsColumns[6]},
+			},
+			{
+				Name:    "cartitem_sku_id",
+				Unique:  false,
+				Columns: []*schema.Column{CartItemsColumns[8]},
+			},
+		},
+	}
 	// CategoriesColumns holds the columns for the "categories" table.
 	CategoriesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -700,6 +795,8 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		CartsTable,
+		CartItemsTable,
 		CategoriesTable,
 		MembersTable,
 		MemberRefreshTokensTable,
@@ -725,6 +822,22 @@ var (
 )
 
 func init() {
+	CartsTable.ForeignKeys[0].RefTable = ShopsTable
+	CartsTable.ForeignKeys[1].RefTable = MembersTable
+	CartsTable.Annotation = &entsql.Annotation{}
+	CartsTable.Annotation.Checks = map[string]string{
+		"carts_status_check": "status IN (0, 1, 2)",
+	}
+	CartItemsTable.ForeignKeys[0].RefTable = CartsTable
+	CartItemsTable.ForeignKeys[1].RefTable = ShopsTable
+	CartItemsTable.ForeignKeys[2].RefTable = ProductSkusTable
+	CartItemsTable.Annotation = &entsql.Annotation{
+		Table: "cart_items",
+	}
+	CartItemsTable.Annotation.Checks = map[string]string{
+		"cart_items_price_amount_check": "price_amount >= 0",
+		"cart_items_quantity_check":     "quantity > 0",
+	}
 	CategoriesTable.ForeignKeys[0].RefTable = ShopsTable
 	CategoriesTable.ForeignKeys[1].RefTable = CategoriesTable
 	MembersTable.Annotation = &entsql.Annotation{}

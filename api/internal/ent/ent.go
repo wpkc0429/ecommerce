@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/cart"
+	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -93,6 +95,8 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
+			cart.Table:               cart.ValidColumn,
+			cartitem.Table:           cartitem.ValidColumn,
 			category.Table:           category.ValidColumn,
 			member.Table:             member.ValidColumn,
 			memberrefreshtoken.Table: memberrefreshtoken.ValidColumn,

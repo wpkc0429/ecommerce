@@ -31,6 +31,7 @@ type Deps struct {
 	Render     *RenderHandler
 	Categories *CategoriesHandler // change product-catalog
 	Products   *ProductsHandler   // change product-catalog (merchant CRUD + public read)
+	Cart       *CartHandler       // change shopping-cart (member self-service, no RBAC)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
@@ -133,12 +134,23 @@ func New(d Deps) http.Handler {
 					sr.With(orPassthrough(d.MemberLoginRateLimit)).Post("/auth/login", d.MemberAuth.Login)
 					sr.With(orPassthrough(d.MemberRefreshRateLimit)).Post("/auth/refresh", d.MemberAuth.RefreshToken)
 					sr.Post("/auth/logout", d.MemberAuth.Logout)
-					if d.MemberMW != nil {
-						sr.Group(func(mr chi.Router) {
-							mr.Use(d.MemberMW)
+				}
+				// change shopping-cart: the MemberMW-protected group is no
+				// longer nested under `d.MemberAuth != nil` — Cart only needs
+				// member authentication, not the auth handler itself (mirrors
+				// product-catalog design D8's loosening of the public-route
+				// mount condition). Real deployments always wire both, so
+				// behavior there is unchanged.
+				if d.MemberMW != nil {
+					sr.Group(func(mr chi.Router) {
+						mr.Use(d.MemberMW)
+						if d.MemberAuth != nil {
 							mr.Get("/me", d.MemberAuth.Me)
-						})
-					}
+						}
+						if d.Cart != nil {
+							d.Cart.MountShop(mr)
+						}
+					})
 				}
 				if d.Products != nil {
 					d.Products.MountPublic(sr)

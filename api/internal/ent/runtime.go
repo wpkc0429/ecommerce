@@ -4,6 +4,8 @@ package ent
 
 import (
 	"encoding/json"
+	"ksdevworks/ecommerce/api/internal/ent/cart"
+	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -29,6 +31,76 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	cartMixin := schema.Cart{}.Mixin()
+	cartMixinFields0 := cartMixin[0].Fields()
+	_ = cartMixinFields0
+	cartFields := schema.Cart{}.Fields()
+	_ = cartFields
+	// cartDescCreatedAt is the schema descriptor for created_at field.
+	cartDescCreatedAt := cartMixinFields0[0].Descriptor()
+	// cart.DefaultCreatedAt holds the default value on creation for the created_at field.
+	cart.DefaultCreatedAt = cartDescCreatedAt.Default.(func() time.Time)
+	// cartDescUpdatedAt is the schema descriptor for updated_at field.
+	cartDescUpdatedAt := cartMixinFields0[1].Descriptor()
+	// cart.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	cart.DefaultUpdatedAt = cartDescUpdatedAt.Default.(func() time.Time)
+	// cart.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	cart.UpdateDefaultUpdatedAt = cartDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// cartDescStatus is the schema descriptor for status field.
+	cartDescStatus := cartFields[2].Descriptor()
+	// cart.DefaultStatus holds the default value on creation for the status field.
+	cart.DefaultStatus = cartDescStatus.Default.(int16)
+	// cartDescCurrency is the schema descriptor for currency field.
+	cartDescCurrency := cartFields[3].Descriptor()
+	// cart.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	cart.CurrencyValidator = func() func(string) error {
+		validators := cartDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	cartitemMixin := schema.CartItem{}.Mixin()
+	cartitemMixinFields0 := cartitemMixin[0].Fields()
+	_ = cartitemMixinFields0
+	cartitemFields := schema.CartItem{}.Fields()
+	_ = cartitemFields
+	// cartitemDescCreatedAt is the schema descriptor for created_at field.
+	cartitemDescCreatedAt := cartitemMixinFields0[0].Descriptor()
+	// cartitem.DefaultCreatedAt holds the default value on creation for the created_at field.
+	cartitem.DefaultCreatedAt = cartitemDescCreatedAt.Default.(func() time.Time)
+	// cartitemDescUpdatedAt is the schema descriptor for updated_at field.
+	cartitemDescUpdatedAt := cartitemMixinFields0[1].Descriptor()
+	// cartitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	cartitem.DefaultUpdatedAt = cartitemDescUpdatedAt.Default.(func() time.Time)
+	// cartitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	cartitem.UpdateDefaultUpdatedAt = cartitemDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// cartitemDescCurrency is the schema descriptor for currency field.
+	cartitemDescCurrency := cartitemFields[5].Descriptor()
+	// cartitem.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	cartitem.CurrencyValidator = func() func(string) error {
+		validators := cartitemDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	categoryMixin := schema.Category{}.Mixin()
 	categoryMixinFields0 := categoryMixin[0].Fields()
 	_ = categoryMixinFields0

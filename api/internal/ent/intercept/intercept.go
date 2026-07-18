@@ -7,6 +7,8 @@ import (
 	"fmt"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/ent/cart"
+	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -87,6 +89,60 @@ func (f TraverseFunc) Traverse(ctx context.Context, q ent.Query) error {
 		return err
 	}
 	return f(ctx, query)
+}
+
+// The CartFunc type is an adapter to allow the use of ordinary function as a Querier.
+type CartFunc func(context.Context, *ent.CartQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f CartFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.CartQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.CartQuery", q)
+}
+
+// The TraverseCart type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseCart func(context.Context, *ent.CartQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseCart) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseCart) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.CartQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.CartQuery", q)
+}
+
+// The CartItemFunc type is an adapter to allow the use of ordinary function as a Querier.
+type CartItemFunc func(context.Context, *ent.CartItemQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f CartItemFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.CartItemQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.CartItemQuery", q)
+}
+
+// The TraverseCartItem type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseCartItem func(context.Context, *ent.CartItemQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseCartItem) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseCartItem) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.CartItemQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.CartItemQuery", q)
 }
 
 // The CategoryFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -659,6 +715,10 @@ func (f TraverseUserRefreshToken) Traverse(ctx context.Context, q ent.Query) err
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
+	case *ent.CartQuery:
+		return &query[*ent.CartQuery, predicate.Cart, cart.OrderOption]{typ: ent.TypeCart, tq: q}, nil
+	case *ent.CartItemQuery:
+		return &query[*ent.CartItemQuery, predicate.CartItem, cartitem.OrderOption]{typ: ent.TypeCartItem, tq: q}, nil
 	case *ent.CategoryQuery:
 		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
 	case *ent.MemberQuery:

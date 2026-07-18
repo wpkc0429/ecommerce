@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/database"
@@ -103,6 +104,11 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	catalogService := &catalog.Service{Client: client}
 	deps.Categories = &httpapi.CategoriesHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
 	deps.Products = &httpapi.ProductsHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
+
+	// Shopping cart (change shopping-cart): member self-service, no RBAC/
+	// events involved (design D9 — no ConflictError, no cache to invalidate).
+	cartService := &cart.Service{Client: client}
+	deps.Cart = &httpapi.CartHandler{Client: client, Service: cartService, Log: a.log}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

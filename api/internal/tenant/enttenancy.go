@@ -23,6 +23,11 @@ var tenantOwned = map[string]bool{
 	"Product":         true,
 	"ProductSKU":      true,
 	"ProductCategory": true,
+	// change shopping-cart: both tables carry a direct shop_id column
+	// (design D1/D9 — Cart stores shop_id+member_id directly rather than
+	// indirecting through ShopMember, mirroring ShopMember's own shape).
+	"Cart":     true,
+	"CartItem": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned
