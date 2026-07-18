@@ -79,6 +79,37 @@ func TestValidatePayloadPointerDetails(t *testing.T) {
 	}
 }
 
+// Scenario (theme-system/Theme schema validity): 不合法欄位排序標註被拒 — the
+// same ValidateSchemaDoc 422 path used by CreateTheme/UpdateTheme/
+// CreateThemePage/UpdateThemePage must reject a non-integer x-editor-order.
+func TestValidateSchemaDocRejectsInvalidEditorOrder(t *testing.T) {
+	schema := json.RawMessage(`{
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
+		"type": "object",
+		"additionalProperties": false,
+		"properties": {
+			"title": {"type": "string", "default": "", "x-editor-order": "1"}
+		}
+	}`)
+	err := ValidateSchemaDoc(schema)
+	if err == nil {
+		t.Fatal("non-integer x-editor-order must be rejected")
+	}
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("want *ValidationError, got %T", err)
+	}
+	found := false
+	for _, d := range ve.Details {
+		if strings.Contains(d.Pointer, "x-editor-order") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("details must reference x-editor-order, got %+v", ve.Details)
+	}
+}
+
 // additionalProperties: false rejects undeclared keys at write time.
 func TestValidatePayloadRejectsUnknownKeys(t *testing.T) {
 	schema := json.RawMessage(`{

@@ -6,32 +6,35 @@
   "properties": {
     "tokens": {
       "type": "object",
+      "x-editor-order": 0,
       "additionalProperties": false,
       "properties": {
-        "color_primary": { "type": "string", "default": "#2563eb", "x-editor": "color" },
-        "color_background": { "type": "string", "default": "#ffffff", "x-editor": "color" },
-        "color_text": { "type": "string", "default": "#111827", "x-editor": "color" },
-        "font_family": { "type": "string", "default": "system-ui, -apple-system, sans-serif", "x-editor": "text" },
-        "spacing_unit": { "type": "string", "default": "1rem", "x-editor": "text" },
-        "radius": { "type": "string", "default": "0.5rem", "x-editor": "text" }
+        "color_primary": { "type": "string", "x-editor-order": 0, "default": "#2563eb", "x-editor": "color" },
+        "color_background": { "type": "string", "x-editor-order": 1, "default": "#ffffff", "x-editor": "color" },
+        "color_text": { "type": "string", "x-editor-order": 2, "default": "#111827", "x-editor": "color" },
+        "font_family": { "type": "string", "x-editor-order": 3, "default": "system-ui, -apple-system, sans-serif", "x-editor": "text" },
+        "spacing_unit": { "type": "string", "x-editor-order": 4, "default": "1rem", "x-editor": "text" },
+        "radius": { "type": "string", "x-editor-order": 5, "default": "0.5rem", "x-editor": "text" }
       }
     },
     "header": {
       "type": "object",
+      "x-editor-order": 1,
       "additionalProperties": false,
       "properties": {
-        "site_title": { "type": "string", "default": "My Shop", "x-editor": "text" },
-        "logo_url": { "type": "string", "default": "", "x-editor": "image" },
+        "site_title": { "type": "string", "x-editor-order": 0, "default": "My Shop", "x-editor": "text" },
+        "logo_url": { "type": "string", "x-editor-order": 1, "default": "", "x-editor": "image" },
         "nav": {
           "type": "array",
+          "x-editor-order": 2,
           "default": [],
           "x-editor": "list",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "label": { "type": "string", "default": "", "x-editor": "text" },
-              "href": { "type": "string", "default": "/", "x-editor": "text" }
+              "label": { "type": "string", "x-editor-order": 0, "default": "", "x-editor": "text" },
+              "href": { "type": "string", "x-editor-order": 1, "default": "/", "x-editor": "text" }
             }
           }
         }
@@ -39,19 +42,21 @@
     },
     "footer": {
       "type": "object",
+      "x-editor-order": 2,
       "additionalProperties": false,
       "properties": {
-        "text": { "type": "string", "default": "© My Shop", "x-editor": "text" },
+        "text": { "type": "string", "x-editor-order": 0, "default": "© My Shop", "x-editor": "text" },
         "links": {
           "type": "array",
+          "x-editor-order": 1,
           "default": [],
           "x-editor": "list",
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "label": { "type": "string", "default": "", "x-editor": "text" },
-              "href": { "type": "string", "default": "/", "x-editor": "text" }
+              "label": { "type": "string", "x-editor-order": 0, "default": "", "x-editor": "text" },
+              "href": { "type": "string", "x-editor-order": 1, "default": "/", "x-editor": "text" }
             }
           }
         }

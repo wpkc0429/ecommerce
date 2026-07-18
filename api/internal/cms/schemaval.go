@@ -60,10 +60,16 @@ func CompileSchema(raw json.RawMessage) (*jsonschema.Schema, error) {
 	return sch, nil
 }
 
-// ValidateSchemaDoc verifies that raw is a compilable JSON Schema.
+// ValidateSchemaDoc verifies that raw is a compilable JSON Schema, and that
+// any "x-editor-order" admin form field-ordering annotations it carries are
+// well-formed (design cms-editor-field-order — same 422 path as metaschema
+// validation, so authoring mistakes are caught at theme create/update time
+// rather than silently misordering the admin form later).
 func ValidateSchemaDoc(raw json.RawMessage) error {
-	_, err := CompileSchema(raw)
-	return err
+	if _, err := CompileSchema(raw); err != nil {
+		return err
+	}
+	return validateEditorOrder(raw)
 }
 
 // ValidatePayload validates a JSONB payload against a theme schema and

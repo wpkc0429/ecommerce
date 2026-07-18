@@ -5,11 +5,11 @@
     "required": ["type"],
     "properties": {
       "type": { "const": "hero" },
-      "title": { "type": "string", "default": "歡迎光臨", "x-editor": "text" },
-      "subtitle": { "type": "string", "default": "", "x-editor": "text" },
-      "image": { "type": "string", "default": "", "x-editor": "image" },
-      "cta_text": { "type": "string", "default": "了解更多", "x-editor": "text" },
-      "cta_href": { "type": "string", "default": "/", "x-editor": "text" }
+      "title": { "type": "string", "x-editor-order": 0, "default": "歡迎光臨", "x-editor": "text" },
+      "subtitle": { "type": "string", "x-editor-order": 1, "default": "", "x-editor": "text" },
+      "image": { "type": "string", "x-editor-order": 2, "default": "", "x-editor": "image" },
+      "cta_text": { "type": "string", "x-editor-order": 3, "default": "了解更多", "x-editor": "text" },
+      "cta_href": { "type": "string", "x-editor-order": 4, "default": "/", "x-editor": "text" }
     }
   },
   "rich_text": {
@@ -18,7 +18,7 @@
     "required": ["type"],
     "properties": {
       "type": { "const": "rich_text" },
-      "html": { "type": "string", "default": "", "x-editor": "richtext" }
+      "html": { "type": "string", "x-editor-order": 0, "default": "", "x-editor": "richtext" }
     }
   },
   "feature_grid": {
@@ -27,18 +27,19 @@
     "required": ["type"],
     "properties": {
       "type": { "const": "feature_grid" },
-      "title": { "type": "string", "default": "特色", "x-editor": "text" },
+      "title": { "type": "string", "x-editor-order": 0, "default": "特色", "x-editor": "text" },
       "items": {
         "type": "array",
+        "x-editor-order": 1,
         "default": [],
         "x-editor": "list",
         "items": {
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "icon": { "type": "string", "default": "", "x-editor": "image" },
-            "title": { "type": "string", "default": "", "x-editor": "text" },
-            "text": { "type": "string", "default": "", "x-editor": "text" }
+            "icon": { "type": "string", "x-editor-order": 0, "default": "", "x-editor": "image" },
+            "title": { "type": "string", "x-editor-order": 1, "default": "", "x-editor": "text" },
+            "text": { "type": "string", "x-editor-order": 2, "default": "", "x-editor": "text" }
           }
         }
       }
@@ -50,9 +51,9 @@
     "required": ["type"],
     "properties": {
       "type": { "const": "cta" },
-      "text": { "type": "string", "default": "立即開始", "x-editor": "text" },
-      "button_text": { "type": "string", "default": "聯絡我們", "x-editor": "text" },
-      "button_href": { "type": "string", "default": "/about", "x-editor": "text" }
+      "text": { "type": "string", "x-editor-order": 0, "default": "立即開始", "x-editor": "text" },
+      "button_text": { "type": "string", "x-editor-order": 1, "default": "聯絡我們", "x-editor": "text" },
+      "button_href": { "type": "string", "x-editor-order": 2, "default": "/about", "x-editor": "text" }
     }
   }
 }

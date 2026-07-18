@@ -126,6 +126,29 @@ function resolveRef(node, root) {
   return cur;
 }
 
+// orderedKeys(props, root)：依 x-editor-order 排序一個 properties 物件的鍵
+// （design cms-editor-field-order；與 api/internal/cms/fieldorder.go 的
+// FieldOrder 規則一致，各自實作以配合 admin 無建置的 vanilla JS 限制）——
+// jsonb 不保留物件鍵順序，schema 撰寫順序無法單靠 Object.entries() 還原，
+// 需要顯式標註。已標註者依整數升冪排前（同值以鍵名字母序打破平手），未標
+// 註者排在最後、彼此依鍵名字母序排列（決定性 fallback，取代目前不可預期
+// 的順序）。
+function orderedKeys(props, root) {
+  const keys = Object.keys(props || {});
+  const orderOf = (k) => {
+    const ps = resolveRef(props[k], root);
+    const v = ps?.["x-editor-order"];
+    return typeof v === "number" && Number.isInteger(v) ? v : null;
+  };
+  return keys.sort((a, b) => {
+    const oa = orderOf(a), ob = orderOf(b);
+    if (oa !== null && ob !== null) return oa - ob || a.localeCompare(b);
+    if (oa !== null) return -1;
+    if (ob !== null) return 1;
+    return a.localeCompare(b);
+  });
+}
+
 function sectionBranches(items, root) {
   const resolved = resolveRef(items || {}, root);
   const oneOf = resolved?.oneOf;
@@ -156,8 +179,8 @@ function el(tag, attrs = {}, ...children) {
 function buildForm(schema, value, container, root, pointer = "") {
   container.textContent = "";
   const props = resolveRef(schema, root)?.properties || {};
-  for (const [key, rawPS] of Object.entries(props)) {
-    const ps = resolveRef(rawPS, root);
+  for (const key of orderedKeys(props, root)) {
+    const ps = resolveRef(props[key], root);
     container.append(buildField(key, ps, value?.[key], root, `${pointer}/${key}`));
   }
 }
@@ -170,8 +193,8 @@ function buildField(key, ps, value, root, pointer) {
   if (type === "object" || (ps.properties && !type)) {
     const fieldset = el("fieldset", { class: "obj", "data-pointer": pointer }, el("legend", {}, label));
     const props = ps.properties || {};
-    for (const [k, rawChild] of Object.entries(props)) {
-      const child = resolveRef(rawChild, root);
+    for (const k of orderedKeys(props, root)) {
+      const child = resolveRef(props[k], root);
       fieldset.append(buildField(k, child, value?.[k], root, `${pointer}/${k}`));
     }
     return fieldset;
@@ -220,8 +243,8 @@ function buildListField(label, ps, value, root, pointer) {
     const row = el("div", { class: "list-row" });
     const body = el("div", { class: "list-row-body" });
     if (items.properties) {
-      for (const [k, rawChild] of Object.entries(items.properties)) {
-        const child = resolveRef(rawChild, root);
+      for (const k of orderedKeys(items.properties, root)) {
+        const child = resolveRef(items.properties[k], root);
         body.append(buildField(k, child, itemValue?.[k], root, ""));
       }
     } else {
@@ -266,9 +289,10 @@ function buildSectionsField(label, ps, value, root, pointer, branches) {
         el("button", { type: "button", onclick: () => row.nextElementSibling?.after(row) }, "↓"),
         el("button", { type: "button", class: "danger", onclick: () => row.remove() }, "刪除")));
     const body = el("div", { class: "section-body" });
-    for (const [k, rawChild] of Object.entries(branch.schema.properties || {})) {
+    const branchProps = branch.schema.properties || {};
+    for (const k of orderedKeys(branchProps, root)) {
       if (k === "type") continue;
-      const child = resolveRef(rawChild, root);
+      const child = resolveRef(branchProps[k], root);
       body.append(buildField(k, child, item?.[k], root, ""));
     }
     row._type = branch.type;
