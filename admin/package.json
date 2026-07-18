@@ -1,0 +1,8 @@
+{
+  "name": "ecommerce-admin",
+  "private": true,
+  "description": "Admin thin-shell SPA — no build step; static ES modules served on :3001 (schema-driven forms per design D6)",
+  "scripts": {
+    "dev": "python3 -m http.server 3001"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "ecommerce-web",
+  "private": true,
+  "description": "Storefront SSR — renders shops from the render bundle API (design D1/D8)",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "gen:types": "node scripts/gen-types.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "json-schema-to-typescript": "^15.0.0",
+    "typescript": "^5.8.0"
+  }
+}

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ecommerce Admin</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 登入畫面 -->
+    <section id="view-login" class="view">
+      <div class="card login-card">
+        <h1>後台登入</h1>
+        <form id="login-form">
+          <label>Email <input type="email" id="login-email" required autocomplete="username" /></label>
+          <label>密碼 <input type="password" id="login-password" required autocomplete="current-password" /></label>
+          <button type="submit" class="primary">登入</button>
+          <p id="login-error" class="error" hidden>登入失敗，請確認帳號密碼。</p>
+        </form>
+      </div>
+    </section>
+
+    <!-- 主畫面 -->
+    <section id="view-main" class="view" hidden>
+      <header class="topbar">
+        <strong>Ecommerce Admin</strong>
+        <div class="topbar-right">
+          <label>商家
+            <select id="shop-select"></select>
+            <input type="number" id="shop-input" min="1" placeholder="Shop ID" hidden />
+          </label>
+          <span id="whoami"></span>
+          <button id="logout-btn">登出</button>
+        </div>
+      </header>
+
+      <nav class="tabs">
+        <button data-tab="pages" class="tab active">頁面</button>
+        <button data-tab="content" class="tab">全域內容</button>
+      </nav>
+
+      <!-- 頁面清單 -->
+      <div id="tab-pages" class="tab-panel">
+        <div class="toolbar">
+          <h2>頁面</h2>
+          <button id="new-page-btn" class="primary">新增頁面</button>
+        </div>
+        <table class="table">
+          <thead><tr><th>ID</th><th>標題</th><th>slug</th><th>型別</th><th>狀態</th><th>動作</th></tr></thead>
+          <tbody id="pages-tbody"></tbody>
+        </table>
+
+        <dialog id="new-page-dialog">
+          <form id="new-page-form" method="dialog">
+            <h3>新增頁面</h3>
+            <label>頁面型別 <select id="new-page-type"></select></label>
+            <label>標題 <input type="text" id="new-page-title" required /></label>
+            <label>Slug <input type="text" id="new-page-slug" required pattern="[a-z0-9-]+" /></label>
+            <p id="new-page-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="new-page-cancel">取消</button>
+              <button type="submit" class="primary">建立</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+
+      <!-- 頁面編輯器 -->
+      <div id="tab-editor" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2 id="editor-title">編輯頁面</h2>
+          <div class="toolbar-actions">
+            <button id="editor-back">← 返回清單</button>
+            <button id="editor-preview">預覽</button>
+            <button id="editor-save" class="primary">儲存草稿</button>
+            <button id="editor-publish" class="publish">發佈</button>
+            <button id="editor-unpublish">下架</button>
+          </div>
+        </div>
+        <p id="editor-status" class="hint"></p>
+        <p id="editor-error" class="error" hidden></p>
+        <form id="editor-form" class="schema-form"></form>
+        <details class="seo-box">
+          <summary>SEO 設定</summary>
+          <label>SEO 標題 <input type="text" id="seo-title" /></label>
+          <label>SEO 關鍵字 <input type="text" id="seo-keywords" /></label>
+          <label>SEO 描述 <textarea id="seo-description" rows="2"></textarea></label>
+        </details>
+      </div>
+
+      <!-- 商家全域內容 -->
+      <div id="tab-content" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>商家全域內容</h2>
+          <button id="content-save" class="primary">儲存（立即生效）</button>
+        </div>
+        <p id="content-error" class="error" hidden></p>
+        <form id="content-form" class="schema-form"></form>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Starter theme — shop global content",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color_primary": { "type": "string", "default": "#2563eb", "x-editor": "color" },
+        "color_background": { "type": "string", "default": "#ffffff", "x-editor": "color" },
+        "color_text": { "type": "string", "default": "#111827", "x-editor": "color" },
+        "font_family": { "type": "string", "default": "system-ui, -apple-system, sans-serif", "x-editor": "text" },
+        "spacing_unit": { "type": "string", "default": "1rem", "x-editor": "text" },
+        "radius": { "type": "string", "default": "0.5rem", "x-editor": "text" }
+      }
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "site_title": { "type": "string", "default": "My Shop", "x-editor": "text" },
+        "logo_url": { "type": "string", "default": "", "x-editor": "image" },
+        "nav": {
+          "type": "array",
+          "default": [],
+          "x-editor": "list",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string", "default": "", "x-editor": "text" },
+              "href": { "type": "string", "default": "/", "x-editor": "text" }
+            }
+          }
+        }
+      }
+    },
+    "footer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": { "type": "string", "default": "© My Shop", "x-editor": "text" },
+        "links": {
+          "type": "array",
+          "default": [],
+          "x-editor": "list",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": { "type": "string", "default": "", "x-editor": "text" },
+              "href": { "type": "string", "default": "/", "x-editor": "text" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
