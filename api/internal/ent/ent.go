@@ -6,10 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
@@ -89,10 +93,14 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
+			category.Table:           category.ValidColumn,
 			member.Table:             member.ValidColumn,
 			memberrefreshtoken.Table: memberrefreshtoken.ValidColumn,
 			page.Table:               page.ValidColumn,
 			permission.Table:         permission.ValidColumn,
+			product.Table:            product.ValidColumn,
+			productcategory.Table:    productcategory.ValidColumn,
+			productsku.Table:         productsku.ValidColumn,
 			role.Table:               role.ValidColumn,
 			rolepermission.Table:     rolepermission.ValidColumn,
 			roleuser.Table:           roleuser.ValidColumn,

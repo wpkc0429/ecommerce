@@ -4,10 +4,13 @@ package ent
 
 import (
 	"encoding/json"
+	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/schema"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
@@ -26,6 +29,61 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	categoryMixin := schema.Category{}.Mixin()
+	categoryMixinFields0 := categoryMixin[0].Fields()
+	_ = categoryMixinFields0
+	categoryFields := schema.Category{}.Fields()
+	_ = categoryFields
+	// categoryDescCreatedAt is the schema descriptor for created_at field.
+	categoryDescCreatedAt := categoryMixinFields0[0].Descriptor()
+	// category.DefaultCreatedAt holds the default value on creation for the created_at field.
+	category.DefaultCreatedAt = categoryDescCreatedAt.Default.(func() time.Time)
+	// categoryDescUpdatedAt is the schema descriptor for updated_at field.
+	categoryDescUpdatedAt := categoryMixinFields0[1].Descriptor()
+	// category.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	category.DefaultUpdatedAt = categoryDescUpdatedAt.Default.(func() time.Time)
+	// category.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	category.UpdateDefaultUpdatedAt = categoryDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// categoryDescName is the schema descriptor for name field.
+	categoryDescName := categoryFields[2].Descriptor()
+	// category.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	category.NameValidator = func() func(string) error {
+		validators := categoryDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// categoryDescSlug is the schema descriptor for slug field.
+	categoryDescSlug := categoryFields[3].Descriptor()
+	// category.SlugValidator is a validator for the "slug" field. It is called by the builders before save.
+	category.SlugValidator = func() func(string) error {
+		validators := categoryDescSlug.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(slug string) error {
+			for _, fn := range fns {
+				if err := fn(slug); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// categoryDescPosition is the schema descriptor for position field.
+	categoryDescPosition := categoryFields[4].Descriptor()
+	// category.DefaultPosition holds the default value on creation for the position field.
+	category.DefaultPosition = categoryDescPosition.Default.(int32)
 	memberMixin := schema.Member{}.Mixin()
 	memberMixinFields0 := memberMixin[0].Fields()
 	_ = memberMixinFields0
@@ -180,6 +238,120 @@ func init() {
 	permission.DefaultDescription = permissionDescDescription.Default.(string)
 	// permission.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	permission.DescriptionValidator = permissionDescDescription.Validators[0].(func(string) error)
+	productMixin := schema.Product{}.Mixin()
+	productMixinFields0 := productMixin[0].Fields()
+	_ = productMixinFields0
+	productFields := schema.Product{}.Fields()
+	_ = productFields
+	// productDescCreatedAt is the schema descriptor for created_at field.
+	productDescCreatedAt := productMixinFields0[0].Descriptor()
+	// product.DefaultCreatedAt holds the default value on creation for the created_at field.
+	product.DefaultCreatedAt = productDescCreatedAt.Default.(func() time.Time)
+	// productDescUpdatedAt is the schema descriptor for updated_at field.
+	productDescUpdatedAt := productMixinFields0[1].Descriptor()
+	// product.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	product.DefaultUpdatedAt = productDescUpdatedAt.Default.(func() time.Time)
+	// product.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	product.UpdateDefaultUpdatedAt = productDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// productDescTitle is the schema descriptor for title field.
+	productDescTitle := productFields[1].Descriptor()
+	// product.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	product.TitleValidator = func() func(string) error {
+		validators := productDescTitle.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(title string) error {
+			for _, fn := range fns {
+				if err := fn(title); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// productDescSlug is the schema descriptor for slug field.
+	productDescSlug := productFields[2].Descriptor()
+	// product.SlugValidator is a validator for the "slug" field. It is called by the builders before save.
+	product.SlugValidator = func() func(string) error {
+		validators := productDescSlug.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(slug string) error {
+			for _, fn := range fns {
+				if err := fn(slug); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// productDescDescription is the schema descriptor for description field.
+	productDescDescription := productFields[3].Descriptor()
+	// product.DefaultDescription holds the default value on creation for the description field.
+	product.DefaultDescription = productDescDescription.Default.(string)
+	// productDescStatus is the schema descriptor for status field.
+	productDescStatus := productFields[4].Descriptor()
+	// product.DefaultStatus holds the default value on creation for the status field.
+	product.DefaultStatus = productDescStatus.Default.(int16)
+	// productDescMeta is the schema descriptor for meta field.
+	productDescMeta := productFields[5].Descriptor()
+	// product.DefaultMeta holds the default value on creation for the meta field.
+	product.DefaultMeta = productDescMeta.Default.(json.RawMessage)
+	productskuMixin := schema.ProductSKU{}.Mixin()
+	productskuMixinFields0 := productskuMixin[0].Fields()
+	_ = productskuMixinFields0
+	productskuFields := schema.ProductSKU{}.Fields()
+	_ = productskuFields
+	// productskuDescCreatedAt is the schema descriptor for created_at field.
+	productskuDescCreatedAt := productskuMixinFields0[0].Descriptor()
+	// productsku.DefaultCreatedAt holds the default value on creation for the created_at field.
+	productsku.DefaultCreatedAt = productskuDescCreatedAt.Default.(func() time.Time)
+	// productskuDescUpdatedAt is the schema descriptor for updated_at field.
+	productskuDescUpdatedAt := productskuMixinFields0[1].Descriptor()
+	// productsku.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	productsku.DefaultUpdatedAt = productskuDescUpdatedAt.Default.(func() time.Time)
+	// productsku.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	productsku.UpdateDefaultUpdatedAt = productskuDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// productskuDescSkuCode is the schema descriptor for sku_code field.
+	productskuDescSkuCode := productskuFields[2].Descriptor()
+	// productsku.SkuCodeValidator is a validator for the "sku_code" field. It is called by the builders before save.
+	productsku.SkuCodeValidator = func() func(string) error {
+		validators := productskuDescSkuCode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(sku_code string) error {
+			for _, fn := range fns {
+				if err := fn(sku_code); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// productskuDescOptions is the schema descriptor for options field.
+	productskuDescOptions := productskuFields[3].Descriptor()
+	// productsku.DefaultOptions holds the default value on creation for the options field.
+	productsku.DefaultOptions = productskuDescOptions.Default.(json.RawMessage)
+	// productskuDescCurrency is the schema descriptor for currency field.
+	productskuDescCurrency := productskuFields[5].Descriptor()
+	// productsku.DefaultCurrency holds the default value on creation for the currency field.
+	productsku.DefaultCurrency = productskuDescCurrency.Default.(string)
+	// productsku.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	productsku.CurrencyValidator = productskuDescCurrency.Validators[0].(func(string) error)
+	// productskuDescStockQty is the schema descriptor for stock_qty field.
+	productskuDescStockQty := productskuFields[6].Descriptor()
+	// productsku.DefaultStockQty holds the default value on creation for the stock_qty field.
+	productsku.DefaultStockQty = productskuDescStockQty.Default.(int32)
+	// productskuDescIsActive is the schema descriptor for is_active field.
+	productskuDescIsActive := productskuFields[7].Descriptor()
+	// productsku.DefaultIsActive holds the default value on creation for the is_active field.
+	productsku.DefaultIsActive = productskuDescIsActive.Default.(bool)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0

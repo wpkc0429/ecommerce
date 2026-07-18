@@ -18,6 +18,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
@@ -59,6 +60,14 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"user.manage_roles", "指派與移除商家角色"},
 	{"theme.view", "檢視主題目錄"},
 	{"theme.manage", "管理主題與頁型（平台層）"},
+	{"category.view", "檢視商品分類"},
+	{"category.create", "建立商品分類"},
+	{"category.edit", "編輯商品分類"},
+	{"category.delete", "刪除商品分類"},
+	{"product.view", "檢視商品與 SKU"},
+	{"product.create", "建立商品（含巢狀 SKU）"},
+	{"product.edit", "編輯商品（含巢狀 SKU 新增/更新/移除）"},
+	{"product.delete", "刪除商品"},
 }
 
 // roleDefs maps seeded roles to their scope and granted permissions.
@@ -72,9 +81,13 @@ var roleDefs = []struct {
 		"shop.view", "shop.update",
 		"page.view", "page.create", "page.edit", "page.delete", "page.publish",
 		"user.view", "user.manage_roles", "theme.view",
+		"category.view", "category.create", "category.edit", "category.delete",
+		"product.view", "product.create", "product.edit", "product.delete",
 	}},
 	{"editor", "merchant", []string{
 		"shop.view", "page.view", "page.create", "page.edit", "theme.view",
+		"category.view", "category.create", "category.edit",
+		"product.view", "product.create", "product.edit",
 	}},
 }
 
@@ -403,6 +416,10 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 		}
 	}
 
+	if err := seedDemoCatalog(ctx, tx, shopID); err != nil {
+		return err
+	}
+
 	// Demo merchant owner account for admin-UI/RBAC testing.
 	const ownerEmail = "demo-owner@example.com"
 	owner, err := tx.User.Query().Where(user.EmailEQ(ownerEmail)).Only(ctx)
@@ -442,5 +459,115 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 			return fmt.Errorf("seed: demo owner role: %w", err)
 		}
 	}
+	return nil
+}
+
+// seedDemoCatalog provisions a small sample category + product/SKU set for
+// the demo shop (change product-catalog), so local dev / E2E has non-empty
+// catalog data to exercise. Idempotent: skipped entirely if the demo product
+// slug already exists.
+func seedDemoCatalog(ctx context.Context, tx *ent.Tx, shopID int) error {
+	hasProduct, err := tx.Product.Query().
+		Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ("classic-runner")).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo product: %w", err)
+	}
+	if hasProduct {
+		return nil
+	}
+
+	shoes, err := tx.Category.Create().
+		SetShopID(shopID).SetName("鞋類").SetSlug("shoes").Save(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: demo category shoes: %w", err)
+	}
+	if _, err := tx.Category.Create().
+		SetShopID(shopID).SetName("跑鞋").SetSlug("running-shoes").SetParentID(shoes.ID).Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo category running-shoes: %w", err)
+	}
+	bags, err := tx.Category.Create().
+		SetShopID(shopID).SetName("包款").SetSlug("bags").Save(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: demo category bags: %w", err)
+	}
+
+	runner, err := tx.Product.Create().
+		SetShopID(shopID).
+		SetTitle("經典跑鞋").
+		SetSlug("classic-runner").
+		SetDescription("輕量緩震，日常訓練首選。").
+		SetStatus(1).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: demo product classic-runner: %w", err)
+	}
+	if _, err := tx.ProductCategory.Create().SetShopID(shopID).SetProductID(runner.ID).SetCategoryID(shoes.ID).Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo product_category: %w", err)
+	}
+	skus := []struct {
+		code  string
+		size  string
+		color string
+		price int64
+		stock int32
+	}{
+		{"RUNNER-M-BLK", "M", "black", 1290, 30},
+		{"RUNNER-L-BLK", "L", "black", 1290, 18},
+	}
+	for _, sk := range skus {
+		options, _ := json.Marshal(map[string]any{"size": sk.size, "color": sk.color})
+		if _, err := tx.ProductSKU.Create().
+			SetShopID(shopID).
+			SetProductID(runner.ID).
+			SetSkuCode(sk.code).
+			SetOptions(options).
+			SetPriceAmount(sk.price).
+			SetCurrency("TWD").
+			SetStockQty(sk.stock).
+			Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo sku %s: %w", sk.code, err)
+		}
+	}
+
+	tote, err := tx.Product.Create().
+		SetShopID(shopID).
+		SetTitle("帆布托特包").
+		SetSlug("canvas-tote").
+		SetDescription("耐用帆布材質，日常通勤好夥伴。").
+		SetStatus(1).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: demo product canvas-tote: %w", err)
+	}
+	if _, err := tx.ProductCategory.Create().SetShopID(shopID).SetProductID(tote.ID).SetCategoryID(bags.ID).Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo product_category: %w", err)
+	}
+	toteOptions, _ := json.Marshal(map[string]any{"color": "beige"})
+	if _, err := tx.ProductSKU.Create().
+		SetShopID(shopID).
+		SetProductID(tote.ID).
+		SetSkuCode("TOTE-BEIGE").
+		SetOptions(toteOptions).
+		SetPriceAmount(890).
+		SetCurrency("TWD").
+		SetStockQty(40).
+		Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo sku TOTE-BEIGE: %w", err)
+	}
+
+	// A draft product (spec Published-only public catalog endpoint — must
+	// not appear on the public endpoint) so E2E/manual QA can verify the
+	// draft/published boundary against real seeded data.
+	if _, err := tx.Product.Create().
+		SetShopID(shopID).
+		SetTitle("即將上市：限量聯名鞋款").
+		SetSlug("upcoming-collab").
+		SetDescription("尚未公開的草稿商品，用於驗證草稿不會出現在公開端點。").
+		SetStatus(0).
+		Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo draft product: %w", err)
+	}
+
 	return nil
 }

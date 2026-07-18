@@ -14,6 +14,8 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// Category is the client for interacting with the Category builders.
+	Category *CategoryClient
 	// Member is the client for interacting with the Member builders.
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
@@ -22,6 +24,12 @@ type Tx struct {
 	Page *PageClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
+	// Product is the client for interacting with the Product builders.
+	Product *ProductClient
+	// ProductCategory is the client for interacting with the ProductCategory builders.
+	ProductCategory *ProductCategoryClient
+	// ProductSKU is the client for interacting with the ProductSKU builders.
+	ProductSKU *ProductSKUClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
@@ -179,10 +187,14 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.Category = NewCategoryClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)
 	tx.Page = NewPageClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
+	tx.Product = NewProductClient(tx.config)
+	tx.ProductCategory = NewProductCategoryClient(tx.config)
+	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.RoleUser = NewRoleUserClient(tx.config)
@@ -205,7 +217,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: Member.QueryXXX(), the query will be executed
+// applies a query, for example: Category.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

@@ -9,6 +9,54 @@ import (
 )
 
 var (
+	// CategoriesColumns holds the columns for the "categories" table.
+	CategoriesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "slug", Type: field.TypeString, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "position", Type: field.TypeInt32, Default: 0},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "parent_id", Type: field.TypeInt, Nullable: true},
+	}
+	// CategoriesTable holds the schema information for the "categories" table.
+	CategoriesTable = &schema.Table{
+		Name:       "categories",
+		Columns:    CategoriesColumns,
+		PrimaryKey: []*schema.Column{CategoriesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "categories_shops_shop",
+				Columns:    []*schema.Column{CategoriesColumns[6]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "categories_categories_children",
+				Columns:    []*schema.Column{CategoriesColumns[7]},
+				RefColumns: []*schema.Column{CategoriesColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "category_shop_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{CategoriesColumns[6], CategoriesColumns[3]},
+			},
+			{
+				Name:    "category_shop_id_slug",
+				Unique:  true,
+				Columns: []*schema.Column{CategoriesColumns[6], CategoriesColumns[4]},
+			},
+			{
+				Name:    "category_parent_id",
+				Unique:  false,
+				Columns: []*schema.Column{CategoriesColumns[7]},
+			},
+		},
+	}
 	// MembersColumns holds the columns for the "members" table.
 	MembersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -120,6 +168,129 @@ var (
 		Name:       "permissions",
 		Columns:    PermissionsColumns,
 		PrimaryKey: []*schema.Column{PermissionsColumns[0]},
+	}
+	// ProductsColumns holds the columns for the "products" table.
+	ProductsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "title", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "slug", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "description", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "meta", Type: field.TypeJSON},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ProductsTable holds the schema information for the "products" table.
+	ProductsTable = &schema.Table{
+		Name:       "products",
+		Columns:    ProductsColumns,
+		PrimaryKey: []*schema.Column{ProductsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "products_shops_shop",
+				Columns:    []*schema.Column{ProductsColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "product_shop_id_slug",
+				Unique:  true,
+				Columns: []*schema.Column{ProductsColumns[8], ProductsColumns[4]},
+			},
+			{
+				Name:    "product_shop_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ProductsColumns[8], ProductsColumns[6]},
+			},
+		},
+	}
+	// ProductCategoryColumns holds the columns for the "product_category" table.
+	ProductCategoryColumns = []*schema.Column{
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "category_id", Type: field.TypeInt},
+	}
+	// ProductCategoryTable holds the schema information for the "product_category" table.
+	ProductCategoryTable = &schema.Table{
+		Name:       "product_category",
+		Columns:    ProductCategoryColumns,
+		PrimaryKey: []*schema.Column{ProductCategoryColumns[1], ProductCategoryColumns[2]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "product_category_shops_shop",
+				Columns:    []*schema.Column{ProductCategoryColumns[0]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "product_category_products_product",
+				Columns:    []*schema.Column{ProductCategoryColumns[1]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "product_category_categories_category",
+				Columns:    []*schema.Column{ProductCategoryColumns[2]},
+				RefColumns: []*schema.Column{CategoriesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productcategory_category_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductCategoryColumns[2]},
+			},
+		},
+	}
+	// ProductSkusColumns holds the columns for the "product_skus" table.
+	ProductSkusColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "sku_code", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "options", Type: field.TypeJSON},
+		{Name: "price_amount", Type: field.TypeInt64},
+		{Name: "currency", Type: field.TypeString, Size: 3, Default: "TWD", SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "stock_qty", Type: field.TypeInt32, Default: 0},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ProductSkusTable holds the schema information for the "product_skus" table.
+	ProductSkusTable = &schema.Table{
+		Name:       "product_skus",
+		Columns:    ProductSkusColumns,
+		PrimaryKey: []*schema.Column{ProductSkusColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "product_skus_products_skus",
+				Columns:    []*schema.Column{ProductSkusColumns[9]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "product_skus_shops_shop",
+				Columns:    []*schema.Column{ProductSkusColumns[10]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productsku_shop_id_sku_code",
+				Unique:  true,
+				Columns: []*schema.Column{ProductSkusColumns[10], ProductSkusColumns[3]},
+			},
+			{
+				Name:    "productsku_product_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductSkusColumns[9]},
+			},
+		},
 	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
@@ -529,10 +700,14 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		CategoriesTable,
 		MembersTable,
 		MemberRefreshTokensTable,
 		PagesTable,
 		PermissionsTable,
+		ProductsTable,
+		ProductCategoryTable,
+		ProductSkusTable,
 		RolesTable,
 		RolePermissionTable,
 		RoleUserTable,
@@ -550,6 +725,8 @@ var (
 )
 
 func init() {
+	CategoriesTable.ForeignKeys[0].RefTable = ShopsTable
+	CategoriesTable.ForeignKeys[1].RefTable = CategoriesTable
 	MembersTable.Annotation = &entsql.Annotation{}
 	MembersTable.Annotation.Checks = map[string]string{
 		"members_status_check": "status IN (0, 1)",
@@ -560,6 +737,26 @@ func init() {
 	PagesTable.Annotation = &entsql.Annotation{}
 	PagesTable.Annotation.Checks = map[string]string{
 		"pages_status_check": "status IN (0, 1)",
+	}
+	ProductsTable.ForeignKeys[0].RefTable = ShopsTable
+	ProductsTable.Annotation = &entsql.Annotation{}
+	ProductsTable.Annotation.Checks = map[string]string{
+		"products_status_check": "status IN (0, 1)",
+	}
+	ProductCategoryTable.ForeignKeys[0].RefTable = ShopsTable
+	ProductCategoryTable.ForeignKeys[1].RefTable = ProductsTable
+	ProductCategoryTable.ForeignKeys[2].RefTable = CategoriesTable
+	ProductCategoryTable.Annotation = &entsql.Annotation{
+		Table: "product_category",
+	}
+	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
+	ProductSkusTable.ForeignKeys[1].RefTable = ShopsTable
+	ProductSkusTable.Annotation = &entsql.Annotation{
+		Table: "product_skus",
+	}
+	ProductSkusTable.Annotation.Checks = map[string]string{
+		"product_skus_price_amount_check": "price_amount >= 0",
+		"product_skus_stock_qty_check":    "stock_qty >= 0",
 	}
 	RolesTable.Annotation = &entsql.Annotation{}
 	RolesTable.Annotation.Checks = map[string]string{

@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
@@ -95,6 +96,14 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
+
+	// Product catalog (change product-catalog): no cache/events involved
+	// (design D8 — the public endpoint reads the DB directly), so the
+	// service only needs the ent client.
+	catalogService := &catalog.Service{Client: client}
+	deps.Categories = &httpapi.CategoriesHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
+	deps.Products = &httpapi.ProductsHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
+
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,
 		Assembler: &render.Assembler{Client: client},

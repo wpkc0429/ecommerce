@@ -29,6 +29,8 @@ type Deps struct {
 	Themes     *ThemesHandler
 	Pages      *PagesHandler
 	Render     *RenderHandler
+	Categories *CategoriesHandler // change product-catalog
+	Products   *ProductsHandler   // change product-catalog (merchant CRUD + public read)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
@@ -91,6 +93,12 @@ func New(d Deps) http.Handler {
 						if d.Pages != nil {
 							d.Pages.MountShop(sh)
 						}
+						if d.Categories != nil {
+							d.Categories.MountShop(sh)
+						}
+						if d.Products != nil {
+							d.Products.MountShop(sh)
+						}
 					})
 					// Platform-level resources.
 					if d.Roles != nil {
@@ -109,21 +117,31 @@ func New(d Deps) http.Handler {
 			}
 		})
 
-		// ── Storefront member APIs (tenant context required) ───
-		if d.MemberAuth != nil && d.TenantMW != nil {
+		// ── Storefront member APIs + public catalog (tenant context
+		// required) ─────────────────────────────────────────────────
+		// change product-catalog: the gate no longer requires MemberAuth —
+		// the public product endpoints only need tenant resolution. Member
+		// auth routes stay nested behind their own nil-check so existing
+		// behavior (routes absent unless MemberAuth is wired) is unchanged.
+		if d.TenantMW != nil {
 			v1.Route("/shop", func(sr chi.Router) {
 				sr.Use(d.TenantMW)
-				// Rate limit middlewares run after TenantMW so shop-scoped
-				// rules (design auth-rate-limiting D2) can read tenant.ShopID.
-				sr.With(orPassthrough(d.MemberRegisterRateLimit)).Post("/auth/register", d.MemberAuth.Register)
-				sr.With(orPassthrough(d.MemberLoginRateLimit)).Post("/auth/login", d.MemberAuth.Login)
-				sr.With(orPassthrough(d.MemberRefreshRateLimit)).Post("/auth/refresh", d.MemberAuth.RefreshToken)
-				sr.Post("/auth/logout", d.MemberAuth.Logout)
-				if d.MemberMW != nil {
-					sr.Group(func(mr chi.Router) {
-						mr.Use(d.MemberMW)
-						mr.Get("/me", d.MemberAuth.Me)
-					})
+				if d.MemberAuth != nil {
+					// Rate limit middlewares run after TenantMW so shop-scoped
+					// rules (design auth-rate-limiting D2) can read tenant.ShopID.
+					sr.With(orPassthrough(d.MemberRegisterRateLimit)).Post("/auth/register", d.MemberAuth.Register)
+					sr.With(orPassthrough(d.MemberLoginRateLimit)).Post("/auth/login", d.MemberAuth.Login)
+					sr.With(orPassthrough(d.MemberRefreshRateLimit)).Post("/auth/refresh", d.MemberAuth.RefreshToken)
+					sr.Post("/auth/logout", d.MemberAuth.Logout)
+					if d.MemberMW != nil {
+						sr.Group(func(mr chi.Router) {
+							mr.Use(d.MemberMW)
+							mr.Get("/me", d.MemberAuth.Me)
+						})
+					}
+				}
+				if d.Products != nil {
+					d.Products.MountPublic(sr)
 				}
 			})
 		}

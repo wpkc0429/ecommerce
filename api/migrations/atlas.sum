@@ -1,2 +1,4 @@
-h1:ixZ5HTXhHS1S+9Q77iS3XvBN2hTw+uFG1kZONH2WdWQ=
+h1:qo2iI3og0mfACHUIJshziA3uAuRqp8HhiXQlz4eT5r0=
 20260718063844_init_schema.up.sql h1:wv7KzKfeUwzPi6/BwJcp4vrf5O6TNNAtRXO5YhJVxWI=
+20260718063900_rbac_unique_nulls_not_distinct.up.sql h1:yi40MEFUEo5OLvMs7yGfitQ76iHbyaOtoWNuug3VnB0=
+20260718102453_add_product_catalog.up.sql h1:sJopT0LbEaOTx+rd4I3Gwd4VL43iE2EIx0yAi07DV+0=

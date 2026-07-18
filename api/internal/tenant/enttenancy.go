@@ -16,6 +16,13 @@ var tenantOwned = map[string]bool{
 	"Page":               true,
 	"ShopMember":         true,
 	"MemberRefreshToken": true,
+	// change product-catalog (design D7): all four carry a direct shop_id
+	// column, including the ProductCategory join table (defense in depth —
+	// see design D2/D7 for why the join table duplicates shop_id).
+	"Category":        true,
+	"Product":         true,
+	"ProductSKU":      true,
+	"ProductCategory": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

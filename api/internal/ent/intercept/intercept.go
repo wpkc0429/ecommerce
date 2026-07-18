@@ -7,11 +7,15 @@ import (
 	"fmt"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
+	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
@@ -83,6 +87,33 @@ func (f TraverseFunc) Traverse(ctx context.Context, q ent.Query) error {
 		return err
 	}
 	return f(ctx, query)
+}
+
+// The CategoryFunc type is an adapter to allow the use of ordinary function as a Querier.
+type CategoryFunc func(context.Context, *ent.CategoryQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f CategoryFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.CategoryQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.CategoryQuery", q)
+}
+
+// The TraverseCategory type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseCategory func(context.Context, *ent.CategoryQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseCategory) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseCategory) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.CategoryQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.CategoryQuery", q)
 }
 
 // The MemberFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -191,6 +222,87 @@ func (f TraversePermission) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PermissionQuery", q)
+}
+
+// The ProductFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ProductFunc func(context.Context, *ent.ProductQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ProductFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ProductQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ProductQuery", q)
+}
+
+// The TraverseProduct type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseProduct func(context.Context, *ent.ProductQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseProduct) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseProduct) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ProductQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ProductQuery", q)
+}
+
+// The ProductCategoryFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ProductCategoryFunc func(context.Context, *ent.ProductCategoryQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ProductCategoryFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ProductCategoryQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ProductCategoryQuery", q)
+}
+
+// The TraverseProductCategory type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseProductCategory func(context.Context, *ent.ProductCategoryQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseProductCategory) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseProductCategory) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ProductCategoryQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ProductCategoryQuery", q)
+}
+
+// The ProductSKUFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ProductSKUFunc func(context.Context, *ent.ProductSKUQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ProductSKUFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ProductSKUQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ProductSKUQuery", q)
+}
+
+// The TraverseProductSKU type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseProductSKU func(context.Context, *ent.ProductSKUQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseProductSKU) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseProductSKU) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ProductSKUQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ProductSKUQuery", q)
 }
 
 // The RoleFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -547,6 +659,8 @@ func (f TraverseUserRefreshToken) Traverse(ctx context.Context, q ent.Query) err
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
+	case *ent.CategoryQuery:
+		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
 	case *ent.MemberQuery:
 		return &query[*ent.MemberQuery, predicate.Member, member.OrderOption]{typ: ent.TypeMember, tq: q}, nil
 	case *ent.MemberRefreshTokenQuery:
@@ -555,6 +669,12 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.PageQuery, predicate.Page, page.OrderOption]{typ: ent.TypePage, tq: q}, nil
 	case *ent.PermissionQuery:
 		return &query[*ent.PermissionQuery, predicate.Permission, permission.OrderOption]{typ: ent.TypePermission, tq: q}, nil
+	case *ent.ProductQuery:
+		return &query[*ent.ProductQuery, predicate.Product, product.OrderOption]{typ: ent.TypeProduct, tq: q}, nil
+	case *ent.ProductCategoryQuery:
+		return &query[*ent.ProductCategoryQuery, predicate.ProductCategory, productcategory.OrderOption]{typ: ent.TypeProductCategory, tq: q}, nil
+	case *ent.ProductSKUQuery:
+		return &query[*ent.ProductSKUQuery, predicate.ProductSKU, productsku.OrderOption]{typ: ent.TypeProductSKU, tq: q}, nil
 	case *ent.RoleQuery:
 		return &query[*ent.RoleQuery, predicate.Role, role.OrderOption]{typ: ent.TypeRole, tq: q}, nil
 	case *ent.RolePermissionQuery:

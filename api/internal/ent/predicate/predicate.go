@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// Category is the predicate function for category builders.
+type Category func(*sql.Selector)
+
 // Member is the predicate function for member builders.
 type Member func(*sql.Selector)
 
@@ -17,6 +20,15 @@ type Page func(*sql.Selector)
 
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
+
+// Product is the predicate function for product builders.
+type Product func(*sql.Selector)
+
+// ProductCategory is the predicate function for productcategory builders.
+type ProductCategory func(*sql.Selector)
+
+// ProductSKU is the predicate function for productsku builders.
+type ProductSKU func(*sql.Selector)
 
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
