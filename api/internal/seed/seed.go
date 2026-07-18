@@ -70,6 +70,7 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"product.delete", "刪除商品"},
 	{"order.view", "檢視訂單"},
 	{"order.cancel", "取消訂單"},
+	{"payment.view", "檢視訂單付款紀錄"},
 }
 
 // roleDefs maps seeded roles to their scope and granted permissions.
@@ -86,12 +87,14 @@ var roleDefs = []struct {
 		"category.view", "category.create", "category.edit", "category.delete",
 		"product.view", "product.create", "product.edit", "product.delete",
 		"order.view", "order.cancel",
+		"payment.view",
 	}},
 	{"editor", "merchant", []string{
 		"shop.view", "page.view", "page.create", "page.edit", "theme.view",
 		"category.view", "category.create", "category.edit",
 		"product.view", "product.create", "product.edit",
 		"order.view",
+		"payment.view",
 	}},
 }
 

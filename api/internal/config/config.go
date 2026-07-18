@@ -26,6 +26,14 @@ type Config struct {
 	RefreshTokenTTL time.Duration
 	PreviewTokenTTL time.Duration
 
+	// PaymentMockWebhookSecret keys the mock payment provider's HMAC-SHA256
+	// webhook signature (change payment-integration, design D2/D9). Unlike
+	// the JWT secrets, this is NOT required to be set in production — the
+	// mock provider is a demo/reference implementation, not meant to carry
+	// real production payment traffic; a real provider's own credentials
+	// would get their own config + validation when that change lands.
+	PaymentMockWebhookSecret string
+
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
 
@@ -71,6 +79,8 @@ func Load() (*Config, error) {
 		AdminJWTSecret:  getenv("ADMIN_JWT_SECRET", ""),
 		MemberJWTSecret: getenv("MEMBER_JWT_SECRET", ""),
 		JWTIssuer:       getenv("JWT_ISSUER", "ecommerce-api"),
+
+		PaymentMockWebhookSecret: getenv("PAYMENT_MOCK_WEBHOOK_SECRET", "dev-only-mock-payment-webhook-secret"),
 	}
 
 	origins := getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3001,http://localhost:3000")

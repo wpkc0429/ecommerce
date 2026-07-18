@@ -30,6 +30,8 @@ type Tx struct {
 	OrderItem *OrderItemClient
 	// Page is the client for interacting with the Page builders.
 	Page *PageClient
+	// Payment is the client for interacting with the Payment builders.
+	Payment *PaymentClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Product is the client for interacting with the Product builders.
@@ -203,6 +205,7 @@ func (tx *Tx) init() {
 	tx.Order = NewOrderClient(tx.config)
 	tx.OrderItem = NewOrderItemClient(tx.config)
 	tx.Page = NewPageClient(tx.config)
+	tx.Payment = NewPaymentClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductCategory = NewProductCategoryClient(tx.config)

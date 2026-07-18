@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
+	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/product"
@@ -307,6 +308,33 @@ func (f TraversePage) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PageQuery", q)
+}
+
+// The PaymentFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PaymentFunc func(context.Context, *ent.PaymentQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PaymentFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PaymentQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PaymentQuery", q)
+}
+
+// The TraversePayment type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePayment func(context.Context, *ent.PaymentQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePayment) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePayment) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PaymentQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PaymentQuery", q)
 }
 
 // The PermissionFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -787,6 +815,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.OrderItemQuery, predicate.OrderItem, orderitem.OrderOption]{typ: ent.TypeOrderItem, tq: q}, nil
 	case *ent.PageQuery:
 		return &query[*ent.PageQuery, predicate.Page, page.OrderOption]{typ: ent.TypePage, tq: q}, nil
+	case *ent.PaymentQuery:
+		return &query[*ent.PaymentQuery, predicate.Payment, payment.OrderOption]{typ: ent.TypePayment, tq: q}, nil
 	case *ent.PermissionQuery:
 		return &query[*ent.PermissionQuery, predicate.Permission, permission.OrderOption]{typ: ent.TypePermission, tq: q}, nil
 	case *ent.ProductQuery:

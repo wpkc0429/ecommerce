@@ -12,6 +12,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
+	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
@@ -400,6 +401,79 @@ func init() {
 	pageDescMeta := pageFields[7].Descriptor()
 	// page.DefaultMeta holds the default value on creation for the meta field.
 	page.DefaultMeta = pageDescMeta.Default.(json.RawMessage)
+	paymentMixin := schema.Payment{}.Mixin()
+	paymentMixinFields0 := paymentMixin[0].Fields()
+	_ = paymentMixinFields0
+	paymentFields := schema.Payment{}.Fields()
+	_ = paymentFields
+	// paymentDescCreatedAt is the schema descriptor for created_at field.
+	paymentDescCreatedAt := paymentMixinFields0[0].Descriptor()
+	// payment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	payment.DefaultCreatedAt = paymentDescCreatedAt.Default.(func() time.Time)
+	// paymentDescUpdatedAt is the schema descriptor for updated_at field.
+	paymentDescUpdatedAt := paymentMixinFields0[1].Descriptor()
+	// payment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	payment.DefaultUpdatedAt = paymentDescUpdatedAt.Default.(func() time.Time)
+	// payment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	payment.UpdateDefaultUpdatedAt = paymentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// paymentDescProvider is the schema descriptor for provider field.
+	paymentDescProvider := paymentFields[2].Descriptor()
+	// payment.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	payment.ProviderValidator = func() func(string) error {
+		validators := paymentDescProvider.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(provider string) error {
+			for _, fn := range fns {
+				if err := fn(provider); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// paymentDescProviderReference is the schema descriptor for provider_reference field.
+	paymentDescProviderReference := paymentFields[3].Descriptor()
+	// payment.ProviderReferenceValidator is a validator for the "provider_reference" field. It is called by the builders before save.
+	payment.ProviderReferenceValidator = func() func(string) error {
+		validators := paymentDescProviderReference.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(provider_reference string) error {
+			for _, fn := range fns {
+				if err := fn(provider_reference); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// paymentDescCurrency is the schema descriptor for currency field.
+	paymentDescCurrency := paymentFields[5].Descriptor()
+	// payment.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
+	payment.CurrencyValidator = func() func(string) error {
+		validators := paymentDescCurrency.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(currency string) error {
+			for _, fn := range fns {
+				if err := fn(currency); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// paymentDescStatus is the schema descriptor for status field.
+	paymentDescStatus := paymentFields[6].Descriptor()
+	// payment.DefaultStatus holds the default value on creation for the status field.
+	payment.DefaultStatus = paymentDescStatus.Default.(int16)
 	permissionFields := schema.Permission{}.Fields()
 	_ = permissionFields
 	// permissionDescName is the schema descriptor for name field.

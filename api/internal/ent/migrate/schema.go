@@ -346,6 +346,51 @@ var (
 			},
 		},
 	}
+	// PaymentsColumns holds the columns for the "payments" table.
+	PaymentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeString, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
+		{Name: "provider_reference", Type: field.TypeString, Size: 191, SchemaType: map[string]string{"postgres": "varchar(191)"}},
+		{Name: "amount", Type: field.TypeInt64},
+		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "order_id", Type: field.TypeInt},
+	}
+	// PaymentsTable holds the schema information for the "payments" table.
+	PaymentsTable = &schema.Table{
+		Name:       "payments",
+		Columns:    PaymentsColumns,
+		PrimaryKey: []*schema.Column{PaymentsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "payments_shops_shop",
+				Columns:    []*schema.Column{PaymentsColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "payments_orders_order",
+				Columns:    []*schema.Column{PaymentsColumns[9]},
+				RefColumns: []*schema.Column{OrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "payment_provider_provider_reference",
+				Unique:  true,
+				Columns: []*schema.Column{PaymentsColumns[3], PaymentsColumns[4]},
+			},
+			{
+				Name:    "payment_shop_id_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{PaymentsColumns[8], PaymentsColumns[9]},
+			},
+		},
+	}
 	// PermissionsColumns holds the columns for the "permissions" table.
 	PermissionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -897,6 +942,7 @@ var (
 		OrdersTable,
 		OrderItemsTable,
 		PagesTable,
+		PaymentsTable,
 		PermissionsTable,
 		ProductsTable,
 		ProductCategoryTable,
@@ -964,6 +1010,13 @@ func init() {
 	PagesTable.Annotation = &entsql.Annotation{}
 	PagesTable.Annotation.Checks = map[string]string{
 		"pages_status_check": "status IN (0, 1)",
+	}
+	PaymentsTable.ForeignKeys[0].RefTable = ShopsTable
+	PaymentsTable.ForeignKeys[1].RefTable = OrdersTable
+	PaymentsTable.Annotation = &entsql.Annotation{}
+	PaymentsTable.Annotation.Checks = map[string]string{
+		"payments_amount_check": "amount > 0",
+		"payments_status_check": "status IN (0, 1, 2, 3)",
 	}
 	ProductsTable.ForeignKeys[0].RefTable = ShopsTable
 	ProductsTable.Annotation = &entsql.Annotation{}

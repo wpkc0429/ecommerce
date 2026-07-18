@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
+	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
@@ -116,6 +117,21 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// like Cart, admin routes reuse the same authz engine as Products.
 	orderService := &order.Service{Client: client}
 	deps.Orders = &httpapi.OrderHandler{Client: client, Service: orderService, Authz: authz, Log: a.log}
+
+	// Payment integration (change payment-integration): a provider registry
+	// of one demo/reference provider today (design D1/D2/D9) — adding a
+	// real provider later means constructing it here and adding it to this
+	// map, nothing else changes. Member/admin routes reuse orderService as
+	// the sole controlled entry point for advancing orders.payment_status
+	// (design D6/D7); the webhook route needs no auth middleware of its own.
+	mockProvider := payment.NewMockProvider(cfg.PaymentMockWebhookSecret)
+	paymentService := &payment.Service{
+		Client:          client,
+		Orders:          orderService,
+		Providers:       map[string]payment.Provider{mockProvider.Name(): mockProvider},
+		DefaultProvider: mockProvider.Name(),
+	}
+	deps.Payments = &httpapi.PaymentHandler{Client: client, Service: paymentService, Authz: authz, Log: a.log}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

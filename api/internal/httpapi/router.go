@@ -33,6 +33,7 @@ type Deps struct {
 	Products   *ProductsHandler   // change product-catalog (merchant CRUD + public read)
 	Cart       *CartHandler       // change shopping-cart (member self-service, no RBAC)
 	Orders     *OrderHandler      // change order-management (member self-service + merchant back office)
+	Payments   *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
@@ -104,6 +105,9 @@ func New(d Deps) http.Handler {
 						if d.Orders != nil {
 							d.Orders.MountShopAdmin(sh)
 						}
+						if d.Payments != nil {
+							d.Payments.MountShopAdmin(sh)
+						}
 					})
 					// Platform-level resources.
 					if d.Roles != nil {
@@ -157,12 +161,25 @@ func New(d Deps) http.Handler {
 						if d.Orders != nil {
 							d.Orders.MountShop(mr)
 						}
+						if d.Payments != nil {
+							d.Payments.MountShop(mr)
+						}
 					})
 				}
 				if d.Products != nil {
 					d.Products.MountPublic(sr)
 				}
 			})
+		}
+
+		// ── Payment provider webhooks (change payment-integration, design
+		// D7) ───────────────────────────────────────────────────────
+		// Deliberately outside every tenant/member/admin middleware group:
+		// the caller is a payment provider's server, authenticated by
+		// signature (Provider.VerifyWebhook), not a JWT or resolved shop
+		// domain.
+		if d.Payments != nil {
+			v1.Post("/webhooks/payments/{provider}", d.Payments.Webhook)
 		}
 
 		// ── Render bundle API (SSR / native apps) ──────────────

@@ -30,6 +30,9 @@ type OrderItem func(*sql.Selector)
 // Page is the predicate function for page builders.
 type Page func(*sql.Selector)
 
+// Payment is the predicate function for payment builders.
+type Payment func(*sql.Selector)
+
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
 

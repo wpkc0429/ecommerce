@@ -33,6 +33,13 @@ var tenantOwned = map[string]bool{
 	// own shape).
 	"Order":     true,
 	"OrderItem": true,
+	// change payment-integration: carries a direct shop_id column (design
+	// D3). The webhook route intentionally runs without tenant context, so
+	// this map only governs the member/admin-facing paths (design D7) —
+	// HandleWebhook's own reads/writes are scoped explicitly by primary key
+	// and by the shop_id/order_id read off the located row, not by this
+	// interceptor.
+	"Payment": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned
