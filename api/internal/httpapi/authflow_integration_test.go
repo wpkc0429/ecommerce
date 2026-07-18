@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -226,10 +227,11 @@ func TestMemberRegistrationIsomorphism(t *testing.T) {
 		t.Fatalf("isomorphism broken: codes %d vs %d", codeA, codeB)
 	}
 	keysOf := func(m map[string]any) string {
-		var ks []string
+		ks := make([]string, 0, len(m))
 		for k := range m {
 			ks = append(ks, k)
 		}
+		slices.Sort(ks) // map iteration order is randomized; compare a canonical shape
 		return strings.Join(ks, ",")
 	}
 	if keysOf(bodyA) != keysOf(bodyB) {
