@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,6 +28,32 @@ type Config struct {
 
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
+
+	// RateLimit carries the auth-endpoint sliding-window thresholds (design
+	// auth-rate-limiting D2/D4).
+	RateLimit RateLimitConfig
+}
+
+// RateLimitConfig carries the sliding-window thresholds for the
+// authentication endpoints (design auth-rate-limiting D2). Each pair applies
+// identically to the admin and member variants of that endpoint class;
+// Register gets its own (tighter) pair since brand-new signups are rarer
+// than repeat logins. Refresh uses a single IP-scoped (or shop+IP-scoped)
+// rule — the refresh token itself is already a high-entropy secret, so the
+// concern there is abuse/DoS, not credential brute force.
+type RateLimitConfig struct {
+	LoginBroadLimit  int
+	LoginBroadWindow time.Duration
+	LoginTightLimit  int
+	LoginTightWindow time.Duration
+
+	RegisterBroadLimit  int
+	RegisterBroadWindow time.Duration
+	RegisterTightLimit  int
+	RegisterTightWindow time.Duration
+
+	RefreshLimit  int
+	RefreshWindow time.Duration
 }
 
 // Load reads configuration from the environment. A .env file (searched in the
@@ -61,6 +88,40 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.PreviewTokenTTL, err = parseDuration("PREVIEW_TOKEN_TTL", 10*time.Minute); err != nil {
+		return nil, err
+	}
+
+	// Rate limiting (design auth-rate-limiting D2/D4): sane defaults, no
+	// production-only requirement (unlike the JWT secrets) — thresholds are
+	// a tunable, not a secret.
+	if cfg.RateLimit.LoginBroadLimit, err = parseInt("RATE_LIMIT_LOGIN_BROAD_LIMIT", 20); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.LoginBroadWindow, err = parseDuration("RATE_LIMIT_LOGIN_BROAD_WINDOW", 5*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.LoginTightLimit, err = parseInt("RATE_LIMIT_LOGIN_TIGHT_LIMIT", 5); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.LoginTightWindow, err = parseDuration("RATE_LIMIT_LOGIN_TIGHT_WINDOW", 5*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RegisterBroadLimit, err = parseInt("RATE_LIMIT_REGISTER_BROAD_LIMIT", 10); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RegisterBroadWindow, err = parseDuration("RATE_LIMIT_REGISTER_BROAD_WINDOW", 10*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RegisterTightLimit, err = parseInt("RATE_LIMIT_REGISTER_TIGHT_LIMIT", 3); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RegisterTightWindow, err = parseDuration("RATE_LIMIT_REGISTER_TIGHT_WINDOW", 10*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RefreshLimit, err = parseInt("RATE_LIMIT_REFRESH_LIMIT", 30); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.RefreshWindow, err = parseDuration("RATE_LIMIT_REFRESH_WINDOW", 5*time.Minute); err != nil {
 		return nil, err
 	}
 
@@ -99,6 +160,18 @@ func parseDuration(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("config: %s: %w", key, err)
 	}
 	return d, nil
+}
+
+func parseInt(key string, fallback int) (int, error) {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback, nil
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return 0, fmt.Errorf("config: %s: %w", key, err)
+	}
+	return n, nil
 }
 
 // loadDotEnv applies KEY=VALUE lines from the first .env found walking up

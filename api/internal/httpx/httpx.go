@@ -15,6 +15,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
+	"time"
 )
 
 // ErrorDetail is the inner payload of the unified error envelope.
@@ -84,4 +86,17 @@ func ShopDisabled(w http.ResponseWriter) {
 
 func Internal(w http.ResponseWriter) {
 	WriteError(w, http.StatusInternalServerError, "internal", "internal server error", nil)
+}
+
+// TooManyRequests reports rate limiting (429, design auth-rate-limiting D7).
+// retryAfter is rounded up to whole seconds (minimum 1s, so clients never see
+// a 0s Retry-After that would invite an immediate retry loop) and written as
+// the Retry-After header per RFC 9110.
+func TooManyRequests(w http.ResponseWriter, retryAfter time.Duration) {
+	secs := int((retryAfter + time.Second - time.Nanosecond) / time.Second)
+	if secs < 1 {
+		secs = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(secs))
+	WriteError(w, http.StatusTooManyRequests, "rate_limited", "too many requests, please try again later", nil)
 }

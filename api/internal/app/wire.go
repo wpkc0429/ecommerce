@@ -12,6 +12,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
 	"ksdevworks/ecommerce/api/internal/tenant"
@@ -57,6 +58,16 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.MemberAuth = &httpapi.MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: a.log}
 	deps.AdminMW = httpapi.NewAdminMiddleware(issuer)
 	deps.MemberMW = httpapi.NewMemberMiddleware(issuer)
+
+	// Auth endpoint rate limiting (design auth-rate-limiting): reuses the
+	// same Redis client as the render/authz caches — rate limiting is
+	// defense-in-depth, not a new infra dependency.
+	limiter := ratelimit.New(rdb, a.log)
+	deps.AdminLoginRateLimit = httpapi.NewAdminLoginRateLimit(limiter, cfg.RateLimit)
+	deps.AdminRefreshRateLimit = httpapi.NewAdminRefreshRateLimit(limiter, cfg.RateLimit)
+	deps.MemberLoginRateLimit = httpapi.NewMemberLoginRateLimit(limiter, cfg.RateLimit)
+	deps.MemberRegisterRateLimit = httpapi.NewMemberRegisterRateLimit(limiter, cfg.RateLimit)
+	deps.MemberRefreshRateLimit = httpapi.NewMemberRefreshRateLimit(limiter, cfg.RateLimit)
 
 	engine := rbac.NewEngine(client, rdb, a.log)
 	authz := &httpapi.AuthzMW{Engine: engine}

@@ -32,6 +32,15 @@ type Deps struct {
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
 	MemberMW func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
+
+	// Rate limiting (design auth-rate-limiting): nil disables the check for
+	// that route (e.g. in tests that don't wire Redis) — orPassthrough makes
+	// every unset field behave exactly as before this feature existed.
+	AdminLoginRateLimit     func(http.Handler) http.Handler
+	AdminRefreshRateLimit   func(http.Handler) http.Handler
+	MemberLoginRateLimit    func(http.Handler) http.Handler
+	MemberRegisterRateLimit func(http.Handler) http.Handler
+	MemberRefreshRateLimit  func(http.Handler) http.Handler
 }
 
 // New assembles the full router.
@@ -58,8 +67,8 @@ func New(d Deps) http.Handler {
 		// ── Admin (back office) ────────────────────────────────
 		v1.Route("/admin", func(ar chi.Router) {
 			if d.AdminAuth != nil {
-				ar.Post("/auth/login", d.AdminAuth.Login)
-				ar.Post("/auth/refresh", d.AdminAuth.RefreshToken)
+				ar.With(orPassthrough(d.AdminLoginRateLimit)).Post("/auth/login", d.AdminAuth.Login)
+				ar.With(orPassthrough(d.AdminRefreshRateLimit)).Post("/auth/refresh", d.AdminAuth.RefreshToken)
 				ar.Post("/auth/logout", d.AdminAuth.Logout)
 			}
 			if d.AdminMW != nil {
@@ -100,9 +109,11 @@ func New(d Deps) http.Handler {
 		if d.MemberAuth != nil && d.TenantMW != nil {
 			v1.Route("/shop", func(sr chi.Router) {
 				sr.Use(d.TenantMW)
-				sr.Post("/auth/register", d.MemberAuth.Register)
-				sr.Post("/auth/login", d.MemberAuth.Login)
-				sr.Post("/auth/refresh", d.MemberAuth.RefreshToken)
+				// Rate limit middlewares run after TenantMW so shop-scoped
+				// rules (design auth-rate-limiting D2) can read tenant.ShopID.
+				sr.With(orPassthrough(d.MemberRegisterRateLimit)).Post("/auth/register", d.MemberAuth.Register)
+				sr.With(orPassthrough(d.MemberLoginRateLimit)).Post("/auth/login", d.MemberAuth.Login)
+				sr.With(orPassthrough(d.MemberRefreshRateLimit)).Post("/auth/refresh", d.MemberAuth.RefreshToken)
 				sr.Post("/auth/logout", d.MemberAuth.Logout)
 				if d.MemberMW != nil {
 					sr.Group(func(mr chi.Router) {
