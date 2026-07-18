@@ -24,6 +24,8 @@ type Tx struct {
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
 	MemberRefreshToken *MemberRefreshTokenClient
+	// MemberTier is the client for interacting with the MemberTier builders.
+	MemberTier *MemberTierClient
 	// Order is the client for interacting with the Order builders.
 	Order *OrderClient
 	// OrderItem is the client for interacting with the OrderItem builders.
@@ -34,6 +36,8 @@ type Tx struct {
 	Payment *PaymentClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
+	// PointTransaction is the client for interacting with the PointTransaction builders.
+	PointTransaction *PointTransactionClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductCategory is the client for interacting with the ProductCategory builders.
@@ -206,11 +210,13 @@ func (tx *Tx) init() {
 	tx.Category = NewCategoryClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)
+	tx.MemberTier = NewMemberTierClient(tx.config)
 	tx.Order = NewOrderClient(tx.config)
 	tx.OrderItem = NewOrderItemClient(tx.config)
 	tx.Page = NewPageClient(tx.config)
 	tx.Payment = NewPaymentClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
+	tx.PointTransaction = NewPointTransactionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductCategory = NewProductCategoryClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)

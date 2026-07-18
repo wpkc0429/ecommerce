@@ -16,11 +16,13 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
@@ -63,6 +65,8 @@ type Client struct {
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
 	MemberRefreshToken *MemberRefreshTokenClient
+	// MemberTier is the client for interacting with the MemberTier builders.
+	MemberTier *MemberTierClient
 	// Order is the client for interacting with the Order builders.
 	Order *OrderClient
 	// OrderItem is the client for interacting with the OrderItem builders.
@@ -73,6 +77,8 @@ type Client struct {
 	Payment *PaymentClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
+	// PointTransaction is the client for interacting with the PointTransaction builders.
+	PointTransaction *PointTransactionClient
 	// Product is the client for interacting with the Product builders.
 	Product *ProductClient
 	// ProductCategory is the client for interacting with the ProductCategory builders.
@@ -125,11 +131,13 @@ func (c *Client) init() {
 	c.Category = NewCategoryClient(c.config)
 	c.Member = NewMemberClient(c.config)
 	c.MemberRefreshToken = NewMemberRefreshTokenClient(c.config)
+	c.MemberTier = NewMemberTierClient(c.config)
 	c.Order = NewOrderClient(c.config)
 	c.OrderItem = NewOrderItemClient(c.config)
 	c.Page = NewPageClient(c.config)
 	c.Payment = NewPaymentClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
+	c.PointTransaction = NewPointTransactionClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductCategory = NewProductCategoryClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
@@ -245,11 +253,13 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Category:           NewCategoryClient(cfg),
 		Member:             NewMemberClient(cfg),
 		MemberRefreshToken: NewMemberRefreshTokenClient(cfg),
+		MemberTier:         NewMemberTierClient(cfg),
 		Order:              NewOrderClient(cfg),
 		OrderItem:          NewOrderItemClient(cfg),
 		Page:               NewPageClient(cfg),
 		Payment:            NewPaymentClient(cfg),
 		Permission:         NewPermissionClient(cfg),
+		PointTransaction:   NewPointTransactionClient(cfg),
 		Product:            NewProductClient(cfg),
 		ProductCategory:    NewProductCategoryClient(cfg),
 		ProductSKU:         NewProductSKUClient(cfg),
@@ -292,11 +302,13 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Category:           NewCategoryClient(cfg),
 		Member:             NewMemberClient(cfg),
 		MemberRefreshToken: NewMemberRefreshTokenClient(cfg),
+		MemberTier:         NewMemberTierClient(cfg),
 		Order:              NewOrderClient(cfg),
 		OrderItem:          NewOrderItemClient(cfg),
 		Page:               NewPageClient(cfg),
 		Payment:            NewPaymentClient(cfg),
 		Permission:         NewPermissionClient(cfg),
+		PointTransaction:   NewPointTransactionClient(cfg),
 		Product:            NewProductClient(cfg),
 		ProductCategory:    NewProductCategoryClient(cfg),
 		ProductSKU:         NewProductSKUClient(cfg),
@@ -344,11 +356,12 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.Order,
-		c.OrderItem, c.Page, c.Payment, c.Permission, c.Product, c.ProductCategory,
-		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser, c.Site, c.SiteShop,
-		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
+		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser,
+		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -358,11 +371,12 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.Order,
-		c.OrderItem, c.Page, c.Payment, c.Permission, c.Product, c.ProductCategory,
-		c.ProductSKU, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser, c.Site, c.SiteShop,
-		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
+		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser,
+		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -381,6 +395,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Member.mutate(ctx, m)
 	case *MemberRefreshTokenMutation:
 		return c.MemberRefreshToken.mutate(ctx, m)
+	case *MemberTierMutation:
+		return c.MemberTier.mutate(ctx, m)
 	case *OrderMutation:
 		return c.Order.mutate(ctx, m)
 	case *OrderItemMutation:
@@ -391,6 +407,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Payment.mutate(ctx, m)
 	case *PermissionMutation:
 		return c.Permission.mutate(ctx, m)
+	case *PointTransactionMutation:
+		return c.PointTransaction.mutate(ctx, m)
 	case *ProductMutation:
 		return c.Product.mutate(ctx, m)
 	case *ProductCategoryMutation:
@@ -1337,6 +1355,155 @@ func (c *MemberRefreshTokenClient) mutate(ctx context.Context, m *MemberRefreshT
 	}
 }
 
+// MemberTierClient is a client for the MemberTier schema.
+type MemberTierClient struct {
+	config
+}
+
+// NewMemberTierClient returns a client for the MemberTier from the given config.
+func NewMemberTierClient(c config) *MemberTierClient {
+	return &MemberTierClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `membertier.Hooks(f(g(h())))`.
+func (c *MemberTierClient) Use(hooks ...Hook) {
+	c.hooks.MemberTier = append(c.hooks.MemberTier, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `membertier.Intercept(f(g(h())))`.
+func (c *MemberTierClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MemberTier = append(c.inters.MemberTier, interceptors...)
+}
+
+// Create returns a builder for creating a MemberTier entity.
+func (c *MemberTierClient) Create() *MemberTierCreate {
+	mutation := newMemberTierMutation(c.config, OpCreate)
+	return &MemberTierCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MemberTier entities.
+func (c *MemberTierClient) CreateBulk(builders ...*MemberTierCreate) *MemberTierCreateBulk {
+	return &MemberTierCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MemberTierClient) MapCreateBulk(slice any, setFunc func(*MemberTierCreate, int)) *MemberTierCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MemberTierCreateBulk{err: fmt.Errorf("calling to MemberTierClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MemberTierCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MemberTierCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MemberTier.
+func (c *MemberTierClient) Update() *MemberTierUpdate {
+	mutation := newMemberTierMutation(c.config, OpUpdate)
+	return &MemberTierUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MemberTierClient) UpdateOne(_m *MemberTier) *MemberTierUpdateOne {
+	mutation := newMemberTierMutation(c.config, OpUpdateOne, withMemberTier(_m))
+	return &MemberTierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MemberTierClient) UpdateOneID(id int) *MemberTierUpdateOne {
+	mutation := newMemberTierMutation(c.config, OpUpdateOne, withMemberTierID(id))
+	return &MemberTierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MemberTier.
+func (c *MemberTierClient) Delete() *MemberTierDelete {
+	mutation := newMemberTierMutation(c.config, OpDelete)
+	return &MemberTierDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MemberTierClient) DeleteOne(_m *MemberTier) *MemberTierDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MemberTierClient) DeleteOneID(id int) *MemberTierDeleteOne {
+	builder := c.Delete().Where(membertier.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MemberTierDeleteOne{builder}
+}
+
+// Query returns a query builder for MemberTier.
+func (c *MemberTierClient) Query() *MemberTierQuery {
+	return &MemberTierQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMemberTier},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MemberTier entity by its id.
+func (c *MemberTierClient) Get(ctx context.Context, id int) (*MemberTier, error) {
+	return c.Query().Where(membertier.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MemberTierClient) GetX(ctx context.Context, id int) *MemberTier {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a MemberTier.
+func (c *MemberTierClient) QueryShop(_m *MemberTier) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(membertier.Table, membertier.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, membertier.ShopTable, membertier.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MemberTierClient) Hooks() []Hook {
+	return c.hooks.MemberTier
+}
+
+// Interceptors returns the client interceptors.
+func (c *MemberTierClient) Interceptors() []Interceptor {
+	return c.inters.MemberTier
+}
+
+func (c *MemberTierClient) mutate(ctx context.Context, m *MemberTierMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MemberTierCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MemberTierUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MemberTierUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MemberTierDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MemberTier mutation op: %q", m.Op())
+	}
+}
+
 // OrderClient is a client for the Order schema.
 type OrderClient struct {
 	config
@@ -2175,6 +2342,187 @@ func (c *PermissionClient) mutate(ctx context.Context, m *PermissionMutation) (V
 		return (&PermissionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Permission mutation op: %q", m.Op())
+	}
+}
+
+// PointTransactionClient is a client for the PointTransaction schema.
+type PointTransactionClient struct {
+	config
+}
+
+// NewPointTransactionClient returns a client for the PointTransaction from the given config.
+func NewPointTransactionClient(c config) *PointTransactionClient {
+	return &PointTransactionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `pointtransaction.Hooks(f(g(h())))`.
+func (c *PointTransactionClient) Use(hooks ...Hook) {
+	c.hooks.PointTransaction = append(c.hooks.PointTransaction, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `pointtransaction.Intercept(f(g(h())))`.
+func (c *PointTransactionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PointTransaction = append(c.inters.PointTransaction, interceptors...)
+}
+
+// Create returns a builder for creating a PointTransaction entity.
+func (c *PointTransactionClient) Create() *PointTransactionCreate {
+	mutation := newPointTransactionMutation(c.config, OpCreate)
+	return &PointTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PointTransaction entities.
+func (c *PointTransactionClient) CreateBulk(builders ...*PointTransactionCreate) *PointTransactionCreateBulk {
+	return &PointTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PointTransactionClient) MapCreateBulk(slice any, setFunc func(*PointTransactionCreate, int)) *PointTransactionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PointTransactionCreateBulk{err: fmt.Errorf("calling to PointTransactionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PointTransactionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PointTransactionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PointTransaction.
+func (c *PointTransactionClient) Update() *PointTransactionUpdate {
+	mutation := newPointTransactionMutation(c.config, OpUpdate)
+	return &PointTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PointTransactionClient) UpdateOne(_m *PointTransaction) *PointTransactionUpdateOne {
+	mutation := newPointTransactionMutation(c.config, OpUpdateOne, withPointTransaction(_m))
+	return &PointTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PointTransactionClient) UpdateOneID(id int) *PointTransactionUpdateOne {
+	mutation := newPointTransactionMutation(c.config, OpUpdateOne, withPointTransactionID(id))
+	return &PointTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PointTransaction.
+func (c *PointTransactionClient) Delete() *PointTransactionDelete {
+	mutation := newPointTransactionMutation(c.config, OpDelete)
+	return &PointTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PointTransactionClient) DeleteOne(_m *PointTransaction) *PointTransactionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PointTransactionClient) DeleteOneID(id int) *PointTransactionDeleteOne {
+	builder := c.Delete().Where(pointtransaction.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PointTransactionDeleteOne{builder}
+}
+
+// Query returns a query builder for PointTransaction.
+func (c *PointTransactionClient) Query() *PointTransactionQuery {
+	return &PointTransactionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePointTransaction},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PointTransaction entity by its id.
+func (c *PointTransactionClient) Get(ctx context.Context, id int) (*PointTransaction, error) {
+	return c.Query().Where(pointtransaction.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PointTransactionClient) GetX(ctx context.Context, id int) *PointTransaction {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a PointTransaction.
+func (c *PointTransactionClient) QueryShop(_m *PointTransaction) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(pointtransaction.Table, pointtransaction.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.ShopTable, pointtransaction.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryShopMember queries the shop_member edge of a PointTransaction.
+func (c *PointTransactionClient) QueryShopMember(_m *PointTransaction) *ShopMemberQuery {
+	query := (&ShopMemberClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(pointtransaction.Table, pointtransaction.FieldID, id),
+			sqlgraph.To(shopmember.Table, shopmember.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.ShopMemberTable, pointtransaction.ShopMemberColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOrder queries the order edge of a PointTransaction.
+func (c *PointTransactionClient) QueryOrder(_m *PointTransaction) *OrderQuery {
+	query := (&OrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(pointtransaction.Table, pointtransaction.FieldID, id),
+			sqlgraph.To(order.Table, order.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.OrderTable, pointtransaction.OrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PointTransactionClient) Hooks() []Hook {
+	return c.hooks.PointTransaction
+}
+
+// Interceptors returns the client interceptors.
+func (c *PointTransactionClient) Interceptors() []Interceptor {
+	return c.inters.PointTransaction
+}
+
+func (c *PointTransactionClient) mutate(ctx context.Context, m *PointTransactionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PointTransactionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PointTransactionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PointTransactionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PointTransactionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PointTransaction mutation op: %q", m.Op())
 	}
 }
 
@@ -3792,6 +4140,22 @@ func (c *ShopMemberClient) QueryMember(_m *ShopMember) *MemberQuery {
 	return query
 }
 
+// QueryMemberTier queries the member_tier edge of a ShopMember.
+func (c *ShopMemberClient) QueryMemberTier(_m *ShopMember) *MemberTierQuery {
+	query := (&MemberTierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shopmember.Table, shopmember.FieldID, id),
+			sqlgraph.To(membertier.Table, membertier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.MemberTierTable, shopmember.MemberTierColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ShopMemberClient) Hooks() []Hook {
 	return c.hooks.ShopMember
@@ -5107,18 +5471,18 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Cart, CartItem, Category, Member, MemberRefreshToken, Order, OrderItem, Page,
-		Payment, Permission, Product, ProductCategory, ProductSKU, Role,
-		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopMember, ShopUser,
-		Site, SiteShop, Theme, ThemePage, User, UserPermission,
-		UserRefreshToken []ent.Hook
+		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
+		OrderItem, Page, Payment, Permission, PointTransaction, Product,
+		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
+		ShippingMethod, Shop, ShopMember, ShopUser, Site, SiteShop, Theme, ThemePage,
+		User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
-		Cart, CartItem, Category, Member, MemberRefreshToken, Order, OrderItem, Page,
-		Payment, Permission, Product, ProductCategory, ProductSKU, Role,
-		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopMember, ShopUser,
-		Site, SiteShop, Theme, ThemePage, User, UserPermission,
-		UserRefreshToken []ent.Interceptor
+		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
+		OrderItem, Page, Payment, Permission, PointTransaction, Product,
+		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
+		ShippingMethod, Shop, ShopMember, ShopUser, Site, SiteShop, Theme, ThemePage,
+		User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

@@ -45,6 +45,11 @@ var tenantOwned = map[string]bool{
 	// mirrors Payment's shape).
 	"ShippingMethod": true,
 	"Shipment":       true,
+	// change member-tiers-and-points: both tables carry a direct shop_id
+	// column (design D1 — MemberTier mirrors ShippingMethod's shape,
+	// PointTransaction mirrors Payment/Shipment's shape).
+	"MemberTier":       true,
+	"PointTransaction": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

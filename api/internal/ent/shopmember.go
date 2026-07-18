@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"strings"
@@ -30,7 +31,7 @@ type ShopMember struct {
 	// Points holds the value of the "points" field.
 	Points int32 `json:"points,omitempty"`
 	// LevelID holds the value of the "level_id" field.
-	LevelID *int32 `json:"level_id,omitempty"`
+	LevelID *int `json:"level_id,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ShopMemberQuery when eager-loading is set.
 	Edges        ShopMemberEdges `json:"edges"`
@@ -43,9 +44,11 @@ type ShopMemberEdges struct {
 	Shop *Shop `json:"shop,omitempty"`
 	// Member holds the value of the member edge.
 	Member *Member `json:"member,omitempty"`
+	// MemberTier holds the value of the member_tier edge.
+	MemberTier *MemberTier `json:"member_tier,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // ShopOrErr returns the Shop value or an error if the edge
@@ -68,6 +71,17 @@ func (e ShopMemberEdges) MemberOrErr() (*Member, error) {
 		return nil, &NotFoundError{label: member.Label}
 	}
 	return nil, &NotLoadedError{edge: "member"}
+}
+
+// MemberTierOrErr returns the MemberTier value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ShopMemberEdges) MemberTierOrErr() (*MemberTier, error) {
+	if e.MemberTier != nil {
+		return e.MemberTier, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: membertier.Label}
+	}
+	return nil, &NotLoadedError{edge: "member_tier"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -134,8 +148,8 @@ func (_m *ShopMember) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field level_id", values[i])
 			} else if value.Valid {
-				_m.LevelID = new(int32)
-				*_m.LevelID = int32(value.Int64)
+				_m.LevelID = new(int)
+				*_m.LevelID = int(value.Int64)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -158,6 +172,11 @@ func (_m *ShopMember) QueryShop() *ShopQuery {
 // QueryMember queries the "member" edge of the ShopMember entity.
 func (_m *ShopMember) QueryMember() *MemberQuery {
 	return NewShopMemberClient(_m.config).QueryMember(_m)
+}
+
+// QueryMemberTier queries the "member_tier" edge of the ShopMember entity.
+func (_m *ShopMember) QueryMemberTier() *MemberTierQuery {
+	return NewShopMemberClient(_m.config).QueryMemberTier(_m)
 }
 
 // Update returns a builder for updating this ShopMember.

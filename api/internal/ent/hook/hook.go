@@ -68,6 +68,18 @@ func (f MemberRefreshTokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MemberRefreshTokenMutation", m)
 }
 
+// The MemberTierFunc type is an adapter to allow the use of ordinary
+// function as MemberTier mutator.
+type MemberTierFunc func(context.Context, *ent.MemberTierMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MemberTierFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MemberTierMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MemberTierMutation", m)
+}
+
 // The OrderFunc type is an adapter to allow the use of ordinary
 // function as Order mutator.
 type OrderFunc func(context.Context, *ent.OrderMutation) (ent.Value, error)
@@ -126,6 +138,18 @@ func (f PermissionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PermissionMutation", m)
+}
+
+// The PointTransactionFunc type is an adapter to allow the use of ordinary
+// function as PointTransaction mutator.
+type PointTransactionFunc func(context.Context, *ent.PointTransactionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PointTransactionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PointTransactionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PointTransactionMutation", m)
 }
 
 // The ProductFunc type is an adapter to allow the use of ordinary

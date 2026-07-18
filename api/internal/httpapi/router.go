@@ -35,6 +35,7 @@ type Deps struct {
 	Orders     *OrderHandler      // change order-management (member self-service + merchant back office)
 	Payments   *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
 	Shipping   *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
+	Points     *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
@@ -112,6 +113,9 @@ func New(d Deps) http.Handler {
 						if d.Shipping != nil {
 							d.Shipping.MountShopAdmin(sh)
 						}
+						if d.Points != nil {
+							d.Points.MountShopAdmin(sh)
+						}
 					})
 					// Platform-level resources.
 					if d.Roles != nil {
@@ -170,6 +174,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Shipping != nil {
 							d.Shipping.MountShop(mr)
+						}
+						if d.Points != nil {
+							d.Points.MountShop(mr)
 						}
 					})
 				}

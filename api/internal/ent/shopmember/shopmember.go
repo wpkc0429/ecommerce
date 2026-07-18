@@ -30,6 +30,8 @@ const (
 	EdgeShop = "shop"
 	// EdgeMember holds the string denoting the member edge name in mutations.
 	EdgeMember = "member"
+	// EdgeMemberTier holds the string denoting the member_tier edge name in mutations.
+	EdgeMemberTier = "member_tier"
 	// Table holds the table name of the shopmember in the database.
 	Table = "shop_member"
 	// ShopTable is the table that holds the shop relation/edge.
@@ -46,6 +48,13 @@ const (
 	MemberInverseTable = "members"
 	// MemberColumn is the table column denoting the member relation/edge.
 	MemberColumn = "member_id"
+	// MemberTierTable is the table that holds the member_tier relation/edge.
+	MemberTierTable = "shop_member"
+	// MemberTierInverseTable is the table name for the MemberTier entity.
+	// It exists in this package in order to avoid circular dependency with the "membertier" package.
+	MemberTierInverseTable = "member_tiers"
+	// MemberTierColumn is the table column denoting the member_tier relation/edge.
+	MemberTierColumn = "level_id"
 )
 
 // Columns holds all SQL columns for shopmember fields.
@@ -131,6 +140,13 @@ func ByMemberField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newMemberStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByMemberTierField orders the results by member_tier field.
+func ByMemberTierField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newMemberTierStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newShopStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -143,5 +159,12 @@ func newMemberStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(MemberInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, MemberTable, MemberColumn),
+	)
+}
+func newMemberTierStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MemberTierInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, MemberTierTable, MemberTierColumn),
 	)
 }

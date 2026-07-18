@@ -9,11 +9,13 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -220,6 +222,43 @@ func init() {
 	memberrefreshtokenDescCreatedAt := memberrefreshtokenFields[6].Descriptor()
 	// memberrefreshtoken.DefaultCreatedAt holds the default value on creation for the created_at field.
 	memberrefreshtoken.DefaultCreatedAt = memberrefreshtokenDescCreatedAt.Default.(func() time.Time)
+	membertierMixin := schema.MemberTier{}.Mixin()
+	membertierMixinFields0 := membertierMixin[0].Fields()
+	_ = membertierMixinFields0
+	membertierFields := schema.MemberTier{}.Fields()
+	_ = membertierFields
+	// membertierDescCreatedAt is the schema descriptor for created_at field.
+	membertierDescCreatedAt := membertierMixinFields0[0].Descriptor()
+	// membertier.DefaultCreatedAt holds the default value on creation for the created_at field.
+	membertier.DefaultCreatedAt = membertierDescCreatedAt.Default.(func() time.Time)
+	// membertierDescUpdatedAt is the schema descriptor for updated_at field.
+	membertierDescUpdatedAt := membertierMixinFields0[1].Descriptor()
+	// membertier.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	membertier.DefaultUpdatedAt = membertierDescUpdatedAt.Default.(func() time.Time)
+	// membertier.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	membertier.UpdateDefaultUpdatedAt = membertierDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// membertierDescName is the schema descriptor for name field.
+	membertierDescName := membertierFields[1].Descriptor()
+	// membertier.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	membertier.NameValidator = func() func(string) error {
+		validators := membertierDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// membertierDescMinPoints is the schema descriptor for min_points field.
+	membertierDescMinPoints := membertierFields[2].Descriptor()
+	// membertier.DefaultMinPoints holds the default value on creation for the min_points field.
+	membertier.DefaultMinPoints = membertierDescMinPoints.Default.(int32)
 	orderMixin := schema.Order{}.Mixin()
 	orderMixinFields0 := orderMixin[0].Fields()
 	_ = orderMixinFields0
@@ -502,6 +541,39 @@ func init() {
 	permission.DefaultDescription = permissionDescDescription.Default.(string)
 	// permission.DescriptionValidator is a validator for the "description" field. It is called by the builders before save.
 	permission.DescriptionValidator = permissionDescDescription.Validators[0].(func(string) error)
+	pointtransactionMixin := schema.PointTransaction{}.Mixin()
+	pointtransactionMixinFields0 := pointtransactionMixin[0].Fields()
+	_ = pointtransactionMixinFields0
+	pointtransactionFields := schema.PointTransaction{}.Fields()
+	_ = pointtransactionFields
+	// pointtransactionDescCreatedAt is the schema descriptor for created_at field.
+	pointtransactionDescCreatedAt := pointtransactionMixinFields0[0].Descriptor()
+	// pointtransaction.DefaultCreatedAt holds the default value on creation for the created_at field.
+	pointtransaction.DefaultCreatedAt = pointtransactionDescCreatedAt.Default.(func() time.Time)
+	// pointtransactionDescUpdatedAt is the schema descriptor for updated_at field.
+	pointtransactionDescUpdatedAt := pointtransactionMixinFields0[1].Descriptor()
+	// pointtransaction.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	pointtransaction.DefaultUpdatedAt = pointtransactionDescUpdatedAt.Default.(func() time.Time)
+	// pointtransaction.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	pointtransaction.UpdateDefaultUpdatedAt = pointtransactionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// pointtransactionDescReason is the schema descriptor for reason field.
+	pointtransactionDescReason := pointtransactionFields[5].Descriptor()
+	// pointtransaction.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
+	pointtransaction.ReasonValidator = func() func(string) error {
+		validators := pointtransactionDescReason.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(reason string) error {
+			for _, fn := range fns {
+				if err := fn(reason); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	productMixin := schema.Product{}.Mixin()
 	productMixinFields0 := productMixin[0].Fields()
 	_ = productMixinFields0

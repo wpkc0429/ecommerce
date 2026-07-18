@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"time"
@@ -79,13 +80,13 @@ func (_c *ShopMemberCreate) SetNillablePoints(v *int32) *ShopMemberCreate {
 }
 
 // SetLevelID sets the "level_id" field.
-func (_c *ShopMemberCreate) SetLevelID(v int32) *ShopMemberCreate {
+func (_c *ShopMemberCreate) SetLevelID(v int) *ShopMemberCreate {
 	_c.mutation.SetLevelID(v)
 	return _c
 }
 
 // SetNillableLevelID sets the "level_id" field if the given value is not nil.
-func (_c *ShopMemberCreate) SetNillableLevelID(v *int32) *ShopMemberCreate {
+func (_c *ShopMemberCreate) SetNillableLevelID(v *int) *ShopMemberCreate {
 	if v != nil {
 		_c.SetLevelID(*v)
 	}
@@ -100,6 +101,25 @@ func (_c *ShopMemberCreate) SetShop(v *Shop) *ShopMemberCreate {
 // SetMember sets the "member" edge to the Member entity.
 func (_c *ShopMemberCreate) SetMember(v *Member) *ShopMemberCreate {
 	return _c.SetMemberID(v.ID)
+}
+
+// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by ID.
+func (_c *ShopMemberCreate) SetMemberTierID(id int) *ShopMemberCreate {
+	_c.mutation.SetMemberTierID(id)
+	return _c
+}
+
+// SetNillableMemberTierID sets the "member_tier" edge to the MemberTier entity by ID if the given value is not nil.
+func (_c *ShopMemberCreate) SetNillableMemberTierID(id *int) *ShopMemberCreate {
+	if id != nil {
+		_c = _c.SetMemberTierID(*id)
+	}
+	return _c
+}
+
+// SetMemberTier sets the "member_tier" edge to the MemberTier entity.
+func (_c *ShopMemberCreate) SetMemberTier(v *MemberTier) *ShopMemberCreate {
+	return _c.SetMemberTierID(v.ID)
 }
 
 // Mutation returns the ShopMemberMutation object of the builder.
@@ -213,10 +233,6 @@ func (_c *ShopMemberCreate) createSpec() (*ShopMember, *sqlgraph.CreateSpec) {
 		_spec.SetField(shopmember.FieldPoints, field.TypeInt32, value)
 		_node.Points = value
 	}
-	if value, ok := _c.mutation.LevelID(); ok {
-		_spec.SetField(shopmember.FieldLevelID, field.TypeInt32, value)
-		_node.LevelID = &value
-	}
 	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -249,6 +265,23 @@ func (_c *ShopMemberCreate) createSpec() (*ShopMember, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.MemberID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MemberTierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shopmember.MemberTierTable,
+			Columns: []string{shopmember.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.LevelID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -358,7 +391,7 @@ func (u *ShopMemberUpsert) AddPoints(v int32) *ShopMemberUpsert {
 }
 
 // SetLevelID sets the "level_id" field.
-func (u *ShopMemberUpsert) SetLevelID(v int32) *ShopMemberUpsert {
+func (u *ShopMemberUpsert) SetLevelID(v int) *ShopMemberUpsert {
 	u.Set(shopmember.FieldLevelID, v)
 	return u
 }
@@ -366,12 +399,6 @@ func (u *ShopMemberUpsert) SetLevelID(v int32) *ShopMemberUpsert {
 // UpdateLevelID sets the "level_id" field to the value that was provided on create.
 func (u *ShopMemberUpsert) UpdateLevelID() *ShopMemberUpsert {
 	u.SetExcluded(shopmember.FieldLevelID)
-	return u
-}
-
-// AddLevelID adds v to the "level_id" field.
-func (u *ShopMemberUpsert) AddLevelID(v int32) *ShopMemberUpsert {
-	u.Add(shopmember.FieldLevelID, v)
 	return u
 }
 
@@ -490,16 +517,9 @@ func (u *ShopMemberUpsertOne) UpdatePoints() *ShopMemberUpsertOne {
 }
 
 // SetLevelID sets the "level_id" field.
-func (u *ShopMemberUpsertOne) SetLevelID(v int32) *ShopMemberUpsertOne {
+func (u *ShopMemberUpsertOne) SetLevelID(v int) *ShopMemberUpsertOne {
 	return u.Update(func(s *ShopMemberUpsert) {
 		s.SetLevelID(v)
-	})
-}
-
-// AddLevelID adds v to the "level_id" field.
-func (u *ShopMemberUpsertOne) AddLevelID(v int32) *ShopMemberUpsertOne {
-	return u.Update(func(s *ShopMemberUpsert) {
-		s.AddLevelID(v)
 	})
 }
 
@@ -792,16 +812,9 @@ func (u *ShopMemberUpsertBulk) UpdatePoints() *ShopMemberUpsertBulk {
 }
 
 // SetLevelID sets the "level_id" field.
-func (u *ShopMemberUpsertBulk) SetLevelID(v int32) *ShopMemberUpsertBulk {
+func (u *ShopMemberUpsertBulk) SetLevelID(v int) *ShopMemberUpsertBulk {
 	return u.Update(func(s *ShopMemberUpsert) {
 		s.SetLevelID(v)
-	})
-}
-
-// AddLevelID adds v to the "level_id" field.
-func (u *ShopMemberUpsertBulk) AddLevelID(v int32) *ShopMemberUpsertBulk {
-	return u.Update(func(s *ShopMemberUpsert) {
-		s.AddLevelID(v)
 	})
 }
 

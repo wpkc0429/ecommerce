@@ -9,6 +9,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpayment "ksdevworks/ecommerce/api/internal/ent/payment"
+	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 )
 
@@ -22,9 +23,16 @@ import (
 // Orders is order.Service — the ONLY way this package ever advances
 // orders.payment_status is Orders.UpdatePaymentStatus (order-management
 // design D6). Nothing in this package writes ent.Order directly.
+//
+// Dispatcher is optional (nil-safe — see HandleWebhook) and publishes
+// events.OrderPaymentSucceeded after a successful payment confirmation
+// (change member-tiers-and-points design D1): this package still never
+// imports points — it only publishes a generic domain event and knows
+// nothing about who (if anyone) is subscribed.
 type Service struct {
-	Client *ent.Client
-	Orders *order.Service
+	Client     *ent.Client
+	Orders     *order.Service
+	Dispatcher *events.Dispatcher
 
 	// Providers is the provider registry (design D1), keyed by
 	// Provider.Name(). DefaultProvider is used when a caller does not
@@ -141,10 +149,20 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 	// (design D6) — a "failed" attempt leaves the order unpaid so the
 	// member can retry. Re-asserting on every delivery where the payment's
 	// current status already equals "succeeded" (not just on the winning
-	// call) is deliberate — see the doc comment above.
+	// call) is deliberate — see the doc comment above. This means
+	// events.OrderPaymentSucceeded is published on every such delivery too,
+	// not just the first (member-tiers-and-points design D4) — subscribers
+	// must be idempotent.
 	if target == StatusSucceeded && p.Status == StatusSucceeded {
-		if _, err := s.Orders.UpdatePaymentStatus(ctx, p.ShopID, p.OrderID, OrderPaymentStatusPaid); err != nil {
+		ord, err := s.Orders.UpdatePaymentStatus(ctx, p.ShopID, p.OrderID, OrderPaymentStatusPaid)
+		if err != nil {
 			return nil, fmt.Errorf("payment: mark order paid: %w", err)
+		}
+		if s.Dispatcher != nil {
+			s.Dispatcher.Publish(ctx, events.OrderPaymentSucceeded{
+				ShopID: ord.ShopID, OrderID: ord.ID, MemberID: ord.MemberID,
+				TotalAmount: ord.TotalAmount, Currency: ord.Currency,
+			})
 		}
 	}
 

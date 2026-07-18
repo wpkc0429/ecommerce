@@ -3,9 +3,11 @@ package payment_test
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"testing"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -302,6 +304,116 @@ func TestServiceInitiatePaymentRejectsUnknownProvider(t *testing.T) {
 	}
 	if !asValidation(err, &ve) {
 		t.Fatalf("expected *payment.ValidationError, got %T: %v", err, err)
+	}
+}
+
+// ── design D1/D4 (change member-tiers-and-points): HandleWebhook publishes
+// events.OrderPaymentSucceeded after successfully marking an order paid ────
+
+// newTestServiceWithDispatcher mirrors newTestService but also wires a
+// Dispatcher, matching how api/internal/app/wire.go constructs payment.Service
+// in production (design D1).
+func newTestServiceWithDispatcher(f *paymentFixtures, dispatcher *events.Dispatcher) *payment.Service {
+	svc := newTestService(f)
+	svc.Dispatcher = dispatcher
+	return svc
+}
+
+func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	memberID := newMember(t, f.client, "event@t.dev")
+	ord := f.newOrder(t, memberID, 1290)
+	ctx := context.Background()
+
+	log := slog.New(slog.DiscardHandler)
+	dispatcher := events.NewDispatcher(log)
+	var captured []events.OrderPaymentSucceeded
+	dispatcher.Subscribe(func(_ context.Context, e events.Event) {
+		if ev, ok := e.(events.OrderPaymentSucceeded); ok {
+			captured = append(captured, ev)
+		}
+	})
+	svc := newTestServiceWithDispatcher(f, dispatcher)
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
+	}); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+
+	if len(captured) != 1 {
+		t.Fatalf("expected exactly one OrderPaymentSucceeded event, got %d", len(captured))
+	}
+	ev := captured[0]
+	if ev.ShopID != f.shopID || ev.OrderID != ord.ID || ev.MemberID != memberID {
+		t.Fatalf("expected event to carry the order's identity, got %+v", ev)
+	}
+	if ev.TotalAmount != 1290 || ev.Currency != "TWD" {
+		t.Fatalf("expected event to carry the order's amount/currency, got %+v", ev)
+	}
+}
+
+// TestServiceHandleWebhookDuplicateSucceededPublishesEventAgain documents the
+// premise member-tiers-and-points design D4 relies on: the re-assertion
+// branch (already-succeeded payment, repeated delivery) re-publishes the
+// event on every delivery, not just the first — so a points subscriber MUST
+// be idempotent on its own, not rely on this package de-duplicating for it.
+func TestServiceHandleWebhookDuplicateSucceededPublishesEventAgain(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	memberID := newMember(t, f.client, "event-dup@t.dev")
+	ord := f.newOrder(t, memberID, 1000)
+	ctx := context.Background()
+
+	log := slog.New(slog.DiscardHandler)
+	dispatcher := events.NewDispatcher(log)
+	var count int
+	dispatcher.Subscribe(func(_ context.Context, e events.Event) {
+		if _, ok := e.(events.OrderPaymentSucceeded); ok {
+			count++
+		}
+	})
+	svc := newTestServiceWithDispatcher(f, dispatcher)
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	wh := &payment.WebhookResult{ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded}
+	if _, err := svc.HandleWebhook(ctx, "mock", wh); err != nil {
+		t.Fatalf("first HandleWebhook: %v", err)
+	}
+	if _, err := svc.HandleWebhook(ctx, "mock", wh); err != nil {
+		t.Fatalf("second HandleWebhook: %v", err)
+	}
+
+	if count != 2 {
+		t.Fatalf("expected the event to be published on both deliveries (design D4 premise), got %d", count)
+	}
+}
+
+// TestServiceHandleWebhookWithoutDispatcherIsNilSafe proves every existing
+// caller that constructs payment.Service without setting Dispatcher (e.g.
+// every other test in this file, via newTestService) keeps working — nothing
+// panics or errors just because no one is listening.
+func TestServiceHandleWebhookWithoutDispatcherIsNilSafe(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	memberID := newMember(t, f.client, "nil-dispatcher@t.dev")
+	ord := f.newOrder(t, memberID, 1000)
+	svc := newTestService(f) // Dispatcher left nil, as in every other test
+	ctx := context.Background()
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
+	}); err != nil {
+		t.Fatalf("HandleWebhook must not fail with a nil Dispatcher: %v", err)
 	}
 }
 

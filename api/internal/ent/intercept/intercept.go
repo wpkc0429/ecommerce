@@ -12,11 +12,13 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
+	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
@@ -231,6 +233,33 @@ func (f TraverseMemberRefreshToken) Traverse(ctx context.Context, q ent.Query) e
 	return fmt.Errorf("unexpected query type %T. expect *ent.MemberRefreshTokenQuery", q)
 }
 
+// The MemberTierFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MemberTierFunc func(context.Context, *ent.MemberTierQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MemberTierFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MemberTierQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MemberTierQuery", q)
+}
+
+// The TraverseMemberTier type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMemberTier func(context.Context, *ent.MemberTierQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMemberTier) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMemberTier) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MemberTierQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MemberTierQuery", q)
+}
+
 // The OrderFunc type is an adapter to allow the use of ordinary function as a Querier.
 type OrderFunc func(context.Context, *ent.OrderQuery) (ent.Value, error)
 
@@ -364,6 +393,33 @@ func (f TraversePermission) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.PermissionQuery", q)
+}
+
+// The PointTransactionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PointTransactionFunc func(context.Context, *ent.PointTransactionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PointTransactionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PointTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PointTransactionQuery", q)
+}
+
+// The TraversePointTransaction type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePointTransaction func(context.Context, *ent.PointTransactionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePointTransaction) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePointTransaction) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PointTransactionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PointTransactionQuery", q)
 }
 
 // The ProductFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -865,6 +921,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.MemberQuery, predicate.Member, member.OrderOption]{typ: ent.TypeMember, tq: q}, nil
 	case *ent.MemberRefreshTokenQuery:
 		return &query[*ent.MemberRefreshTokenQuery, predicate.MemberRefreshToken, memberrefreshtoken.OrderOption]{typ: ent.TypeMemberRefreshToken, tq: q}, nil
+	case *ent.MemberTierQuery:
+		return &query[*ent.MemberTierQuery, predicate.MemberTier, membertier.OrderOption]{typ: ent.TypeMemberTier, tq: q}, nil
 	case *ent.OrderQuery:
 		return &query[*ent.OrderQuery, predicate.Order, order.OrderOption]{typ: ent.TypeOrder, tq: q}, nil
 	case *ent.OrderItemQuery:
@@ -875,6 +933,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.PaymentQuery, predicate.Payment, payment.OrderOption]{typ: ent.TypePayment, tq: q}, nil
 	case *ent.PermissionQuery:
 		return &query[*ent.PermissionQuery, predicate.Permission, permission.OrderOption]{typ: ent.TypePermission, tq: q}, nil
+	case *ent.PointTransactionQuery:
+		return &query[*ent.PointTransactionQuery, predicate.PointTransaction, pointtransaction.OrderOption]{typ: ent.TypePointTransaction, tq: q}, nil
 	case *ent.ProductQuery:
 		return &query[*ent.ProductQuery, predicate.Product, product.OrderOption]{typ: ent.TypeProduct, tq: q}, nil
 	case *ent.ProductCategoryQuery:

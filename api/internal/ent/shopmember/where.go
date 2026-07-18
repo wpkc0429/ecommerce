@@ -81,7 +81,7 @@ func Points(v int32) predicate.ShopMember {
 }
 
 // LevelID applies equality check predicate on the "level_id" field. It's identical to LevelIDEQ.
-func LevelID(v int32) predicate.ShopMember {
+func LevelID(v int) predicate.ShopMember {
 	return predicate.ShopMember(sql.FieldEQ(FieldLevelID, v))
 }
 
@@ -246,43 +246,23 @@ func PointsLTE(v int32) predicate.ShopMember {
 }
 
 // LevelIDEQ applies the EQ predicate on the "level_id" field.
-func LevelIDEQ(v int32) predicate.ShopMember {
+func LevelIDEQ(v int) predicate.ShopMember {
 	return predicate.ShopMember(sql.FieldEQ(FieldLevelID, v))
 }
 
 // LevelIDNEQ applies the NEQ predicate on the "level_id" field.
-func LevelIDNEQ(v int32) predicate.ShopMember {
+func LevelIDNEQ(v int) predicate.ShopMember {
 	return predicate.ShopMember(sql.FieldNEQ(FieldLevelID, v))
 }
 
 // LevelIDIn applies the In predicate on the "level_id" field.
-func LevelIDIn(vs ...int32) predicate.ShopMember {
+func LevelIDIn(vs ...int) predicate.ShopMember {
 	return predicate.ShopMember(sql.FieldIn(FieldLevelID, vs...))
 }
 
 // LevelIDNotIn applies the NotIn predicate on the "level_id" field.
-func LevelIDNotIn(vs ...int32) predicate.ShopMember {
+func LevelIDNotIn(vs ...int) predicate.ShopMember {
 	return predicate.ShopMember(sql.FieldNotIn(FieldLevelID, vs...))
-}
-
-// LevelIDGT applies the GT predicate on the "level_id" field.
-func LevelIDGT(v int32) predicate.ShopMember {
-	return predicate.ShopMember(sql.FieldGT(FieldLevelID, v))
-}
-
-// LevelIDGTE applies the GTE predicate on the "level_id" field.
-func LevelIDGTE(v int32) predicate.ShopMember {
-	return predicate.ShopMember(sql.FieldGTE(FieldLevelID, v))
-}
-
-// LevelIDLT applies the LT predicate on the "level_id" field.
-func LevelIDLT(v int32) predicate.ShopMember {
-	return predicate.ShopMember(sql.FieldLT(FieldLevelID, v))
-}
-
-// LevelIDLTE applies the LTE predicate on the "level_id" field.
-func LevelIDLTE(v int32) predicate.ShopMember {
-	return predicate.ShopMember(sql.FieldLTE(FieldLevelID, v))
 }
 
 // LevelIDIsNil applies the IsNil predicate on the "level_id" field.
@@ -333,6 +313,29 @@ func HasMember() predicate.ShopMember {
 func HasMemberWith(preds ...predicate.Member) predicate.ShopMember {
 	return predicate.ShopMember(func(s *sql.Selector) {
 		step := newMemberStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasMemberTier applies the HasEdge predicate on the "member_tier" edge.
+func HasMemberTier() predicate.ShopMember {
+	return predicate.ShopMember(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, MemberTierTable, MemberTierColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasMemberTierWith applies the HasEdge predicate on the "member_tier" edge with a given conditions (other predicates).
+func HasMemberTierWith(preds ...predicate.MemberTier) predicate.ShopMember {
+	return predicate.ShopMember(func(s *sql.Selector) {
+		step := newMemberTierStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

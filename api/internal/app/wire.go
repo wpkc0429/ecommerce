@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
+	"ksdevworks/ecommerce/api/internal/points"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
@@ -96,6 +97,14 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	invalidator := &render.Invalidator{Cache: renderCache, Client: client, Log: a.log}
 	dispatcher.Subscribe(invalidator.Handle)
 
+	// member-tiers-and-points (change member-tiers-and-points, design D1):
+	// the dispatcher's first non-cache subscriber — reacts to
+	// events.OrderPaymentSucceeded/OrderReturned published by payment/
+	// shipping below. Needs *ent.Client only; it never imports order/
+	// payment/shipping.
+	pointsService := &points.Service{Client: client, Log: a.log}
+	dispatcher.Subscribe(pointsService.Handle)
+
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
 	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
@@ -129,6 +138,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	paymentService := &payment.Service{
 		Client:          client,
 		Orders:          orderService,
+		Dispatcher:      dispatcher,
 		Providers:       map[string]payment.Provider{mockProvider.Name(): mockProvider},
 		DefaultProvider: mockProvider.Name(),
 	}
@@ -139,8 +149,12 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// new config values needed, unlike payment's mock webhook secret).
 	// Member/admin routes reuse orderService as the sole controlled entry
 	// point for advancing orders.fulfillment_status (design D4/D6).
-	shippingService := &shipping.Service{Client: client, Orders: orderService}
+	shippingService := &shipping.Service{Client: client, Orders: orderService, Dispatcher: dispatcher}
 	deps.Shipping = &httpapi.ShippingHandler{Client: client, Service: shippingService, Authz: authz, Log: a.log}
+
+	// member-tiers-and-points HTTP layer (points.Service was already
+	// constructed and subscribed above, alongside the render invalidator).
+	deps.Points = &httpapi.PointsHandler{Client: client, Service: pointsService, Authz: authz, Log: a.log}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

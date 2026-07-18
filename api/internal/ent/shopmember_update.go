@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopmember"
@@ -87,23 +88,16 @@ func (_u *ShopMemberUpdate) AddPoints(v int32) *ShopMemberUpdate {
 }
 
 // SetLevelID sets the "level_id" field.
-func (_u *ShopMemberUpdate) SetLevelID(v int32) *ShopMemberUpdate {
-	_u.mutation.ResetLevelID()
+func (_u *ShopMemberUpdate) SetLevelID(v int) *ShopMemberUpdate {
 	_u.mutation.SetLevelID(v)
 	return _u
 }
 
 // SetNillableLevelID sets the "level_id" field if the given value is not nil.
-func (_u *ShopMemberUpdate) SetNillableLevelID(v *int32) *ShopMemberUpdate {
+func (_u *ShopMemberUpdate) SetNillableLevelID(v *int) *ShopMemberUpdate {
 	if v != nil {
 		_u.SetLevelID(*v)
 	}
-	return _u
-}
-
-// AddLevelID adds value to the "level_id" field.
-func (_u *ShopMemberUpdate) AddLevelID(v int32) *ShopMemberUpdate {
-	_u.mutation.AddLevelID(v)
 	return _u
 }
 
@@ -123,6 +117,25 @@ func (_u *ShopMemberUpdate) SetMember(v *Member) *ShopMemberUpdate {
 	return _u.SetMemberID(v.ID)
 }
 
+// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by ID.
+func (_u *ShopMemberUpdate) SetMemberTierID(id int) *ShopMemberUpdate {
+	_u.mutation.SetMemberTierID(id)
+	return _u
+}
+
+// SetNillableMemberTierID sets the "member_tier" edge to the MemberTier entity by ID if the given value is not nil.
+func (_u *ShopMemberUpdate) SetNillableMemberTierID(id *int) *ShopMemberUpdate {
+	if id != nil {
+		_u = _u.SetMemberTierID(*id)
+	}
+	return _u
+}
+
+// SetMemberTier sets the "member_tier" edge to the MemberTier entity.
+func (_u *ShopMemberUpdate) SetMemberTier(v *MemberTier) *ShopMemberUpdate {
+	return _u.SetMemberTierID(v.ID)
+}
+
 // Mutation returns the ShopMemberMutation object of the builder.
 func (_u *ShopMemberUpdate) Mutation() *ShopMemberMutation {
 	return _u.mutation
@@ -137,6 +150,12 @@ func (_u *ShopMemberUpdate) ClearShop() *ShopMemberUpdate {
 // ClearMember clears the "member" edge to the Member entity.
 func (_u *ShopMemberUpdate) ClearMember() *ShopMemberUpdate {
 	_u.mutation.ClearMember()
+	return _u
+}
+
+// ClearMemberTier clears the "member_tier" edge to the MemberTier entity.
+func (_u *ShopMemberUpdate) ClearMemberTier() *ShopMemberUpdate {
+	_u.mutation.ClearMemberTier()
 	return _u
 }
 
@@ -214,15 +233,6 @@ func (_u *ShopMemberUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	if value, ok := _u.mutation.AddedPoints(); ok {
 		_spec.AddField(shopmember.FieldPoints, field.TypeInt32, value)
 	}
-	if value, ok := _u.mutation.LevelID(); ok {
-		_spec.SetField(shopmember.FieldLevelID, field.TypeInt32, value)
-	}
-	if value, ok := _u.mutation.AddedLevelID(); ok {
-		_spec.AddField(shopmember.FieldLevelID, field.TypeInt32, value)
-	}
-	if _u.mutation.LevelIDCleared() {
-		_spec.ClearField(shopmember.FieldLevelID, field.TypeInt32)
-	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -274,6 +284,35 @@ func (_u *ShopMemberUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.MemberTierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shopmember.MemberTierTable,
+			Columns: []string{shopmember.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.MemberTierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shopmember.MemberTierTable,
+			Columns: []string{shopmember.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -359,23 +398,16 @@ func (_u *ShopMemberUpdateOne) AddPoints(v int32) *ShopMemberUpdateOne {
 }
 
 // SetLevelID sets the "level_id" field.
-func (_u *ShopMemberUpdateOne) SetLevelID(v int32) *ShopMemberUpdateOne {
-	_u.mutation.ResetLevelID()
+func (_u *ShopMemberUpdateOne) SetLevelID(v int) *ShopMemberUpdateOne {
 	_u.mutation.SetLevelID(v)
 	return _u
 }
 
 // SetNillableLevelID sets the "level_id" field if the given value is not nil.
-func (_u *ShopMemberUpdateOne) SetNillableLevelID(v *int32) *ShopMemberUpdateOne {
+func (_u *ShopMemberUpdateOne) SetNillableLevelID(v *int) *ShopMemberUpdateOne {
 	if v != nil {
 		_u.SetLevelID(*v)
 	}
-	return _u
-}
-
-// AddLevelID adds value to the "level_id" field.
-func (_u *ShopMemberUpdateOne) AddLevelID(v int32) *ShopMemberUpdateOne {
-	_u.mutation.AddLevelID(v)
 	return _u
 }
 
@@ -395,6 +427,25 @@ func (_u *ShopMemberUpdateOne) SetMember(v *Member) *ShopMemberUpdateOne {
 	return _u.SetMemberID(v.ID)
 }
 
+// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by ID.
+func (_u *ShopMemberUpdateOne) SetMemberTierID(id int) *ShopMemberUpdateOne {
+	_u.mutation.SetMemberTierID(id)
+	return _u
+}
+
+// SetNillableMemberTierID sets the "member_tier" edge to the MemberTier entity by ID if the given value is not nil.
+func (_u *ShopMemberUpdateOne) SetNillableMemberTierID(id *int) *ShopMemberUpdateOne {
+	if id != nil {
+		_u = _u.SetMemberTierID(*id)
+	}
+	return _u
+}
+
+// SetMemberTier sets the "member_tier" edge to the MemberTier entity.
+func (_u *ShopMemberUpdateOne) SetMemberTier(v *MemberTier) *ShopMemberUpdateOne {
+	return _u.SetMemberTierID(v.ID)
+}
+
 // Mutation returns the ShopMemberMutation object of the builder.
 func (_u *ShopMemberUpdateOne) Mutation() *ShopMemberMutation {
 	return _u.mutation
@@ -409,6 +460,12 @@ func (_u *ShopMemberUpdateOne) ClearShop() *ShopMemberUpdateOne {
 // ClearMember clears the "member" edge to the Member entity.
 func (_u *ShopMemberUpdateOne) ClearMember() *ShopMemberUpdateOne {
 	_u.mutation.ClearMember()
+	return _u
+}
+
+// ClearMemberTier clears the "member_tier" edge to the MemberTier entity.
+func (_u *ShopMemberUpdateOne) ClearMemberTier() *ShopMemberUpdateOne {
+	_u.mutation.ClearMemberTier()
 	return _u
 }
 
@@ -516,15 +573,6 @@ func (_u *ShopMemberUpdateOne) sqlSave(ctx context.Context) (_node *ShopMember, 
 	if value, ok := _u.mutation.AddedPoints(); ok {
 		_spec.AddField(shopmember.FieldPoints, field.TypeInt32, value)
 	}
-	if value, ok := _u.mutation.LevelID(); ok {
-		_spec.SetField(shopmember.FieldLevelID, field.TypeInt32, value)
-	}
-	if value, ok := _u.mutation.AddedLevelID(); ok {
-		_spec.AddField(shopmember.FieldLevelID, field.TypeInt32, value)
-	}
-	if _u.mutation.LevelIDCleared() {
-		_spec.ClearField(shopmember.FieldLevelID, field.TypeInt32)
-	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -576,6 +624,35 @@ func (_u *ShopMemberUpdateOne) sqlSave(ctx context.Context) (_node *ShopMember, 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.MemberTierCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shopmember.MemberTierTable,
+			Columns: []string{shopmember.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.MemberTierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   shopmember.MemberTierTable,
+			Columns: []string{shopmember.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

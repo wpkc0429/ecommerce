@@ -52,6 +52,35 @@ type SiteMappingChanged struct {
 
 func (SiteMappingChanged) EventName() string { return "site.mapping_changed" }
 
+// OrderPaymentSucceeded — payment.Service.HandleWebhook advanced an order's
+// payment_status to paid (change member-tiers-and-points design D1): the
+// first non-cache consumer of this dispatcher. Published every time the
+// webhook's re-assertion branch re-confirms an already-succeeded payment
+// (see payment.Service.HandleWebhook's own doc comment), not just on the
+// first delivery — subscribers MUST be idempotent on (ShopID, OrderID).
+type OrderPaymentSucceeded struct {
+	ShopID      int
+	OrderID     int
+	MemberID    int
+	TotalAmount int64
+	Currency    string
+}
+
+func (OrderPaymentSucceeded) EventName() string { return "order.payment_succeeded" }
+
+// OrderReturned — shipping.Service.AdvanceShipment transitioned a shipment
+// (and its order's fulfillment_status) to returned (change
+// member-tiers-and-points design D1/D5). Unlike OrderPaymentSucceeded, this
+// transition's own CAS guard means it is published at most once per order in
+// practice, but subscribers should still treat it as idempotent.
+type OrderReturned struct {
+	ShopID   int
+	OrderID  int
+	MemberID int
+}
+
+func (OrderReturned) EventName() string { return "order.returned" }
+
 // Handler consumes events; it must be non-blocking-ish and never panic the
 // request (the dispatcher recovers and logs).
 type Handler func(ctx context.Context, e Event)

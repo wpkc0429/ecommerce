@@ -24,6 +24,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	entshipment "ksdevworks/ecommerce/api/internal/ent/shipment"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
+	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 )
 
@@ -91,9 +92,15 @@ func statusName(status int16) string {
 // orders.fulfillment_status is Orders.UpdateFulfillmentStatus
 // (order-management design D6). Nothing in this package writes ent.Order
 // directly.
+//
+// Dispatcher is optional (nil-safe — see AdvanceShipment) and publishes
+// events.OrderReturned when a shipment transitions to returned (change
+// member-tiers-and-points design D1/D5): this package still never imports
+// points — it only publishes a generic domain event.
 type Service struct {
-	Client *ent.Client
-	Orders *order.Service
+	Client     *ent.Client
+	Orders     *order.Service
+	Dispatcher *events.Dispatcher
 }
 
 // ── shipping methods CRUD (design D1) ──────────────────────────────────
@@ -304,8 +311,16 @@ func (s *Service) AdvanceShipment(ctx context.Context, shopID, orderID, shipment
 		}
 	}
 
-	if _, err := s.Orders.UpdateFulfillmentStatus(ctx, shopID, orderID, target); err != nil {
+	ord, err := s.Orders.UpdateFulfillmentStatus(ctx, shopID, orderID, target)
+	if err != nil {
 		return nil, fmt.Errorf("shipping: advance fulfillment status: %w", err)
+	}
+	// design D5: only the returned transition triggers a points clawback —
+	// delivered is not published, there is nothing for points to react to.
+	if target == ReturnedStatus && s.Dispatcher != nil {
+		s.Dispatcher.Publish(ctx, events.OrderReturned{
+			ShopID: ord.ShopID, OrderID: ord.ID, MemberID: ord.MemberID,
+		})
 	}
 
 	updated, err := s.Client.Shipment.Get(ctx, shipmentID)

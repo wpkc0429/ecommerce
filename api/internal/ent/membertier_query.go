@@ -5,11 +5,9 @@ package ent
 import (
 	"context"
 	"fmt"
-	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"math"
 
 	"entgo.io/ent"
@@ -19,55 +17,53 @@ import (
 	"entgo.io/ent/schema/field"
 )
 
-// ShopMemberQuery is the builder for querying ShopMember entities.
-type ShopMemberQuery struct {
+// MemberTierQuery is the builder for querying MemberTier entities.
+type MemberTierQuery struct {
 	config
-	ctx            *QueryContext
-	order          []shopmember.OrderOption
-	inters         []Interceptor
-	predicates     []predicate.ShopMember
-	withShop       *ShopQuery
-	withMember     *MemberQuery
-	withMemberTier *MemberTierQuery
-	modifiers      []func(*sql.Selector)
+	ctx        *QueryContext
+	order      []membertier.OrderOption
+	inters     []Interceptor
+	predicates []predicate.MemberTier
+	withShop   *ShopQuery
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
 }
 
-// Where adds a new predicate for the ShopMemberQuery builder.
-func (_q *ShopMemberQuery) Where(ps ...predicate.ShopMember) *ShopMemberQuery {
+// Where adds a new predicate for the MemberTierQuery builder.
+func (_q *MemberTierQuery) Where(ps ...predicate.MemberTier) *MemberTierQuery {
 	_q.predicates = append(_q.predicates, ps...)
 	return _q
 }
 
 // Limit the number of records to be returned by this query.
-func (_q *ShopMemberQuery) Limit(limit int) *ShopMemberQuery {
+func (_q *MemberTierQuery) Limit(limit int) *MemberTierQuery {
 	_q.ctx.Limit = &limit
 	return _q
 }
 
 // Offset to start from.
-func (_q *ShopMemberQuery) Offset(offset int) *ShopMemberQuery {
+func (_q *MemberTierQuery) Offset(offset int) *MemberTierQuery {
 	_q.ctx.Offset = &offset
 	return _q
 }
 
 // Unique configures the query builder to filter duplicate records on query.
 // By default, unique is set to true, and can be disabled using this method.
-func (_q *ShopMemberQuery) Unique(unique bool) *ShopMemberQuery {
+func (_q *MemberTierQuery) Unique(unique bool) *MemberTierQuery {
 	_q.ctx.Unique = &unique
 	return _q
 }
 
 // Order specifies how the records should be ordered.
-func (_q *ShopMemberQuery) Order(o ...shopmember.OrderOption) *ShopMemberQuery {
+func (_q *MemberTierQuery) Order(o ...membertier.OrderOption) *MemberTierQuery {
 	_q.order = append(_q.order, o...)
 	return _q
 }
 
 // QueryShop chains the current query on the "shop" edge.
-func (_q *ShopMemberQuery) QueryShop() *ShopQuery {
+func (_q *MemberTierQuery) QueryShop() *ShopQuery {
 	query := (&ShopClient{config: _q.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := _q.prepareQuery(ctx); err != nil {
@@ -78,9 +74,9 @@ func (_q *ShopMemberQuery) QueryShop() *ShopQuery {
 			return nil, err
 		}
 		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, selector),
+			sqlgraph.From(membertier.Table, membertier.FieldID, selector),
 			sqlgraph.To(shop.Table, shop.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.ShopTable, shopmember.ShopColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, membertier.ShopTable, membertier.ShopColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -88,65 +84,21 @@ func (_q *ShopMemberQuery) QueryShop() *ShopQuery {
 	return query
 }
 
-// QueryMember chains the current query on the "member" edge.
-func (_q *ShopMemberQuery) QueryMember() *MemberQuery {
-	query := (&MemberClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, selector),
-			sqlgraph.To(member.Table, member.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.MemberTable, shopmember.MemberColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QueryMemberTier chains the current query on the "member_tier" edge.
-func (_q *ShopMemberQuery) QueryMemberTier() *MemberTierQuery {
-	query := (&MemberTierClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, selector),
-			sqlgraph.To(membertier.Table, membertier.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.MemberTierTable, shopmember.MemberTierColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// First returns the first ShopMember entity from the query.
-// Returns a *NotFoundError when no ShopMember was found.
-func (_q *ShopMemberQuery) First(ctx context.Context) (*ShopMember, error) {
+// First returns the first MemberTier entity from the query.
+// Returns a *NotFoundError when no MemberTier was found.
+func (_q *MemberTierQuery) First(ctx context.Context) (*MemberTier, error) {
 	nodes, err := _q.Limit(1).All(setContextOp(ctx, _q.ctx, ent.OpQueryFirst))
 	if err != nil {
 		return nil, err
 	}
 	if len(nodes) == 0 {
-		return nil, &NotFoundError{shopmember.Label}
+		return nil, &NotFoundError{membertier.Label}
 	}
 	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
-func (_q *ShopMemberQuery) FirstX(ctx context.Context) *ShopMember {
+func (_q *MemberTierQuery) FirstX(ctx context.Context) *MemberTier {
 	node, err := _q.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -154,22 +106,22 @@ func (_q *ShopMemberQuery) FirstX(ctx context.Context) *ShopMember {
 	return node
 }
 
-// FirstID returns the first ShopMember ID from the query.
-// Returns a *NotFoundError when no ShopMember ID was found.
-func (_q *ShopMemberQuery) FirstID(ctx context.Context) (id int, err error) {
+// FirstID returns the first MemberTier ID from the query.
+// Returns a *NotFoundError when no MemberTier ID was found.
+func (_q *MemberTierQuery) FirstID(ctx context.Context) (id int, err error) {
 	var ids []int
 	if ids, err = _q.Limit(1).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryFirstID)); err != nil {
 		return
 	}
 	if len(ids) == 0 {
-		err = &NotFoundError{shopmember.Label}
+		err = &NotFoundError{membertier.Label}
 		return
 	}
 	return ids[0], nil
 }
 
 // FirstIDX is like FirstID, but panics if an error occurs.
-func (_q *ShopMemberQuery) FirstIDX(ctx context.Context) int {
+func (_q *MemberTierQuery) FirstIDX(ctx context.Context) int {
 	id, err := _q.FirstID(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
@@ -177,10 +129,10 @@ func (_q *ShopMemberQuery) FirstIDX(ctx context.Context) int {
 	return id
 }
 
-// Only returns a single ShopMember entity found by the query, ensuring it only returns one.
-// Returns a *NotSingularError when more than one ShopMember entity is found.
-// Returns a *NotFoundError when no ShopMember entities are found.
-func (_q *ShopMemberQuery) Only(ctx context.Context) (*ShopMember, error) {
+// Only returns a single MemberTier entity found by the query, ensuring it only returns one.
+// Returns a *NotSingularError when more than one MemberTier entity is found.
+// Returns a *NotFoundError when no MemberTier entities are found.
+func (_q *MemberTierQuery) Only(ctx context.Context) (*MemberTier, error) {
 	nodes, err := _q.Limit(2).All(setContextOp(ctx, _q.ctx, ent.OpQueryOnly))
 	if err != nil {
 		return nil, err
@@ -189,14 +141,14 @@ func (_q *ShopMemberQuery) Only(ctx context.Context) (*ShopMember, error) {
 	case 1:
 		return nodes[0], nil
 	case 0:
-		return nil, &NotFoundError{shopmember.Label}
+		return nil, &NotFoundError{membertier.Label}
 	default:
-		return nil, &NotSingularError{shopmember.Label}
+		return nil, &NotSingularError{membertier.Label}
 	}
 }
 
 // OnlyX is like Only, but panics if an error occurs.
-func (_q *ShopMemberQuery) OnlyX(ctx context.Context) *ShopMember {
+func (_q *MemberTierQuery) OnlyX(ctx context.Context) *MemberTier {
 	node, err := _q.Only(ctx)
 	if err != nil {
 		panic(err)
@@ -204,10 +156,10 @@ func (_q *ShopMemberQuery) OnlyX(ctx context.Context) *ShopMember {
 	return node
 }
 
-// OnlyID is like Only, but returns the only ShopMember ID in the query.
-// Returns a *NotSingularError when more than one ShopMember ID is found.
+// OnlyID is like Only, but returns the only MemberTier ID in the query.
+// Returns a *NotSingularError when more than one MemberTier ID is found.
 // Returns a *NotFoundError when no entities are found.
-func (_q *ShopMemberQuery) OnlyID(ctx context.Context) (id int, err error) {
+func (_q *MemberTierQuery) OnlyID(ctx context.Context) (id int, err error) {
 	var ids []int
 	if ids, err = _q.Limit(2).IDs(setContextOp(ctx, _q.ctx, ent.OpQueryOnlyID)); err != nil {
 		return
@@ -216,15 +168,15 @@ func (_q *ShopMemberQuery) OnlyID(ctx context.Context) (id int, err error) {
 	case 1:
 		id = ids[0]
 	case 0:
-		err = &NotFoundError{shopmember.Label}
+		err = &NotFoundError{membertier.Label}
 	default:
-		err = &NotSingularError{shopmember.Label}
+		err = &NotSingularError{membertier.Label}
 	}
 	return
 }
 
 // OnlyIDX is like OnlyID, but panics if an error occurs.
-func (_q *ShopMemberQuery) OnlyIDX(ctx context.Context) int {
+func (_q *MemberTierQuery) OnlyIDX(ctx context.Context) int {
 	id, err := _q.OnlyID(ctx)
 	if err != nil {
 		panic(err)
@@ -232,18 +184,18 @@ func (_q *ShopMemberQuery) OnlyIDX(ctx context.Context) int {
 	return id
 }
 
-// All executes the query and returns a list of ShopMembers.
-func (_q *ShopMemberQuery) All(ctx context.Context) ([]*ShopMember, error) {
+// All executes the query and returns a list of MemberTiers.
+func (_q *MemberTierQuery) All(ctx context.Context) ([]*MemberTier, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryAll)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return nil, err
 	}
-	qr := querierAll[[]*ShopMember, *ShopMemberQuery]()
-	return withInterceptors[[]*ShopMember](ctx, _q, qr, _q.inters)
+	qr := querierAll[[]*MemberTier, *MemberTierQuery]()
+	return withInterceptors[[]*MemberTier](ctx, _q, qr, _q.inters)
 }
 
 // AllX is like All, but panics if an error occurs.
-func (_q *ShopMemberQuery) AllX(ctx context.Context) []*ShopMember {
+func (_q *MemberTierQuery) AllX(ctx context.Context) []*MemberTier {
 	nodes, err := _q.All(ctx)
 	if err != nil {
 		panic(err)
@@ -251,20 +203,20 @@ func (_q *ShopMemberQuery) AllX(ctx context.Context) []*ShopMember {
 	return nodes
 }
 
-// IDs executes the query and returns a list of ShopMember IDs.
-func (_q *ShopMemberQuery) IDs(ctx context.Context) (ids []int, err error) {
+// IDs executes the query and returns a list of MemberTier IDs.
+func (_q *MemberTierQuery) IDs(ctx context.Context) (ids []int, err error) {
 	if _q.ctx.Unique == nil && _q.path != nil {
 		_q.Unique(true)
 	}
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryIDs)
-	if err = _q.Select(shopmember.FieldID).Scan(ctx, &ids); err != nil {
+	if err = _q.Select(membertier.FieldID).Scan(ctx, &ids); err != nil {
 		return nil, err
 	}
 	return ids, nil
 }
 
 // IDsX is like IDs, but panics if an error occurs.
-func (_q *ShopMemberQuery) IDsX(ctx context.Context) []int {
+func (_q *MemberTierQuery) IDsX(ctx context.Context) []int {
 	ids, err := _q.IDs(ctx)
 	if err != nil {
 		panic(err)
@@ -273,16 +225,16 @@ func (_q *ShopMemberQuery) IDsX(ctx context.Context) []int {
 }
 
 // Count returns the count of the given query.
-func (_q *ShopMemberQuery) Count(ctx context.Context) (int, error) {
+func (_q *MemberTierQuery) Count(ctx context.Context) (int, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryCount)
 	if err := _q.prepareQuery(ctx); err != nil {
 		return 0, err
 	}
-	return withInterceptors[int](ctx, _q, querierCount[*ShopMemberQuery](), _q.inters)
+	return withInterceptors[int](ctx, _q, querierCount[*MemberTierQuery](), _q.inters)
 }
 
 // CountX is like Count, but panics if an error occurs.
-func (_q *ShopMemberQuery) CountX(ctx context.Context) int {
+func (_q *MemberTierQuery) CountX(ctx context.Context) int {
 	count, err := _q.Count(ctx)
 	if err != nil {
 		panic(err)
@@ -291,7 +243,7 @@ func (_q *ShopMemberQuery) CountX(ctx context.Context) int {
 }
 
 // Exist returns true if the query has elements in the graph.
-func (_q *ShopMemberQuery) Exist(ctx context.Context) (bool, error) {
+func (_q *MemberTierQuery) Exist(ctx context.Context) (bool, error) {
 	ctx = setContextOp(ctx, _q.ctx, ent.OpQueryExist)
 	switch _, err := _q.FirstID(ctx); {
 	case IsNotFound(err):
@@ -304,7 +256,7 @@ func (_q *ShopMemberQuery) Exist(ctx context.Context) (bool, error) {
 }
 
 // ExistX is like Exist, but panics if an error occurs.
-func (_q *ShopMemberQuery) ExistX(ctx context.Context) bool {
+func (_q *MemberTierQuery) ExistX(ctx context.Context) bool {
 	exist, err := _q.Exist(ctx)
 	if err != nil {
 		panic(err)
@@ -312,21 +264,19 @@ func (_q *ShopMemberQuery) ExistX(ctx context.Context) bool {
 	return exist
 }
 
-// Clone returns a duplicate of the ShopMemberQuery builder, including all associated steps. It can be
+// Clone returns a duplicate of the MemberTierQuery builder, including all associated steps. It can be
 // used to prepare common query builders and use them differently after the clone is made.
-func (_q *ShopMemberQuery) Clone() *ShopMemberQuery {
+func (_q *MemberTierQuery) Clone() *MemberTierQuery {
 	if _q == nil {
 		return nil
 	}
-	return &ShopMemberQuery{
-		config:         _q.config,
-		ctx:            _q.ctx.Clone(),
-		order:          append([]shopmember.OrderOption{}, _q.order...),
-		inters:         append([]Interceptor{}, _q.inters...),
-		predicates:     append([]predicate.ShopMember{}, _q.predicates...),
-		withShop:       _q.withShop.Clone(),
-		withMember:     _q.withMember.Clone(),
-		withMemberTier: _q.withMemberTier.Clone(),
+	return &MemberTierQuery{
+		config:     _q.config,
+		ctx:        _q.ctx.Clone(),
+		order:      append([]membertier.OrderOption{}, _q.order...),
+		inters:     append([]Interceptor{}, _q.inters...),
+		predicates: append([]predicate.MemberTier{}, _q.predicates...),
+		withShop:   _q.withShop.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -336,34 +286,12 @@ func (_q *ShopMemberQuery) Clone() *ShopMemberQuery {
 
 // WithShop tells the query-builder to eager-load the nodes that are connected to
 // the "shop" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopMemberQuery) WithShop(opts ...func(*ShopQuery)) *ShopMemberQuery {
+func (_q *MemberTierQuery) WithShop(opts ...func(*ShopQuery)) *MemberTierQuery {
 	query := (&ShopClient{config: _q.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
 	_q.withShop = query
-	return _q
-}
-
-// WithMember tells the query-builder to eager-load the nodes that are connected to
-// the "member" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopMemberQuery) WithMember(opts ...func(*MemberQuery)) *ShopMemberQuery {
-	query := (&MemberClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withMember = query
-	return _q
-}
-
-// WithMemberTier tells the query-builder to eager-load the nodes that are connected to
-// the "member_tier" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopMemberQuery) WithMemberTier(opts ...func(*MemberTierQuery)) *ShopMemberQuery {
-	query := (&MemberTierClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withMemberTier = query
 	return _q
 }
 
@@ -377,15 +305,15 @@ func (_q *ShopMemberQuery) WithMemberTier(opts ...func(*MemberTierQuery)) *ShopM
 //		Count int `json:"count,omitempty"`
 //	}
 //
-//	client.ShopMember.Query().
-//		GroupBy(shopmember.FieldCreatedAt).
+//	client.MemberTier.Query().
+//		GroupBy(membertier.FieldCreatedAt).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
-func (_q *ShopMemberQuery) GroupBy(field string, fields ...string) *ShopMemberGroupBy {
+func (_q *MemberTierQuery) GroupBy(field string, fields ...string) *MemberTierGroupBy {
 	_q.ctx.Fields = append([]string{field}, fields...)
-	grbuild := &ShopMemberGroupBy{build: _q}
+	grbuild := &MemberTierGroupBy{build: _q}
 	grbuild.flds = &_q.ctx.Fields
-	grbuild.label = shopmember.Label
+	grbuild.label = membertier.Label
 	grbuild.scan = grbuild.Scan
 	return grbuild
 }
@@ -399,23 +327,23 @@ func (_q *ShopMemberQuery) GroupBy(field string, fields ...string) *ShopMemberGr
 //		CreatedAt time.Time `json:"created_at,omitempty"`
 //	}
 //
-//	client.ShopMember.Query().
-//		Select(shopmember.FieldCreatedAt).
+//	client.MemberTier.Query().
+//		Select(membertier.FieldCreatedAt).
 //		Scan(ctx, &v)
-func (_q *ShopMemberQuery) Select(fields ...string) *ShopMemberSelect {
+func (_q *MemberTierQuery) Select(fields ...string) *MemberTierSelect {
 	_q.ctx.Fields = append(_q.ctx.Fields, fields...)
-	sbuild := &ShopMemberSelect{ShopMemberQuery: _q}
-	sbuild.label = shopmember.Label
+	sbuild := &MemberTierSelect{MemberTierQuery: _q}
+	sbuild.label = membertier.Label
 	sbuild.flds, sbuild.scan = &_q.ctx.Fields, sbuild.Scan
 	return sbuild
 }
 
-// Aggregate returns a ShopMemberSelect configured with the given aggregations.
-func (_q *ShopMemberQuery) Aggregate(fns ...AggregateFunc) *ShopMemberSelect {
+// Aggregate returns a MemberTierSelect configured with the given aggregations.
+func (_q *MemberTierQuery) Aggregate(fns ...AggregateFunc) *MemberTierSelect {
 	return _q.Select().Aggregate(fns...)
 }
 
-func (_q *ShopMemberQuery) prepareQuery(ctx context.Context) error {
+func (_q *MemberTierQuery) prepareQuery(ctx context.Context) error {
 	for _, inter := range _q.inters {
 		if inter == nil {
 			return fmt.Errorf("ent: uninitialized interceptor (forgotten import ent/runtime?)")
@@ -427,7 +355,7 @@ func (_q *ShopMemberQuery) prepareQuery(ctx context.Context) error {
 		}
 	}
 	for _, f := range _q.ctx.Fields {
-		if !shopmember.ValidColumn(f) {
+		if !membertier.ValidColumn(f) {
 			return &ValidationError{Name: f, err: fmt.Errorf("ent: invalid field %q for query", f)}
 		}
 	}
@@ -441,21 +369,19 @@ func (_q *ShopMemberQuery) prepareQuery(ctx context.Context) error {
 	return nil
 }
 
-func (_q *ShopMemberQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*ShopMember, error) {
+func (_q *MemberTierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*MemberTier, error) {
 	var (
-		nodes       = []*ShopMember{}
+		nodes       = []*MemberTier{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [1]bool{
 			_q.withShop != nil,
-			_q.withMember != nil,
-			_q.withMemberTier != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
-		return (*ShopMember).scanValues(nil, columns)
+		return (*MemberTier).scanValues(nil, columns)
 	}
 	_spec.Assign = func(columns []string, values []any) error {
-		node := &ShopMember{config: _q.config}
+		node := &MemberTier{config: _q.config}
 		nodes = append(nodes, node)
 		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
@@ -474,28 +400,16 @@ func (_q *ShopMemberQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*S
 	}
 	if query := _q.withShop; query != nil {
 		if err := _q.loadShop(ctx, query, nodes, nil,
-			func(n *ShopMember, e *Shop) { n.Edges.Shop = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withMember; query != nil {
-		if err := _q.loadMember(ctx, query, nodes, nil,
-			func(n *ShopMember, e *Member) { n.Edges.Member = e }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withMemberTier; query != nil {
-		if err := _q.loadMemberTier(ctx, query, nodes, nil,
-			func(n *ShopMember, e *MemberTier) { n.Edges.MemberTier = e }); err != nil {
+			func(n *MemberTier, e *Shop) { n.Edges.Shop = e }); err != nil {
 			return nil, err
 		}
 	}
 	return nodes, nil
 }
 
-func (_q *ShopMemberQuery) loadShop(ctx context.Context, query *ShopQuery, nodes []*ShopMember, init func(*ShopMember), assign func(*ShopMember, *Shop)) error {
+func (_q *MemberTierQuery) loadShop(ctx context.Context, query *ShopQuery, nodes []*MemberTier, init func(*MemberTier), assign func(*MemberTier, *Shop)) error {
 	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*ShopMember)
+	nodeids := make(map[int][]*MemberTier)
 	for i := range nodes {
 		fk := nodes[i].ShopID
 		if _, ok := nodeids[fk]; !ok {
@@ -522,69 +436,8 @@ func (_q *ShopMemberQuery) loadShop(ctx context.Context, query *ShopQuery, nodes
 	}
 	return nil
 }
-func (_q *ShopMemberQuery) loadMember(ctx context.Context, query *MemberQuery, nodes []*ShopMember, init func(*ShopMember), assign func(*ShopMember, *Member)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*ShopMember)
-	for i := range nodes {
-		fk := nodes[i].MemberID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(member.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "member_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
-func (_q *ShopMemberQuery) loadMemberTier(ctx context.Context, query *MemberTierQuery, nodes []*ShopMember, init func(*ShopMember), assign func(*ShopMember, *MemberTier)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*ShopMember)
-	for i := range nodes {
-		if nodes[i].LevelID == nil {
-			continue
-		}
-		fk := *nodes[i].LevelID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(membertier.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "level_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
 
-func (_q *ShopMemberQuery) sqlCount(ctx context.Context) (int, error) {
+func (_q *MemberTierQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
 	if len(_q.modifiers) > 0 {
 		_spec.Modifiers = _q.modifiers
@@ -596,8 +449,8 @@ func (_q *ShopMemberQuery) sqlCount(ctx context.Context) (int, error) {
 	return sqlgraph.CountNodes(ctx, _q.driver, _spec)
 }
 
-func (_q *ShopMemberQuery) querySpec() *sqlgraph.QuerySpec {
-	_spec := sqlgraph.NewQuerySpec(shopmember.Table, shopmember.Columns, sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt))
+func (_q *MemberTierQuery) querySpec() *sqlgraph.QuerySpec {
+	_spec := sqlgraph.NewQuerySpec(membertier.Table, membertier.Columns, sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt))
 	_spec.From = _q.sql
 	if unique := _q.ctx.Unique; unique != nil {
 		_spec.Unique = *unique
@@ -606,20 +459,14 @@ func (_q *ShopMemberQuery) querySpec() *sqlgraph.QuerySpec {
 	}
 	if fields := _q.ctx.Fields; len(fields) > 0 {
 		_spec.Node.Columns = make([]string, 0, len(fields))
-		_spec.Node.Columns = append(_spec.Node.Columns, shopmember.FieldID)
+		_spec.Node.Columns = append(_spec.Node.Columns, membertier.FieldID)
 		for i := range fields {
-			if fields[i] != shopmember.FieldID {
+			if fields[i] != membertier.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
 		}
 		if _q.withShop != nil {
-			_spec.Node.AddColumnOnce(shopmember.FieldShopID)
-		}
-		if _q.withMember != nil {
-			_spec.Node.AddColumnOnce(shopmember.FieldMemberID)
-		}
-		if _q.withMemberTier != nil {
-			_spec.Node.AddColumnOnce(shopmember.FieldLevelID)
+			_spec.Node.AddColumnOnce(membertier.FieldShopID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {
@@ -645,12 +492,12 @@ func (_q *ShopMemberQuery) querySpec() *sqlgraph.QuerySpec {
 	return _spec
 }
 
-func (_q *ShopMemberQuery) sqlQuery(ctx context.Context) *sql.Selector {
+func (_q *MemberTierQuery) sqlQuery(ctx context.Context) *sql.Selector {
 	builder := sql.Dialect(_q.driver.Dialect())
-	t1 := builder.Table(shopmember.Table)
+	t1 := builder.Table(membertier.Table)
 	columns := _q.ctx.Fields
 	if len(columns) == 0 {
-		columns = shopmember.Columns
+		columns = membertier.Columns
 	}
 	selector := builder.Select(t1.Columns(columns...)...).From(t1)
 	if _q.sql != nil {
@@ -683,7 +530,7 @@ func (_q *ShopMemberQuery) sqlQuery(ctx context.Context) *sql.Selector {
 // ForUpdate locks the selected rows against concurrent updates, and prevent them from being
 // updated, deleted or "selected ... for update" by other sessions, until the transaction is
 // either committed or rolled-back.
-func (_q *ShopMemberQuery) ForUpdate(opts ...sql.LockOption) *ShopMemberQuery {
+func (_q *MemberTierQuery) ForUpdate(opts ...sql.LockOption) *MemberTierQuery {
 	if _q.driver.Dialect() == dialect.Postgres {
 		_q.Unique(false)
 	}
@@ -696,7 +543,7 @@ func (_q *ShopMemberQuery) ForUpdate(opts ...sql.LockOption) *ShopMemberQuery {
 // ForShare behaves similarly to ForUpdate, except that it acquires a shared mode lock
 // on any rows that are read. Other sessions can read the rows, but cannot modify them
 // until your transaction commits.
-func (_q *ShopMemberQuery) ForShare(opts ...sql.LockOption) *ShopMemberQuery {
+func (_q *MemberTierQuery) ForShare(opts ...sql.LockOption) *MemberTierQuery {
 	if _q.driver.Dialect() == dialect.Postgres {
 		_q.Unique(false)
 	}
@@ -707,33 +554,33 @@ func (_q *ShopMemberQuery) ForShare(opts ...sql.LockOption) *ShopMemberQuery {
 }
 
 // Modify adds a query modifier for attaching custom logic to queries.
-func (_q *ShopMemberQuery) Modify(modifiers ...func(s *sql.Selector)) *ShopMemberSelect {
+func (_q *MemberTierQuery) Modify(modifiers ...func(s *sql.Selector)) *MemberTierSelect {
 	_q.modifiers = append(_q.modifiers, modifiers...)
 	return _q.Select()
 }
 
-// ShopMemberGroupBy is the group-by builder for ShopMember entities.
-type ShopMemberGroupBy struct {
+// MemberTierGroupBy is the group-by builder for MemberTier entities.
+type MemberTierGroupBy struct {
 	selector
-	build *ShopMemberQuery
+	build *MemberTierQuery
 }
 
 // Aggregate adds the given aggregation functions to the group-by query.
-func (_g *ShopMemberGroupBy) Aggregate(fns ...AggregateFunc) *ShopMemberGroupBy {
+func (_g *MemberTierGroupBy) Aggregate(fns ...AggregateFunc) *MemberTierGroupBy {
 	_g.fns = append(_g.fns, fns...)
 	return _g
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_g *ShopMemberGroupBy) Scan(ctx context.Context, v any) error {
+func (_g *MemberTierGroupBy) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _g.build.ctx, ent.OpQueryGroupBy)
 	if err := _g.build.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*ShopMemberQuery, *ShopMemberGroupBy](ctx, _g.build, _g, _g.build.inters, v)
+	return scanWithInterceptors[*MemberTierQuery, *MemberTierGroupBy](ctx, _g.build, _g, _g.build.inters, v)
 }
 
-func (_g *ShopMemberGroupBy) sqlScan(ctx context.Context, root *ShopMemberQuery, v any) error {
+func (_g *MemberTierGroupBy) sqlScan(ctx context.Context, root *MemberTierQuery, v any) error {
 	selector := root.sqlQuery(ctx).Select()
 	aggregation := make([]string, 0, len(_g.fns))
 	for _, fn := range _g.fns {
@@ -760,28 +607,28 @@ func (_g *ShopMemberGroupBy) sqlScan(ctx context.Context, root *ShopMemberQuery,
 	return sql.ScanSlice(rows, v)
 }
 
-// ShopMemberSelect is the builder for selecting fields of ShopMember entities.
-type ShopMemberSelect struct {
-	*ShopMemberQuery
+// MemberTierSelect is the builder for selecting fields of MemberTier entities.
+type MemberTierSelect struct {
+	*MemberTierQuery
 	selector
 }
 
 // Aggregate adds the given aggregation functions to the selector query.
-func (_s *ShopMemberSelect) Aggregate(fns ...AggregateFunc) *ShopMemberSelect {
+func (_s *MemberTierSelect) Aggregate(fns ...AggregateFunc) *MemberTierSelect {
 	_s.fns = append(_s.fns, fns...)
 	return _s
 }
 
 // Scan applies the selector query and scans the result into the given value.
-func (_s *ShopMemberSelect) Scan(ctx context.Context, v any) error {
+func (_s *MemberTierSelect) Scan(ctx context.Context, v any) error {
 	ctx = setContextOp(ctx, _s.ctx, ent.OpQuerySelect)
 	if err := _s.prepareQuery(ctx); err != nil {
 		return err
 	}
-	return scanWithInterceptors[*ShopMemberQuery, *ShopMemberSelect](ctx, _s.ShopMemberQuery, _s, _s.inters, v)
+	return scanWithInterceptors[*MemberTierQuery, *MemberTierSelect](ctx, _s.MemberTierQuery, _s, _s.inters, v)
 }
 
-func (_s *ShopMemberSelect) sqlScan(ctx context.Context, root *ShopMemberQuery, v any) error {
+func (_s *MemberTierSelect) sqlScan(ctx context.Context, root *MemberTierQuery, v any) error {
 	selector := root.sqlQuery(ctx)
 	aggregation := make([]string, 0, len(_s.fns))
 	for _, fn := range _s.fns {
@@ -803,7 +650,7 @@ func (_s *ShopMemberSelect) sqlScan(ctx context.Context, root *ShopMemberQuery, 
 }
 
 // Modify adds a query modifier for attaching custom logic to queries.
-func (_s *ShopMemberSelect) Modify(modifiers ...func(s *sql.Selector)) *ShopMemberSelect {
+func (_s *MemberTierSelect) Modify(modifiers ...func(s *sql.Selector)) *MemberTierSelect {
 	_s.modifiers = append(_s.modifiers, modifiers...)
 	return _s
 }

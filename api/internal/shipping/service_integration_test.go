@@ -3,9 +3,11 @@ package shipping_test
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"testing"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -385,6 +387,89 @@ func TestServiceCreateShippingMethodRejectsNegativeFlatRate(t *testing.T) {
 	}
 	if !asValidation(err, &ve) {
 		t.Fatalf("expected *shipping.ValidationError, got %T: %v", err, err)
+	}
+}
+
+// ── design D1/D5 (change member-tiers-and-points): AdvanceShipment
+// publishes events.OrderReturned only for the returned transition ─────────
+
+func TestServiceAdvanceShipmentToReturnedPublishesOrderReturned(t *testing.T) {
+	f := setupShippingFixtures(t)
+	memberID := newMember(t, f.client, "publish-returned@t.dev")
+	ord := f.newOrder(t, memberID)
+	ctx := context.Background()
+
+	log := slog.New(slog.DiscardHandler)
+	dispatcher := events.NewDispatcher(log)
+	var captured []events.OrderReturned
+	dispatcher.Subscribe(func(_ context.Context, e events.Event) {
+		if ev, ok := e.(events.OrderReturned); ok {
+			captured = append(captured, ev)
+		}
+	})
+	f.svc.Dispatcher = dispatcher
+
+	sh, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil)
+	if err != nil {
+		t.Fatalf("CreateShipment: %v", err)
+	}
+	if _, err := f.svc.AdvanceShipment(ctx, f.shopID, ord.ID, sh.ID, shipping.ReturnedStatus); err != nil {
+		t.Fatalf("AdvanceShipment: %v", err)
+	}
+
+	if len(captured) != 1 {
+		t.Fatalf("expected exactly one OrderReturned event, got %d", len(captured))
+	}
+	ev := captured[0]
+	if ev.ShopID != f.shopID || ev.OrderID != ord.ID || ev.MemberID != memberID {
+		t.Fatalf("expected event to carry the order's identity, got %+v", ev)
+	}
+}
+
+func TestServiceAdvanceShipmentToDeliveredDoesNotPublishOrderReturned(t *testing.T) {
+	f := setupShippingFixtures(t)
+	memberID := newMember(t, f.client, "publish-delivered@t.dev")
+	ord := f.newOrder(t, memberID)
+	ctx := context.Background()
+
+	log := slog.New(slog.DiscardHandler)
+	dispatcher := events.NewDispatcher(log)
+	var count int
+	dispatcher.Subscribe(func(_ context.Context, e events.Event) {
+		if _, ok := e.(events.OrderReturned); ok {
+			count++
+		}
+	})
+	f.svc.Dispatcher = dispatcher
+
+	sh, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil)
+	if err != nil {
+		t.Fatalf("CreateShipment: %v", err)
+	}
+	if _, err := f.svc.AdvanceShipment(ctx, f.shopID, ord.ID, sh.ID, shipping.DeliveredStatus); err != nil {
+		t.Fatalf("AdvanceShipment: %v", err)
+	}
+
+	if count != 0 {
+		t.Fatalf("expected no OrderReturned event for a delivered transition, got %d", count)
+	}
+}
+
+// TestServiceAdvanceShipmentWithoutDispatcherIsNilSafe proves every existing
+// caller that constructs shipping.Service without setting Dispatcher (e.g.
+// every other test in this file, via setupShippingFixtures) keeps working.
+func TestServiceAdvanceShipmentWithoutDispatcherIsNilSafe(t *testing.T) {
+	f := setupShippingFixtures(t) // Dispatcher left nil
+	memberID := newMember(t, f.client, "nil-dispatcher@t.dev")
+	ord := f.newOrder(t, memberID)
+	ctx := context.Background()
+
+	sh, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil)
+	if err != nil {
+		t.Fatalf("CreateShipment: %v", err)
+	}
+	if _, err := f.svc.AdvanceShipment(ctx, f.shopID, ord.ID, sh.ID, shipping.ReturnedStatus); err != nil {
+		t.Fatalf("AdvanceShipment must not fail with a nil Dispatcher: %v", err)
 	}
 }
 

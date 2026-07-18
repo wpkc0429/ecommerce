@@ -21,6 +21,9 @@ type Member func(*sql.Selector)
 // MemberRefreshToken is the predicate function for memberrefreshtoken builders.
 type MemberRefreshToken func(*sql.Selector)
 
+// MemberTier is the predicate function for membertier builders.
+type MemberTier func(*sql.Selector)
+
 // Order is the predicate function for order builders.
 type Order func(*sql.Selector)
 
@@ -35,6 +38,9 @@ type Payment func(*sql.Selector)
 
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
+
+// PointTransaction is the predicate function for pointtransaction builders.
+type PointTransaction func(*sql.Selector)
 
 // Product is the predicate function for product builders.
 type Product func(*sql.Selector)

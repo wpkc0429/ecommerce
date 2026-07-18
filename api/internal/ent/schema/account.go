@@ -124,7 +124,11 @@ func (Member) Annotations() []schema.Annotation {
 }
 
 // ShopMember is the per-shop membership of a member (跨店會籍隔離).
-// points/level_id are reserved for Phase 2 loyalty features.
+// points/level_id back the member-tiers-and-points loyalty feature: points
+// is a maintained cache of the point_transactions ledger (design D6,
+// schema.PointTransaction), level_id points at the highest MemberTier the
+// member currently qualifies for (design D7), kept in sync by
+// points.Service — never written directly by any other package.
 type ShopMember struct {
 	ent.Schema
 }
@@ -144,7 +148,11 @@ func (ShopMember) Fields() []ent.Field {
 		field.Int("shop_id"),
 		field.Int("member_id"),
 		field.Int32("points").Default(0),
-		field.Int32("level_id").Optional().Nillable(),
+		// level_id (member-tiers-and-points design D7): field.Int (not
+		// Int32) to match MemberTier's default bigint id column — required
+		// for the edge below (ent rejects a Field() type mismatch against
+		// the target entity's id type).
+		field.Int("level_id").Optional().Nillable(),
 	}
 }
 
@@ -152,6 +160,11 @@ func (ShopMember) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("shop", Shop.Type).Unique().Required().Field("shop_id"),
 		edge.To("member", Member.Type).Unique().Required().Field("member_id"),
+		// member-tiers-and-points design D7: deleting a MemberTier a member
+		// currently holds clears level_id (SetNull) rather than blocking the
+		// delete or cascading — see MemberTier's own doc comment.
+		edge.To("member_tier", MemberTier.Type).Unique().Field("level_id").
+			Annotations(entsql.OnDelete(entsql.SetNull)),
 	}
 }
 
