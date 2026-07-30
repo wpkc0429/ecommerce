@@ -36,10 +36,16 @@ type Deps struct {
 	Payments   *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
 	Shipping   *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
 	Points     *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
+	ClientAuth *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
 
 	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
 	MemberMW func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
+
+	// CORSOrigins resolves per-shop registered browser origins (change
+	// storefront-client-auth). nil → only Cfg.CORSAllowedOrigins applies,
+	// which is the pre-change behavior every existing test relies on.
+	CORSOrigins OriginRegistry
 
 	// Rate limiting (design auth-rate-limiting): nil disables the check for
 	// that route (e.g. in tests that don't wire Redis) — orPassthrough makes
@@ -57,8 +63,15 @@ func New(d Deps) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(requestLogger(d.Log))
 	r.Use(recoverer(d.Log))
-	if d.Cfg != nil && len(d.Cfg.CORSAllowedOrigins) > 0 {
-		r.Use(NewCORSMiddleware(d.Cfg.CORSAllowedOrigins))
+	// CORS is mounted whenever either source of allowed origins is wired: a
+	// deployment may have an empty env list and rely entirely on registered
+	// per-shop origins (change storefront-client-auth).
+	var corsOrigins []string
+	if d.Cfg != nil {
+		corsOrigins = d.Cfg.CORSAllowedOrigins
+	}
+	if len(corsOrigins) > 0 || d.CORSOrigins != nil {
+		r.Use(NewCORSMiddleware(corsOrigins, d.CORSOrigins))
 	}
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -115,6 +128,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Points != nil {
 							d.Points.MountShopAdmin(sh)
+						}
+						if d.ClientAuth != nil {
+							d.ClientAuth.MountShopAdmin(sh)
 						}
 					})
 					// Platform-level resources.
@@ -198,7 +214,7 @@ func New(d Deps) http.Handler {
 
 		// ── Render bundle API (SSR / native apps) ──────────────
 		if d.Render != nil {
-			v1.Get("/render/page", d.Render.Page)       // resolves tenant internally from X-Site-Domain/Host + path
+			v1.Get("/render/page", d.Render.Page)       // resolves tenant internally: X-Publishable-Key → X-Site-Domain → Host
 			v1.Get("/render/preview", d.Render.Preview) // short-lived preview token variant
 		}
 

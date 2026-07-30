@@ -66,8 +66,8 @@ func newRLEnv(t *testing.T) *rlEnv {
 		AdminMW:    httpapi.NewAdminMiddleware(issuer),
 		MemberMW:   httpapi.NewMemberMiddleware(issuer),
 		TenantMW: fakeTenantMW(map[string]int{
-			"shop-a.test": shopA.ID,
-			"shop-b.test": shopB.ID,
+			keyShopA: shopA.ID,
+			keyShopB: shopB.ID,
 		}),
 		AdminLoginRateLimit:     httpapi.NewAdminLoginRateLimit(limiter, cfg),
 		AdminRefreshRateLimit:   httpapi.NewAdminRefreshRateLimit(limiter, cfg),
@@ -184,8 +184,8 @@ func TestRateLimitRecoversAfterWindow(t *testing.T) {
 func TestRateLimitShopScopeIsolation(t *testing.T) {
 	e := newRLEnv(t)
 	ip := "203.0.113.4:5001"
-	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
-	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
+	hostB := map[string]string{httpapi.PublishableKeyHeader: keyShopB}
 	creds := map[string]string{"email": "buyer@test.dev", "password": "password-123"}
 
 	// Both attempts must reach the handler (whatever it answers) so they

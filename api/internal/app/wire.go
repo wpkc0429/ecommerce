@@ -86,11 +86,28 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	dispatcher.Subscribe(func(ctx context.Context, e events.Event) {
 		if ev, ok := e.(events.SiteMappingChanged); ok {
 			resolver.InvalidateHosts(ctx, ev.Hosts...)
+			// change storefront-client-auth (design D10): this event is also
+			// what a shop status change publishes, and the cached publishable
+			// key entries embed that status — so a disabled shop's keys stop
+			// serving at the same moment its domains do.
+			for _, shopID := range ev.ShopIDs {
+				resolver.InvalidateShopKeys(ctx, shopID)
+			}
+		}
+	})
+	// change storefront-client-auth: key/origin mutations drop their own cache
+	// entries so revocation and registration take effect immediately.
+	dispatcher.Subscribe(func(ctx context.Context, e events.Event) {
+		if ev, ok := e.(events.StorefrontClientChanged); ok {
+			resolver.InvalidateKeys(ctx, ev.Keys...)
+			resolver.InvalidateOrigins(ctx, ev.Origins...)
 		}
 	})
 
 	deps.TenantMW = httpapi.NewTenantMiddleware(resolver)
+	deps.CORSOrigins = resolver
 	deps.Sites = &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: a.log, Authz: authz}
+	deps.ClientAuth = &httpapi.ClientAuthHandler{Client: client, Dispatcher: dispatcher, Authz: authz, Log: a.log}
 
 	// CMS engine + render pipeline (M5).
 	renderCache := render.NewCache(rdb, a.log)

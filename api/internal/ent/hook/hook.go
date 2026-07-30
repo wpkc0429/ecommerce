@@ -188,6 +188,18 @@ func (f ProductSKUFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductSKUMutation", m)
 }
 
+// The PublishableKeyFunc type is an adapter to allow the use of ordinary
+// function as PublishableKey mutator.
+type PublishableKeyFunc func(context.Context, *ent.PublishableKeyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f PublishableKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.PublishableKeyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PublishableKeyMutation", m)
+}
+
 // The RoleFunc type is an adapter to allow the use of ordinary
 // function as Role mutator.
 type RoleFunc func(context.Context, *ent.RoleMutation) (ent.Value, error)
@@ -258,6 +270,18 @@ func (f ShopFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopMutation", m)
+}
+
+// The ShopAllowedOriginFunc type is an adapter to allow the use of ordinary
+// function as ShopAllowedOrigin mutator.
+type ShopAllowedOriginFunc func(context.Context, *ent.ShopAllowedOriginMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopAllowedOriginFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopAllowedOriginMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopAllowedOriginMutation", m)
 }
 
 // The ShopUserFunc type is an adapter to allow the use of ordinary

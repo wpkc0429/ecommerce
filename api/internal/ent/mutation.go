@@ -23,12 +23,14 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -68,12 +70,14 @@ const (
 	TypeProduct            = "Product"
 	TypeProductCategory    = "ProductCategory"
 	TypeProductSKU         = "ProductSKU"
+	TypePublishableKey     = "PublishableKey"
 	TypeRole               = "Role"
 	TypeRolePermission     = "RolePermission"
 	TypeRoleUser           = "RoleUser"
 	TypeShipment           = "Shipment"
 	TypeShippingMethod     = "ShippingMethod"
 	TypeShop               = "Shop"
+	TypeShopAllowedOrigin  = "ShopAllowedOrigin"
 	TypeShopUser           = "ShopUser"
 	TypeSite               = "Site"
 	TypeSiteShop           = "SiteShop"
@@ -13765,6 +13769,627 @@ func (m *ProductSKUMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ProductSKU edge %s", name)
 }
 
+// PublishableKeyMutation represents an operation that mutates the PublishableKey nodes in the graph.
+type PublishableKeyMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	key           *string
+	label         *string
+	created_at    *time.Time
+	revoked_at    *time.Time
+	clearedFields map[string]struct{}
+	shop          *int
+	clearedshop   bool
+	done          bool
+	oldValue      func(context.Context) (*PublishableKey, error)
+	predicates    []predicate.PublishableKey
+}
+
+var _ ent.Mutation = (*PublishableKeyMutation)(nil)
+
+// publishablekeyOption allows management of the mutation configuration using functional options.
+type publishablekeyOption func(*PublishableKeyMutation)
+
+// newPublishableKeyMutation creates new mutation for the PublishableKey entity.
+func newPublishableKeyMutation(c config, op Op, opts ...publishablekeyOption) *PublishableKeyMutation {
+	m := &PublishableKeyMutation{
+		config:        c,
+		op:            op,
+		typ:           TypePublishableKey,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withPublishableKeyID sets the ID field of the mutation.
+func withPublishableKeyID(id int) publishablekeyOption {
+	return func(m *PublishableKeyMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *PublishableKey
+		)
+		m.oldValue = func(ctx context.Context) (*PublishableKey, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().PublishableKey.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withPublishableKey sets the old PublishableKey of the mutation.
+func withPublishableKey(node *PublishableKey) publishablekeyOption {
+	return func(m *PublishableKeyMutation) {
+		m.oldValue = func(context.Context) (*PublishableKey, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m PublishableKeyMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m PublishableKeyMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *PublishableKeyMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *PublishableKeyMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().PublishableKey.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *PublishableKeyMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *PublishableKeyMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the PublishableKey entity.
+// If the PublishableKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublishableKeyMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *PublishableKeyMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetKey sets the "key" field.
+func (m *PublishableKeyMutation) SetKey(s string) {
+	m.key = &s
+}
+
+// Key returns the value of the "key" field in the mutation.
+func (m *PublishableKeyMutation) Key() (r string, exists bool) {
+	v := m.key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKey returns the old "key" field's value of the PublishableKey entity.
+// If the PublishableKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublishableKeyMutation) OldKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKey: %w", err)
+	}
+	return oldValue.Key, nil
+}
+
+// ResetKey resets all changes to the "key" field.
+func (m *PublishableKeyMutation) ResetKey() {
+	m.key = nil
+}
+
+// SetLabel sets the "label" field.
+func (m *PublishableKeyMutation) SetLabel(s string) {
+	m.label = &s
+}
+
+// Label returns the value of the "label" field in the mutation.
+func (m *PublishableKeyMutation) Label() (r string, exists bool) {
+	v := m.label
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLabel returns the old "label" field's value of the PublishableKey entity.
+// If the PublishableKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublishableKeyMutation) OldLabel(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLabel is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLabel requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLabel: %w", err)
+	}
+	return oldValue.Label, nil
+}
+
+// ResetLabel resets all changes to the "label" field.
+func (m *PublishableKeyMutation) ResetLabel() {
+	m.label = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *PublishableKeyMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *PublishableKeyMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the PublishableKey entity.
+// If the PublishableKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublishableKeyMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *PublishableKeyMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (m *PublishableKeyMutation) SetRevokedAt(t time.Time) {
+	m.revoked_at = &t
+}
+
+// RevokedAt returns the value of the "revoked_at" field in the mutation.
+func (m *PublishableKeyMutation) RevokedAt() (r time.Time, exists bool) {
+	v := m.revoked_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokedAt returns the old "revoked_at" field's value of the PublishableKey entity.
+// If the PublishableKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PublishableKeyMutation) OldRevokedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokedAt: %w", err)
+	}
+	return oldValue.RevokedAt, nil
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (m *PublishableKeyMutation) ClearRevokedAt() {
+	m.revoked_at = nil
+	m.clearedFields[publishablekey.FieldRevokedAt] = struct{}{}
+}
+
+// RevokedAtCleared returns if the "revoked_at" field was cleared in this mutation.
+func (m *PublishableKeyMutation) RevokedAtCleared() bool {
+	_, ok := m.clearedFields[publishablekey.FieldRevokedAt]
+	return ok
+}
+
+// ResetRevokedAt resets all changes to the "revoked_at" field.
+func (m *PublishableKeyMutation) ResetRevokedAt() {
+	m.revoked_at = nil
+	delete(m.clearedFields, publishablekey.FieldRevokedAt)
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *PublishableKeyMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[publishablekey.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *PublishableKeyMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *PublishableKeyMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *PublishableKeyMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// Where appends a list predicates to the PublishableKeyMutation builder.
+func (m *PublishableKeyMutation) Where(ps ...predicate.PublishableKey) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the PublishableKeyMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *PublishableKeyMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.PublishableKey, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *PublishableKeyMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *PublishableKeyMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (PublishableKey).
+func (m *PublishableKeyMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *PublishableKeyMutation) Fields() []string {
+	fields := make([]string, 0, 5)
+	if m.shop != nil {
+		fields = append(fields, publishablekey.FieldShopID)
+	}
+	if m.key != nil {
+		fields = append(fields, publishablekey.FieldKey)
+	}
+	if m.label != nil {
+		fields = append(fields, publishablekey.FieldLabel)
+	}
+	if m.created_at != nil {
+		fields = append(fields, publishablekey.FieldCreatedAt)
+	}
+	if m.revoked_at != nil {
+		fields = append(fields, publishablekey.FieldRevokedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *PublishableKeyMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case publishablekey.FieldShopID:
+		return m.ShopID()
+	case publishablekey.FieldKey:
+		return m.Key()
+	case publishablekey.FieldLabel:
+		return m.Label()
+	case publishablekey.FieldCreatedAt:
+		return m.CreatedAt()
+	case publishablekey.FieldRevokedAt:
+		return m.RevokedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *PublishableKeyMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case publishablekey.FieldShopID:
+		return m.OldShopID(ctx)
+	case publishablekey.FieldKey:
+		return m.OldKey(ctx)
+	case publishablekey.FieldLabel:
+		return m.OldLabel(ctx)
+	case publishablekey.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case publishablekey.FieldRevokedAt:
+		return m.OldRevokedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown PublishableKey field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PublishableKeyMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case publishablekey.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case publishablekey.FieldKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKey(v)
+		return nil
+	case publishablekey.FieldLabel:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLabel(v)
+		return nil
+	case publishablekey.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case publishablekey.FieldRevokedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown PublishableKey field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *PublishableKeyMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *PublishableKeyMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *PublishableKeyMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown PublishableKey numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *PublishableKeyMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(publishablekey.FieldRevokedAt) {
+		fields = append(fields, publishablekey.FieldRevokedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *PublishableKeyMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *PublishableKeyMutation) ClearField(name string) error {
+	switch name {
+	case publishablekey.FieldRevokedAt:
+		m.ClearRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PublishableKey nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *PublishableKeyMutation) ResetField(name string) error {
+	switch name {
+	case publishablekey.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case publishablekey.FieldKey:
+		m.ResetKey()
+		return nil
+	case publishablekey.FieldLabel:
+		m.ResetLabel()
+		return nil
+	case publishablekey.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case publishablekey.FieldRevokedAt:
+		m.ResetRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown PublishableKey field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *PublishableKeyMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.shop != nil {
+		edges = append(edges, publishablekey.EdgeShop)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *PublishableKeyMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case publishablekey.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *PublishableKeyMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *PublishableKeyMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *PublishableKeyMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedshop {
+		edges = append(edges, publishablekey.EdgeShop)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *PublishableKeyMutation) EdgeCleared(name string) bool {
+	switch name {
+	case publishablekey.EdgeShop:
+		return m.clearedshop
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *PublishableKeyMutation) ClearEdge(name string) error {
+	switch name {
+	case publishablekey.EdgeShop:
+		m.ClearShop()
+		return nil
+	}
+	return fmt.Errorf("unknown PublishableKey unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *PublishableKeyMutation) ResetEdge(name string) error {
+	switch name {
+	case publishablekey.EdgeShop:
+		m.ResetShop()
+		return nil
+	}
+	return fmt.Errorf("unknown PublishableKey edge %s", name)
+}
+
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
@@ -18070,6 +18695,497 @@ func (m *ShopMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Shop edge %s", name)
+}
+
+// ShopAllowedOriginMutation represents an operation that mutates the ShopAllowedOrigin nodes in the graph.
+type ShopAllowedOriginMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *int
+	origin        *string
+	created_at    *time.Time
+	clearedFields map[string]struct{}
+	shop          *int
+	clearedshop   bool
+	done          bool
+	oldValue      func(context.Context) (*ShopAllowedOrigin, error)
+	predicates    []predicate.ShopAllowedOrigin
+}
+
+var _ ent.Mutation = (*ShopAllowedOriginMutation)(nil)
+
+// shopallowedoriginOption allows management of the mutation configuration using functional options.
+type shopallowedoriginOption func(*ShopAllowedOriginMutation)
+
+// newShopAllowedOriginMutation creates new mutation for the ShopAllowedOrigin entity.
+func newShopAllowedOriginMutation(c config, op Op, opts ...shopallowedoriginOption) *ShopAllowedOriginMutation {
+	m := &ShopAllowedOriginMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeShopAllowedOrigin,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withShopAllowedOriginID sets the ID field of the mutation.
+func withShopAllowedOriginID(id int) shopallowedoriginOption {
+	return func(m *ShopAllowedOriginMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ShopAllowedOrigin
+		)
+		m.oldValue = func(ctx context.Context) (*ShopAllowedOrigin, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ShopAllowedOrigin.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withShopAllowedOrigin sets the old ShopAllowedOrigin of the mutation.
+func withShopAllowedOrigin(node *ShopAllowedOrigin) shopallowedoriginOption {
+	return func(m *ShopAllowedOriginMutation) {
+		m.oldValue = func(context.Context) (*ShopAllowedOrigin, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ShopAllowedOriginMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ShopAllowedOriginMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ShopAllowedOriginMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ShopAllowedOriginMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ShopAllowedOrigin.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *ShopAllowedOriginMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *ShopAllowedOriginMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the ShopAllowedOrigin entity.
+// If the ShopAllowedOrigin object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopAllowedOriginMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *ShopAllowedOriginMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetOrigin sets the "origin" field.
+func (m *ShopAllowedOriginMutation) SetOrigin(s string) {
+	m.origin = &s
+}
+
+// Origin returns the value of the "origin" field in the mutation.
+func (m *ShopAllowedOriginMutation) Origin() (r string, exists bool) {
+	v := m.origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrigin returns the old "origin" field's value of the ShopAllowedOrigin entity.
+// If the ShopAllowedOrigin object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopAllowedOriginMutation) OldOrigin(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrigin: %w", err)
+	}
+	return oldValue.Origin, nil
+}
+
+// ResetOrigin resets all changes to the "origin" field.
+func (m *ShopAllowedOriginMutation) ResetOrigin() {
+	m.origin = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ShopAllowedOriginMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ShopAllowedOriginMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ShopAllowedOrigin entity.
+// If the ShopAllowedOrigin object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopAllowedOriginMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ShopAllowedOriginMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *ShopAllowedOriginMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[shopallowedorigin.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *ShopAllowedOriginMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *ShopAllowedOriginMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *ShopAllowedOriginMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// Where appends a list predicates to the ShopAllowedOriginMutation builder.
+func (m *ShopAllowedOriginMutation) Where(ps ...predicate.ShopAllowedOrigin) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ShopAllowedOriginMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ShopAllowedOriginMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ShopAllowedOrigin, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ShopAllowedOriginMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ShopAllowedOriginMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ShopAllowedOrigin).
+func (m *ShopAllowedOriginMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ShopAllowedOriginMutation) Fields() []string {
+	fields := make([]string, 0, 3)
+	if m.shop != nil {
+		fields = append(fields, shopallowedorigin.FieldShopID)
+	}
+	if m.origin != nil {
+		fields = append(fields, shopallowedorigin.FieldOrigin)
+	}
+	if m.created_at != nil {
+		fields = append(fields, shopallowedorigin.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ShopAllowedOriginMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case shopallowedorigin.FieldShopID:
+		return m.ShopID()
+	case shopallowedorigin.FieldOrigin:
+		return m.Origin()
+	case shopallowedorigin.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ShopAllowedOriginMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case shopallowedorigin.FieldShopID:
+		return m.OldShopID(ctx)
+	case shopallowedorigin.FieldOrigin:
+		return m.OldOrigin(ctx)
+	case shopallowedorigin.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ShopAllowedOrigin field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ShopAllowedOriginMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case shopallowedorigin.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case shopallowedorigin.FieldOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrigin(v)
+		return nil
+	case shopallowedorigin.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ShopAllowedOrigin field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ShopAllowedOriginMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ShopAllowedOriginMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ShopAllowedOriginMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ShopAllowedOrigin numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ShopAllowedOriginMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ShopAllowedOriginMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ShopAllowedOriginMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ShopAllowedOrigin nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ShopAllowedOriginMutation) ResetField(name string) error {
+	switch name {
+	case shopallowedorigin.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case shopallowedorigin.FieldOrigin:
+		m.ResetOrigin()
+		return nil
+	case shopallowedorigin.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopAllowedOrigin field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ShopAllowedOriginMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.shop != nil {
+		edges = append(edges, shopallowedorigin.EdgeShop)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ShopAllowedOriginMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case shopallowedorigin.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ShopAllowedOriginMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ShopAllowedOriginMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ShopAllowedOriginMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedshop {
+		edges = append(edges, shopallowedorigin.EdgeShop)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ShopAllowedOriginMutation) EdgeCleared(name string) bool {
+	switch name {
+	case shopallowedorigin.EdgeShop:
+		return m.clearedshop
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ShopAllowedOriginMutation) ClearEdge(name string) error {
+	switch name {
+	case shopallowedorigin.EdgeShop:
+		m.ClearShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopAllowedOrigin unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ShopAllowedOriginMutation) ResetEdge(name string) error {
+	switch name {
+	case shopallowedorigin.EdgeShop:
+		m.ResetShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopAllowedOrigin edge %s", name)
 }
 
 // ShopUserMutation represents an operation that mutates the ShopUser nodes in the graph.

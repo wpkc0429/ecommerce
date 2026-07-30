@@ -18,11 +18,13 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/schema"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -691,6 +693,36 @@ func init() {
 	productskuDescIsActive := productskuFields[7].Descriptor()
 	// productsku.DefaultIsActive holds the default value on creation for the is_active field.
 	productsku.DefaultIsActive = productskuDescIsActive.Default.(bool)
+	publishablekeyFields := schema.PublishableKey{}.Fields()
+	_ = publishablekeyFields
+	// publishablekeyDescKey is the schema descriptor for key field.
+	publishablekeyDescKey := publishablekeyFields[1].Descriptor()
+	// publishablekey.KeyValidator is a validator for the "key" field. It is called by the builders before save.
+	publishablekey.KeyValidator = func() func(string) error {
+		validators := publishablekeyDescKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(key string) error {
+			for _, fn := range fns {
+				if err := fn(key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// publishablekeyDescLabel is the schema descriptor for label field.
+	publishablekeyDescLabel := publishablekeyFields[2].Descriptor()
+	// publishablekey.DefaultLabel holds the default value on creation for the label field.
+	publishablekey.DefaultLabel = publishablekeyDescLabel.Default.(string)
+	// publishablekey.LabelValidator is a validator for the "label" field. It is called by the builders before save.
+	publishablekey.LabelValidator = publishablekeyDescLabel.Validators[0].(func(string) error)
+	// publishablekeyDescCreatedAt is the schema descriptor for created_at field.
+	publishablekeyDescCreatedAt := publishablekeyFields[3].Descriptor()
+	// publishablekey.DefaultCreatedAt holds the default value on creation for the created_at field.
+	publishablekey.DefaultCreatedAt = publishablekeyDescCreatedAt.Default.(func() time.Time)
 	roleMixin := schema.Role{}.Mixin()
 	roleMixinFields0 := roleMixin[0].Fields()
 	_ = roleMixinFields0
@@ -865,6 +897,30 @@ func init() {
 	shopDescMeta := shopFields[4].Descriptor()
 	// shop.DefaultMeta holds the default value on creation for the meta field.
 	shop.DefaultMeta = shopDescMeta.Default.(json.RawMessage)
+	shopallowedoriginFields := schema.ShopAllowedOrigin{}.Fields()
+	_ = shopallowedoriginFields
+	// shopallowedoriginDescOrigin is the schema descriptor for origin field.
+	shopallowedoriginDescOrigin := shopallowedoriginFields[1].Descriptor()
+	// shopallowedorigin.OriginValidator is a validator for the "origin" field. It is called by the builders before save.
+	shopallowedorigin.OriginValidator = func() func(string) error {
+		validators := shopallowedoriginDescOrigin.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(origin string) error {
+			for _, fn := range fns {
+				if err := fn(origin); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shopallowedoriginDescCreatedAt is the schema descriptor for created_at field.
+	shopallowedoriginDescCreatedAt := shopallowedoriginFields[2].Descriptor()
+	// shopallowedorigin.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shopallowedorigin.DefaultCreatedAt = shopallowedoriginDescCreatedAt.Default.(func() time.Time)
 	shopuserFields := schema.ShopUser{}.Fields()
 	_ = shopuserFields
 	// shopuserDescCreatedAt is the schema descriptor for created_at field.

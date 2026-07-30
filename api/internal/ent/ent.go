@@ -21,12 +21,14 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -116,12 +118,14 @@ func checkColumn(t, c string) error {
 			product.Table:            product.ValidColumn,
 			productcategory.Table:    productcategory.ValidColumn,
 			productsku.Table:         productsku.ValidColumn,
+			publishablekey.Table:     publishablekey.ValidColumn,
 			role.Table:               role.ValidColumn,
 			rolepermission.Table:     rolepermission.ValidColumn,
 			roleuser.Table:           roleuser.ValidColumn,
 			shipment.Table:           shipment.ValidColumn,
 			shippingmethod.Table:     shippingmethod.ValidColumn,
 			shop.Table:               shop.ValidColumn,
+			shopallowedorigin.Table:  shopallowedorigin.ValidColumn,
 			shopuser.Table:           shopuser.ValidColumn,
 			site.Table:               site.ValidColumn,
 			siteshop.Table:           siteshop.ValidColumn,

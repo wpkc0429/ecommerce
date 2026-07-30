@@ -631,6 +631,36 @@ var (
 			},
 		},
 	}
+	// PublishableKeysColumns holds the columns for the "publishable_keys" table.
+	PublishableKeysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "key", Type: field.TypeString, Unique: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "label", Type: field.TypeString, Size: 100, Default: "", SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// PublishableKeysTable holds the schema information for the "publishable_keys" table.
+	PublishableKeysTable = &schema.Table{
+		Name:       "publishable_keys",
+		Columns:    PublishableKeysColumns,
+		PrimaryKey: []*schema.Column{PublishableKeysColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "publishable_keys_shops_shop",
+				Columns:    []*schema.Column{PublishableKeysColumns[5]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "publishablekey_shop_id",
+				Unique:  false,
+				Columns: []*schema.Column{PublishableKeysColumns[5]},
+			},
+		},
+	}
 	// RolesColumns holds the columns for the "roles" table.
 	RolesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -828,6 +858,34 @@ var (
 				Name:    "shop_theme_id",
 				Unique:  false,
 				Columns: []*schema.Column{ShopsColumns[7]},
+			},
+		},
+	}
+	// ShopAllowedOriginsColumns holds the columns for the "shop_allowed_origins" table.
+	ShopAllowedOriginsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "origin", Type: field.TypeString, Unique: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ShopAllowedOriginsTable holds the schema information for the "shop_allowed_origins" table.
+	ShopAllowedOriginsTable = &schema.Table{
+		Name:       "shop_allowed_origins",
+		Columns:    ShopAllowedOriginsColumns,
+		PrimaryKey: []*schema.Column{ShopAllowedOriginsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shop_allowed_origins_shops_shop",
+				Columns:    []*schema.Column{ShopAllowedOriginsColumns[3]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shopallowedorigin_shop_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShopAllowedOriginsColumns[3]},
 			},
 		},
 	}
@@ -1089,12 +1147,14 @@ var (
 		ProductsTable,
 		ProductCategoryTable,
 		ProductSkusTable,
+		PublishableKeysTable,
 		RolesTable,
 		RolePermissionTable,
 		RoleUserTable,
 		ShipmentsTable,
 		ShippingMethodsTable,
 		ShopsTable,
+		ShopAllowedOriginsTable,
 		ShopUserTable,
 		SitesTable,
 		SiteShopTable,
@@ -1200,6 +1260,10 @@ func init() {
 		"product_skus_price_amount_check": "price_amount >= 0",
 		"product_skus_stock_qty_check":    "stock_qty >= 0",
 	}
+	PublishableKeysTable.ForeignKeys[0].RefTable = ShopsTable
+	PublishableKeysTable.Annotation = &entsql.Annotation{
+		Table: "publishable_keys",
+	}
 	RolesTable.Annotation = &entsql.Annotation{}
 	RolesTable.Annotation.Checks = map[string]string{
 		"roles_scope_check": "scope IN ('platform', 'merchant')",
@@ -1232,6 +1296,10 @@ func init() {
 	ShopsTable.Annotation = &entsql.Annotation{}
 	ShopsTable.Annotation.Checks = map[string]string{
 		"shops_status_check": "status IN (0, 1, 2)",
+	}
+	ShopAllowedOriginsTable.ForeignKeys[0].RefTable = ShopsTable
+	ShopAllowedOriginsTable.Annotation = &entsql.Annotation{
+		Table: "shop_allowed_origins",
 	}
 	ShopUserTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopUserTable.ForeignKeys[1].RefTable = UsersTable

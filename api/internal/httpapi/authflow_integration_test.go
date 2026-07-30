@@ -31,13 +31,22 @@ type authEnv struct {
 	refresh *auth.RefreshService
 }
 
-// fakeTenantMW resolves X-Site-Domain via a static host→shop map, standing in
-// for the real resolver (task 5.1) so auth flows are testable in isolation.
-func fakeTenantMW(hosts map[string]int) func(http.Handler) http.Handler {
+// Stand-in publishable keys for the fake resolver below.
+const (
+	keyShopA = "pk_faketenantshopaaaaaaaaaaaaaaaaa"
+	keyShopB = "pk_faketenantshopbbbbbbbbbbbbbbbbb"
+)
+
+// fakeTenantMW resolves X-Publishable-Key via a static key→shop map, standing
+// in for the real resolver so auth flows are testable in isolation. It models
+// the same channel the real middleware uses (change storefront-client-auth
+// design D6/D7); X-Site-Domain no longer resolves anything in this group, so
+// keeping it here would only teach a misleading pattern.
+func fakeTenantMW(keys map[string]int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			host := strings.ToLower(r.Header.Get("X-Site-Domain"))
-			shopID, ok := hosts[host]
+			key := strings.ToLower(r.Header.Get(httpapi.PublishableKeyHeader))
+			shopID, ok := keys[key]
 			if !ok {
 				http.NotFound(w, r)
 				return
@@ -70,8 +79,8 @@ func newAuthEnv(t *testing.T) *authEnv {
 		AdminMW:    httpapi.NewAdminMiddleware(issuer),
 		MemberMW:   httpapi.NewMemberMiddleware(issuer),
 		TenantMW: fakeTenantMW(map[string]int{
-			"shop-a.test": shopA.ID,
-			"shop-b.test": shopB.ID,
+			keyShopA: shopA.ID,
+			keyShopB: shopB.ID,
 		}),
 	})
 	return &authEnv{client: client, router: router, shopA: shopA.ID, shopB: shopB.ID, refresh: refresh}
@@ -205,8 +214,8 @@ func TestAdminLogoutAndDisabledRefresh(t *testing.T) {
 func TestMemberRegistrationIsShopScopedAndIsomorphic(t *testing.T) {
 	e := newAuthEnv(t)
 	ctx := context.Background()
-	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
-	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
+	hostB := map[string]string{httpapi.PublishableKeyHeader: keyShopB}
 
 	keysOf := func(m map[string]any) string {
 		ks := make([]string, 0, len(m))
@@ -273,8 +282,8 @@ func TestMemberRegistrationIsShopScopedAndIsomorphic(t *testing.T) {
 func TestMemberCredentialsDoNotCrossShops(t *testing.T) {
 	e := newAuthEnv(t)
 	ctx := context.Background()
-	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
-	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
+	hostB := map[string]string{httpapi.PublishableKeyHeader: keyShopB}
 
 	if code, _, raw := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
 		map[string]string{"email": "buyer@test.dev", "password": "password-123"}); code != 200 {
@@ -316,7 +325,7 @@ func TestMemberCredentialsDoNotCrossShops(t *testing.T) {
 func TestMemberLoginScopeAndTokenIsolation(t *testing.T) {
 	e := newAuthEnv(t)
 	ctx := context.Background()
-	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
 
 	_, regA, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
 		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
@@ -337,11 +346,11 @@ func TestMemberLoginScopeAndTokenIsolation(t *testing.T) {
 		{"member token on admin API", "/api/v1/admin/me",
 			map[string]string{"Authorization": "Bearer " + memberAccessA}, 401},
 		{"admin token on member API", "/api/v1/shop/me",
-			map[string]string{"Authorization": "Bearer " + adminAccess, "X-Site-Domain": "shop-a.test"}, 401},
+			map[string]string{"Authorization": "Bearer " + adminAccess, httpapi.PublishableKeyHeader: keyShopA}, 401},
 		{"shop A member token on shop B", "/api/v1/shop/me",
-			map[string]string{"Authorization": "Bearer " + memberAccessA, "X-Site-Domain": "shop-b.test"}, 401},
+			map[string]string{"Authorization": "Bearer " + memberAccessA, httpapi.PublishableKeyHeader: keyShopB}, 401},
 		{"shop A member token on shop A", "/api/v1/shop/me",
-			map[string]string{"Authorization": "Bearer " + memberAccessA, "X-Site-Domain": "shop-a.test"}, 200},
+			map[string]string{"Authorization": "Bearer " + memberAccessA, httpapi.PublishableKeyHeader: keyShopA}, 200},
 		{"admin token on admin API", "/api/v1/admin/me",
 			map[string]string{"Authorization": "Bearer " + adminAccess}, 200},
 	}
@@ -353,7 +362,7 @@ func TestMemberLoginScopeAndTokenIsolation(t *testing.T) {
 	}
 
 	// Member refresh tokens are shop-bound: A-issued refresh fails on B.
-	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
+	hostB := map[string]string{httpapi.PublishableKeyHeader: keyShopB}
 	refreshA := regA["refresh_token"].(string)
 	code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/refresh", hostB, map[string]string{"refresh_token": refreshA})
 	if code != 401 {

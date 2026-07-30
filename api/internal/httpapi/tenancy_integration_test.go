@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/member"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/rbac"
@@ -206,10 +207,14 @@ func TestSitesAPIConstraintsAndInvalidation(t *testing.T) {
 	}
 }
 
-// The tenant middleware end-to-end: header channel + status gating.
+// The tenant middleware end-to-end: Host channel + status gating.
+//
+// change storefront-client-auth (design D6): the storefront group no longer
+// reads X-Site-Domain / X-Site-Path at all, so the Host is the only
+// keyless channel left — the "header wins over Host" case below is inverted
+// into "the header is ignored".
 func TestTenantMiddlewareHTTP(t *testing.T) {
 	e := newTenancyEnv(t)
-	log := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 
 	var gotShop int
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,28 +222,23 @@ func TestTenantMiddlewareHTTP(t *testing.T) {
 		w.WriteHeader(200)
 	})
 	mw := httpapi.NewTenantMiddleware(e.resolver)(inner)
-	_ = log
 
 	cases := []struct {
 		name     string
-		domain   string
-		path     string
+		host     string
 		want     int
 		wantShop int
 	}{
-		{"X-Site-Domain wins over Host", "shop1.test", "/", 200, e.active},
-		{"prefix via X-Site-Path", "shop1.test", "/brand-a/cart", 200, e.brandA},
-		{"unknown domain 404", "nope.test", "/", 404, 0},
-		{"disabled shop 503", "disabled.test", "/", 503, 0},
-		{"review shop 404", "review.test", "/", 404, 0},
+		{"Host resolves to the site's default shop", "shop1.test", 200, e.active},
+		{"unknown domain 404", "nope.test", 404, 0},
+		{"disabled shop 503", "disabled.test", 503, 0},
+		{"review shop 404", "review.test", 404, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			gotShop = 0
 			req := httptest.NewRequest("POST", "/api/v1/shop/auth/login", nil)
-			req.Host = "irrelevant.example" // X-Site-Domain must take precedence
-			req.Header.Set("X-Site-Domain", tc.domain)
-			req.Header.Set("X-Site-Path", tc.path)
+			req.Host = tc.host
 			rec := httptest.NewRecorder()
 			mw.ServeHTTP(rec, req)
 			if rec.Code != tc.want {
@@ -248,6 +248,132 @@ func TestTenantMiddlewareHTTP(t *testing.T) {
 				t.Fatalf("shop ctx %d, want %d", gotShop, tc.wantShop)
 			}
 		})
+	}
+
+	// Scenario (multi-tenancy): 前台 API 忽略 X-Site-Domain. The header names a
+	// disabled shop, which would have produced a 503 before this change; the
+	// Host wins because the header is no longer read at all.
+	t.Run("X-Site-Domain is ignored by the storefront group", func(t *testing.T) {
+		gotShop = 0
+		req := httptest.NewRequest("POST", "/api/v1/shop/auth/login", nil)
+		req.Host = "shop1.test"
+		req.Header.Set("X-Site-Domain", "disabled.test")
+		req.Header.Set("X-Site-Path", "/brand-a")
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, req)
+		if rec.Code != 200 || gotShop != e.active {
+			t.Fatalf("status=%d shop=%d, want 200/%d (%s)", rec.Code, gotShop, e.active, rec.Body.String())
+		}
+	})
+}
+
+// TestPublishableKeyTenantResolution pins spec storefront-client-auth's
+// resolution requirements at the middleware boundary: the key wins over Host,
+// an unusable key never falls back, and unknown/malformed/revoked keys are
+// indistinguishable.
+func TestPublishableKeyTenantResolution(t *testing.T) {
+	e := newTenancyEnv(t)
+	ctx := context.Background()
+
+	mint := func(shopID int) string {
+		v, err := tenant.NewPublishableKey()
+		if err != nil {
+			t.Fatal(err)
+		}
+		e.client.PublishableKey.Create().SetShopID(shopID).SetKey(v).SaveX(ctx)
+		return v
+	}
+	activeKey := mint(e.active)
+	brandKey := mint(e.brandA)
+	disabledKey := mint(e.disabled)
+	reviewKey := mint(e.review)
+	revokedKey := mint(e.active)
+	e.client.PublishableKey.Update().
+		Where(publishablekey.KeyEQ(revokedKey)).SetRevokedAt(time.Now()).ExecX(ctx)
+
+	var gotShop int
+	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotShop, _ = tenant.ShopID(r.Context())
+		w.WriteHeader(200)
+	})
+	mw := httpapi.NewTenantMiddleware(e.resolver)(inner)
+
+	call := func(key, host string) (int, string, int) {
+		gotShop = 0
+		req := httptest.NewRequest("POST", "/api/v1/shop/auth/login", nil)
+		req.Host = host
+		if key != "" {
+			req.Header.Set(httpapi.PublishableKeyHeader, key)
+		}
+		rec := httptest.NewRecorder()
+		mw.ServeHTTP(rec, req)
+		return rec.Code, rec.Body.String(), gotShop
+	}
+
+	// Scenario: 有效金鑰解析出商家 — including a shop that has no domain of its
+	// own on this site's default mapping (brandA is prefix-only).
+	if code, body, shop := call(activeKey, "irrelevant.example"); code != 200 || shop != e.active {
+		t.Fatalf("active key: code=%d shop=%d (%s)", code, shop, body)
+	}
+	if code, body, shop := call(brandKey, "irrelevant.example"); code != 200 || shop != e.brandA {
+		t.Fatalf("prefix-shop key: code=%d shop=%d (%s)", code, shop, body)
+	}
+
+	// Scenario: 金鑰優先於 Host — the Host would resolve to a different shop.
+	if code, body, shop := call(activeKey, "review.test"); code != 200 || shop != e.active {
+		t.Fatalf("key must win over Host: code=%d shop=%d (%s)", code, shop, body)
+	}
+
+	// Scenario: 已撤銷金鑰被拒且不回退 — the Host alone would have been a 200.
+	revokedCode, revokedBody, shop := call(revokedKey, "shop1.test")
+	if revokedCode != 404 || shop != 0 {
+		t.Fatalf("revoked key must 404 without falling back: code=%d shop=%d (%s)", revokedCode, shop, revokedBody)
+	}
+
+	// Scenario: 未知金鑰與已撤銷金鑰的回應同構 (malformed too — every unusable
+	// key looks the same from outside).
+	unknownCode, unknownBody, _ := call("pk_zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz", "shop1.test")
+	malformedCode, malformedBody, _ := call("not-a-key", "shop1.test")
+	if unknownCode != revokedCode || malformedCode != revokedCode {
+		t.Fatalf("statuses must be identical: revoked=%d unknown=%d malformed=%d", revokedCode, unknownCode, malformedCode)
+	}
+	if unknownBody != revokedBody || malformedBody != revokedBody {
+		t.Fatalf("bodies must be identical:\nrevoked=%s\nunknown=%s\nmalformed=%s", revokedBody, unknownBody, malformedBody)
+	}
+	var parsed map[string]any
+	_ = json.Unmarshal([]byte(revokedBody), &parsed)
+	if errObj, _ := parsed["error"].(map[string]any); errObj["code"] != "unknown_publishable_key" {
+		t.Fatalf("want the dedicated error code, got %v", parsed)
+	}
+
+	// Scenario: 停用商家的金鑰 / 審核中商家的金鑰 — same gating as the domain path.
+	if code, body, _ := call(disabledKey, "shop1.test"); code != 503 {
+		t.Fatalf("disabled shop key: want 503, got %d (%s)", code, body)
+	}
+	if code, body, _ := call(reviewKey, "shop1.test"); code != 404 {
+		t.Fatalf("under-review shop key: want 404, got %d (%s)", code, body)
+	}
+
+	// Scenario: 撤銷即時生效 — prime the cache with a live key, revoke it, then
+	// invalidate through the same call the domain-event subscriber makes.
+	rotating := mint(e.active)
+	if code, _, _ := call(rotating, "irrelevant.example"); code != 200 {
+		t.Fatalf("priming call: %d", code)
+	}
+	e.client.PublishableKey.Update().
+		Where(publishablekey.KeyEQ(rotating)).SetRevokedAt(time.Now()).ExecX(ctx)
+	e.resolver.InvalidateKeys(ctx, rotating)
+	if code, body, _ := call(rotating, "irrelevant.example"); code != 404 {
+		t.Fatalf("revocation must take effect without waiting for the TTL: %d (%s)", code, body)
+	}
+
+	// Scenario: 金鑰不接受查詢參數.
+	req := httptest.NewRequest("POST", "/api/v1/shop/auth/login?publishable_key="+activeKey, nil)
+	req.Host = "nope.test"
+	rec := httptest.NewRecorder()
+	mw.ServeHTTP(rec, req)
+	if rec.Code != 404 {
+		t.Fatalf("query-parameter key must not resolve a tenant: %d (%s)", rec.Code, rec.Body.String())
 	}
 }
 

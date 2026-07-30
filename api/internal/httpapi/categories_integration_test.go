@@ -136,11 +136,13 @@ func (e *catalogEnv) callJSON(t *testing.T, userID int, method, path string, bod
 }
 
 // public issues an unauthenticated request through the tenant-resolved
-// storefront group (X-Site-Domain channel, design D5).
+// storefront group (Host channel — change storefront-client-auth removed
+// X-Site-Domain from this group; a self-hosted client would send a
+// publishable key instead).
 func (e *catalogEnv) public(t *testing.T, method, path, domain string) (int, string) {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
-	req.Header.Set("X-Site-Domain", domain)
+	req.Host = domain
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()

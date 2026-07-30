@@ -41,8 +41,8 @@
 
 ## Domain Context
 
-- shop＝租戶；site↔shop 多對多，`path_prefix` 消歧、`is_primary` 主網域；`X-Site-Domain` 標頭為原生 APP 通道
-- 後台 `users`（RBAC）與前台 `members`（平台級身分 + `shop_member` 會籍）完全分離，JWT 金鑰/audience 隔離
+- shop＝租戶；site↔shop 多對多，`path_prefix` 消歧、`is_primary` 主網域；不由平台託管的前端（商家自帶靜態站／SPA／原生 APP）以 `X-Publishable-Key` 宣告所代表的商家（change storefront-client-auth），`X-Site-Domain` 僅存活於渲染 bundle 端點
+- 後台 `users`（RBAC）與前台 `members`（每商家獨立身分，change member-identity-per-shop）完全分離，JWT 金鑰/audience 隔離
 - 頁面以 `type_key` 動態綁定當前主題頁型（換版免遷移）；draft（`content_json`）/published（`published_json`）兩態
 - 渲染 bundle 為用戶端無關 SDUI 契約：web SSR 與未來原生 APP 消費同一結構，未知區塊型別必須優雅略過
 
@@ -51,7 +51,8 @@
 - PostgreSQL 15+ 才有 UNIQUE NULLS NOT DISTINCT（環境鎖定 PG16）
 - Redis 僅作 cache：所有快取路徑皆有 DB fallback，Redis 故障是 degrade 不是 down
 - jsonb 不保留物件鍵順序：schema 驅動表單的欄位順序非撰寫順序（如需固定順序需另訂 x-editor 排序約定）
-- `members.email/phone` 全平台唯一為刻意設計，註冊/登入回應不得洩漏跨店存在性
+- `members.email/phone` 唯一性以商家為界（`UNIQUE(shop_id, email/phone)`，change member-identity-per-shop），註冊/登入回應不得洩漏該 email 是否為本店顧客
+- publishable key 是公開識別碼不是憑證：明文儲存、可完整顯示、MUST NOT 作為授權依據（change storefront-client-auth design D1）
 
 ## External Dependencies
 

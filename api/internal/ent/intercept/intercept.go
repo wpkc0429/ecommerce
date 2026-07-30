@@ -23,12 +23,14 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -502,6 +504,33 @@ func (f TraverseProductSKU) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.ProductSKUQuery", q)
 }
 
+// The PublishableKeyFunc type is an adapter to allow the use of ordinary function as a Querier.
+type PublishableKeyFunc func(context.Context, *ent.PublishableKeyQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f PublishableKeyFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.PublishableKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.PublishableKeyQuery", q)
+}
+
+// The TraversePublishableKey type is an adapter to allow the use of ordinary function as Traverser.
+type TraversePublishableKey func(context.Context, *ent.PublishableKeyQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraversePublishableKey) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraversePublishableKey) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.PublishableKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.PublishableKeyQuery", q)
+}
+
 // The RoleFunc type is an adapter to allow the use of ordinary function as a Querier.
 type RoleFunc func(context.Context, *ent.RoleQuery) (ent.Value, error)
 
@@ -662,6 +691,33 @@ func (f TraverseShop) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.ShopQuery", q)
+}
+
+// The ShopAllowedOriginFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShopAllowedOriginFunc func(context.Context, *ent.ShopAllowedOriginQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShopAllowedOriginFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShopAllowedOriginQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopAllowedOriginQuery", q)
+}
+
+// The TraverseShopAllowedOrigin type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShopAllowedOrigin func(context.Context, *ent.ShopAllowedOriginQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShopAllowedOrigin) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShopAllowedOrigin) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShopAllowedOriginQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShopAllowedOriginQuery", q)
 }
 
 // The ShopUserFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -913,6 +969,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ProductCategoryQuery, predicate.ProductCategory, productcategory.OrderOption]{typ: ent.TypeProductCategory, tq: q}, nil
 	case *ent.ProductSKUQuery:
 		return &query[*ent.ProductSKUQuery, predicate.ProductSKU, productsku.OrderOption]{typ: ent.TypeProductSKU, tq: q}, nil
+	case *ent.PublishableKeyQuery:
+		return &query[*ent.PublishableKeyQuery, predicate.PublishableKey, publishablekey.OrderOption]{typ: ent.TypePublishableKey, tq: q}, nil
 	case *ent.RoleQuery:
 		return &query[*ent.RoleQuery, predicate.Role, role.OrderOption]{typ: ent.TypeRole, tq: q}, nil
 	case *ent.RolePermissionQuery:
@@ -925,6 +983,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ShippingMethodQuery, predicate.ShippingMethod, shippingmethod.OrderOption]{typ: ent.TypeShippingMethod, tq: q}, nil
 	case *ent.ShopQuery:
 		return &query[*ent.ShopQuery, predicate.Shop, shop.OrderOption]{typ: ent.TypeShop, tq: q}, nil
+	case *ent.ShopAllowedOriginQuery:
+		return &query[*ent.ShopAllowedOriginQuery, predicate.ShopAllowedOrigin, shopallowedorigin.OrderOption]{typ: ent.TypeShopAllowedOrigin, tq: q}, nil
 	case *ent.ShopUserQuery:
 		return &query[*ent.ShopUserQuery, predicate.ShopUser, shopuser.OrderOption]{typ: ent.TypeShopUser, tq: q}, nil
 	case *ent.SiteQuery:

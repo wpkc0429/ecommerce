@@ -52,6 +52,20 @@ type SiteMappingChanged struct {
 
 func (SiteMappingChanged) EventName() string { return "site.mapping_changed" }
 
+// StorefrontClientChanged — a shop's publishable keys or allowed origins were
+// created, revoked or deleted (change storefront-client-auth, design D10).
+// Subscribers drop the affected `pkey:{key}` / `corsorigin:{origin}` cache
+// entries so revocation takes effect immediately instead of after the TTL.
+// Either slice may be empty; both name the values as they were before the
+// mutation, which is what the cache is keyed by.
+type StorefrontClientChanged struct {
+	ShopID  int
+	Keys    []string
+	Origins []string
+}
+
+func (StorefrontClientChanged) EventName() string { return "storefront.client_changed" }
+
 // OrderPaymentSucceeded — payment.Service.HandleWebhook advanced an order's
 // payment_status to paid (change member-tiers-and-points design D1): the
 // first non-cache consumer of this dispatcher. Published every time the

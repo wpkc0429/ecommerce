@@ -185,7 +185,7 @@ func (e *paymentEnv) memberRequest(memberID, shopID int, domain, method, path st
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if domain != "" {
-		req.Header.Set("X-Site-Domain", domain)
+		req.Host = domain // change storefront-client-auth: Host, not X-Site-Domain
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)

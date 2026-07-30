@@ -27,7 +27,7 @@ TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purp
 
 ### Requirement: Member registration and login in shop context
 
-前台會員的註冊與登入 MUST 於商家上下文（Host 解析）進行，且 MUST 完全在該商家範圍內判定。註冊時 email/phone 命中**該商家**既有 `members` 者 MUST 被拒；未命中者建立一筆隸屬該商家的 `members`。同一 email/phone 於其他商家是否已存在 MUST NOT 影響本商家的註冊結果，系統 MUST NOT 提供任何沿用其他商家身分的路徑。
+前台會員的註冊與登入 MUST 於商家上下文（前台租戶解析，見 spec multi-tenancy 的 Host-based tenant resolution：publishable key 優先、否則 `Host`）進行，且 MUST 完全在該商家範圍內判定。註冊時 email/phone 命中**該商家**既有 `members` 者 MUST 被拒；未命中者建立一筆隸屬該商家的 `members`。同一 email/phone 於其他商家是否已存在 MUST NOT 影響本商家的註冊結果，系統 MUST NOT 提供任何沿用其他商家身分的路徑。
 
 註冊成功與各種失敗情形的回應 MUST 同構，不得洩漏該 email/phone 是否已為本商家顧客。登入成功簽發 `aud=shop:{shop_id}` 的 access token 與綁定該店的 refresh token。
 
@@ -48,6 +48,10 @@ TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purp
 #### Scenario: 他店密碼無法登入本店
 - **WHEN** 以顧客於 shop A 設定的 email 與密碼向 shop B 網域登入，而該 email 尚未於 shop B 註冊
 - **THEN** 登入失敗，MUST NOT 簽發任何 shop B 的 token
+
+#### Scenario: 以金鑰指定商家的註冊
+- **WHEN** 自帶前端以 shop A 的 publishable key 呼叫註冊端點
+- **THEN** 於 shop A 建立身分並回傳 shop A 的 token，行為與以 shop A 網域註冊完全相同
 
 #### Scenario: 單一商家超限
 - **WHEN** 同一來源 IP 對 shop A 的同一 email 在門檻視窗內的登入或註冊嘗試次數超過嚴格規則上限

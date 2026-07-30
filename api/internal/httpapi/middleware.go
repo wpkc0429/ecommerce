@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,10 +16,27 @@ import (
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
-// NewCORSMiddleware allows the admin SPA (and storefront dev) origins to call
-// the API from the browser. Origins come from config; credentials are not
-// used (Bearer tokens travel in headers).
-func NewCORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+// OriginRegistry answers "is this origin registered by some shop?" — the only
+// question a CORS preflight can ask, since an OPTIONS preflight carries no
+// custom header values and therefore no tenant context (change
+// storefront-client-auth, design D3). *tenant.Resolver implements it.
+type OriginRegistry interface {
+	IsRegisteredOrigin(ctx context.Context, origin string) bool
+}
+
+// NewCORSMiddleware grants browser access to the API. The allowed set is the
+// union of two sources:
+//
+//	platform list (CORS_ALLOWED_ORIGINS) — the platform's own front ends: the
+//	    admin SPA, the storefront dev server, any future platform-hosted
+//	    multi-tenant SPA.
+//	registry (shop_allowed_origins)      — merchant-owned front ends, registered
+//	    per shop and effective immediately, with no env change or restart
+//	    (change storefront-client-auth).
+//
+// Credentials are not used (Bearer tokens travel in headers), so no
+// Access-Control-Allow-Credentials is emitted.
+func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(http.Handler) http.Handler {
 	allowed := make(map[string]bool, len(allowedOrigins))
 	for _, o := range allowedOrigins {
 		allowed[strings.TrimSuffix(strings.TrimSpace(o), "/")] = true
@@ -26,12 +44,21 @@ func NewCORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			if origin != "" && allowed[origin] {
+			// The platform list short-circuits first: admin/web traffic never
+			// reaches the registry lookup, and server-to-server requests carry
+			// no Origin at all.
+			if origin != "" && (allowed[origin] ||
+				(registry != nil && registry.IsRegisteredOrigin(r.Context(), origin))) {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Vary", "Origin")
 				h.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Site-Domain, X-Site-Path")
+				// X-Publishable-Key MUST be listed or browsers reject the
+				// actual request after the preflight. X-Site-Domain /
+				// X-Site-Path are gone: the only endpoint that still reads
+				// X-Site-Domain is called server-to-server by the SSR, never
+				// from a browser.
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+PublishableKeyHeader)
 				h.Set("Access-Control-Expose-Headers", "X-Cache")
 				h.Set("Access-Control-Max-Age", "600")
 				if r.Method == http.MethodOptions {

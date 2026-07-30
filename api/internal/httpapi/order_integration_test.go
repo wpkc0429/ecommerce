@@ -179,7 +179,7 @@ func (e *orderEnv) memberRequest(memberID, shopID int, domain, method, path stri
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if domain != "" {
-		req.Header.Set("X-Site-Domain", domain)
+		req.Host = domain // change storefront-client-auth: Host, not X-Site-Domain
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -526,7 +526,7 @@ func TestOrderMemberCrossShopIsolation(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/shop/orders/%d", orderID), nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("X-Site-Domain", e.shopBDomain)
+	req.Host = e.shopBDomain
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {

@@ -54,6 +54,14 @@ var tenantOwned = map[string]bool{
 	// PointTransaction mirrors Payment/Shipment's shape).
 	"MemberTier":       true,
 	"PointTransaction": true,
+	// change storefront-client-auth: both carry a direct shop_id column.
+	// Their *resolution* paths (publishable key → shop, origin → registered?)
+	// deliberately run before any tenant context exists — they are what
+	// establishes it — and scope themselves by the unique key/origin column,
+	// so this entry governs the back-office paths only (which, being outside
+	// tenant context too, pass an explicit shop_id as always).
+	"PublishableKey":    true,
+	"ShopAllowedOrigin": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

@@ -51,6 +51,14 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"shop.list", "列出所有商家（平台層）"},
 	{"shop.update", "更新商家全域內容與切換主題"},
 	{"shop.manage_domains", "管理站點網域與 site-shop 綁定（平台層）"},
+	// change storefront-client-auth (design D11): allowed origins are a
+	// contested global namespace like bound domains, hence platform-scoped;
+	// publishable keys are randomly generated per shop, hence merchant-scoped
+	// and self-service.
+	{"shop.manage_client_origins", "登記商家自帶前端的瀏覽器 origin（平台層）"},
+	{"publishable_key.view", "檢視商家的 publishable key"},
+	{"publishable_key.create", "產生 publishable key"},
+	{"publishable_key.revoke", "撤銷 publishable key"},
 	{"page.view", "檢視頁面"},
 	{"page.create", "建立頁面"},
 	{"page.edit", "編輯頁面內容"},
@@ -105,6 +113,10 @@ var roleDefs = []struct {
 		"shipment.view", "shipment.create", "shipment.update",
 		"member_tier.view", "member_tier.create", "member_tier.edit", "member_tier.delete",
 		"point.view", "point.adjust",
+		// change storefront-client-auth: key rotation is the merchant's own
+		// operational rhythm. Deliberately not granted to `editor` — minting a
+		// client identity is an integration action, not content editing.
+		"publishable_key.view", "publishable_key.create", "publishable_key.revoke",
 	}},
 	{"editor", "merchant", []string{
 		"shop.view", "page.view", "page.create", "page.edit", "theme.view",

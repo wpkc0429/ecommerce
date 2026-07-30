@@ -44,6 +44,8 @@ type Tx struct {
 	ProductCategory *ProductCategoryClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
+	// PublishableKey is the client for interacting with the PublishableKey builders.
+	PublishableKey *PublishableKeyClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
@@ -56,6 +58,8 @@ type Tx struct {
 	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
+	// ShopAllowedOrigin is the client for interacting with the ShopAllowedOrigin builders.
+	ShopAllowedOrigin *ShopAllowedOriginClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -218,12 +222,14 @@ func (tx *Tx) init() {
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductCategory = NewProductCategoryClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
+	tx.PublishableKey = NewPublishableKeyClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.RoleUser = NewRoleUserClient(tx.config)
 	tx.Shipment = NewShipmentClient(tx.config)
 	tx.ShippingMethod = NewShippingMethodClient(tx.config)
 	tx.Shop = NewShopClient(tx.config)
+	tx.ShopAllowedOrigin = NewShopAllowedOriginClient(tx.config)
 	tx.ShopUser = NewShopUserClient(tx.config)
 	tx.Site = NewSiteClient(tx.config)
 	tx.SiteShop = NewSiteShopClient(tx.config)

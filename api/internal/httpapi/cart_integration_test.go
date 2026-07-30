@@ -121,7 +121,10 @@ func (e *cartEnv) call(t *testing.T, memberID, shopID int, domain, method, path 
 		req.Header.Set("Authorization", authHeader)
 	}
 	if domain != "" {
-		req.Header.Set("X-Site-Domain", domain)
+		// change storefront-client-auth: the storefront group resolves the
+		// tenant from the publishable key or the Host header — X-Site-Domain
+		// is no longer read here.
+		req.Host = domain
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)

@@ -26,12 +26,14 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
+	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -84,6 +86,8 @@ type Client struct {
 	ProductCategory *ProductCategoryClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
+	// PublishableKey is the client for interacting with the PublishableKey builders.
+	PublishableKey *PublishableKeyClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
 	// RolePermission is the client for interacting with the RolePermission builders.
@@ -96,6 +100,8 @@ type Client struct {
 	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
+	// ShopAllowedOrigin is the client for interacting with the ShopAllowedOrigin builders.
+	ShopAllowedOrigin *ShopAllowedOriginClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -138,12 +144,14 @@ func (c *Client) init() {
 	c.Product = NewProductClient(c.config)
 	c.ProductCategory = NewProductCategoryClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
+	c.PublishableKey = NewPublishableKeyClient(c.config)
 	c.Role = NewRoleClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
 	c.RoleUser = NewRoleUserClient(c.config)
 	c.Shipment = NewShipmentClient(c.config)
 	c.ShippingMethod = NewShippingMethodClient(c.config)
 	c.Shop = NewShopClient(c.config)
+	c.ShopAllowedOrigin = NewShopAllowedOriginClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
 	c.Site = NewSiteClient(c.config)
 	c.SiteShop = NewSiteShopClient(c.config)
@@ -259,12 +267,14 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Product:            NewProductClient(cfg),
 		ProductCategory:    NewProductCategoryClient(cfg),
 		ProductSKU:         NewProductSKUClient(cfg),
+		PublishableKey:     NewPublishableKeyClient(cfg),
 		Role:               NewRoleClient(cfg),
 		RolePermission:     NewRolePermissionClient(cfg),
 		RoleUser:           NewRoleUserClient(cfg),
 		Shipment:           NewShipmentClient(cfg),
 		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
+		ShopAllowedOrigin:  NewShopAllowedOriginClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
 		Site:               NewSiteClient(cfg),
 		SiteShop:           NewSiteShopClient(cfg),
@@ -307,12 +317,14 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Product:            NewProductClient(cfg),
 		ProductCategory:    NewProductCategoryClient(cfg),
 		ProductSKU:         NewProductSKUClient(cfg),
+		PublishableKey:     NewPublishableKeyClient(cfg),
 		Role:               NewRoleClient(cfg),
 		RolePermission:     NewRolePermissionClient(cfg),
 		RoleUser:           NewRoleUserClient(cfg),
 		Shipment:           NewShipmentClient(cfg),
 		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
+		ShopAllowedOrigin:  NewShopAllowedOriginClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
 		Site:               NewSiteClient(cfg),
 		SiteShop:           NewSiteShopClient(cfg),
@@ -352,9 +364,10 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
 		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopUser, c.Site,
-		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Product, c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role,
+		c.RolePermission, c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop,
+		c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage,
+		c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -366,9 +379,10 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
 		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopUser, c.Site,
-		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Product, c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role,
+		c.RolePermission, c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop,
+		c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage,
+		c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -407,6 +421,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProductCategory.mutate(ctx, m)
 	case *ProductSKUMutation:
 		return c.ProductSKU.mutate(ctx, m)
+	case *PublishableKeyMutation:
+		return c.PublishableKey.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
 	case *RolePermissionMutation:
@@ -419,6 +435,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ShippingMethod.mutate(ctx, m)
 	case *ShopMutation:
 		return c.Shop.mutate(ctx, m)
+	case *ShopAllowedOriginMutation:
+		return c.ShopAllowedOrigin.mutate(ctx, m)
 	case *ShopUserMutation:
 		return c.ShopUser.mutate(ctx, m)
 	case *SiteMutation:
@@ -3017,6 +3035,155 @@ func (c *ProductSKUClient) mutate(ctx context.Context, m *ProductSKUMutation) (V
 	}
 }
 
+// PublishableKeyClient is a client for the PublishableKey schema.
+type PublishableKeyClient struct {
+	config
+}
+
+// NewPublishableKeyClient returns a client for the PublishableKey from the given config.
+func NewPublishableKeyClient(c config) *PublishableKeyClient {
+	return &PublishableKeyClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `publishablekey.Hooks(f(g(h())))`.
+func (c *PublishableKeyClient) Use(hooks ...Hook) {
+	c.hooks.PublishableKey = append(c.hooks.PublishableKey, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `publishablekey.Intercept(f(g(h())))`.
+func (c *PublishableKeyClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PublishableKey = append(c.inters.PublishableKey, interceptors...)
+}
+
+// Create returns a builder for creating a PublishableKey entity.
+func (c *PublishableKeyClient) Create() *PublishableKeyCreate {
+	mutation := newPublishableKeyMutation(c.config, OpCreate)
+	return &PublishableKeyCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PublishableKey entities.
+func (c *PublishableKeyClient) CreateBulk(builders ...*PublishableKeyCreate) *PublishableKeyCreateBulk {
+	return &PublishableKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PublishableKeyClient) MapCreateBulk(slice any, setFunc func(*PublishableKeyCreate, int)) *PublishableKeyCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PublishableKeyCreateBulk{err: fmt.Errorf("calling to PublishableKeyClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PublishableKeyCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PublishableKeyCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PublishableKey.
+func (c *PublishableKeyClient) Update() *PublishableKeyUpdate {
+	mutation := newPublishableKeyMutation(c.config, OpUpdate)
+	return &PublishableKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PublishableKeyClient) UpdateOne(_m *PublishableKey) *PublishableKeyUpdateOne {
+	mutation := newPublishableKeyMutation(c.config, OpUpdateOne, withPublishableKey(_m))
+	return &PublishableKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PublishableKeyClient) UpdateOneID(id int) *PublishableKeyUpdateOne {
+	mutation := newPublishableKeyMutation(c.config, OpUpdateOne, withPublishableKeyID(id))
+	return &PublishableKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PublishableKey.
+func (c *PublishableKeyClient) Delete() *PublishableKeyDelete {
+	mutation := newPublishableKeyMutation(c.config, OpDelete)
+	return &PublishableKeyDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PublishableKeyClient) DeleteOne(_m *PublishableKey) *PublishableKeyDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PublishableKeyClient) DeleteOneID(id int) *PublishableKeyDeleteOne {
+	builder := c.Delete().Where(publishablekey.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PublishableKeyDeleteOne{builder}
+}
+
+// Query returns a query builder for PublishableKey.
+func (c *PublishableKeyClient) Query() *PublishableKeyQuery {
+	return &PublishableKeyQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePublishableKey},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PublishableKey entity by its id.
+func (c *PublishableKeyClient) Get(ctx context.Context, id int) (*PublishableKey, error) {
+	return c.Query().Where(publishablekey.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PublishableKeyClient) GetX(ctx context.Context, id int) *PublishableKey {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a PublishableKey.
+func (c *PublishableKeyClient) QueryShop(_m *PublishableKey) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(publishablekey.Table, publishablekey.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, publishablekey.ShopTable, publishablekey.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *PublishableKeyClient) Hooks() []Hook {
+	return c.hooks.PublishableKey
+}
+
+// Interceptors returns the client interceptors.
+func (c *PublishableKeyClient) Interceptors() []Interceptor {
+	return c.inters.PublishableKey
+}
+
+func (c *PublishableKeyClient) mutate(ctx context.Context, m *PublishableKeyMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PublishableKeyCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PublishableKeyUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PublishableKeyUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PublishableKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PublishableKey mutation op: %q", m.Op())
+	}
+}
+
 // RoleClient is a client for the Role schema.
 type RoleClient struct {
 	config
@@ -4003,6 +4170,155 @@ func (c *ShopClient) mutate(ctx context.Context, m *ShopMutation) (Value, error)
 		return (&ShopDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Shop mutation op: %q", m.Op())
+	}
+}
+
+// ShopAllowedOriginClient is a client for the ShopAllowedOrigin schema.
+type ShopAllowedOriginClient struct {
+	config
+}
+
+// NewShopAllowedOriginClient returns a client for the ShopAllowedOrigin from the given config.
+func NewShopAllowedOriginClient(c config) *ShopAllowedOriginClient {
+	return &ShopAllowedOriginClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shopallowedorigin.Hooks(f(g(h())))`.
+func (c *ShopAllowedOriginClient) Use(hooks ...Hook) {
+	c.hooks.ShopAllowedOrigin = append(c.hooks.ShopAllowedOrigin, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shopallowedorigin.Intercept(f(g(h())))`.
+func (c *ShopAllowedOriginClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopAllowedOrigin = append(c.inters.ShopAllowedOrigin, interceptors...)
+}
+
+// Create returns a builder for creating a ShopAllowedOrigin entity.
+func (c *ShopAllowedOriginClient) Create() *ShopAllowedOriginCreate {
+	mutation := newShopAllowedOriginMutation(c.config, OpCreate)
+	return &ShopAllowedOriginCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopAllowedOrigin entities.
+func (c *ShopAllowedOriginClient) CreateBulk(builders ...*ShopAllowedOriginCreate) *ShopAllowedOriginCreateBulk {
+	return &ShopAllowedOriginCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopAllowedOriginClient) MapCreateBulk(slice any, setFunc func(*ShopAllowedOriginCreate, int)) *ShopAllowedOriginCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopAllowedOriginCreateBulk{err: fmt.Errorf("calling to ShopAllowedOriginClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopAllowedOriginCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopAllowedOriginCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopAllowedOrigin.
+func (c *ShopAllowedOriginClient) Update() *ShopAllowedOriginUpdate {
+	mutation := newShopAllowedOriginMutation(c.config, OpUpdate)
+	return &ShopAllowedOriginUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopAllowedOriginClient) UpdateOne(_m *ShopAllowedOrigin) *ShopAllowedOriginUpdateOne {
+	mutation := newShopAllowedOriginMutation(c.config, OpUpdateOne, withShopAllowedOrigin(_m))
+	return &ShopAllowedOriginUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopAllowedOriginClient) UpdateOneID(id int) *ShopAllowedOriginUpdateOne {
+	mutation := newShopAllowedOriginMutation(c.config, OpUpdateOne, withShopAllowedOriginID(id))
+	return &ShopAllowedOriginUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopAllowedOrigin.
+func (c *ShopAllowedOriginClient) Delete() *ShopAllowedOriginDelete {
+	mutation := newShopAllowedOriginMutation(c.config, OpDelete)
+	return &ShopAllowedOriginDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopAllowedOriginClient) DeleteOne(_m *ShopAllowedOrigin) *ShopAllowedOriginDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopAllowedOriginClient) DeleteOneID(id int) *ShopAllowedOriginDeleteOne {
+	builder := c.Delete().Where(shopallowedorigin.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopAllowedOriginDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopAllowedOrigin.
+func (c *ShopAllowedOriginClient) Query() *ShopAllowedOriginQuery {
+	return &ShopAllowedOriginQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopAllowedOrigin},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopAllowedOrigin entity by its id.
+func (c *ShopAllowedOriginClient) Get(ctx context.Context, id int) (*ShopAllowedOrigin, error) {
+	return c.Query().Where(shopallowedorigin.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopAllowedOriginClient) GetX(ctx context.Context, id int) *ShopAllowedOrigin {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a ShopAllowedOrigin.
+func (c *ShopAllowedOriginClient) QueryShop(_m *ShopAllowedOrigin) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shopallowedorigin.Table, shopallowedorigin.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shopallowedorigin.ShopTable, shopallowedorigin.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShopAllowedOriginClient) Hooks() []Hook {
+	return c.hooks.ShopAllowedOrigin
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopAllowedOriginClient) Interceptors() []Interceptor {
+	return c.inters.ShopAllowedOrigin
+}
+
+func (c *ShopAllowedOriginClient) mutate(ctx context.Context, m *ShopAllowedOriginMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopAllowedOriginCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopAllowedOriginUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopAllowedOriginUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopAllowedOriginDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopAllowedOrigin mutation op: %q", m.Op())
 	}
 }
 
@@ -5298,16 +5614,16 @@ type (
 	hooks struct {
 		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
 		OrderItem, Page, Payment, Permission, PointTransaction, Product,
-		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
-		ShippingMethod, Shop, ShopUser, Site, SiteShop, Theme, ThemePage, User,
-		UserPermission, UserRefreshToken []ent.Hook
+		ProductCategory, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
+		Shipment, ShippingMethod, Shop, ShopAllowedOrigin, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
 		OrderItem, Page, Payment, Permission, PointTransaction, Product,
-		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
-		ShippingMethod, Shop, ShopUser, Site, SiteShop, Theme, ThemePage, User,
-		UserPermission, UserRefreshToken []ent.Interceptor
+		ProductCategory, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
+		Shipment, ShippingMethod, Shop, ShopAllowedOrigin, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

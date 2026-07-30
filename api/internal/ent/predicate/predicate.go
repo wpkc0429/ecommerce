@@ -51,6 +51,9 @@ type ProductCategory func(*sql.Selector)
 // ProductSKU is the predicate function for productsku builders.
 type ProductSKU func(*sql.Selector)
 
+// PublishableKey is the predicate function for publishablekey builders.
+type PublishableKey func(*sql.Selector)
+
 // Role is the predicate function for role builders.
 type Role func(*sql.Selector)
 
@@ -68,6 +71,9 @@ type ShippingMethod func(*sql.Selector)
 
 // Shop is the predicate function for shop builders.
 type Shop func(*sql.Selector)
+
+// ShopAllowedOrigin is the predicate function for shopallowedorigin builders.
+type ShopAllowedOrigin func(*sql.Selector)
 
 // ShopUser is the predicate function for shopuser builders.
 type ShopUser func(*sql.Selector)
