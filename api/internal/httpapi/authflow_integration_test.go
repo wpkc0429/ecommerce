@@ -17,7 +17,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/tenant"
@@ -203,29 +202,12 @@ func TestAdminLogoutAndDisabledRefresh(t *testing.T) {
 	}
 }
 
-func TestMemberRegistrationIsomorphism(t *testing.T) {
+func TestMemberRegistrationIsShopScopedAndIsomorphic(t *testing.T) {
 	e := newAuthEnv(t)
 	ctx := context.Background()
 	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
 	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
 
-	// Scenario: 全新會員註冊 (shop A).
-	codeA, bodyA, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
-		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
-	if codeA != 200 || bodyA["access_token"] == "" {
-		t.Fatalf("register A: %d %v", codeA, bodyA)
-	}
-	m := e.client.Member.Query().Where(member.EmailEQ("buyer@test.dev")).OnlyX(ctx)
-	if m.PasswordHash == nil || !strings.HasPrefix(*m.PasswordHash, "$argon2id$") {
-		t.Fatal("member password not stored as $argon2id$ hash")
-	}
-
-	// Scenario: 既有平台身分於第二家店註冊 — same response shape, no new member.
-	codeB, bodyB, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostB,
-		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
-	if codeB != codeA {
-		t.Fatalf("isomorphism broken: codes %d vs %d", codeA, codeB)
-	}
 	keysOf := func(m map[string]any) string {
 		ks := make([]string, 0, len(m))
 		for k := range m {
@@ -234,50 +216,111 @@ func TestMemberRegistrationIsomorphism(t *testing.T) {
 		slices.Sort(ks) // map iteration order is randomized; compare a canonical shape
 		return strings.Join(ks, ",")
 	}
+
+	// Scenario: 全新會員註冊 (shop A).
+	codeA, bodyA, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
+		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
+	if codeA != 200 || bodyA["access_token"] == "" {
+		t.Fatalf("register A: %d %v", codeA, bodyA)
+	}
+	mA := e.client.Member.Query().Where(member.ShopIDEQ(e.shopA), member.EmailEQ("buyer@test.dev")).OnlyX(ctx)
+	if mA.PasswordHash == nil || !strings.HasPrefix(*mA.PasswordHash, "$argon2id$") {
+		t.Fatal("member password not stored as $argon2id$ hash")
+	}
+
+	// Scenario: 他店已存在的 email 於本店註冊視同全新 — a *different* password
+	// is accepted without any reference to the shop A identity, and the
+	// response is indistinguishable from a brand-new registration.
+	codeB, bodyB, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostB,
+		map[string]string{"email": "buyer@test.dev", "password": "totally-different-pw"})
+	if codeB != codeA {
+		t.Fatalf("isomorphism broken: codes %d vs %d", codeA, codeB)
+	}
 	if keysOf(bodyA) != keysOf(bodyB) {
 		t.Fatalf("isomorphism broken: shapes %q vs %q", keysOf(bodyA), keysOf(bodyB))
 	}
-	if n := e.client.Member.Query().CountX(ctx); n != 1 {
-		t.Fatalf("member rows: %d, want 1", n)
+	if n := e.client.Member.Query().CountX(ctx); n != 2 {
+		t.Fatalf("member rows: %d, want 2 (one independent identity per shop)", n)
 	}
-	if n := e.client.ShopMember.Query().CountX(ctx); n != 2 {
-		t.Fatalf("shop_member rows: %d, want 2", n)
+	mB := e.client.Member.Query().Where(member.ShopIDEQ(e.shopB), member.EmailEQ("buyer@test.dev")).OnlyX(ctx)
+	if mB.ID == mA.ID {
+		t.Fatal("shop B registration reused the shop A identity row")
+	}
+	if mB.PasswordHash == nil || *mB.PasswordHash == *mA.PasswordHash {
+		t.Fatal("the two identities must hold independent password hashes")
 	}
 
-	// Wrong password on existing identity → generic failure, no membership.
-	e.client.ShopMember.Delete().Where(shopmember.ShopIDEQ(e.shopB)).ExecX(ctx)
-	code, body, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostB,
-		map[string]string{"email": "buyer@test.dev", "password": "wrong-password"})
+	// Scenario: 本店已存在的 email 重複註冊被拒 — uniform failure, no leak.
+	code, body, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
+		map[string]string{"email": "buyer@test.dev", "password": "another-password"})
 	if code != 422 {
-		t.Fatalf("register with wrong password: want 422, got %d", code)
+		t.Fatalf("duplicate registration at the same shop: want 422, got %d", code)
 	}
 	if msg := body["error"].(map[string]any)["message"].(string); strings.Contains(strings.ToLower(msg), "exist") {
 		t.Fatalf("error message leaks existence: %q", msg)
 	}
-	if n := e.client.ShopMember.Query().Where(shopmember.ShopIDEQ(e.shopB)).CountX(ctx); n != 0 {
-		t.Fatal("failed registration must not create membership")
+	if n := e.client.Member.Query().Where(member.ShopIDEQ(e.shopA)).CountX(ctx); n != 1 {
+		t.Fatalf("rejected registration must not create a second shop A identity (got %d)", n)
+	}
+	// The rejection must not have overwritten the existing credential either.
+	if got := e.client.Member.GetX(ctx, mA.ID); got.PasswordHash == nil || *got.PasswordHash != *mA.PasswordHash {
+		t.Fatal("rejected registration must leave the existing password untouched")
 	}
 }
 
-func TestMemberLoginAutoJoinAndTokenIsolation(t *testing.T) {
+// TestMemberCredentialsDoNotCrossShops pins spec member-identity's
+// "顧客憑證不跨商家共用": a password set at shop A is worthless at shop B.
+func TestMemberCredentialsDoNotCrossShops(t *testing.T) {
 	e := newAuthEnv(t)
 	ctx := context.Background()
 	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
 	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
 
+	if code, _, raw := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
+		map[string]string{"email": "buyer@test.dev", "password": "password-123"}); code != 200 {
+		t.Fatalf("register A: %d (%s)", code, raw)
+	}
+
+	// Scenario: 他店密碼無法登入本店.
+	code, body, _ := e.do(t, "POST", "/api/v1/shop/auth/login", hostB,
+		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
+	if code != 401 {
+		t.Fatalf("shop A credentials on shop B: want 401, got %d %v", code, body)
+	}
+	if body["access_token"] != nil || body["refresh_token"] != nil {
+		t.Fatalf("no shop B token may be issued: %v", body)
+	}
+	// Login must never lazily materialize an identity at the other shop.
+	if n := e.client.Member.Query().Where(member.ShopIDEQ(e.shopB)).CountX(ctx); n != 0 {
+		t.Fatalf("failed cross-shop login created %d shop B identities", n)
+	}
+	if n := e.client.MemberRefreshToken.Query().Where(memberrefreshtoken.ShopIDEQ(e.shopB)).CountX(ctx); n != 0 {
+		t.Fatalf("failed cross-shop login issued %d shop B refresh tokens", n)
+	}
+
+	// Same email at shop B with its own password works and is unrelated.
+	if code, _, raw := e.do(t, "POST", "/api/v1/shop/auth/register", hostB,
+		map[string]string{"email": "buyer@test.dev", "password": "shop-b-password"}); code != 200 {
+		t.Fatalf("register B: %d (%s)", code, raw)
+	}
+	if code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/login", hostB,
+		map[string]string{"email": "buyer@test.dev", "password": "shop-b-password"}); code != 200 {
+		t.Fatal("shop B credentials must authenticate at shop B")
+	}
+	if code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/login", hostA,
+		map[string]string{"email": "buyer@test.dev", "password": "shop-b-password"}); code != 401 {
+		t.Fatal("shop B credentials must not authenticate at shop A")
+	}
+}
+
+func TestMemberLoginScopeAndTokenIsolation(t *testing.T) {
+	e := newAuthEnv(t)
+	ctx := context.Background()
+	hostA := map[string]string{"X-Site-Domain": "shop-a.test"}
+
 	_, regA, _ := e.do(t, "POST", "/api/v1/shop/auth/register", hostA,
 		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
 	memberAccessA := regA["access_token"].(string)
-
-	// Login on shop B auto-creates the membership (design D9 首次互動).
-	code, loginB, _ := e.do(t, "POST", "/api/v1/shop/auth/login", hostB,
-		map[string]string{"email": "buyer@test.dev", "password": "password-123"})
-	if code != 200 {
-		t.Fatalf("login B: %d", code)
-	}
-	if n := e.client.ShopMember.Query().Where(shopmember.ShopIDEQ(e.shopB)).CountX(ctx); n != 1 {
-		t.Fatal("login did not auto-join shop B")
-	}
 
 	e.createUser(t, "staff@test.dev", "password-123", 1)
 	_, adminLogin, _ := e.do(t, "POST", "/api/v1/admin/auth/login", nil,
@@ -310,8 +353,9 @@ func TestMemberLoginAutoJoinAndTokenIsolation(t *testing.T) {
 	}
 
 	// Member refresh tokens are shop-bound: A-issued refresh fails on B.
+	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
 	refreshA := regA["refresh_token"].(string)
-	code, _, _ = e.do(t, "POST", "/api/v1/shop/auth/refresh", hostB, map[string]string{"refresh_token": refreshA})
+	code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/refresh", hostB, map[string]string{"refresh_token": refreshA})
 	if code != 401 {
 		t.Fatalf("cross-shop member refresh: want 401, got %d", code)
 	}
@@ -331,5 +375,4 @@ func TestMemberLoginAutoJoinAndTokenIsolation(t *testing.T) {
 	if active != 0 {
 		t.Fatalf("member chain not fully revoked: %d active", active)
 	}
-	_ = loginB
 }

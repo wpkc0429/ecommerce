@@ -188,10 +188,14 @@ func TestRateLimitShopScopeIsolation(t *testing.T) {
 	hostB := map[string]string{"X-Site-Domain": "shop-b.test"}
 	creds := map[string]string{"email": "buyer@test.dev", "password": "password-123"}
 
+	// Both attempts must reach the handler (whatever it answers) so they
+	// consume shop A's quota. Only the first can succeed: since change
+	// member-identity-per-shop, re-registering the same email at the same
+	// shop is a uniform 422 rather than a re-join of an existing identity.
 	for i := 0; i < 2; i++ {
 		code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/register", ip, hostA, creds)
-		if code != http.StatusOK {
-			t.Fatalf("shop A attempt %d: want 200, got %d", i, code)
+		if code == http.StatusTooManyRequests {
+			t.Fatalf("shop A attempt %d: unexpected 429 under threshold", i)
 		}
 	}
 	code, _, _ := e.do(t, "POST", "/api/v1/shop/auth/register", ip, hostA, creds)

@@ -95,9 +95,9 @@ func newShippingEnv(t *testing.T) *shippingEnv {
 	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
 	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
 
-	e.memberA1 = client.Member.Create().SetEmail("shipping-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberA2 = client.Member.Create().SetEmail("shipping-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberB1 = client.Member.Create().SetEmail("shipping-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("shipping-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("shipping-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberB1 = client.Member.Create().SetShopID(e.shopB).SetEmail("shipping-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
 
 	hash, _ := auth.HashPassword("password-123")
 	e.ownerA = client.User.Create().SetEmail("shipping-owner-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID

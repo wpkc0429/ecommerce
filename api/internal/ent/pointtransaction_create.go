@@ -6,10 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -59,9 +59,9 @@ func (_c *PointTransactionCreate) SetShopID(v int) *PointTransactionCreate {
 	return _c
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (_c *PointTransactionCreate) SetShopMemberID(v int) *PointTransactionCreate {
-	_c.mutation.SetShopMemberID(v)
+// SetMemberID sets the "member_id" field.
+func (_c *PointTransactionCreate) SetMemberID(v int) *PointTransactionCreate {
+	_c.mutation.SetMemberID(v)
 	return _c
 }
 
@@ -102,9 +102,9 @@ func (_c *PointTransactionCreate) SetShop(v *Shop) *PointTransactionCreate {
 	return _c.SetShopID(v.ID)
 }
 
-// SetShopMember sets the "shop_member" edge to the ShopMember entity.
-func (_c *PointTransactionCreate) SetShopMember(v *ShopMember) *PointTransactionCreate {
-	return _c.SetShopMemberID(v.ID)
+// SetMember sets the "member" edge to the Member entity.
+func (_c *PointTransactionCreate) SetMember(v *Member) *PointTransactionCreate {
+	return _c.SetMemberID(v.ID)
 }
 
 // SetOrder sets the "order" edge to the Order entity.
@@ -168,8 +168,8 @@ func (_c *PointTransactionCreate) check() error {
 	if _, ok := _c.mutation.ShopID(); !ok {
 		return &ValidationError{Name: "shop_id", err: errors.New(`ent: missing required field "PointTransaction.shop_id"`)}
 	}
-	if _, ok := _c.mutation.ShopMemberID(); !ok {
-		return &ValidationError{Name: "shop_member_id", err: errors.New(`ent: missing required field "PointTransaction.shop_member_id"`)}
+	if _, ok := _c.mutation.MemberID(); !ok {
+		return &ValidationError{Name: "member_id", err: errors.New(`ent: missing required field "PointTransaction.member_id"`)}
 	}
 	if _, ok := _c.mutation.PointsDelta(); !ok {
 		return &ValidationError{Name: "points_delta", err: errors.New(`ent: missing required field "PointTransaction.points_delta"`)}
@@ -188,8 +188,8 @@ func (_c *PointTransactionCreate) check() error {
 	if len(_c.mutation.ShopIDs()) == 0 {
 		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "PointTransaction.shop"`)}
 	}
-	if len(_c.mutation.ShopMemberIDs()) == 0 {
-		return &ValidationError{Name: "shop_member", err: errors.New(`ent: missing required edge "PointTransaction.shop_member"`)}
+	if len(_c.mutation.MemberIDs()) == 0 {
+		return &ValidationError{Name: "member", err: errors.New(`ent: missing required edge "PointTransaction.member"`)}
 	}
 	return nil
 }
@@ -255,21 +255,21 @@ func (_c *PointTransactionCreate) createSpec() (*PointTransaction, *sqlgraph.Cre
 		_node.ShopID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	if nodes := _c.mutation.ShopMemberIDs(); len(nodes) > 0 {
+	if nodes := _c.mutation.MemberIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   pointtransaction.ShopMemberTable,
-			Columns: []string{pointtransaction.ShopMemberColumn},
+			Table:   pointtransaction.MemberTable,
+			Columns: []string{pointtransaction.MemberColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.ShopMemberID = nodes[0]
+		_node.MemberID = nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.OrderIDs(); len(nodes) > 0 {
@@ -365,15 +365,15 @@ func (u *PointTransactionUpsert) UpdateShopID() *PointTransactionUpsert {
 	return u
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (u *PointTransactionUpsert) SetShopMemberID(v int) *PointTransactionUpsert {
-	u.Set(pointtransaction.FieldShopMemberID, v)
+// SetMemberID sets the "member_id" field.
+func (u *PointTransactionUpsert) SetMemberID(v int) *PointTransactionUpsert {
+	u.Set(pointtransaction.FieldMemberID, v)
 	return u
 }
 
-// UpdateShopMemberID sets the "shop_member_id" field to the value that was provided on create.
-func (u *PointTransactionUpsert) UpdateShopMemberID() *PointTransactionUpsert {
-	u.SetExcluded(pointtransaction.FieldShopMemberID)
+// UpdateMemberID sets the "member_id" field to the value that was provided on create.
+func (u *PointTransactionUpsert) UpdateMemberID() *PointTransactionUpsert {
+	u.SetExcluded(pointtransaction.FieldMemberID)
 	return u
 }
 
@@ -516,17 +516,17 @@ func (u *PointTransactionUpsertOne) UpdateShopID() *PointTransactionUpsertOne {
 	})
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (u *PointTransactionUpsertOne) SetShopMemberID(v int) *PointTransactionUpsertOne {
+// SetMemberID sets the "member_id" field.
+func (u *PointTransactionUpsertOne) SetMemberID(v int) *PointTransactionUpsertOne {
 	return u.Update(func(s *PointTransactionUpsert) {
-		s.SetShopMemberID(v)
+		s.SetMemberID(v)
 	})
 }
 
-// UpdateShopMemberID sets the "shop_member_id" field to the value that was provided on create.
-func (u *PointTransactionUpsertOne) UpdateShopMemberID() *PointTransactionUpsertOne {
+// UpdateMemberID sets the "member_id" field to the value that was provided on create.
+func (u *PointTransactionUpsertOne) UpdateMemberID() *PointTransactionUpsertOne {
 	return u.Update(func(s *PointTransactionUpsert) {
-		s.UpdateShopMemberID()
+		s.UpdateMemberID()
 	})
 }
 
@@ -846,17 +846,17 @@ func (u *PointTransactionUpsertBulk) UpdateShopID() *PointTransactionUpsertBulk 
 	})
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (u *PointTransactionUpsertBulk) SetShopMemberID(v int) *PointTransactionUpsertBulk {
+// SetMemberID sets the "member_id" field.
+func (u *PointTransactionUpsertBulk) SetMemberID(v int) *PointTransactionUpsertBulk {
 	return u.Update(func(s *PointTransactionUpsert) {
-		s.SetShopMemberID(v)
+		s.SetMemberID(v)
 	})
 }
 
-// UpdateShopMemberID sets the "shop_member_id" field to the value that was provided on create.
-func (u *PointTransactionUpsertBulk) UpdateShopMemberID() *PointTransactionUpsertBulk {
+// UpdateMemberID sets the "member_id" field to the value that was provided on create.
+func (u *PointTransactionUpsertBulk) UpdateMemberID() *PointTransactionUpsertBulk {
 	return u.Update(func(s *PointTransactionUpsert) {
-		s.UpdateShopMemberID()
+		s.UpdateMemberID()
 	})
 }
 

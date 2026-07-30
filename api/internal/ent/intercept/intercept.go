@@ -29,7 +29,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -665,33 +664,6 @@ func (f TraverseShop) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.ShopQuery", q)
 }
 
-// The ShopMemberFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ShopMemberFunc func(context.Context, *ent.ShopMemberQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ShopMemberFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ShopMemberQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopMemberQuery", q)
-}
-
-// The TraverseShopMember type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseShopMember func(context.Context, *ent.ShopMemberQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseShopMember) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseShopMember) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ShopMemberQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ShopMemberQuery", q)
-}
-
 // The ShopUserFunc type is an adapter to allow the use of ordinary function as a Querier.
 type ShopUserFunc func(context.Context, *ent.ShopUserQuery) (ent.Value, error)
 
@@ -953,8 +925,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ShippingMethodQuery, predicate.ShippingMethod, shippingmethod.OrderOption]{typ: ent.TypeShippingMethod, tq: q}, nil
 	case *ent.ShopQuery:
 		return &query[*ent.ShopQuery, predicate.Shop, shop.OrderOption]{typ: ent.TypeShop, tq: q}, nil
-	case *ent.ShopMemberQuery:
-		return &query[*ent.ShopMemberQuery, predicate.ShopMember, shopmember.OrderOption]{typ: ent.TypeShopMember, tq: q}, nil
 	case *ent.ShopUserQuery:
 		return &query[*ent.ShopUserQuery, predicate.ShopUser, shopuser.OrderOption]{typ: ent.TypeShopUser, tq: q}, nil
 	case *ent.SiteQuery:

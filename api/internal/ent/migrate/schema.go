@@ -157,17 +157,41 @@ var (
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "email", Type: field.TypeString, Unique: true, Nullable: true, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
-		{Name: "phone", Type: field.TypeString, Unique: true, Nullable: true, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
+		{Name: "email", Type: field.TypeString, Nullable: true, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "phone", Type: field.TypeString, Nullable: true, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
 		{Name: "password_hash", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
 		{Name: "status", Type: field.TypeInt16, Default: 1},
+		{Name: "points", Type: field.TypeInt32, Default: 0},
 		{Name: "meta", Type: field.TypeJSON},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "level_id", Type: field.TypeInt, Nullable: true},
 	}
 	// MembersTable holds the schema information for the "members" table.
 	MembersTable = &schema.Table{
 		Name:       "members",
 		Columns:    MembersColumns,
 		PrimaryKey: []*schema.Column{MembersColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "members_shops_shop",
+				Columns:    []*schema.Column{MembersColumns[9]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "members_member_tiers_member_tier",
+				Columns:    []*schema.Column{MembersColumns[10]},
+				RefColumns: []*schema.Column{MemberTiersColumns[0]},
+				OnDelete:   schema.SetNull,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "member_shop_id",
+				Unique:  false,
+				Columns: []*schema.Column{MembersColumns[9]},
+			},
+		},
 	}
 	// MemberRefreshTokensColumns holds the columns for the "member_refresh_tokens" table.
 	MemberRefreshTokensColumns = []*schema.Column{
@@ -443,7 +467,7 @@ var (
 		{Name: "kind", Type: field.TypeInt16},
 		{Name: "reason", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
 		{Name: "shop_id", Type: field.TypeInt},
-		{Name: "shop_member_id", Type: field.TypeInt},
+		{Name: "member_id", Type: field.TypeInt},
 		{Name: "order_id", Type: field.TypeInt, Nullable: true},
 	}
 	// PointTransactionsTable holds the schema information for the "point_transactions" table.
@@ -459,9 +483,9 @@ var (
 				OnDelete:   schema.NoAction,
 			},
 			{
-				Symbol:     "point_transactions_shop_member_shop_member",
+				Symbol:     "point_transactions_members_member",
 				Columns:    []*schema.Column{PointTransactionsColumns[7]},
-				RefColumns: []*schema.Column{ShopMemberColumns[0]},
+				RefColumns: []*schema.Column{MembersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
@@ -478,7 +502,7 @@ var (
 				Columns: []*schema.Column{PointTransactionsColumns[8], PointTransactionsColumns[4]},
 			},
 			{
-				Name:    "pointtransaction_shop_id_shop_member_id",
+				Name:    "pointtransaction_shop_id_member_id",
 				Unique:  false,
 				Columns: []*schema.Column{PointTransactionsColumns[6], PointTransactionsColumns[7]},
 			},
@@ -807,54 +831,6 @@ var (
 			},
 		},
 	}
-	// ShopMemberColumns holds the columns for the "shop_member" table.
-	ShopMemberColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "points", Type: field.TypeInt32, Default: 0},
-		{Name: "shop_id", Type: field.TypeInt},
-		{Name: "member_id", Type: field.TypeInt},
-		{Name: "level_id", Type: field.TypeInt, Nullable: true},
-	}
-	// ShopMemberTable holds the schema information for the "shop_member" table.
-	ShopMemberTable = &schema.Table{
-		Name:       "shop_member",
-		Columns:    ShopMemberColumns,
-		PrimaryKey: []*schema.Column{ShopMemberColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "shop_member_shops_shop",
-				Columns:    []*schema.Column{ShopMemberColumns[4]},
-				RefColumns: []*schema.Column{ShopsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "shop_member_members_member",
-				Columns:    []*schema.Column{ShopMemberColumns[5]},
-				RefColumns: []*schema.Column{MembersColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "shop_member_member_tiers_member_tier",
-				Columns:    []*schema.Column{ShopMemberColumns[6]},
-				RefColumns: []*schema.Column{MemberTiersColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "shopmember_shop_id_member_id",
-				Unique:  true,
-				Columns: []*schema.Column{ShopMemberColumns[4], ShopMemberColumns[5]},
-			},
-			{
-				Name:    "shopmember_member_id",
-				Unique:  false,
-				Columns: []*schema.Column{ShopMemberColumns[5]},
-			},
-		},
-	}
 	// ShopUserColumns holds the columns for the "shop_user" table.
 	ShopUserColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1119,7 +1095,6 @@ var (
 		ShipmentsTable,
 		ShippingMethodsTable,
 		ShopsTable,
-		ShopMemberTable,
 		ShopUserTable,
 		SitesTable,
 		SiteShopTable,
@@ -1150,6 +1125,8 @@ func init() {
 	}
 	CategoriesTable.ForeignKeys[0].RefTable = ShopsTable
 	CategoriesTable.ForeignKeys[1].RefTable = CategoriesTable
+	MembersTable.ForeignKeys[0].RefTable = ShopsTable
+	MembersTable.ForeignKeys[1].RefTable = MemberTiersTable
 	MembersTable.Annotation = &entsql.Annotation{}
 	MembersTable.Annotation.Checks = map[string]string{
 		"members_status_check": "status IN (0, 1)",
@@ -1195,7 +1172,7 @@ func init() {
 		"payments_status_check": "status IN (0, 1, 2, 3)",
 	}
 	PointTransactionsTable.ForeignKeys[0].RefTable = ShopsTable
-	PointTransactionsTable.ForeignKeys[1].RefTable = ShopMemberTable
+	PointTransactionsTable.ForeignKeys[1].RefTable = MembersTable
 	PointTransactionsTable.ForeignKeys[2].RefTable = OrdersTable
 	PointTransactionsTable.Annotation = &entsql.Annotation{
 		Table: "point_transactions",
@@ -1255,12 +1232,6 @@ func init() {
 	ShopsTable.Annotation = &entsql.Annotation{}
 	ShopsTable.Annotation.Checks = map[string]string{
 		"shops_status_check": "status IN (0, 1, 2)",
-	}
-	ShopMemberTable.ForeignKeys[0].RefTable = ShopsTable
-	ShopMemberTable.ForeignKeys[1].RefTable = MembersTable
-	ShopMemberTable.ForeignKeys[2].RefTable = MemberTiersTable
-	ShopMemberTable.Annotation = &entsql.Annotation{
-		Table: "shop_member",
 	}
 	ShopUserTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopUserTable.ForeignKeys[1].RefTable = UsersTable

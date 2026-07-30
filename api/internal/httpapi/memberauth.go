@@ -9,15 +9,19 @@ import (
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/member"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/httpx"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
 // MemberAuthHandler implements the storefront member auth API in shop context
-// (task 3.5, design D9): register / login / refresh / logout. Registration
-// responses are isomorphic whether the platform identity is brand new or an
-// existing member joining another shop — cross-shop existence never leaks.
+// (task 3.5, design D9): register / login / logout / refresh.
+//
+// Since change member-identity-per-shop, customer identity is per-shop: every
+// lookup below is scoped to the resolved shop, and an email already used at
+// another shop is simply an unrelated row — registering it here creates a
+// brand-new identity with its own password (design D1). Registration
+// responses stay isomorphic across success and every failure mode, now to
+// avoid leaking whether the email is *this shop's* customer (design D8).
 type MemberAuthHandler struct {
 	Client  *ent.Client
 	Issuer  *auth.TokenIssuer
@@ -69,45 +73,50 @@ func (h *MemberAuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
-	m, err := h.Client.Member.Query().Where(member.EmailEQ(email)).Only(ctx)
-	switch {
-	case ent.IsNotFound(err):
-		// Brand-new platform identity.
-		hash, herr := auth.HashPassword(req.Password)
-		if herr != nil {
-			h.Log.Error("register: hash", "err", herr)
-			httpx.Internal(w)
-			return
-		}
-		m, err = h.Client.Member.Create().SetEmail(email).SetPasswordHash(hash).SetStatus(1).Save(ctx)
-		if err != nil {
-			// Unique race (same email registered concurrently) → generic failure.
-			h.registerFailed(w)
-			return
-		}
-	case err != nil:
+	// Identity is per-shop (design D1/D4): the lookup is explicitly scoped to
+	// the resolved shop rather than relying on the tenant interceptor, so the
+	// intent stays readable at the call site. The same email at another shop
+	// is an unrelated row and never surfaces here.
+	taken, err := h.Client.Member.Query().
+		Where(member.ShopIDEQ(shopID), member.EmailEQ(email)).
+		Exist(ctx)
+	if err != nil {
 		h.Log.Error("register: query member", "err", err)
 		httpx.Internal(w)
 		return
-	default:
-		// Existing platform identity joining this shop: the password must
-		// verify; failures are indistinguishable from other rejections.
-		if m.PasswordHash == nil || !auth.VerifyPassword(req.Password, *m.PasswordHash) || m.Status != 1 {
-			h.registerFailed(w)
-			return
-		}
+	}
+	if taken {
+		// Already a customer of *this* shop. There is no "join with your
+		// existing password" path any more (design D1) — reject uniformly,
+		// burning one Argon2id verification so the rejection costs roughly as
+		// much as the successful hash-and-create below (design D8).
+		auth.EqualizeVerifyTiming()
+		h.registerFailed(w)
+		return
 	}
 
-	if err := h.ensureMembership(r, m.ID, shopID); err != nil {
-		h.Log.Error("register: membership", "err", err)
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		h.Log.Error("register: hash", "err", err)
 		httpx.Internal(w)
+		return
+	}
+	m, err := h.Client.Member.Create().
+		SetShopID(shopID).SetEmail(email).SetPasswordHash(hash).SetStatus(1).
+		Save(ctx)
+	if err != nil {
+		// UNIQUE(shop_id, email) race (same email registered concurrently at
+		// this shop) → the same generic failure.
+		h.registerFailed(w)
 		return
 	}
 	h.issueTokens(w, r, m.ID, shopID)
 }
 
 // registerFailed is the uniform rejection for any non-validation registration
-// failure (wrong password on an existing identity, disabled account, races).
+// failure (email already this shop's customer, races). Identical response for
+// every case so it never reveals whether the email is already registered here
+// (design D8).
 func (h *MemberAuthHandler) registerFailed(w http.ResponseWriter) {
 	httpx.WriteError(w, http.StatusUnprocessableEntity, "registration_failed",
 		"unable to register with the provided credentials", nil)
@@ -128,7 +137,12 @@ func (h *MemberAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	ctx := r.Context()
 
-	m, err := h.Client.Member.Query().Where(member.EmailEQ(email)).Only(ctx)
+	// Scoped to the resolved shop (design D1/D4): credentials set at another
+	// shop MUST NOT authenticate here, even when email and password both
+	// match that other shop's row.
+	m, err := h.Client.Member.Query().
+		Where(member.ShopIDEQ(shopID), member.EmailEQ(email)).
+		Only(ctx)
 	if err != nil {
 		auth.EqualizeVerifyTiming()
 		httpx.Unauthorized(w)
@@ -136,12 +150,6 @@ func (h *MemberAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	if m.PasswordHash == nil || !auth.VerifyPassword(req.Password, *m.PasswordHash) || m.Status != 1 {
 		httpx.Unauthorized(w)
-		return
-	}
-	// First interaction with this shop auto-creates the membership (design D9).
-	if err := h.ensureMembership(r, m.ID, shopID); err != nil {
-		h.Log.Error("login: membership", "err", err)
-		httpx.Internal(w)
 		return
 	}
 	h.issueTokens(w, r, m.ID, shopID)
@@ -197,6 +205,9 @@ func (h *MemberAuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		httpx.Unauthorized(w)
 		return
 	}
+	// Runs in tenant context, so the interceptor scopes this read to the
+	// resolved shop (design D4): a member id belonging to another shop is
+	// simply not found → 401.
 	m, err := h.Client.Member.Get(r.Context(), mid)
 	if err != nil {
 		httpx.Unauthorized(w)
@@ -210,27 +221,6 @@ func (h *MemberAuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		resp["phone"] = *m.Phone
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
-}
-
-// ensureMembership creates the (shop, member) link if missing. Runs without
-// the tenant hook stamping issues because the ids are explicit and match the
-// tenant context by construction.
-func (h *MemberAuthHandler) ensureMembership(r *http.Request, memberID, shopID int) error {
-	ctx := r.Context()
-	exists, err := h.Client.ShopMember.Query().
-		Where(shopmember.ShopIDEQ(shopID), shopmember.MemberIDEQ(memberID)).
-		Exist(ctx)
-	if err != nil {
-		return err
-	}
-	if exists {
-		return nil
-	}
-	_, err = h.Client.ShopMember.Create().SetShopID(shopID).SetMemberID(memberID).Save(ctx)
-	if err != nil && !ent.IsConstraintError(err) { // concurrent join is fine
-		return err
-	}
-	return nil
 }
 
 func (h *MemberAuthHandler) issueTokens(w http.ResponseWriter, r *http.Request, memberID, shopID int) {

@@ -32,7 +32,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -97,8 +96,6 @@ type Client struct {
 	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
-	// ShopMember is the client for interacting with the ShopMember builders.
-	ShopMember *ShopMemberClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -147,7 +144,6 @@ func (c *Client) init() {
 	c.Shipment = NewShipmentClient(c.config)
 	c.ShippingMethod = NewShippingMethodClient(c.config)
 	c.Shop = NewShopClient(c.config)
-	c.ShopMember = NewShopMemberClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
 	c.Site = NewSiteClient(c.config)
 	c.SiteShop = NewSiteShopClient(c.config)
@@ -269,7 +265,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Shipment:           NewShipmentClient(cfg),
 		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
-		ShopMember:         NewShopMemberClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
 		Site:               NewSiteClient(cfg),
 		SiteShop:           NewSiteShopClient(cfg),
@@ -318,7 +313,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Shipment:           NewShipmentClient(cfg),
 		ShippingMethod:     NewShippingMethodClient(cfg),
 		Shop:               NewShopClient(cfg),
-		ShopMember:         NewShopMemberClient(cfg),
 		ShopUser:           NewShopUserClient(cfg),
 		Site:               NewSiteClient(cfg),
 		SiteShop:           NewSiteShopClient(cfg),
@@ -359,9 +353,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
 		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
 		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser,
-		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopUser, c.Site,
+		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -374,9 +367,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Cart, c.CartItem, c.Category, c.Member, c.MemberRefreshToken, c.MemberTier,
 		c.Order, c.OrderItem, c.Page, c.Payment, c.Permission, c.PointTransaction,
 		c.Product, c.ProductCategory, c.ProductSKU, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopMember, c.ShopUser,
-		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopUser, c.Site,
+		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -427,8 +419,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ShippingMethod.mutate(ctx, m)
 	case *ShopMutation:
 		return c.Shop.mutate(ctx, m)
-	case *ShopMemberMutation:
-		return c.ShopMember.mutate(ctx, m)
 	case *ShopUserMutation:
 		return c.ShopUser.mutate(ctx, m)
 	case *SiteMutation:
@@ -1133,15 +1123,31 @@ func (c *MemberClient) GetX(ctx context.Context, id int) *Member {
 	return obj
 }
 
-// QueryShopMembers queries the shop_members edge of a Member.
-func (c *MemberClient) QueryShopMembers(_m *Member) *ShopMemberQuery {
-	query := (&ShopMemberClient{config: c.config}).Query()
+// QueryShop queries the shop edge of a Member.
+func (c *MemberClient) QueryShop(_m *Member) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := _m.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(member.Table, member.FieldID, id),
-			sqlgraph.To(shopmember.Table, shopmember.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, member.ShopMembersTable, member.ShopMembersColumn),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, member.ShopTable, member.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryMemberTier queries the member_tier edge of a Member.
+func (c *MemberClient) QueryMemberTier(_m *Member) *MemberTierQuery {
+	query := (&MemberTierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(member.Table, member.FieldID, id),
+			sqlgraph.To(membertier.Table, membertier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, member.MemberTierTable, member.MemberTierColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -2469,15 +2475,15 @@ func (c *PointTransactionClient) QueryShop(_m *PointTransaction) *ShopQuery {
 	return query
 }
 
-// QueryShopMember queries the shop_member edge of a PointTransaction.
-func (c *PointTransactionClient) QueryShopMember(_m *PointTransaction) *ShopMemberQuery {
-	query := (&ShopMemberClient{config: c.config}).Query()
+// QueryMember queries the member edge of a PointTransaction.
+func (c *PointTransactionClient) QueryMember(_m *PointTransaction) *MemberQuery {
+	query := (&MemberClient{config: c.config}).Query()
 	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
 		id := _m.ID
 		step := sqlgraph.NewStep(
 			sqlgraph.From(pointtransaction.Table, pointtransaction.FieldID, id),
-			sqlgraph.To(shopmember.Table, shopmember.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.ShopMemberTable, pointtransaction.ShopMemberColumn),
+			sqlgraph.To(member.Table, member.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.MemberTable, pointtransaction.MemberColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -4000,187 +4006,6 @@ func (c *ShopClient) mutate(ctx context.Context, m *ShopMutation) (Value, error)
 	}
 }
 
-// ShopMemberClient is a client for the ShopMember schema.
-type ShopMemberClient struct {
-	config
-}
-
-// NewShopMemberClient returns a client for the ShopMember from the given config.
-func NewShopMemberClient(c config) *ShopMemberClient {
-	return &ShopMemberClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `shopmember.Hooks(f(g(h())))`.
-func (c *ShopMemberClient) Use(hooks ...Hook) {
-	c.hooks.ShopMember = append(c.hooks.ShopMember, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `shopmember.Intercept(f(g(h())))`.
-func (c *ShopMemberClient) Intercept(interceptors ...Interceptor) {
-	c.inters.ShopMember = append(c.inters.ShopMember, interceptors...)
-}
-
-// Create returns a builder for creating a ShopMember entity.
-func (c *ShopMemberClient) Create() *ShopMemberCreate {
-	mutation := newShopMemberMutation(c.config, OpCreate)
-	return &ShopMemberCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of ShopMember entities.
-func (c *ShopMemberClient) CreateBulk(builders ...*ShopMemberCreate) *ShopMemberCreateBulk {
-	return &ShopMemberCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *ShopMemberClient) MapCreateBulk(slice any, setFunc func(*ShopMemberCreate, int)) *ShopMemberCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &ShopMemberCreateBulk{err: fmt.Errorf("calling to ShopMemberClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*ShopMemberCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &ShopMemberCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for ShopMember.
-func (c *ShopMemberClient) Update() *ShopMemberUpdate {
-	mutation := newShopMemberMutation(c.config, OpUpdate)
-	return &ShopMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *ShopMemberClient) UpdateOne(_m *ShopMember) *ShopMemberUpdateOne {
-	mutation := newShopMemberMutation(c.config, OpUpdateOne, withShopMember(_m))
-	return &ShopMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *ShopMemberClient) UpdateOneID(id int) *ShopMemberUpdateOne {
-	mutation := newShopMemberMutation(c.config, OpUpdateOne, withShopMemberID(id))
-	return &ShopMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for ShopMember.
-func (c *ShopMemberClient) Delete() *ShopMemberDelete {
-	mutation := newShopMemberMutation(c.config, OpDelete)
-	return &ShopMemberDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *ShopMemberClient) DeleteOne(_m *ShopMember) *ShopMemberDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *ShopMemberClient) DeleteOneID(id int) *ShopMemberDeleteOne {
-	builder := c.Delete().Where(shopmember.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &ShopMemberDeleteOne{builder}
-}
-
-// Query returns a query builder for ShopMember.
-func (c *ShopMemberClient) Query() *ShopMemberQuery {
-	return &ShopMemberQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeShopMember},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a ShopMember entity by its id.
-func (c *ShopMemberClient) Get(ctx context.Context, id int) (*ShopMember, error) {
-	return c.Query().Where(shopmember.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *ShopMemberClient) GetX(ctx context.Context, id int) *ShopMember {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryShop queries the shop edge of a ShopMember.
-func (c *ShopMemberClient) QueryShop(_m *ShopMember) *ShopQuery {
-	query := (&ShopClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, id),
-			sqlgraph.To(shop.Table, shop.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.ShopTable, shopmember.ShopColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryMember queries the member edge of a ShopMember.
-func (c *ShopMemberClient) QueryMember(_m *ShopMember) *MemberQuery {
-	query := (&MemberClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, id),
-			sqlgraph.To(member.Table, member.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.MemberTable, shopmember.MemberColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryMemberTier queries the member_tier edge of a ShopMember.
-func (c *ShopMemberClient) QueryMemberTier(_m *ShopMember) *MemberTierQuery {
-	query := (&MemberTierClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shopmember.Table, shopmember.FieldID, id),
-			sqlgraph.To(membertier.Table, membertier.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shopmember.MemberTierTable, shopmember.MemberTierColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *ShopMemberClient) Hooks() []Hook {
-	return c.hooks.ShopMember
-}
-
-// Interceptors returns the client interceptors.
-func (c *ShopMemberClient) Interceptors() []Interceptor {
-	return c.inters.ShopMember
-}
-
-func (c *ShopMemberClient) mutate(ctx context.Context, m *ShopMemberMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&ShopMemberCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&ShopMemberUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&ShopMemberUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&ShopMemberDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown ShopMember mutation op: %q", m.Op())
-	}
-}
-
 // ShopUserClient is a client for the ShopUser schema.
 type ShopUserClient struct {
 	config
@@ -5474,15 +5299,15 @@ type (
 		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
 		OrderItem, Page, Payment, Permission, PointTransaction, Product,
 		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
-		ShippingMethod, Shop, ShopMember, ShopUser, Site, SiteShop, Theme, ThemePage,
-		User, UserPermission, UserRefreshToken []ent.Hook
+		ShippingMethod, Shop, ShopUser, Site, SiteShop, Theme, ThemePage, User,
+		UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		Cart, CartItem, Category, Member, MemberRefreshToken, MemberTier, Order,
 		OrderItem, Page, Payment, Permission, PointTransaction, Product,
 		ProductCategory, ProductSKU, Role, RolePermission, RoleUser, Shipment,
-		ShippingMethod, Shop, ShopMember, ShopUser, Site, SiteShop, Theme, ThemePage,
-		User, UserPermission, UserRefreshToken []ent.Interceptor
+		ShippingMethod, Shop, ShopUser, Site, SiteShop, Theme, ThemePage, User,
+		UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

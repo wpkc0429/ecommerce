@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
+	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"strings"
 	"time"
 
@@ -22,6 +24,8 @@ type Member struct {
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	// ShopID holds the value of the "shop_id" field.
+	ShopID int `json:"shop_id,omitempty"`
 	// Email holds the value of the "email" field.
 	Email *string `json:"email,omitempty"`
 	// Phone holds the value of the "phone" field.
@@ -30,6 +34,10 @@ type Member struct {
 	PasswordHash *string `json:"-"`
 	// Status holds the value of the "status" field.
 	Status int16 `json:"status,omitempty"`
+	// Points holds the value of the "points" field.
+	Points int32 `json:"points,omitempty"`
+	// LevelID holds the value of the "level_id" field.
+	LevelID *int `json:"level_id,omitempty"`
 	// Meta holds the value of the "meta" field.
 	Meta json.RawMessage `json:"meta,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -40,28 +48,43 @@ type Member struct {
 
 // MemberEdges holds the relations/edges for other nodes in the graph.
 type MemberEdges struct {
-	// ShopMembers holds the value of the shop_members edge.
-	ShopMembers []*ShopMember `json:"shop_members,omitempty"`
+	// Shop holds the value of the shop edge.
+	Shop *Shop `json:"shop,omitempty"`
+	// MemberTier holds the value of the member_tier edge.
+	MemberTier *MemberTier `json:"member_tier,omitempty"`
 	// RefreshTokens holds the value of the refresh_tokens edge.
 	RefreshTokens []*MemberRefreshToken `json:"refresh_tokens,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
-// ShopMembersOrErr returns the ShopMembers value or an error if the edge
-// was not loaded in eager-loading.
-func (e MemberEdges) ShopMembersOrErr() ([]*ShopMember, error) {
-	if e.loadedTypes[0] {
-		return e.ShopMembers, nil
+// ShopOrErr returns the Shop value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e MemberEdges) ShopOrErr() (*Shop, error) {
+	if e.Shop != nil {
+		return e.Shop, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: shop.Label}
 	}
-	return nil, &NotLoadedError{edge: "shop_members"}
+	return nil, &NotLoadedError{edge: "shop"}
+}
+
+// MemberTierOrErr returns the MemberTier value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e MemberEdges) MemberTierOrErr() (*MemberTier, error) {
+	if e.MemberTier != nil {
+		return e.MemberTier, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: membertier.Label}
+	}
+	return nil, &NotLoadedError{edge: "member_tier"}
 }
 
 // RefreshTokensOrErr returns the RefreshTokens value or an error if the edge
 // was not loaded in eager-loading.
 func (e MemberEdges) RefreshTokensOrErr() ([]*MemberRefreshToken, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[2] {
 		return e.RefreshTokens, nil
 	}
 	return nil, &NotLoadedError{edge: "refresh_tokens"}
@@ -74,7 +97,7 @@ func (*Member) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case member.FieldMeta:
 			values[i] = new([]byte)
-		case member.FieldID, member.FieldStatus:
+		case member.FieldID, member.FieldShopID, member.FieldStatus, member.FieldPoints, member.FieldLevelID:
 			values[i] = new(sql.NullInt64)
 		case member.FieldEmail, member.FieldPhone, member.FieldPasswordHash:
 			values[i] = new(sql.NullString)
@@ -113,6 +136,12 @@ func (_m *Member) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.UpdatedAt = value.Time
 			}
+		case member.FieldShopID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field shop_id", values[i])
+			} else if value.Valid {
+				_m.ShopID = int(value.Int64)
+			}
 		case member.FieldEmail:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field email", values[i])
@@ -140,6 +169,19 @@ func (_m *Member) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Status = int16(value.Int64)
 			}
+		case member.FieldPoints:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field points", values[i])
+			} else if value.Valid {
+				_m.Points = int32(value.Int64)
+			}
+		case member.FieldLevelID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field level_id", values[i])
+			} else if value.Valid {
+				_m.LevelID = new(int)
+				*_m.LevelID = int(value.Int64)
+			}
 		case member.FieldMeta:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field meta", values[i])
@@ -161,9 +203,14 @@ func (_m *Member) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
-// QueryShopMembers queries the "shop_members" edge of the Member entity.
-func (_m *Member) QueryShopMembers() *ShopMemberQuery {
-	return NewMemberClient(_m.config).QueryShopMembers(_m)
+// QueryShop queries the "shop" edge of the Member entity.
+func (_m *Member) QueryShop() *ShopQuery {
+	return NewMemberClient(_m.config).QueryShop(_m)
+}
+
+// QueryMemberTier queries the "member_tier" edge of the Member entity.
+func (_m *Member) QueryMemberTier() *MemberTierQuery {
+	return NewMemberClient(_m.config).QueryMemberTier(_m)
 }
 
 // QueryRefreshTokens queries the "refresh_tokens" edge of the Member entity.
@@ -200,6 +247,9 @@ func (_m *Member) String() string {
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
 	builder.WriteString(", ")
+	builder.WriteString("shop_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShopID))
+	builder.WriteString(", ")
 	if v := _m.Email; v != nil {
 		builder.WriteString("email=")
 		builder.WriteString(*v)
@@ -214,6 +264,14 @@ func (_m *Member) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
+	builder.WriteString(", ")
+	builder.WriteString("points=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Points))
+	builder.WriteString(", ")
+	if v := _m.LevelID; v != nil {
+		builder.WriteString("level_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("meta=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Meta))

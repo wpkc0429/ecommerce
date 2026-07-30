@@ -79,9 +79,9 @@ func newOrderEnv(t *testing.T) *orderEnv {
 	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
 	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
 
-	e.memberA1 = client.Member.Create().SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberA2 = client.Member.Create().SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberB1 = client.Member.Create().SetEmail("member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberB1 = client.Member.Create().SetShopID(e.shopB).SetEmail("member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
 
 	hash, _ := auth.HashPassword("password-123")
 	e.ownerA = client.User.Create().SetEmail("owner-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
@@ -424,7 +424,7 @@ func TestCheckoutConcurrentOversellingProtection(t *testing.T) {
 
 	memberIDs := make([]int, n)
 	for i := 0; i < n; i++ {
-		memberIDs[i] = e.client.Member.Create().SetEmail(fmt.Sprintf("concurrent-%d@t.dev", i)).SetStatus(1).SaveX(ctx).ID
+		memberIDs[i] = e.client.Member.Create().SetShopID(e.shopA).SetEmail(fmt.Sprintf("concurrent-%d@t.dev", i)).SetStatus(1).SaveX(ctx).ID
 		e.addToCart(t, e.shopA, memberIDs[i], skuID, 1)
 	}
 

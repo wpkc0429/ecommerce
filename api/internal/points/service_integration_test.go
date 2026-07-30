@@ -37,17 +37,13 @@ func setupPointsFixtures(t *testing.T) *pointsFixtures {
 	}
 }
 
-func newMember(t *testing.T, client *ent.Client, email string) int {
+// newMember creates a customer of this fixture's shop. Since change
+// member-identity-per-shop the identity row *is* the loyalty carrier
+// (shop_member was merged into members), so there is nothing else to create:
+// points/level_id start at their zero values on this row.
+func (f *pointsFixtures) newMember(t *testing.T, email string) int {
 	t.Helper()
-	return client.Member.Create().SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
-}
-
-// newShopMember mirrors httpapi.MemberAuthHandler.ensureMembership's effect
-// (lazily created at login/register — design Context) so service-level
-// tests don't need to drive the full auth flow.
-func (f *pointsFixtures) newShopMember(t *testing.T, memberID int) *ent.ShopMember {
-	t.Helper()
-	return f.client.ShopMember.Create().SetShopID(f.shopID).SetMemberID(memberID).SaveX(context.Background())
+	return f.client.Member.Create().SetShopID(f.shopID).SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
 }
 
 // newOrder creates a real, paid-and-shippable-looking order directly via ent
@@ -81,8 +77,7 @@ func returnedEvent(shopID, orderID, memberID int) events.OrderReturned {
 
 func TestHandleOrderPaidAwardsPointsAndUpdatesBalance(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "award@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "award@t.dev")
 	ord := f.newOrder(t, memberID, 1290)
 	ctx := context.Background()
 
@@ -90,7 +85,7 @@ func TestHandleOrderPaidAwardsPointsAndUpdatesBalance(t *testing.T) {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
 
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 12 { // 1290 / 100 = 12 (design D3)
 		t.Fatalf("expected 12 points awarded, got %d", got.Points)
 	}
@@ -109,8 +104,7 @@ func TestHandleOrderPaidAwardsPointsAndUpdatesBalance(t *testing.T) {
 
 func TestHandleOrderPaidIsIdempotentOnDuplicateEvent(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "award-dup@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "award-dup@t.dev")
 	ord := f.newOrder(t, memberID, 500)
 	ctx := context.Background()
 
@@ -125,7 +119,7 @@ func TestHandleOrderPaidIsIdempotentOnDuplicateEvent(t *testing.T) {
 		t.Fatalf("second HandleOrderPaid (must be a safe no-op, not an error): %v", err)
 	}
 
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 5 { // 500/100 = 5, awarded exactly once
 		t.Fatalf("expected points awarded exactly once (5), got %d", got.Points)
 	}
@@ -137,15 +131,14 @@ func TestHandleOrderPaidIsIdempotentOnDuplicateEvent(t *testing.T) {
 
 func TestHandleOrderPaidZeroAmountRecordsZeroDeltaAward(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "zero@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "zero@t.dev")
 	ord := f.newOrder(t, memberID, 50)
 	ctx := context.Background()
 
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord.ID, memberID, 50)); err != nil {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected 0 points for a sub-100-minor-unit order, got %d", got.Points)
 	}
@@ -159,8 +152,7 @@ func TestHandleOrderPaidZeroAmountRecordsZeroDeltaAward(t *testing.T) {
 
 func TestLevelUpgradesWhenBalanceCrossesTierThreshold(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "level-up@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "level-up@t.dev")
 	ctx := context.Background()
 
 	silver, err := f.svc.CreateMemberTier(ctx, f.shopID, points.MemberTierInput{Name: "銀卡", MinPoints: 10})
@@ -177,7 +169,7 @@ func TestLevelUpgradesWhenBalanceCrossesTierThreshold(t *testing.T) {
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord1.ID, memberID, 1290)); err != nil {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.LevelID == nil || *got.LevelID != silver.ID {
 		t.Fatalf("expected level to be silver (%d) after 12 points, got %v", silver.ID, got.LevelID)
 	}
@@ -187,7 +179,7 @@ func TestLevelUpgradesWhenBalanceCrossesTierThreshold(t *testing.T) {
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord2.ID, memberID, 4000)); err != nil {
 		t.Fatalf("second HandleOrderPaid: %v", err)
 	}
-	got = f.client.ShopMember.GetX(ctx, sm.ID)
+	got = f.client.Member.GetX(ctx, memberID)
 	if got.LevelID == nil || *got.LevelID != gold.ID {
 		t.Fatalf("expected level to be gold (%d) after 52 points, got %v", gold.ID, got.LevelID)
 	}
@@ -195,8 +187,7 @@ func TestLevelUpgradesWhenBalanceCrossesTierThreshold(t *testing.T) {
 
 func TestLevelClearsWhenNoTierQualifies(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "level-none@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "level-none@t.dev")
 	ord := f.newOrder(t, memberID, 100)
 	ctx := context.Background()
 
@@ -206,7 +197,7 @@ func TestLevelClearsWhenNoTierQualifies(t *testing.T) {
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord.ID, memberID, 100)); err != nil {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.LevelID != nil {
 		t.Fatalf("expected level_id to remain nil (1 point does not qualify for any tier), got %v", got.LevelID)
 	}
@@ -216,22 +207,21 @@ func TestLevelClearsWhenNoTierQualifies(t *testing.T) {
 
 func TestHandleOrderReturnedClawsBackAwardedPoints(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "clawback@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "clawback@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord.ID, memberID, 1000)); err != nil {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
-	if got := f.client.ShopMember.GetX(ctx, sm.ID); got.Points != 10 {
+	if got := f.client.Member.GetX(ctx, memberID); got.Points != 10 {
 		t.Fatalf("expected 10 points awarded, got %d", got.Points)
 	}
 
 	if err := f.svc.HandleOrderReturned(ctx, returnedEvent(f.shopID, ord.ID, memberID)); err != nil {
 		t.Fatalf("HandleOrderReturned: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected all 10 points clawed back, got %d", got.Points)
 	}
@@ -253,8 +243,7 @@ func TestHandleOrderReturnedClawsBackAwardedPoints(t *testing.T) {
 
 func TestHandleOrderReturnedIsIdempotent(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "clawback-dup@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "clawback-dup@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
@@ -269,7 +258,7 @@ func TestHandleOrderReturnedIsIdempotent(t *testing.T) {
 		t.Fatalf("second HandleOrderReturned (must be a safe no-op): %v", err)
 	}
 
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected points to remain at 0 (not double-clawed-back into negative), got %d", got.Points)
 	}
@@ -287,8 +276,7 @@ func TestHandleOrderReturnedIsIdempotent(t *testing.T) {
 // member currently holds, not at what was originally awarded.
 func TestHandleOrderReturnedClawbackCappedAtCurrentBalance(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "capped@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "capped@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
@@ -297,17 +285,17 @@ func TestHandleOrderReturnedClawbackCappedAtCurrentBalance(t *testing.T) {
 	} // awards 10 points
 
 	// Merchant manually deducts 7, leaving only 3.
-	if _, err := f.svc.AdjustPoints(ctx, f.shopID, sm.ID, -7, "客服調整"); err != nil {
+	if _, err := f.svc.AdjustPoints(ctx, f.shopID, memberID, -7, "客服調整"); err != nil {
 		t.Fatalf("AdjustPoints: %v", err)
 	}
-	if got := f.client.ShopMember.GetX(ctx, sm.ID); got.Points != 3 {
+	if got := f.client.Member.GetX(ctx, memberID); got.Points != 3 {
 		t.Fatalf("expected 3 points after manual deduction, got %d", got.Points)
 	}
 
 	if err := f.svc.HandleOrderReturned(ctx, returnedEvent(f.shopID, ord.ID, memberID)); err != nil {
 		t.Fatalf("HandleOrderReturned: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected clawback capped at the remaining 3 points (balance floors at 0), got %d", got.Points)
 	}
@@ -315,8 +303,7 @@ func TestHandleOrderReturnedClawbackCappedAtCurrentBalance(t *testing.T) {
 
 func TestHandleOrderReturnedWithNoPriorAwardIsHarmlessNoOp(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "never-paid@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "never-paid@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
@@ -325,7 +312,7 @@ func TestHandleOrderReturnedWithNoPriorAwardIsHarmlessNoOp(t *testing.T) {
 	if err := f.svc.HandleOrderReturned(ctx, returnedEvent(f.shopID, ord.ID, memberID)); err != nil {
 		t.Fatalf("HandleOrderReturned: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected points to remain 0, got %d", got.Points)
 	}
@@ -335,15 +322,14 @@ func TestHandleOrderReturnedWithNoPriorAwardIsHarmlessNoOp(t *testing.T) {
 
 func TestAdjustPointsRejectsGoingNegative(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "adjust-neg@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "adjust-neg@t.dev")
 	ctx := context.Background()
 
-	_, err := f.svc.AdjustPoints(ctx, f.shopID, sm.ID, -1, "太多了")
+	_, err := f.svc.AdjustPoints(ctx, f.shopID, memberID, -1, "太多了")
 	if _, ok := err.(*points.ValidationError); !ok {
 		t.Fatalf("expected *points.ValidationError, got %T: %v", err, err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.Points != 0 {
 		t.Fatalf("expected balance unchanged, got %d", got.Points)
 	}
@@ -351,8 +337,7 @@ func TestAdjustPointsRejectsGoingNegative(t *testing.T) {
 
 func TestAdjustPointsSucceedsAndRecomputesLevel(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "adjust-ok@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "adjust-ok@t.dev")
 	ctx := context.Background()
 
 	tier, err := f.svc.CreateMemberTier(ctx, f.shopID, points.MemberTierInput{Name: "銀卡", MinPoints: 20})
@@ -360,7 +345,7 @@ func TestAdjustPointsSucceedsAndRecomputesLevel(t *testing.T) {
 		t.Fatalf("CreateMemberTier: %v", err)
 	}
 
-	updated, err := f.svc.AdjustPoints(ctx, f.shopID, sm.ID, 25, "客服補償")
+	updated, err := f.svc.AdjustPoints(ctx, f.shopID, memberID, 25, "客服補償")
 	if err != nil {
 		t.Fatalf("AdjustPoints: %v", err)
 	}
@@ -377,11 +362,10 @@ func TestAdjustPointsSucceedsAndRecomputesLevel(t *testing.T) {
 func TestListTransactionsAdminCrossShopIsNotFound(t *testing.T) {
 	f := setupPointsFixtures(t)
 	otherShop := f.client.Shop.Create().SetName("Other Shop").SetStatus(1).SaveX(context.Background())
-	memberID := newMember(t, f.client, "cross-shop@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "cross-shop@t.dev")
 	ctx := context.Background()
 
-	_, err := f.svc.ListTransactionsAdmin(ctx, otherShop.ID, sm.ID, points.ListParams{})
+	_, err := f.svc.ListTransactionsAdmin(ctx, otherShop.ID, memberID, points.ListParams{})
 	if err != points.ErrNotFound {
 		t.Fatalf("expected ErrNotFound for cross-shop access, got %v", err)
 	}
@@ -389,10 +373,8 @@ func TestListTransactionsAdminCrossShopIsNotFound(t *testing.T) {
 
 func TestGetMemberPointsSelfCrossMemberIsolation(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberA := newMember(t, f.client, "self-a@t.dev")
-	memberB := newMember(t, f.client, "self-b@t.dev")
-	f.newShopMember(t, memberA)
-	f.newShopMember(t, memberB)
+	memberA := f.newMember(t, "self-a@t.dev")
+	memberB := f.newMember(t, "self-b@t.dev")
 	ord := f.newOrder(t, memberA, 1000)
 	ctx := context.Background()
 
@@ -452,8 +434,7 @@ func TestMemberTierCRUD(t *testing.T) {
 
 func TestMemberTierDeleteClearsLevelIDButKeepsPoints(t *testing.T) {
 	f := setupPointsFixtures(t)
-	memberID := newMember(t, f.client, "tier-delete@t.dev")
-	sm := f.newShopMember(t, memberID)
+	memberID := f.newMember(t, "tier-delete@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
@@ -464,7 +445,7 @@ func TestMemberTierDeleteClearsLevelIDButKeepsPoints(t *testing.T) {
 	if err := f.svc.HandleOrderPaid(ctx, paidEvent(f.shopID, ord.ID, memberID, 1000)); err != nil {
 		t.Fatalf("HandleOrderPaid: %v", err)
 	}
-	got := f.client.ShopMember.GetX(ctx, sm.ID)
+	got := f.client.Member.GetX(ctx, memberID)
 	if got.LevelID == nil || *got.LevelID != tier.ID {
 		t.Fatalf("expected member to hold the tier before deletion, got %v", got.LevelID)
 	}
@@ -472,7 +453,7 @@ func TestMemberTierDeleteClearsLevelIDButKeepsPoints(t *testing.T) {
 	if err := f.svc.DeleteMemberTier(ctx, f.shopID, tier.ID); err != nil {
 		t.Fatalf("DeleteMemberTier: %v", err)
 	}
-	got = f.client.ShopMember.GetX(ctx, sm.ID)
+	got = f.client.Member.GetX(ctx, memberID)
 	if got.LevelID != nil {
 		t.Fatalf("expected level_id cleared to nil after tier deletion (ON DELETE SET NULL, design D7), got %v", got.LevelID)
 	}

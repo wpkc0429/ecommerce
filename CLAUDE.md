@@ -42,6 +42,7 @@ cd e2e && node happy-path.mjs # 瀏覽器 E2E（需三個服務 + seed-demo 後�
 - **設計權威**：`openspec/changes/phase1-multitenant-cms-foundation/design.md`（D1–D13）；行為驗收：同目錄 `specs/*/spec.md`。
 - **ent schema** 在 `api/internal/ent/schema/`；改動後 `go generate ./internal/ent`，再 `make migrate-gen`。UNIQUE NULLS NOT DISTINCT 等 ent 無法表達的約束在 `api/migrations/` 手寫檔。
 - **租戶隔離**：`internal/tenant` 的 interceptor/hook 在 `database.Open` 全域註冊——tenant ctx 下所有租戶資料查詢自動加 `shop_id`。
+- **顧客身分以商家為界**（change member-identity-per-shop）：`members` 為租戶資料，唯一性是 `UNIQUE(shop_id, email)` / `UNIQUE(shop_id, phone)`（**維持 Postgres 預設 NULLS DISTINCT**，手寫 migration 建立；勿誤套 `site_shop`/`role_user` 的 `NULLS NOT DISTINCT`）。同一 email 於兩家商家＝兩筆互不相干的身分與密碼，無任何跨店沿用路徑。點數／等級（`points`、`level_id`）直接掛在 `members`（原 `shop_member` 已刪除）。後台路徑不在租戶上下文，對 `members` 的查詢一律顯式帶 `shop_id`，不得倚賴 interceptor。
 - **快取失效**：一律走 `internal/events` 領域事件（handler 不得直呼 Redis）；渲染快取 key 版本化（`cache:shop:{id}:v{ver}:page:{slug}`）。
 - **錯誤格式**：`internal/httpx`（D12 統一 envelope）；公開 API 一律掛 `/api/v1`（D13，v1 只做 additive 變更）。
 - **主題 schema 來源**：`api/internal/seed/schemas/starter/*.json` 同時驅動後端驗證/hydration 與 `web` 的 TS 型別（`npm run gen:types`）。

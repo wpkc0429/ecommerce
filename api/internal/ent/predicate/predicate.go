@@ -69,9 +69,6 @@ type ShippingMethod func(*sql.Selector)
 // Shop is the predicate function for shop builders.
 type Shop func(*sql.Selector)
 
-// ShopMember is the predicate function for shopmember builders.
-type ShopMember func(*sql.Selector)
-
 // ShopUser is the predicate function for shopuser builders.
 type ShopUser func(*sql.Selector)
 

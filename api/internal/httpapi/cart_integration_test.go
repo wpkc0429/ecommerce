@@ -34,10 +34,10 @@ type cartEnv struct {
 	issuer   *auth.TokenIssuer
 	resolver *tenant.Resolver
 
-	shopA, shopB              int
-	memberA1, memberA2        int // two members of shop A: cross-member isolation
-	memberB1                  int // a member of shop B: cross-shop isolation
-	shopADomain, shopBDomain  string
+	shopA, shopB             int
+	memberA1, memberA2       int // two members of shop A: cross-member isolation
+	memberB1                 int // a member of shop B: cross-shop isolation
+	shopADomain, shopBDomain string
 
 	seq int // fixture uniqueness counter
 }
@@ -57,9 +57,9 @@ func newCartEnv(t *testing.T) *cartEnv {
 	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
 	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
 
-	e.memberA1 = client.Member.Create().SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberA2 = client.Member.Create().SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberB1 = client.Member.Create().SetEmail("member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberB1 = client.Member.Create().SetShopID(e.shopB).SetEmail("member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
 
 	issuer, err := auth.NewTokenIssuer("test-admin-secret", "test-member-secret", "test", 15*time.Minute)
 	if err != nil {

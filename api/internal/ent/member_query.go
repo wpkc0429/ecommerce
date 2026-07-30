@@ -8,8 +8,9 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
+	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"math"
 
 	"entgo.io/ent"
@@ -26,7 +27,8 @@ type MemberQuery struct {
 	order             []member.OrderOption
 	inters            []Interceptor
 	predicates        []predicate.Member
-	withShopMembers   *ShopMemberQuery
+	withShop          *ShopQuery
+	withMemberTier    *MemberTierQuery
 	withRefreshTokens *MemberRefreshTokenQuery
 	modifiers         []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
@@ -65,9 +67,9 @@ func (_q *MemberQuery) Order(o ...member.OrderOption) *MemberQuery {
 	return _q
 }
 
-// QueryShopMembers chains the current query on the "shop_members" edge.
-func (_q *MemberQuery) QueryShopMembers() *ShopMemberQuery {
-	query := (&ShopMemberClient{config: _q.config}).Query()
+// QueryShop chains the current query on the "shop" edge.
+func (_q *MemberQuery) QueryShop() *ShopQuery {
+	query := (&ShopClient{config: _q.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := _q.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -78,8 +80,30 @@ func (_q *MemberQuery) QueryShopMembers() *ShopMemberQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(member.Table, member.FieldID, selector),
-			sqlgraph.To(shopmember.Table, shopmember.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, member.ShopMembersTable, member.ShopMembersColumn),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, member.ShopTable, member.ShopColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryMemberTier chains the current query on the "member_tier" edge.
+func (_q *MemberQuery) QueryMemberTier() *MemberTierQuery {
+	query := (&MemberTierClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(member.Table, member.FieldID, selector),
+			sqlgraph.To(membertier.Table, membertier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, member.MemberTierTable, member.MemberTierColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -301,7 +325,8 @@ func (_q *MemberQuery) Clone() *MemberQuery {
 		order:             append([]member.OrderOption{}, _q.order...),
 		inters:            append([]Interceptor{}, _q.inters...),
 		predicates:        append([]predicate.Member{}, _q.predicates...),
-		withShopMembers:   _q.withShopMembers.Clone(),
+		withShop:          _q.withShop.Clone(),
+		withMemberTier:    _q.withMemberTier.Clone(),
 		withRefreshTokens: _q.withRefreshTokens.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
@@ -310,14 +335,25 @@ func (_q *MemberQuery) Clone() *MemberQuery {
 	}
 }
 
-// WithShopMembers tells the query-builder to eager-load the nodes that are connected to
-// the "shop_members" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *MemberQuery) WithShopMembers(opts ...func(*ShopMemberQuery)) *MemberQuery {
-	query := (&ShopMemberClient{config: _q.config}).Query()
+// WithShop tells the query-builder to eager-load the nodes that are connected to
+// the "shop" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MemberQuery) WithShop(opts ...func(*ShopQuery)) *MemberQuery {
+	query := (&ShopClient{config: _q.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	_q.withShopMembers = query
+	_q.withShop = query
+	return _q
+}
+
+// WithMemberTier tells the query-builder to eager-load the nodes that are connected to
+// the "member_tier" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *MemberQuery) WithMemberTier(opts ...func(*MemberTierQuery)) *MemberQuery {
+	query := (&MemberTierClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withMemberTier = query
 	return _q
 }
 
@@ -410,8 +446,9 @@ func (_q *MemberQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Membe
 	var (
 		nodes       = []*Member{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
-			_q.withShopMembers != nil,
+		loadedTypes = [3]bool{
+			_q.withShop != nil,
+			_q.withMemberTier != nil,
 			_q.withRefreshTokens != nil,
 		}
 	)
@@ -436,10 +473,15 @@ func (_q *MemberQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Membe
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := _q.withShopMembers; query != nil {
-		if err := _q.loadShopMembers(ctx, query, nodes,
-			func(n *Member) { n.Edges.ShopMembers = []*ShopMember{} },
-			func(n *Member, e *ShopMember) { n.Edges.ShopMembers = append(n.Edges.ShopMembers, e) }); err != nil {
+	if query := _q.withShop; query != nil {
+		if err := _q.loadShop(ctx, query, nodes, nil,
+			func(n *Member, e *Shop) { n.Edges.Shop = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withMemberTier; query != nil {
+		if err := _q.loadMemberTier(ctx, query, nodes, nil,
+			func(n *Member, e *MemberTier) { n.Edges.MemberTier = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -453,33 +495,64 @@ func (_q *MemberQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Membe
 	return nodes, nil
 }
 
-func (_q *MemberQuery) loadShopMembers(ctx context.Context, query *ShopMemberQuery, nodes []*Member, init func(*Member), assign func(*Member, *ShopMember)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int]*Member)
+func (_q *MemberQuery) loadShop(ctx context.Context, query *ShopQuery, nodes []*Member, init func(*Member), assign func(*Member, *Shop)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Member)
 	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
+		fk := nodes[i].ShopID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
 		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
 	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(shopmember.FieldMemberID)
+	if len(ids) == 0 {
+		return nil
 	}
-	query.Where(predicate.ShopMember(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(member.ShopMembersColumn), fks...))
-	}))
+	query.Where(shop.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
 	}
 	for _, n := range neighbors {
-		fk := n.MemberID
-		node, ok := nodeids[fk]
+		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "member_id" returned %v for node %v`, fk, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "shop_id" returned %v`, n.ID)
 		}
-		assign(node, n)
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *MemberQuery) loadMemberTier(ctx context.Context, query *MemberTierQuery, nodes []*Member, init func(*Member), assign func(*Member, *MemberTier)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*Member)
+	for i := range nodes {
+		if nodes[i].LevelID == nil {
+			continue
+		}
+		fk := *nodes[i].LevelID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(membertier.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "level_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
 	}
 	return nil
 }
@@ -541,6 +614,12 @@ func (_q *MemberQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != member.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withShop != nil {
+			_spec.Node.AddColumnOnce(member.FieldShopID)
+		}
+		if _q.withMemberTier != nil {
+			_spec.Node.AddColumnOnce(member.FieldLevelID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

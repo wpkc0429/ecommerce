@@ -4,10 +4,10 @@ package ent
 
 import (
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"strings"
 	"time"
 
@@ -26,8 +26,8 @@ type PointTransaction struct {
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
 	// ShopID holds the value of the "shop_id" field.
 	ShopID int `json:"shop_id,omitempty"`
-	// ShopMemberID holds the value of the "shop_member_id" field.
-	ShopMemberID int `json:"shop_member_id,omitempty"`
+	// MemberID holds the value of the "member_id" field.
+	MemberID int `json:"member_id,omitempty"`
 	// OrderID holds the value of the "order_id" field.
 	OrderID *int `json:"order_id,omitempty"`
 	// PointsDelta holds the value of the "points_delta" field.
@@ -46,8 +46,8 @@ type PointTransaction struct {
 type PointTransactionEdges struct {
 	// Shop holds the value of the shop edge.
 	Shop *Shop `json:"shop,omitempty"`
-	// ShopMember holds the value of the shop_member edge.
-	ShopMember *ShopMember `json:"shop_member,omitempty"`
+	// Member holds the value of the member edge.
+	Member *Member `json:"member,omitempty"`
 	// Order holds the value of the order edge.
 	Order *Order `json:"order,omitempty"`
 	// loadedTypes holds the information for reporting if a
@@ -66,15 +66,15 @@ func (e PointTransactionEdges) ShopOrErr() (*Shop, error) {
 	return nil, &NotLoadedError{edge: "shop"}
 }
 
-// ShopMemberOrErr returns the ShopMember value or an error if the edge
+// MemberOrErr returns the Member value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
-func (e PointTransactionEdges) ShopMemberOrErr() (*ShopMember, error) {
-	if e.ShopMember != nil {
-		return e.ShopMember, nil
+func (e PointTransactionEdges) MemberOrErr() (*Member, error) {
+	if e.Member != nil {
+		return e.Member, nil
 	} else if e.loadedTypes[1] {
-		return nil, &NotFoundError{label: shopmember.Label}
+		return nil, &NotFoundError{label: member.Label}
 	}
-	return nil, &NotLoadedError{edge: "shop_member"}
+	return nil, &NotLoadedError{edge: "member"}
 }
 
 // OrderOrErr returns the Order value or an error if the edge
@@ -93,7 +93,7 @@ func (*PointTransaction) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case pointtransaction.FieldID, pointtransaction.FieldShopID, pointtransaction.FieldShopMemberID, pointtransaction.FieldOrderID, pointtransaction.FieldPointsDelta, pointtransaction.FieldKind:
+		case pointtransaction.FieldID, pointtransaction.FieldShopID, pointtransaction.FieldMemberID, pointtransaction.FieldOrderID, pointtransaction.FieldPointsDelta, pointtransaction.FieldKind:
 			values[i] = new(sql.NullInt64)
 		case pointtransaction.FieldReason:
 			values[i] = new(sql.NullString)
@@ -138,11 +138,11 @@ func (_m *PointTransaction) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShopID = int(value.Int64)
 			}
-		case pointtransaction.FieldShopMemberID:
+		case pointtransaction.FieldMemberID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field shop_member_id", values[i])
+				return fmt.Errorf("unexpected type %T for field member_id", values[i])
 			} else if value.Valid {
-				_m.ShopMemberID = int(value.Int64)
+				_m.MemberID = int(value.Int64)
 			}
 		case pointtransaction.FieldOrderID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -187,9 +187,9 @@ func (_m *PointTransaction) QueryShop() *ShopQuery {
 	return NewPointTransactionClient(_m.config).QueryShop(_m)
 }
 
-// QueryShopMember queries the "shop_member" edge of the PointTransaction entity.
-func (_m *PointTransaction) QueryShopMember() *ShopMemberQuery {
-	return NewPointTransactionClient(_m.config).QueryShopMember(_m)
+// QueryMember queries the "member" edge of the PointTransaction entity.
+func (_m *PointTransaction) QueryMember() *MemberQuery {
+	return NewPointTransactionClient(_m.config).QueryMember(_m)
 }
 
 // QueryOrder queries the "order" edge of the PointTransaction entity.
@@ -229,8 +229,8 @@ func (_m *PointTransaction) String() string {
 	builder.WriteString("shop_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ShopID))
 	builder.WriteString(", ")
-	builder.WriteString("shop_member_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.ShopMemberID))
+	builder.WriteString("member_id=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MemberID))
 	builder.WriteString(", ")
 	if v := _m.OrderID; v != nil {
 		builder.WriteString("order_id=")

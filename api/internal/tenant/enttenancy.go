@@ -13,8 +13,12 @@ import (
 // be invisible outside their tenant. Extend when adding tenant-owned tables
 // (Phase 2: products, orders, ...).
 var tenantOwned = map[string]bool{
-	"Page":               true,
-	"ShopMember":         true,
+	"Page": true,
+	// change member-identity-per-shop (design D4): members carries its own
+	// shop_id since customer identity became per-shop, so it is tenant-owned
+	// like everything else. Back-office paths run without tenant context and
+	// must therefore scope members queries by an explicit shop_id.
+	"Member":             true,
 	"MemberRefreshToken": true,
 	// change product-catalog (design D7): all four carry a direct shop_id
 	// column, including the ProductCategory join table (defense in depth —

@@ -56,9 +56,13 @@ func (f *paymentFixtures) newOrder(t *testing.T, memberID int, totalAmount int64
 		SaveX(ctx)
 }
 
-func newMember(t *testing.T, client *ent.Client, email string) int {
+// newMember creates a customer of this fixture's shop. Since change
+// member-identity-per-shop, members carries shop_id and is tenant-owned, so
+// the shop must be set explicitly here (these fixtures run outside tenant
+// context, so nothing stamps it for them).
+func (f *paymentFixtures) newMember(t *testing.T, email string) int {
 	t.Helper()
-	return client.Member.Create().SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
+	return f.client.Member.Create().SetShopID(f.shopID).SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
 }
 
 const testWebhookSecret = "svc-test-webhook-secret"
@@ -75,7 +79,7 @@ func newTestService(f *paymentFixtures) *payment.Service {
 
 func TestServiceInitiatePaymentAndWebhookSuccessFlow(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "flow@t.dev")
+	memberID := f.newMember(t, "flow@t.dev")
 	ord := f.newOrder(t, memberID, 5000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -115,7 +119,7 @@ func TestServiceInitiatePaymentAndWebhookSuccessFlow(t *testing.T) {
 
 func TestServiceHandleWebhookFailedDoesNotTouchOrder(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "failed@t.dev")
+	memberID := f.newMember(t, "failed@t.dev")
 	ord := f.newOrder(t, memberID, 2000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -155,7 +159,7 @@ func TestServiceHandleWebhookFailedDoesNotTouchOrder(t *testing.T) {
 
 func TestServiceHandleWebhookDuplicateSucceededIsSafeNoOp(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "dup@t.dev")
+	memberID := f.newMember(t, "dup@t.dev")
 	ord := f.newOrder(t, memberID, 3000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -193,7 +197,7 @@ func TestServiceHandleWebhookDuplicateSucceededIsSafeNoOp(t *testing.T) {
 // (a conflicting/confused redelivery) MUST NOT resurrect it into paid.
 func TestServiceHandleWebhookConflictingSucceededAfterFailedIsIgnored(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "conflict@t.dev")
+	memberID := f.newMember(t, "conflict@t.dev")
 	ord := f.newOrder(t, memberID, 4000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -242,7 +246,7 @@ func TestServiceHandleWebhookUnknownReferenceIsErrNotFound(t *testing.T) {
 
 func TestServiceInitiatePaymentRejectsCancelledOrder(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "cancelled@t.dev")
+	memberID := f.newMember(t, "cancelled@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -261,7 +265,7 @@ func TestServiceInitiatePaymentRejectsCancelledOrder(t *testing.T) {
 
 func TestServiceInitiatePaymentRejectsAlreadyPaidOrder(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "paid@t.dev")
+	memberID := f.newMember(t, "paid@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	svc := newTestService(f)
 	ctx := context.Background()
@@ -280,8 +284,8 @@ func TestServiceInitiatePaymentRejectsAlreadyPaidOrder(t *testing.T) {
 
 func TestServiceInitiatePaymentCrossMemberIsNotFound(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	ownerID := newMember(t, f.client, "owner@t.dev")
-	otherID := newMember(t, f.client, "other@t.dev")
+	ownerID := f.newMember(t, "owner@t.dev")
+	otherID := f.newMember(t, "other@t.dev")
 	ord := f.newOrder(t, ownerID, 1000)
 	svc := newTestService(f)
 
@@ -293,7 +297,7 @@ func TestServiceInitiatePaymentCrossMemberIsNotFound(t *testing.T) {
 
 func TestServiceInitiatePaymentRejectsUnknownProvider(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "unknown-provider@t.dev")
+	memberID := f.newMember(t, "unknown-provider@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	svc := newTestService(f)
 
@@ -321,7 +325,7 @@ func newTestServiceWithDispatcher(f *paymentFixtures, dispatcher *events.Dispatc
 
 func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "event@t.dev")
+	memberID := f.newMember(t, "event@t.dev")
 	ord := f.newOrder(t, memberID, 1290)
 	ctx := context.Background()
 
@@ -364,7 +368,7 @@ func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
 // be idempotent on its own, not rely on this package de-duplicating for it.
 func TestServiceHandleWebhookDuplicateSucceededPublishesEventAgain(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "event-dup@t.dev")
+	memberID := f.newMember(t, "event-dup@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	ctx := context.Background()
 
@@ -401,7 +405,7 @@ func TestServiceHandleWebhookDuplicateSucceededPublishesEventAgain(t *testing.T)
 // panics or errors just because no one is listening.
 func TestServiceHandleWebhookWithoutDispatcherIsNilSafe(t *testing.T) {
 	f := setupPaymentFixtures(t)
-	memberID := newMember(t, f.client, "nil-dispatcher@t.dev")
+	memberID := f.newMember(t, "nil-dispatcher@t.dev")
 	ord := f.newOrder(t, memberID, 1000)
 	svc := newTestService(f) // Dispatcher left nil, as in every other test
 	ctx := context.Background()

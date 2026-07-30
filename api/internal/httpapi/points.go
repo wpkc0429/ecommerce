@@ -13,7 +13,7 @@ import (
 )
 
 // PointsHandler implements both the merchant back-office API (member tier
-// CRUD + a shop member's points balance/ledger/manual-adjustment, RBAC-gated
+// CRUD + a member's points balance/ledger/manual-adjustment, RBAC-gated
 // member_tier.*/point.*, mirrors ShippingHandler.MountShopAdmin) and the
 // member self-service points read API (change member-tiers-and-points, no
 // RBAC — mirrors OrderHandler/ShippingHandler.MountShop: "the JWT's
@@ -49,9 +49,11 @@ func (h *PointsHandler) MountShopAdmin(r chi.Router) {
 	r.With(h.Authz.RequireShopPermission("member_tier.edit")).Put("/member-tiers/{memberTierID}", h.updateMemberTier)
 	r.With(h.Authz.RequireShopPermission("member_tier.delete")).Delete("/member-tiers/{memberTierID}", h.deleteMemberTier)
 
-	r.With(h.Authz.RequireShopPermission("point.view")).Get("/members/{shopMemberID}/points", h.getMemberPointsAdmin)
-	r.With(h.Authz.RequireShopPermission("point.view")).Get("/members/{shopMemberID}/points/transactions", h.listMemberTransactionsAdmin)
-	r.With(h.Authz.RequireShopPermission("point.adjust")).Post("/members/{shopMemberID}/points/adjust", h.adjustPoints)
+	// {memberID} addresses a members row directly (change
+	// member-identity-per-shop design D2/D7 — shop_member no longer exists).
+	r.With(h.Authz.RequireShopPermission("point.view")).Get("/members/{memberID}/points", h.getMemberPointsAdmin)
+	r.With(h.Authz.RequireShopPermission("point.view")).Get("/members/{memberID}/points/transactions", h.listMemberTransactionsAdmin)
+	r.With(h.Authz.RequireShopPermission("point.adjust")).Post("/members/{memberID}/points/adjust", h.adjustPoints)
 }
 
 // MountShop: member self-service routes mounted inside the existing
@@ -72,23 +74,27 @@ func memberTierJSON(mt *ent.MemberTier) map[string]any {
 	}
 }
 
-// shopMemberPointsJSON serializes a shop_member's points/level (design D7).
-// "level" is nested only when the MemberTier edge was eager-loaded
-// (WithMemberTier) — both GetMemberPointsAdmin/GetMemberPointsSelf do this.
-func shopMemberPointsJSON(sm *ent.ShopMember) map[string]any {
+// memberPointsJSON serializes a member's points/level (design D7). "level" is
+// nested only when the MemberTier edge was eager-loaded (WithMemberTier) —
+// both GetMemberPointsAdmin/GetMemberPointsSelf do this.
+//
+// The former "shop_member_id" key is gone (change member-identity-per-shop):
+// it named a table that no longer exists and its value is now simply
+// member_id, which this payload already carries.
+func memberPointsJSON(m *ent.Member) map[string]any {
 	out := map[string]any{
-		"shop_member_id": sm.ID, "shop_id": sm.ShopID, "member_id": sm.MemberID,
-		"points": sm.Points, "level_id": sm.LevelID, "level": nil,
+		"shop_id": m.ShopID, "member_id": m.ID,
+		"points": m.Points, "level_id": m.LevelID, "level": nil,
 	}
-	if sm.Edges.MemberTier != nil {
-		out["level"] = memberTierJSON(sm.Edges.MemberTier)
+	if m.Edges.MemberTier != nil {
+		out["level"] = memberTierJSON(m.Edges.MemberTier)
 	}
 	return out
 }
 
 func pointTransactionJSON(pt *ent.PointTransaction) map[string]any {
 	return map[string]any{
-		"id": pt.ID, "shop_member_id": pt.ShopMemberID, "order_id": pt.OrderID,
+		"id": pt.ID, "member_id": pt.MemberID, "order_id": pt.OrderID,
 		"points_delta": pt.PointsDelta, "kind": pt.Kind, "reason": pt.Reason,
 		"created_at": pt.CreatedAt,
 	}
@@ -183,26 +189,26 @@ func (h *PointsHandler) deleteMemberTier(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// ── a shop member's points (merchant back office) ──────────────────────
+// ── a member's points (merchant back office) ───────────────────────────
 
 func (h *PointsHandler) getMemberPointsAdmin(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
-	shopMemberID, ok := intParam(r, "shopMemberID")
+	memberID, ok := intParam(r, "memberID")
 	if !ok {
 		httpx.NotFound(w)
 		return
 	}
-	sm, err := h.Service.GetMemberPointsAdmin(r.Context(), shopID, shopMemberID)
+	m, err := h.Service.GetMemberPointsAdmin(r.Context(), shopID, memberID)
 	if err != nil {
 		writePointsError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, shopMemberPointsJSON(sm))
+	httpx.WriteJSON(w, http.StatusOK, memberPointsJSON(m))
 }
 
 func (h *PointsHandler) listMemberTransactionsAdmin(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
-	shopMemberID, ok := intParam(r, "shopMemberID")
+	memberID, ok := intParam(r, "memberID")
 	if !ok {
 		httpx.NotFound(w)
 		return
@@ -211,7 +217,7 @@ func (h *PointsHandler) listMemberTransactionsAdmin(w http.ResponseWriter, r *ht
 		Page:     paginationParam(r, "page"),
 		PageSize: paginationParam(r, "page_size"),
 	}
-	tp, err := h.Service.ListTransactionsAdmin(r.Context(), shopID, shopMemberID, params)
+	tp, err := h.Service.ListTransactionsAdmin(r.Context(), shopID, memberID, params)
 	if err != nil {
 		writePointsError(w, h.Log, err)
 		return
@@ -228,7 +234,7 @@ type adjustPointsRequest struct {
 
 func (h *PointsHandler) adjustPoints(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
-	shopMemberID, ok := intParam(r, "shopMemberID")
+	memberID, ok := intParam(r, "memberID")
 	if !ok {
 		httpx.NotFound(w)
 		return
@@ -237,12 +243,12 @@ func (h *PointsHandler) adjustPoints(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	sm, err := h.Service.AdjustPoints(r.Context(), shopID, shopMemberID, in.PointsDelta, in.Reason)
+	m, err := h.Service.AdjustPoints(r.Context(), shopID, memberID, in.PointsDelta, in.Reason)
 	if err != nil {
 		writePointsError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, shopMemberPointsJSON(sm))
+	httpx.WriteJSON(w, http.StatusOK, memberPointsJSON(m))
 }
 
 // ── member self-service ────────────────────────────────────────────────
@@ -256,12 +262,12 @@ func (h *PointsHandler) getMinePoints(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	sm, err := h.Service.GetMemberPointsSelf(r.Context(), shopID, memberID)
+	m, err := h.Service.GetMemberPointsSelf(r.Context(), shopID, memberID)
 	if err != nil {
 		writePointsError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, shopMemberPointsJSON(sm))
+	httpx.WriteJSON(w, http.StatusOK, memberPointsJSON(m))
 }
 
 func (h *PointsHandler) listMineTransactions(w http.ResponseWriter, r *http.Request) {

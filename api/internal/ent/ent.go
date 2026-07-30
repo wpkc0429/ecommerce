@@ -27,7 +27,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -123,7 +122,6 @@ func checkColumn(t, c string) error {
 			shipment.Table:           shipment.ValidColumn,
 			shippingmethod.Table:     shippingmethod.ValidColumn,
 			shop.Table:               shop.ValidColumn,
-			shopmember.Table:         shopmember.ValidColumn,
 			shopuser.Table:           shopuser.ValidColumn,
 			site.Table:               site.ValidColumn,
 			siteshop.Table:           siteshop.ValidColumn,

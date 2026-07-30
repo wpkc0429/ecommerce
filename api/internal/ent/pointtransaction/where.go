@@ -70,9 +70,9 @@ func ShopID(v int) predicate.PointTransaction {
 	return predicate.PointTransaction(sql.FieldEQ(FieldShopID, v))
 }
 
-// ShopMemberID applies equality check predicate on the "shop_member_id" field. It's identical to ShopMemberIDEQ.
-func ShopMemberID(v int) predicate.PointTransaction {
-	return predicate.PointTransaction(sql.FieldEQ(FieldShopMemberID, v))
+// MemberID applies equality check predicate on the "member_id" field. It's identical to MemberIDEQ.
+func MemberID(v int) predicate.PointTransaction {
+	return predicate.PointTransaction(sql.FieldEQ(FieldMemberID, v))
 }
 
 // OrderID applies equality check predicate on the "order_id" field. It's identical to OrderIDEQ.
@@ -195,24 +195,24 @@ func ShopIDNotIn(vs ...int) predicate.PointTransaction {
 	return predicate.PointTransaction(sql.FieldNotIn(FieldShopID, vs...))
 }
 
-// ShopMemberIDEQ applies the EQ predicate on the "shop_member_id" field.
-func ShopMemberIDEQ(v int) predicate.PointTransaction {
-	return predicate.PointTransaction(sql.FieldEQ(FieldShopMemberID, v))
+// MemberIDEQ applies the EQ predicate on the "member_id" field.
+func MemberIDEQ(v int) predicate.PointTransaction {
+	return predicate.PointTransaction(sql.FieldEQ(FieldMemberID, v))
 }
 
-// ShopMemberIDNEQ applies the NEQ predicate on the "shop_member_id" field.
-func ShopMemberIDNEQ(v int) predicate.PointTransaction {
-	return predicate.PointTransaction(sql.FieldNEQ(FieldShopMemberID, v))
+// MemberIDNEQ applies the NEQ predicate on the "member_id" field.
+func MemberIDNEQ(v int) predicate.PointTransaction {
+	return predicate.PointTransaction(sql.FieldNEQ(FieldMemberID, v))
 }
 
-// ShopMemberIDIn applies the In predicate on the "shop_member_id" field.
-func ShopMemberIDIn(vs ...int) predicate.PointTransaction {
-	return predicate.PointTransaction(sql.FieldIn(FieldShopMemberID, vs...))
+// MemberIDIn applies the In predicate on the "member_id" field.
+func MemberIDIn(vs ...int) predicate.PointTransaction {
+	return predicate.PointTransaction(sql.FieldIn(FieldMemberID, vs...))
 }
 
-// ShopMemberIDNotIn applies the NotIn predicate on the "shop_member_id" field.
-func ShopMemberIDNotIn(vs ...int) predicate.PointTransaction {
-	return predicate.PointTransaction(sql.FieldNotIn(FieldShopMemberID, vs...))
+// MemberIDNotIn applies the NotIn predicate on the "member_id" field.
+func MemberIDNotIn(vs ...int) predicate.PointTransaction {
+	return predicate.PointTransaction(sql.FieldNotIn(FieldMemberID, vs...))
 }
 
 // OrderIDEQ applies the EQ predicate on the "order_id" field.
@@ -413,21 +413,21 @@ func HasShopWith(preds ...predicate.Shop) predicate.PointTransaction {
 	})
 }
 
-// HasShopMember applies the HasEdge predicate on the "shop_member" edge.
-func HasShopMember() predicate.PointTransaction {
+// HasMember applies the HasEdge predicate on the "member" edge.
+func HasMember() predicate.PointTransaction {
 	return predicate.PointTransaction(func(s *sql.Selector) {
 		step := sqlgraph.NewStep(
 			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, ShopMemberTable, ShopMemberColumn),
+			sqlgraph.Edge(sqlgraph.M2O, false, MemberTable, MemberColumn),
 		)
 		sqlgraph.HasNeighbors(s, step)
 	})
 }
 
-// HasShopMemberWith applies the HasEdge predicate on the "shop_member" edge with a given conditions (other predicates).
-func HasShopMemberWith(preds ...predicate.ShopMember) predicate.PointTransaction {
+// HasMemberWith applies the HasEdge predicate on the "member" edge with a given conditions (other predicates).
+func HasMemberWith(preds ...predicate.Member) predicate.PointTransaction {
 	return predicate.PointTransaction(func(s *sql.Selector) {
-		step := newShopMemberStep()
+		step := newMemberStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

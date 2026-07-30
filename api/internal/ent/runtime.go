@@ -23,7 +23,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -179,23 +178,27 @@ func init() {
 	// member.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	member.UpdateDefaultUpdatedAt = memberDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// memberDescEmail is the schema descriptor for email field.
-	memberDescEmail := memberFields[0].Descriptor()
+	memberDescEmail := memberFields[1].Descriptor()
 	// member.EmailValidator is a validator for the "email" field. It is called by the builders before save.
 	member.EmailValidator = memberDescEmail.Validators[0].(func(string) error)
 	// memberDescPhone is the schema descriptor for phone field.
-	memberDescPhone := memberFields[1].Descriptor()
+	memberDescPhone := memberFields[2].Descriptor()
 	// member.PhoneValidator is a validator for the "phone" field. It is called by the builders before save.
 	member.PhoneValidator = memberDescPhone.Validators[0].(func(string) error)
 	// memberDescPasswordHash is the schema descriptor for password_hash field.
-	memberDescPasswordHash := memberFields[2].Descriptor()
+	memberDescPasswordHash := memberFields[3].Descriptor()
 	// member.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
 	member.PasswordHashValidator = memberDescPasswordHash.Validators[0].(func(string) error)
 	// memberDescStatus is the schema descriptor for status field.
-	memberDescStatus := memberFields[3].Descriptor()
+	memberDescStatus := memberFields[4].Descriptor()
 	// member.DefaultStatus holds the default value on creation for the status field.
 	member.DefaultStatus = memberDescStatus.Default.(int16)
+	// memberDescPoints is the schema descriptor for points field.
+	memberDescPoints := memberFields[5].Descriptor()
+	// member.DefaultPoints holds the default value on creation for the points field.
+	member.DefaultPoints = memberDescPoints.Default.(int32)
 	// memberDescMeta is the schema descriptor for meta field.
-	memberDescMeta := memberFields[4].Descriptor()
+	memberDescMeta := memberFields[7].Descriptor()
 	// member.DefaultMeta holds the default value on creation for the meta field.
 	member.DefaultMeta = memberDescMeta.Default.(json.RawMessage)
 	memberrefreshtokenFields := schema.MemberRefreshToken{}.Fields()
@@ -862,25 +865,6 @@ func init() {
 	shopDescMeta := shopFields[4].Descriptor()
 	// shop.DefaultMeta holds the default value on creation for the meta field.
 	shop.DefaultMeta = shopDescMeta.Default.(json.RawMessage)
-	shopmemberMixin := schema.ShopMember{}.Mixin()
-	shopmemberMixinFields0 := shopmemberMixin[0].Fields()
-	_ = shopmemberMixinFields0
-	shopmemberFields := schema.ShopMember{}.Fields()
-	_ = shopmemberFields
-	// shopmemberDescCreatedAt is the schema descriptor for created_at field.
-	shopmemberDescCreatedAt := shopmemberMixinFields0[0].Descriptor()
-	// shopmember.DefaultCreatedAt holds the default value on creation for the created_at field.
-	shopmember.DefaultCreatedAt = shopmemberDescCreatedAt.Default.(func() time.Time)
-	// shopmemberDescUpdatedAt is the schema descriptor for updated_at field.
-	shopmemberDescUpdatedAt := shopmemberMixinFields0[1].Descriptor()
-	// shopmember.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	shopmember.DefaultUpdatedAt = shopmemberDescUpdatedAt.Default.(func() time.Time)
-	// shopmember.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	shopmember.UpdateDefaultUpdatedAt = shopmemberDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// shopmemberDescPoints is the schema descriptor for points field.
-	shopmemberDescPoints := shopmemberFields[2].Descriptor()
-	// shopmember.DefaultPoints holds the default value on creation for the points field.
-	shopmember.DefaultPoints = shopmemberDescPoints.Default.(int32)
 	shopuserFields := schema.ShopUser{}.Fields()
 	_ = shopuserFields
 	// shopuserDescCreatedAt is the schema descriptor for created_at field.

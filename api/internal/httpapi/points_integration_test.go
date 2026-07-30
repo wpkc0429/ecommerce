@@ -31,7 +31,7 @@ import (
 )
 
 // pointsEnv exercises change member-tiers-and-points end-to-end: merchant
-// back-office member-tier CRUD + a shop member's points balance/ledger/
+// back-office member-tier CRUD + a member's points balance/ledger/
 // manual-adjustment, member self-service points queries, and the full
 // event-driven award/clawback flow through real checkout + payment webhook +
 // shipment endpoints. Mirrors paymentEnv's/shippingEnv's fixture shape, with
@@ -56,8 +56,6 @@ type pointsEnv struct {
 
 	memberA1, memberA2 int // shop A members: cross-member isolation
 	memberB1           int // shop B member: cross-shop isolation
-
-	shopMemberA1, shopMemberA2, shopMemberB1 int // ShopMember row ids (admin routes address these, not member_id)
 
 	ownerA  int // merchant_owner of shop A: every member_tier.*/point.* node
 	viewerA int // shop A role WITHOUT any member_tier.*/point.* permission
@@ -104,17 +102,12 @@ func newPointsEnv(t *testing.T) *pointsEnv {
 	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
 	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
 
-	e.memberA1 = client.Member.Create().SetEmail("points-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberA2 = client.Member.Create().SetEmail("points-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberB1 = client.Member.Create().SetEmail("points-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
-
-	// A real ShopMember row per (shop, member) — mirrors
-	// httpapi.MemberAuthHandler.ensureMembership's effect at login/register
-	// time (design Context); tests here mint JWTs directly, bypassing that
-	// handler, so the row is created explicitly instead.
-	e.shopMemberA1 = client.ShopMember.Create().SetShopID(e.shopA).SetMemberID(e.memberA1).SaveX(ctx).ID
-	e.shopMemberA2 = client.ShopMember.Create().SetShopID(e.shopA).SetMemberID(e.memberA2).SaveX(ctx).ID
-	e.shopMemberB1 = client.ShopMember.Create().SetShopID(e.shopB).SetMemberID(e.memberB1).SaveX(ctx).ID
+	// Since change member-identity-per-shop the identity row itself carries
+	// shop_id and the loyalty balance — there is no separate membership row
+	// to create, and the admin routes address these ids directly.
+	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("points-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("points-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberB1 = client.Member.Create().SetShopID(e.shopB).SetEmail("points-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
 
 	hash, _ := auth.HashPassword("password-123")
 	e.ownerA = client.User.Create().SetEmail("points-owner-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
@@ -391,7 +384,7 @@ func TestMemberTierDeleteClearsMemberLevel(t *testing.T) {
 	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
 	e.payOrder(t, e.shopA, e.memberA1, e.shopADomain, orderID) // 10 points awarded, crosses the 5-point tier
 
-	code, before := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.shopMemberA1)), nil)
+	code, before := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.memberA1)), nil)
 	if code != http.StatusOK || before["level_id"] == nil {
 		t.Fatalf("expected member to hold a level before tier deletion, got %d: %+v", code, before)
 	}
@@ -401,7 +394,7 @@ func TestMemberTierDeleteClearsMemberLevel(t *testing.T) {
 		t.Fatalf("delete tier: want 204, got %d", code)
 	}
 
-	code, after := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.shopMemberA1)), nil)
+	code, after := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.memberA1)), nil)
 	if code != http.StatusOK {
 		t.Fatalf("get points after tier delete: want 200, got %d", code)
 	}
@@ -430,11 +423,11 @@ func TestPointsAwardedOnPaymentSuccessEndToEnd(t *testing.T) {
 	}
 
 	// Merchant back-office view + ledger.
-	code, admin := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.shopMemberA1)), nil)
+	code, admin := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.memberA1)), nil)
 	if code != http.StatusOK || admin["points"].(float64) != 12 {
 		t.Fatalf("admin get points: want 200 with 12 points, got %d: %+v", code, admin)
 	}
-	code, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.shopMemberA1)), nil)
+	code, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.memberA1)), nil)
 	if code != http.StatusOK {
 		t.Fatalf("admin list transactions: want 200, got %d", code)
 	}
@@ -475,7 +468,7 @@ func TestPointsAwardIdempotentOnDuplicateWebhookDelivery(t *testing.T) {
 	if code != http.StatusOK || mine["points"].(float64) != 10 {
 		t.Fatalf("expected points awarded exactly once (10) despite duplicate webhook delivery, got %d: %+v", code, mine)
 	}
-	_, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.shopMemberA1)), nil)
+	_, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.memberA1)), nil)
 	if len(ledger["transactions"].([]any)) != 1 {
 		t.Fatalf("expected exactly one ledger row after duplicate delivery, got %+v", ledger)
 	}
@@ -521,7 +514,7 @@ func TestPointsClawbackOnReturnEndToEnd(t *testing.T) {
 		t.Fatalf("expected points clawed back to 0 after return, got %d: %+v", code, mine)
 	}
 
-	_, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.shopMemberA1)), nil)
+	_, ledger := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/transactions", e.memberA1)), nil)
 	txs := ledger["transactions"].([]any)
 	if len(txs) != 2 {
 		t.Fatalf("expected 2 ledger rows (award + clawback), got %d: %+v", len(txs), ledger)
@@ -533,24 +526,24 @@ func TestPointsClawbackOnReturnEndToEnd(t *testing.T) {
 func TestPointsAdjustRBACAndValidation(t *testing.T) {
 	e := newPointsEnv(t)
 
-	code, _ := e.adminCall(t, e.viewerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.shopMemberA1)),
+	code, _ := e.adminCall(t, e.viewerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.memberA1)),
 		map[string]any{"points_delta": 10, "reason": "test"})
 	if code != http.StatusForbidden {
 		t.Fatalf("viewer adjust: want 403, got %d", code)
 	}
-	code, _ = e.adminCall(t, e.ownerB, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.shopMemberA1)),
+	code, _ = e.adminCall(t, e.ownerB, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.memberA1)),
 		map[string]any{"points_delta": 10, "reason": "test"})
 	if code != http.StatusForbidden {
 		t.Fatalf("cross-shop adjust: want 403, got %d", code)
 	}
 
-	code, adjusted := e.adminCallJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.shopMemberA1)),
+	code, adjusted := e.adminCallJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.memberA1)),
 		map[string]any{"points_delta": 50, "reason": "客服補償"})
 	if code != http.StatusOK || adjusted["points"].(float64) != 50 {
 		t.Fatalf("owner adjust: want 200 with 50 points, got %d: %+v", code, adjusted)
 	}
 
-	code, resp := e.adminCallJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.shopMemberA1)),
+	code, resp := e.adminCallJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points/adjust", e.memberA1)),
 		map[string]any{"points_delta": -1000, "reason": "太多了"})
 	if code != http.StatusUnprocessableEntity {
 		t.Fatalf("adjust below zero: want 422, got %d: %+v", code, resp)
@@ -561,7 +554,7 @@ func TestPointsAdjustRBACAndValidation(t *testing.T) {
 
 func TestPointsAdminCrossShopIsolation(t *testing.T) {
 	e := newPointsEnv(t)
-	code, _ := e.adminCall(t, e.ownerB, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.shopMemberA1)), nil)
+	code, _ := e.adminCall(t, e.ownerB, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.memberA1)), nil)
 	if code != http.StatusForbidden {
 		t.Fatalf("cross-shop get points: want 403, got %d", code)
 	}
@@ -569,7 +562,7 @@ func TestPointsAdminCrossShopIsolation(t *testing.T) {
 
 func TestPointsAdminUnknownMemberIsNotFound(t *testing.T) {
 	e := newPointsEnv(t)
-	code, _ := e.adminCall(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.shopMemberB1)), nil)
+	code, _ := e.adminCall(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/members/%d/points", e.memberB1)), nil)
 	if code != http.StatusNotFound {
 		t.Fatalf("shop A owner querying a shop B member: want 404, got %d", code)
 	}

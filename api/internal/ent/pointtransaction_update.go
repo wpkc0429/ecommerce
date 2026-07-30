@@ -6,11 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -52,16 +52,16 @@ func (_u *PointTransactionUpdate) SetNillableShopID(v *int) *PointTransactionUpd
 	return _u
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (_u *PointTransactionUpdate) SetShopMemberID(v int) *PointTransactionUpdate {
-	_u.mutation.SetShopMemberID(v)
+// SetMemberID sets the "member_id" field.
+func (_u *PointTransactionUpdate) SetMemberID(v int) *PointTransactionUpdate {
+	_u.mutation.SetMemberID(v)
 	return _u
 }
 
-// SetNillableShopMemberID sets the "shop_member_id" field if the given value is not nil.
-func (_u *PointTransactionUpdate) SetNillableShopMemberID(v *int) *PointTransactionUpdate {
+// SetNillableMemberID sets the "member_id" field if the given value is not nil.
+func (_u *PointTransactionUpdate) SetNillableMemberID(v *int) *PointTransactionUpdate {
 	if v != nil {
-		_u.SetShopMemberID(*v)
+		_u.SetMemberID(*v)
 	}
 	return _u
 }
@@ -147,9 +147,9 @@ func (_u *PointTransactionUpdate) SetShop(v *Shop) *PointTransactionUpdate {
 	return _u.SetShopID(v.ID)
 }
 
-// SetShopMember sets the "shop_member" edge to the ShopMember entity.
-func (_u *PointTransactionUpdate) SetShopMember(v *ShopMember) *PointTransactionUpdate {
-	return _u.SetShopMemberID(v.ID)
+// SetMember sets the "member" edge to the Member entity.
+func (_u *PointTransactionUpdate) SetMember(v *Member) *PointTransactionUpdate {
+	return _u.SetMemberID(v.ID)
 }
 
 // SetOrder sets the "order" edge to the Order entity.
@@ -168,9 +168,9 @@ func (_u *PointTransactionUpdate) ClearShop() *PointTransactionUpdate {
 	return _u
 }
 
-// ClearShopMember clears the "shop_member" edge to the ShopMember entity.
-func (_u *PointTransactionUpdate) ClearShopMember() *PointTransactionUpdate {
-	_u.mutation.ClearShopMember()
+// ClearMember clears the "member" edge to the Member entity.
+func (_u *PointTransactionUpdate) ClearMember() *PointTransactionUpdate {
+	_u.mutation.ClearMember()
 	return _u
 }
 
@@ -226,8 +226,8 @@ func (_u *PointTransactionUpdate) check() error {
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "PointTransaction.shop"`)
 	}
-	if _u.mutation.ShopMemberCleared() && len(_u.mutation.ShopMemberIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "PointTransaction.shop_member"`)
+	if _u.mutation.MemberCleared() && len(_u.mutation.MemberIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "PointTransaction.member"`)
 	}
 	return nil
 }
@@ -297,28 +297,28 @@ func (_u *PointTransactionUpdate) sqlSave(ctx context.Context) (_node int, err e
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.ShopMemberCleared() {
+	if _u.mutation.MemberCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   pointtransaction.ShopMemberTable,
-			Columns: []string{pointtransaction.ShopMemberColumn},
+			Table:   pointtransaction.MemberTable,
+			Columns: []string{pointtransaction.MemberColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.ShopMemberIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.MemberIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   pointtransaction.ShopMemberTable,
-			Columns: []string{pointtransaction.ShopMemberColumn},
+			Table:   pointtransaction.MemberTable,
+			Columns: []string{pointtransaction.MemberColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -397,16 +397,16 @@ func (_u *PointTransactionUpdateOne) SetNillableShopID(v *int) *PointTransaction
 	return _u
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (_u *PointTransactionUpdateOne) SetShopMemberID(v int) *PointTransactionUpdateOne {
-	_u.mutation.SetShopMemberID(v)
+// SetMemberID sets the "member_id" field.
+func (_u *PointTransactionUpdateOne) SetMemberID(v int) *PointTransactionUpdateOne {
+	_u.mutation.SetMemberID(v)
 	return _u
 }
 
-// SetNillableShopMemberID sets the "shop_member_id" field if the given value is not nil.
-func (_u *PointTransactionUpdateOne) SetNillableShopMemberID(v *int) *PointTransactionUpdateOne {
+// SetNillableMemberID sets the "member_id" field if the given value is not nil.
+func (_u *PointTransactionUpdateOne) SetNillableMemberID(v *int) *PointTransactionUpdateOne {
 	if v != nil {
-		_u.SetShopMemberID(*v)
+		_u.SetMemberID(*v)
 	}
 	return _u
 }
@@ -492,9 +492,9 @@ func (_u *PointTransactionUpdateOne) SetShop(v *Shop) *PointTransactionUpdateOne
 	return _u.SetShopID(v.ID)
 }
 
-// SetShopMember sets the "shop_member" edge to the ShopMember entity.
-func (_u *PointTransactionUpdateOne) SetShopMember(v *ShopMember) *PointTransactionUpdateOne {
-	return _u.SetShopMemberID(v.ID)
+// SetMember sets the "member" edge to the Member entity.
+func (_u *PointTransactionUpdateOne) SetMember(v *Member) *PointTransactionUpdateOne {
+	return _u.SetMemberID(v.ID)
 }
 
 // SetOrder sets the "order" edge to the Order entity.
@@ -513,9 +513,9 @@ func (_u *PointTransactionUpdateOne) ClearShop() *PointTransactionUpdateOne {
 	return _u
 }
 
-// ClearShopMember clears the "shop_member" edge to the ShopMember entity.
-func (_u *PointTransactionUpdateOne) ClearShopMember() *PointTransactionUpdateOne {
-	_u.mutation.ClearShopMember()
+// ClearMember clears the "member" edge to the Member entity.
+func (_u *PointTransactionUpdateOne) ClearMember() *PointTransactionUpdateOne {
+	_u.mutation.ClearMember()
 	return _u
 }
 
@@ -584,8 +584,8 @@ func (_u *PointTransactionUpdateOne) check() error {
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "PointTransaction.shop"`)
 	}
-	if _u.mutation.ShopMemberCleared() && len(_u.mutation.ShopMemberIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "PointTransaction.shop_member"`)
+	if _u.mutation.MemberCleared() && len(_u.mutation.MemberIDs()) > 0 {
+		return errors.New(`ent: clearing a required unique edge "PointTransaction.member"`)
 	}
 	return nil
 }
@@ -672,28 +672,28 @@ func (_u *PointTransactionUpdateOne) sqlSave(ctx context.Context) (_node *PointT
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.ShopMemberCleared() {
+	if _u.mutation.MemberCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   pointtransaction.ShopMemberTable,
-			Columns: []string{pointtransaction.ShopMemberColumn},
+			Table:   pointtransaction.MemberTable,
+			Columns: []string{pointtransaction.MemberColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
 			},
 		}
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
-	if nodes := _u.mutation.ShopMemberIDs(); len(nodes) > 0 {
+	if nodes := _u.mutation.MemberIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
 			Inverse: false,
-			Table:   pointtransaction.ShopMemberTable,
-			Columns: []string{pointtransaction.ShopMemberColumn},
+			Table:   pointtransaction.MemberTable,
+			Columns: []string{pointtransaction.MemberColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(member.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

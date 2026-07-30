@@ -29,7 +29,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -75,7 +74,6 @@ const (
 	TypeShipment           = "Shipment"
 	TypeShippingMethod     = "ShippingMethod"
 	TypeShop               = "Shop"
-	TypeShopMember         = "ShopMember"
 	TypeShopUser           = "ShopUser"
 	TypeSite               = "Site"
 	TypeSiteShop           = "SiteShop"
@@ -2833,12 +2831,15 @@ type MemberMutation struct {
 	password_hash         *string
 	status                *int16
 	addstatus             *int16
+	points                *int32
+	addpoints             *int32
 	meta                  *json.RawMessage
 	appendmeta            json.RawMessage
 	clearedFields         map[string]struct{}
-	shop_members          map[int]struct{}
-	removedshop_members   map[int]struct{}
-	clearedshop_members   bool
+	shop                  *int
+	clearedshop           bool
+	member_tier           *int
+	clearedmember_tier    bool
 	refresh_tokens        map[int]struct{}
 	removedrefresh_tokens map[int]struct{}
 	clearedrefresh_tokens bool
@@ -3015,6 +3016,42 @@ func (m *MemberMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err err
 // ResetUpdatedAt resets all changes to the "updated_at" field.
 func (m *MemberMutation) ResetUpdatedAt() {
 	m.updated_at = nil
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *MemberMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *MemberMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *MemberMutation) ResetShopID() {
+	m.shop = nil
 }
 
 // SetEmail sets the "email" field.
@@ -3220,6 +3257,111 @@ func (m *MemberMutation) ResetStatus() {
 	m.addstatus = nil
 }
 
+// SetPoints sets the "points" field.
+func (m *MemberMutation) SetPoints(i int32) {
+	m.points = &i
+	m.addpoints = nil
+}
+
+// Points returns the value of the "points" field in the mutation.
+func (m *MemberMutation) Points() (r int32, exists bool) {
+	v := m.points
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPoints returns the old "points" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldPoints(ctx context.Context) (v int32, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPoints is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPoints requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPoints: %w", err)
+	}
+	return oldValue.Points, nil
+}
+
+// AddPoints adds i to the "points" field.
+func (m *MemberMutation) AddPoints(i int32) {
+	if m.addpoints != nil {
+		*m.addpoints += i
+	} else {
+		m.addpoints = &i
+	}
+}
+
+// AddedPoints returns the value that was added to the "points" field in this mutation.
+func (m *MemberMutation) AddedPoints() (r int32, exists bool) {
+	v := m.addpoints
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPoints resets all changes to the "points" field.
+func (m *MemberMutation) ResetPoints() {
+	m.points = nil
+	m.addpoints = nil
+}
+
+// SetLevelID sets the "level_id" field.
+func (m *MemberMutation) SetLevelID(i int) {
+	m.member_tier = &i
+}
+
+// LevelID returns the value of the "level_id" field in the mutation.
+func (m *MemberMutation) LevelID() (r int, exists bool) {
+	v := m.member_tier
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLevelID returns the old "level_id" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldLevelID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLevelID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLevelID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLevelID: %w", err)
+	}
+	return oldValue.LevelID, nil
+}
+
+// ClearLevelID clears the value of the "level_id" field.
+func (m *MemberMutation) ClearLevelID() {
+	m.member_tier = nil
+	m.clearedFields[member.FieldLevelID] = struct{}{}
+}
+
+// LevelIDCleared returns if the "level_id" field was cleared in this mutation.
+func (m *MemberMutation) LevelIDCleared() bool {
+	_, ok := m.clearedFields[member.FieldLevelID]
+	return ok
+}
+
+// ResetLevelID resets all changes to the "level_id" field.
+func (m *MemberMutation) ResetLevelID() {
+	m.member_tier = nil
+	delete(m.clearedFields, member.FieldLevelID)
+}
+
 // SetMeta sets the "meta" field.
 func (m *MemberMutation) SetMeta(jm json.RawMessage) {
 	m.meta = &jm
@@ -3271,58 +3413,71 @@ func (m *MemberMutation) ResetMeta() {
 	m.appendmeta = nil
 }
 
-// AddShopMemberIDs adds the "shop_members" edge to the ShopMember entity by ids.
-func (m *MemberMutation) AddShopMemberIDs(ids ...int) {
-	if m.shop_members == nil {
-		m.shop_members = make(map[int]struct{})
-	}
-	for i := range ids {
-		m.shop_members[ids[i]] = struct{}{}
-	}
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *MemberMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[member.FieldShopID] = struct{}{}
 }
 
-// ClearShopMembers clears the "shop_members" edge to the ShopMember entity.
-func (m *MemberMutation) ClearShopMembers() {
-	m.clearedshop_members = true
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *MemberMutation) ShopCleared() bool {
+	return m.clearedshop
 }
 
-// ShopMembersCleared reports if the "shop_members" edge to the ShopMember entity was cleared.
-func (m *MemberMutation) ShopMembersCleared() bool {
-	return m.clearedshop_members
-}
-
-// RemoveShopMemberIDs removes the "shop_members" edge to the ShopMember entity by IDs.
-func (m *MemberMutation) RemoveShopMemberIDs(ids ...int) {
-	if m.removedshop_members == nil {
-		m.removedshop_members = make(map[int]struct{})
-	}
-	for i := range ids {
-		delete(m.shop_members, ids[i])
-		m.removedshop_members[ids[i]] = struct{}{}
-	}
-}
-
-// RemovedShopMembers returns the removed IDs of the "shop_members" edge to the ShopMember entity.
-func (m *MemberMutation) RemovedShopMembersIDs() (ids []int) {
-	for id := range m.removedshop_members {
-		ids = append(ids, id)
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *MemberMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
 	}
 	return
 }
 
-// ShopMembersIDs returns the "shop_members" edge IDs in the mutation.
-func (m *MemberMutation) ShopMembersIDs() (ids []int) {
-	for id := range m.shop_members {
-		ids = append(ids, id)
+// ResetShop resets all changes to the "shop" edge.
+func (m *MemberMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by id.
+func (m *MemberMutation) SetMemberTierID(id int) {
+	m.member_tier = &id
+}
+
+// ClearMemberTier clears the "member_tier" edge to the MemberTier entity.
+func (m *MemberMutation) ClearMemberTier() {
+	m.clearedmember_tier = true
+	m.clearedFields[member.FieldLevelID] = struct{}{}
+}
+
+// MemberTierCleared reports if the "member_tier" edge to the MemberTier entity was cleared.
+func (m *MemberMutation) MemberTierCleared() bool {
+	return m.LevelIDCleared() || m.clearedmember_tier
+}
+
+// MemberTierID returns the "member_tier" edge ID in the mutation.
+func (m *MemberMutation) MemberTierID() (id int, exists bool) {
+	if m.member_tier != nil {
+		return *m.member_tier, true
 	}
 	return
 }
 
-// ResetShopMembers resets all changes to the "shop_members" edge.
-func (m *MemberMutation) ResetShopMembers() {
-	m.shop_members = nil
-	m.clearedshop_members = false
-	m.removedshop_members = nil
+// MemberTierIDs returns the "member_tier" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// MemberTierID instead. It exists only for internal usage by the builders.
+func (m *MemberMutation) MemberTierIDs() (ids []int) {
+	if id := m.member_tier; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetMemberTier resets all changes to the "member_tier" edge.
+func (m *MemberMutation) ResetMemberTier() {
+	m.member_tier = nil
+	m.clearedmember_tier = false
 }
 
 // AddRefreshTokenIDs adds the "refresh_tokens" edge to the MemberRefreshToken entity by ids.
@@ -3413,12 +3568,15 @@ func (m *MemberMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MemberMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, member.FieldCreatedAt)
 	}
 	if m.updated_at != nil {
 		fields = append(fields, member.FieldUpdatedAt)
+	}
+	if m.shop != nil {
+		fields = append(fields, member.FieldShopID)
 	}
 	if m.email != nil {
 		fields = append(fields, member.FieldEmail)
@@ -3431,6 +3589,12 @@ func (m *MemberMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, member.FieldStatus)
+	}
+	if m.points != nil {
+		fields = append(fields, member.FieldPoints)
+	}
+	if m.member_tier != nil {
+		fields = append(fields, member.FieldLevelID)
 	}
 	if m.meta != nil {
 		fields = append(fields, member.FieldMeta)
@@ -3447,6 +3611,8 @@ func (m *MemberMutation) Field(name string) (ent.Value, bool) {
 		return m.CreatedAt()
 	case member.FieldUpdatedAt:
 		return m.UpdatedAt()
+	case member.FieldShopID:
+		return m.ShopID()
 	case member.FieldEmail:
 		return m.Email()
 	case member.FieldPhone:
@@ -3455,6 +3621,10 @@ func (m *MemberMutation) Field(name string) (ent.Value, bool) {
 		return m.PasswordHash()
 	case member.FieldStatus:
 		return m.Status()
+	case member.FieldPoints:
+		return m.Points()
+	case member.FieldLevelID:
+		return m.LevelID()
 	case member.FieldMeta:
 		return m.Meta()
 	}
@@ -3470,6 +3640,8 @@ func (m *MemberMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldCreatedAt(ctx)
 	case member.FieldUpdatedAt:
 		return m.OldUpdatedAt(ctx)
+	case member.FieldShopID:
+		return m.OldShopID(ctx)
 	case member.FieldEmail:
 		return m.OldEmail(ctx)
 	case member.FieldPhone:
@@ -3478,6 +3650,10 @@ func (m *MemberMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldPasswordHash(ctx)
 	case member.FieldStatus:
 		return m.OldStatus(ctx)
+	case member.FieldPoints:
+		return m.OldPoints(ctx)
+	case member.FieldLevelID:
+		return m.OldLevelID(ctx)
 	case member.FieldMeta:
 		return m.OldMeta(ctx)
 	}
@@ -3502,6 +3678,13 @@ func (m *MemberMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetUpdatedAt(v)
+		return nil
+	case member.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
 		return nil
 	case member.FieldEmail:
 		v, ok := value.(string)
@@ -3531,6 +3714,20 @@ func (m *MemberMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetStatus(v)
 		return nil
+	case member.FieldPoints:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPoints(v)
+		return nil
+	case member.FieldLevelID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLevelID(v)
+		return nil
 	case member.FieldMeta:
 		v, ok := value.(json.RawMessage)
 		if !ok {
@@ -3549,6 +3746,9 @@ func (m *MemberMutation) AddedFields() []string {
 	if m.addstatus != nil {
 		fields = append(fields, member.FieldStatus)
 	}
+	if m.addpoints != nil {
+		fields = append(fields, member.FieldPoints)
+	}
 	return fields
 }
 
@@ -3559,6 +3759,8 @@ func (m *MemberMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case member.FieldStatus:
 		return m.AddedStatus()
+	case member.FieldPoints:
+		return m.AddedPoints()
 	}
 	return nil, false
 }
@@ -3574,6 +3776,13 @@ func (m *MemberMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddStatus(v)
+		return nil
+	case member.FieldPoints:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPoints(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Member numeric field %s", name)
@@ -3591,6 +3800,9 @@ func (m *MemberMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(member.FieldPasswordHash) {
 		fields = append(fields, member.FieldPasswordHash)
+	}
+	if m.FieldCleared(member.FieldLevelID) {
+		fields = append(fields, member.FieldLevelID)
 	}
 	return fields
 }
@@ -3615,6 +3827,9 @@ func (m *MemberMutation) ClearField(name string) error {
 	case member.FieldPasswordHash:
 		m.ClearPasswordHash()
 		return nil
+	case member.FieldLevelID:
+		m.ClearLevelID()
+		return nil
 	}
 	return fmt.Errorf("unknown Member nullable field %s", name)
 }
@@ -3629,6 +3844,9 @@ func (m *MemberMutation) ResetField(name string) error {
 	case member.FieldUpdatedAt:
 		m.ResetUpdatedAt()
 		return nil
+	case member.FieldShopID:
+		m.ResetShopID()
+		return nil
 	case member.FieldEmail:
 		m.ResetEmail()
 		return nil
@@ -3641,6 +3859,12 @@ func (m *MemberMutation) ResetField(name string) error {
 	case member.FieldStatus:
 		m.ResetStatus()
 		return nil
+	case member.FieldPoints:
+		m.ResetPoints()
+		return nil
+	case member.FieldLevelID:
+		m.ResetLevelID()
+		return nil
 	case member.FieldMeta:
 		m.ResetMeta()
 		return nil
@@ -3650,9 +3874,12 @@ func (m *MemberMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *MemberMutation) AddedEdges() []string {
-	edges := make([]string, 0, 2)
-	if m.shop_members != nil {
-		edges = append(edges, member.EdgeShopMembers)
+	edges := make([]string, 0, 3)
+	if m.shop != nil {
+		edges = append(edges, member.EdgeShop)
+	}
+	if m.member_tier != nil {
+		edges = append(edges, member.EdgeMemberTier)
 	}
 	if m.refresh_tokens != nil {
 		edges = append(edges, member.EdgeRefreshTokens)
@@ -3664,12 +3891,14 @@ func (m *MemberMutation) AddedEdges() []string {
 // name in this mutation.
 func (m *MemberMutation) AddedIDs(name string) []ent.Value {
 	switch name {
-	case member.EdgeShopMembers:
-		ids := make([]ent.Value, 0, len(m.shop_members))
-		for id := range m.shop_members {
-			ids = append(ids, id)
+	case member.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
 		}
-		return ids
+	case member.EdgeMemberTier:
+		if id := m.member_tier; id != nil {
+			return []ent.Value{*id}
+		}
 	case member.EdgeRefreshTokens:
 		ids := make([]ent.Value, 0, len(m.refresh_tokens))
 		for id := range m.refresh_tokens {
@@ -3682,10 +3911,7 @@ func (m *MemberMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *MemberMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 2)
-	if m.removedshop_members != nil {
-		edges = append(edges, member.EdgeShopMembers)
-	}
+	edges := make([]string, 0, 3)
 	if m.removedrefresh_tokens != nil {
 		edges = append(edges, member.EdgeRefreshTokens)
 	}
@@ -3696,12 +3922,6 @@ func (m *MemberMutation) RemovedEdges() []string {
 // the given name in this mutation.
 func (m *MemberMutation) RemovedIDs(name string) []ent.Value {
 	switch name {
-	case member.EdgeShopMembers:
-		ids := make([]ent.Value, 0, len(m.removedshop_members))
-		for id := range m.removedshop_members {
-			ids = append(ids, id)
-		}
-		return ids
 	case member.EdgeRefreshTokens:
 		ids := make([]ent.Value, 0, len(m.removedrefresh_tokens))
 		for id := range m.removedrefresh_tokens {
@@ -3714,9 +3934,12 @@ func (m *MemberMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *MemberMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 2)
-	if m.clearedshop_members {
-		edges = append(edges, member.EdgeShopMembers)
+	edges := make([]string, 0, 3)
+	if m.clearedshop {
+		edges = append(edges, member.EdgeShop)
+	}
+	if m.clearedmember_tier {
+		edges = append(edges, member.EdgeMemberTier)
 	}
 	if m.clearedrefresh_tokens {
 		edges = append(edges, member.EdgeRefreshTokens)
@@ -3728,8 +3951,10 @@ func (m *MemberMutation) ClearedEdges() []string {
 // was cleared in this mutation.
 func (m *MemberMutation) EdgeCleared(name string) bool {
 	switch name {
-	case member.EdgeShopMembers:
-		return m.clearedshop_members
+	case member.EdgeShop:
+		return m.clearedshop
+	case member.EdgeMemberTier:
+		return m.clearedmember_tier
 	case member.EdgeRefreshTokens:
 		return m.clearedrefresh_tokens
 	}
@@ -3740,6 +3965,12 @@ func (m *MemberMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *MemberMutation) ClearEdge(name string) error {
 	switch name {
+	case member.EdgeShop:
+		m.ClearShop()
+		return nil
+	case member.EdgeMemberTier:
+		m.ClearMemberTier()
+		return nil
 	}
 	return fmt.Errorf("unknown Member unique edge %s", name)
 }
@@ -3748,8 +3979,11 @@ func (m *MemberMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *MemberMutation) ResetEdge(name string) error {
 	switch name {
-	case member.EdgeShopMembers:
-		m.ResetShopMembers()
+	case member.EdgeShop:
+		m.ResetShop()
+		return nil
+	case member.EdgeMemberTier:
+		m.ResetMemberTier()
 		return nil
 	case member.EdgeRefreshTokens:
 		m.ResetRefreshTokens()
@@ -10155,26 +10389,26 @@ func (m *PermissionMutation) ResetEdge(name string) error {
 // PointTransactionMutation represents an operation that mutates the PointTransaction nodes in the graph.
 type PointTransactionMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	points_delta       *int32
-	addpoints_delta    *int32
-	kind               *int16
-	addkind            *int16
-	reason             *string
-	clearedFields      map[string]struct{}
-	shop               *int
-	clearedshop        bool
-	shop_member        *int
-	clearedshop_member bool
-	_order             *int
-	cleared_order      bool
-	done               bool
-	oldValue           func(context.Context) (*PointTransaction, error)
-	predicates         []predicate.PointTransaction
+	op              Op
+	typ             string
+	id              *int
+	created_at      *time.Time
+	updated_at      *time.Time
+	points_delta    *int32
+	addpoints_delta *int32
+	kind            *int16
+	addkind         *int16
+	reason          *string
+	clearedFields   map[string]struct{}
+	shop            *int
+	clearedshop     bool
+	member          *int
+	clearedmember   bool
+	_order          *int
+	cleared_order   bool
+	done            bool
+	oldValue        func(context.Context) (*PointTransaction, error)
+	predicates      []predicate.PointTransaction
 }
 
 var _ ent.Mutation = (*PointTransactionMutation)(nil)
@@ -10383,40 +10617,40 @@ func (m *PointTransactionMutation) ResetShopID() {
 	m.shop = nil
 }
 
-// SetShopMemberID sets the "shop_member_id" field.
-func (m *PointTransactionMutation) SetShopMemberID(i int) {
-	m.shop_member = &i
+// SetMemberID sets the "member_id" field.
+func (m *PointTransactionMutation) SetMemberID(i int) {
+	m.member = &i
 }
 
-// ShopMemberID returns the value of the "shop_member_id" field in the mutation.
-func (m *PointTransactionMutation) ShopMemberID() (r int, exists bool) {
-	v := m.shop_member
+// MemberID returns the value of the "member_id" field in the mutation.
+func (m *PointTransactionMutation) MemberID() (r int, exists bool) {
+	v := m.member
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldShopMemberID returns the old "shop_member_id" field's value of the PointTransaction entity.
+// OldMemberID returns the old "member_id" field's value of the PointTransaction entity.
 // If the PointTransaction object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *PointTransactionMutation) OldShopMemberID(ctx context.Context) (v int, err error) {
+func (m *PointTransactionMutation) OldMemberID(ctx context.Context) (v int, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldShopMemberID is only allowed on UpdateOne operations")
+		return v, errors.New("OldMemberID is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldShopMemberID requires an ID field in the mutation")
+		return v, errors.New("OldMemberID requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldShopMemberID: %w", err)
+		return v, fmt.Errorf("querying old value for OldMemberID: %w", err)
 	}
-	return oldValue.ShopMemberID, nil
+	return oldValue.MemberID, nil
 }
 
-// ResetShopMemberID resets all changes to the "shop_member_id" field.
-func (m *PointTransactionMutation) ResetShopMemberID() {
-	m.shop_member = nil
+// ResetMemberID resets all changes to the "member_id" field.
+func (m *PointTransactionMutation) ResetMemberID() {
+	m.member = nil
 }
 
 // SetOrderID sets the "order_id" field.
@@ -10643,31 +10877,31 @@ func (m *PointTransactionMutation) ResetShop() {
 	m.clearedshop = false
 }
 
-// ClearShopMember clears the "shop_member" edge to the ShopMember entity.
-func (m *PointTransactionMutation) ClearShopMember() {
-	m.clearedshop_member = true
-	m.clearedFields[pointtransaction.FieldShopMemberID] = struct{}{}
+// ClearMember clears the "member" edge to the Member entity.
+func (m *PointTransactionMutation) ClearMember() {
+	m.clearedmember = true
+	m.clearedFields[pointtransaction.FieldMemberID] = struct{}{}
 }
 
-// ShopMemberCleared reports if the "shop_member" edge to the ShopMember entity was cleared.
-func (m *PointTransactionMutation) ShopMemberCleared() bool {
-	return m.clearedshop_member
+// MemberCleared reports if the "member" edge to the Member entity was cleared.
+func (m *PointTransactionMutation) MemberCleared() bool {
+	return m.clearedmember
 }
 
-// ShopMemberIDs returns the "shop_member" edge IDs in the mutation.
+// MemberIDs returns the "member" edge IDs in the mutation.
 // Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// ShopMemberID instead. It exists only for internal usage by the builders.
-func (m *PointTransactionMutation) ShopMemberIDs() (ids []int) {
-	if id := m.shop_member; id != nil {
+// MemberID instead. It exists only for internal usage by the builders.
+func (m *PointTransactionMutation) MemberIDs() (ids []int) {
+	if id := m.member; id != nil {
 		ids = append(ids, *id)
 	}
 	return
 }
 
-// ResetShopMember resets all changes to the "shop_member" edge.
-func (m *PointTransactionMutation) ResetShopMember() {
-	m.shop_member = nil
-	m.clearedshop_member = false
+// ResetMember resets all changes to the "member" edge.
+func (m *PointTransactionMutation) ResetMember() {
+	m.member = nil
+	m.clearedmember = false
 }
 
 // ClearOrder clears the "order" edge to the Order entity.
@@ -10741,8 +10975,8 @@ func (m *PointTransactionMutation) Fields() []string {
 	if m.shop != nil {
 		fields = append(fields, pointtransaction.FieldShopID)
 	}
-	if m.shop_member != nil {
-		fields = append(fields, pointtransaction.FieldShopMemberID)
+	if m.member != nil {
+		fields = append(fields, pointtransaction.FieldMemberID)
 	}
 	if m._order != nil {
 		fields = append(fields, pointtransaction.FieldOrderID)
@@ -10770,8 +11004,8 @@ func (m *PointTransactionMutation) Field(name string) (ent.Value, bool) {
 		return m.UpdatedAt()
 	case pointtransaction.FieldShopID:
 		return m.ShopID()
-	case pointtransaction.FieldShopMemberID:
-		return m.ShopMemberID()
+	case pointtransaction.FieldMemberID:
+		return m.MemberID()
 	case pointtransaction.FieldOrderID:
 		return m.OrderID()
 	case pointtransaction.FieldPointsDelta:
@@ -10795,8 +11029,8 @@ func (m *PointTransactionMutation) OldField(ctx context.Context, name string) (e
 		return m.OldUpdatedAt(ctx)
 	case pointtransaction.FieldShopID:
 		return m.OldShopID(ctx)
-	case pointtransaction.FieldShopMemberID:
-		return m.OldShopMemberID(ctx)
+	case pointtransaction.FieldMemberID:
+		return m.OldMemberID(ctx)
 	case pointtransaction.FieldOrderID:
 		return m.OldOrderID(ctx)
 	case pointtransaction.FieldPointsDelta:
@@ -10835,12 +11069,12 @@ func (m *PointTransactionMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetShopID(v)
 		return nil
-	case pointtransaction.FieldShopMemberID:
+	case pointtransaction.FieldMemberID:
 		v, ok := value.(int)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetShopMemberID(v)
+		m.SetMemberID(v)
 		return nil
 	case pointtransaction.FieldOrderID:
 		v, ok := value.(int)
@@ -10964,8 +11198,8 @@ func (m *PointTransactionMutation) ResetField(name string) error {
 	case pointtransaction.FieldShopID:
 		m.ResetShopID()
 		return nil
-	case pointtransaction.FieldShopMemberID:
-		m.ResetShopMemberID()
+	case pointtransaction.FieldMemberID:
+		m.ResetMemberID()
 		return nil
 	case pointtransaction.FieldOrderID:
 		m.ResetOrderID()
@@ -10989,8 +11223,8 @@ func (m *PointTransactionMutation) AddedEdges() []string {
 	if m.shop != nil {
 		edges = append(edges, pointtransaction.EdgeShop)
 	}
-	if m.shop_member != nil {
-		edges = append(edges, pointtransaction.EdgeShopMember)
+	if m.member != nil {
+		edges = append(edges, pointtransaction.EdgeMember)
 	}
 	if m._order != nil {
 		edges = append(edges, pointtransaction.EdgeOrder)
@@ -11006,8 +11240,8 @@ func (m *PointTransactionMutation) AddedIDs(name string) []ent.Value {
 		if id := m.shop; id != nil {
 			return []ent.Value{*id}
 		}
-	case pointtransaction.EdgeShopMember:
-		if id := m.shop_member; id != nil {
+	case pointtransaction.EdgeMember:
+		if id := m.member; id != nil {
 			return []ent.Value{*id}
 		}
 	case pointtransaction.EdgeOrder:
@@ -11036,8 +11270,8 @@ func (m *PointTransactionMutation) ClearedEdges() []string {
 	if m.clearedshop {
 		edges = append(edges, pointtransaction.EdgeShop)
 	}
-	if m.clearedshop_member {
-		edges = append(edges, pointtransaction.EdgeShopMember)
+	if m.clearedmember {
+		edges = append(edges, pointtransaction.EdgeMember)
 	}
 	if m.cleared_order {
 		edges = append(edges, pointtransaction.EdgeOrder)
@@ -11051,8 +11285,8 @@ func (m *PointTransactionMutation) EdgeCleared(name string) bool {
 	switch name {
 	case pointtransaction.EdgeShop:
 		return m.clearedshop
-	case pointtransaction.EdgeShopMember:
-		return m.clearedshop_member
+	case pointtransaction.EdgeMember:
+		return m.clearedmember
 	case pointtransaction.EdgeOrder:
 		return m.cleared_order
 	}
@@ -11066,8 +11300,8 @@ func (m *PointTransactionMutation) ClearEdge(name string) error {
 	case pointtransaction.EdgeShop:
 		m.ClearShop()
 		return nil
-	case pointtransaction.EdgeShopMember:
-		m.ClearShopMember()
+	case pointtransaction.EdgeMember:
+		m.ClearMember()
 		return nil
 	case pointtransaction.EdgeOrder:
 		m.ClearOrder()
@@ -11083,8 +11317,8 @@ func (m *PointTransactionMutation) ResetEdge(name string) error {
 	case pointtransaction.EdgeShop:
 		m.ResetShop()
 		return nil
-	case pointtransaction.EdgeShopMember:
-		m.ResetShopMember()
+	case pointtransaction.EdgeMember:
+		m.ResetMember()
 		return nil
 	case pointtransaction.EdgeOrder:
 		m.ResetOrder()
@@ -17836,819 +18070,6 @@ func (m *ShopMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Shop edge %s", name)
-}
-
-// ShopMemberMutation represents an operation that mutates the ShopMember nodes in the graph.
-type ShopMemberMutation struct {
-	config
-	op                 Op
-	typ                string
-	id                 *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	points             *int32
-	addpoints          *int32
-	clearedFields      map[string]struct{}
-	shop               *int
-	clearedshop        bool
-	member             *int
-	clearedmember      bool
-	member_tier        *int
-	clearedmember_tier bool
-	done               bool
-	oldValue           func(context.Context) (*ShopMember, error)
-	predicates         []predicate.ShopMember
-}
-
-var _ ent.Mutation = (*ShopMemberMutation)(nil)
-
-// shopmemberOption allows management of the mutation configuration using functional options.
-type shopmemberOption func(*ShopMemberMutation)
-
-// newShopMemberMutation creates new mutation for the ShopMember entity.
-func newShopMemberMutation(c config, op Op, opts ...shopmemberOption) *ShopMemberMutation {
-	m := &ShopMemberMutation{
-		config:        c,
-		op:            op,
-		typ:           TypeShopMember,
-		clearedFields: make(map[string]struct{}),
-	}
-	for _, opt := range opts {
-		opt(m)
-	}
-	return m
-}
-
-// withShopMemberID sets the ID field of the mutation.
-func withShopMemberID(id int) shopmemberOption {
-	return func(m *ShopMemberMutation) {
-		var (
-			err   error
-			once  sync.Once
-			value *ShopMember
-		)
-		m.oldValue = func(ctx context.Context) (*ShopMember, error) {
-			once.Do(func() {
-				if m.done {
-					err = errors.New("querying old values post mutation is not allowed")
-				} else {
-					value, err = m.Client().ShopMember.Get(ctx, id)
-				}
-			})
-			return value, err
-		}
-		m.id = &id
-	}
-}
-
-// withShopMember sets the old ShopMember of the mutation.
-func withShopMember(node *ShopMember) shopmemberOption {
-	return func(m *ShopMemberMutation) {
-		m.oldValue = func(context.Context) (*ShopMember, error) {
-			return node, nil
-		}
-		m.id = &node.ID
-	}
-}
-
-// Client returns a new `ent.Client` from the mutation. If the mutation was
-// executed in a transaction (ent.Tx), a transactional client is returned.
-func (m ShopMemberMutation) Client() *Client {
-	client := &Client{config: m.config}
-	client.init()
-	return client
-}
-
-// Tx returns an `ent.Tx` for mutations that were executed in transactions;
-// it returns an error otherwise.
-func (m ShopMemberMutation) Tx() (*Tx, error) {
-	if _, ok := m.driver.(*txDriver); !ok {
-		return nil, errors.New("ent: mutation is not running in a transaction")
-	}
-	tx := &Tx{config: m.config}
-	tx.init()
-	return tx, nil
-}
-
-// ID returns the ID value in the mutation. Note that the ID is only available
-// if it was provided to the builder or after it was returned from the database.
-func (m *ShopMemberMutation) ID() (id int, exists bool) {
-	if m.id == nil {
-		return
-	}
-	return *m.id, true
-}
-
-// IDs queries the database and returns the entity ids that match the mutation's predicate.
-// That means, if the mutation is applied within a transaction with an isolation level such
-// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
-// or updated by the mutation.
-func (m *ShopMemberMutation) IDs(ctx context.Context) ([]int, error) {
-	switch {
-	case m.op.Is(OpUpdateOne | OpDeleteOne):
-		id, exists := m.ID()
-		if exists {
-			return []int{id}, nil
-		}
-		fallthrough
-	case m.op.Is(OpUpdate | OpDelete):
-		return m.Client().ShopMember.Query().Where(m.predicates...).IDs(ctx)
-	default:
-		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
-	}
-}
-
-// SetCreatedAt sets the "created_at" field.
-func (m *ShopMemberMutation) SetCreatedAt(t time.Time) {
-	m.created_at = &t
-}
-
-// CreatedAt returns the value of the "created_at" field in the mutation.
-func (m *ShopMemberMutation) CreatedAt() (r time.Time, exists bool) {
-	v := m.created_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCreatedAt returns the old "created_at" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
-	}
-	return oldValue.CreatedAt, nil
-}
-
-// ResetCreatedAt resets all changes to the "created_at" field.
-func (m *ShopMemberMutation) ResetCreatedAt() {
-	m.created_at = nil
-}
-
-// SetUpdatedAt sets the "updated_at" field.
-func (m *ShopMemberMutation) SetUpdatedAt(t time.Time) {
-	m.updated_at = &t
-}
-
-// UpdatedAt returns the value of the "updated_at" field in the mutation.
-func (m *ShopMemberMutation) UpdatedAt() (r time.Time, exists bool) {
-	v := m.updated_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldUpdatedAt returns the old "updated_at" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
-	}
-	return oldValue.UpdatedAt, nil
-}
-
-// ResetUpdatedAt resets all changes to the "updated_at" field.
-func (m *ShopMemberMutation) ResetUpdatedAt() {
-	m.updated_at = nil
-}
-
-// SetShopID sets the "shop_id" field.
-func (m *ShopMemberMutation) SetShopID(i int) {
-	m.shop = &i
-}
-
-// ShopID returns the value of the "shop_id" field in the mutation.
-func (m *ShopMemberMutation) ShopID() (r int, exists bool) {
-	v := m.shop
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldShopID returns the old "shop_id" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldShopID(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldShopID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
-	}
-	return oldValue.ShopID, nil
-}
-
-// ResetShopID resets all changes to the "shop_id" field.
-func (m *ShopMemberMutation) ResetShopID() {
-	m.shop = nil
-}
-
-// SetMemberID sets the "member_id" field.
-func (m *ShopMemberMutation) SetMemberID(i int) {
-	m.member = &i
-}
-
-// MemberID returns the value of the "member_id" field in the mutation.
-func (m *ShopMemberMutation) MemberID() (r int, exists bool) {
-	v := m.member
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldMemberID returns the old "member_id" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldMemberID(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldMemberID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldMemberID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldMemberID: %w", err)
-	}
-	return oldValue.MemberID, nil
-}
-
-// ResetMemberID resets all changes to the "member_id" field.
-func (m *ShopMemberMutation) ResetMemberID() {
-	m.member = nil
-}
-
-// SetPoints sets the "points" field.
-func (m *ShopMemberMutation) SetPoints(i int32) {
-	m.points = &i
-	m.addpoints = nil
-}
-
-// Points returns the value of the "points" field in the mutation.
-func (m *ShopMemberMutation) Points() (r int32, exists bool) {
-	v := m.points
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldPoints returns the old "points" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldPoints(ctx context.Context) (v int32, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldPoints is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldPoints requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldPoints: %w", err)
-	}
-	return oldValue.Points, nil
-}
-
-// AddPoints adds i to the "points" field.
-func (m *ShopMemberMutation) AddPoints(i int32) {
-	if m.addpoints != nil {
-		*m.addpoints += i
-	} else {
-		m.addpoints = &i
-	}
-}
-
-// AddedPoints returns the value that was added to the "points" field in this mutation.
-func (m *ShopMemberMutation) AddedPoints() (r int32, exists bool) {
-	v := m.addpoints
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetPoints resets all changes to the "points" field.
-func (m *ShopMemberMutation) ResetPoints() {
-	m.points = nil
-	m.addpoints = nil
-}
-
-// SetLevelID sets the "level_id" field.
-func (m *ShopMemberMutation) SetLevelID(i int) {
-	m.member_tier = &i
-}
-
-// LevelID returns the value of the "level_id" field in the mutation.
-func (m *ShopMemberMutation) LevelID() (r int, exists bool) {
-	v := m.member_tier
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldLevelID returns the old "level_id" field's value of the ShopMember entity.
-// If the ShopMember object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *ShopMemberMutation) OldLevelID(ctx context.Context) (v *int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldLevelID is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldLevelID requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldLevelID: %w", err)
-	}
-	return oldValue.LevelID, nil
-}
-
-// ClearLevelID clears the value of the "level_id" field.
-func (m *ShopMemberMutation) ClearLevelID() {
-	m.member_tier = nil
-	m.clearedFields[shopmember.FieldLevelID] = struct{}{}
-}
-
-// LevelIDCleared returns if the "level_id" field was cleared in this mutation.
-func (m *ShopMemberMutation) LevelIDCleared() bool {
-	_, ok := m.clearedFields[shopmember.FieldLevelID]
-	return ok
-}
-
-// ResetLevelID resets all changes to the "level_id" field.
-func (m *ShopMemberMutation) ResetLevelID() {
-	m.member_tier = nil
-	delete(m.clearedFields, shopmember.FieldLevelID)
-}
-
-// ClearShop clears the "shop" edge to the Shop entity.
-func (m *ShopMemberMutation) ClearShop() {
-	m.clearedshop = true
-	m.clearedFields[shopmember.FieldShopID] = struct{}{}
-}
-
-// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
-func (m *ShopMemberMutation) ShopCleared() bool {
-	return m.clearedshop
-}
-
-// ShopIDs returns the "shop" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// ShopID instead. It exists only for internal usage by the builders.
-func (m *ShopMemberMutation) ShopIDs() (ids []int) {
-	if id := m.shop; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetShop resets all changes to the "shop" edge.
-func (m *ShopMemberMutation) ResetShop() {
-	m.shop = nil
-	m.clearedshop = false
-}
-
-// ClearMember clears the "member" edge to the Member entity.
-func (m *ShopMemberMutation) ClearMember() {
-	m.clearedmember = true
-	m.clearedFields[shopmember.FieldMemberID] = struct{}{}
-}
-
-// MemberCleared reports if the "member" edge to the Member entity was cleared.
-func (m *ShopMemberMutation) MemberCleared() bool {
-	return m.clearedmember
-}
-
-// MemberIDs returns the "member" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// MemberID instead. It exists only for internal usage by the builders.
-func (m *ShopMemberMutation) MemberIDs() (ids []int) {
-	if id := m.member; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetMember resets all changes to the "member" edge.
-func (m *ShopMemberMutation) ResetMember() {
-	m.member = nil
-	m.clearedmember = false
-}
-
-// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by id.
-func (m *ShopMemberMutation) SetMemberTierID(id int) {
-	m.member_tier = &id
-}
-
-// ClearMemberTier clears the "member_tier" edge to the MemberTier entity.
-func (m *ShopMemberMutation) ClearMemberTier() {
-	m.clearedmember_tier = true
-	m.clearedFields[shopmember.FieldLevelID] = struct{}{}
-}
-
-// MemberTierCleared reports if the "member_tier" edge to the MemberTier entity was cleared.
-func (m *ShopMemberMutation) MemberTierCleared() bool {
-	return m.LevelIDCleared() || m.clearedmember_tier
-}
-
-// MemberTierID returns the "member_tier" edge ID in the mutation.
-func (m *ShopMemberMutation) MemberTierID() (id int, exists bool) {
-	if m.member_tier != nil {
-		return *m.member_tier, true
-	}
-	return
-}
-
-// MemberTierIDs returns the "member_tier" edge IDs in the mutation.
-// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
-// MemberTierID instead. It exists only for internal usage by the builders.
-func (m *ShopMemberMutation) MemberTierIDs() (ids []int) {
-	if id := m.member_tier; id != nil {
-		ids = append(ids, *id)
-	}
-	return
-}
-
-// ResetMemberTier resets all changes to the "member_tier" edge.
-func (m *ShopMemberMutation) ResetMemberTier() {
-	m.member_tier = nil
-	m.clearedmember_tier = false
-}
-
-// Where appends a list predicates to the ShopMemberMutation builder.
-func (m *ShopMemberMutation) Where(ps ...predicate.ShopMember) {
-	m.predicates = append(m.predicates, ps...)
-}
-
-// WhereP appends storage-level predicates to the ShopMemberMutation builder. Using this method,
-// users can use type-assertion to append predicates that do not depend on any generated package.
-func (m *ShopMemberMutation) WhereP(ps ...func(*sql.Selector)) {
-	p := make([]predicate.ShopMember, len(ps))
-	for i := range ps {
-		p[i] = ps[i]
-	}
-	m.Where(p...)
-}
-
-// Op returns the operation name.
-func (m *ShopMemberMutation) Op() Op {
-	return m.op
-}
-
-// SetOp allows setting the mutation operation.
-func (m *ShopMemberMutation) SetOp(op Op) {
-	m.op = op
-}
-
-// Type returns the node type of this mutation (ShopMember).
-func (m *ShopMemberMutation) Type() string {
-	return m.typ
-}
-
-// Fields returns all fields that were changed during this mutation. Note that in
-// order to get all numeric fields that were incremented/decremented, call
-// AddedFields().
-func (m *ShopMemberMutation) Fields() []string {
-	fields := make([]string, 0, 6)
-	if m.created_at != nil {
-		fields = append(fields, shopmember.FieldCreatedAt)
-	}
-	if m.updated_at != nil {
-		fields = append(fields, shopmember.FieldUpdatedAt)
-	}
-	if m.shop != nil {
-		fields = append(fields, shopmember.FieldShopID)
-	}
-	if m.member != nil {
-		fields = append(fields, shopmember.FieldMemberID)
-	}
-	if m.points != nil {
-		fields = append(fields, shopmember.FieldPoints)
-	}
-	if m.member_tier != nil {
-		fields = append(fields, shopmember.FieldLevelID)
-	}
-	return fields
-}
-
-// Field returns the value of a field with the given name. The second boolean
-// return value indicates that this field was not set, or was not defined in the
-// schema.
-func (m *ShopMemberMutation) Field(name string) (ent.Value, bool) {
-	switch name {
-	case shopmember.FieldCreatedAt:
-		return m.CreatedAt()
-	case shopmember.FieldUpdatedAt:
-		return m.UpdatedAt()
-	case shopmember.FieldShopID:
-		return m.ShopID()
-	case shopmember.FieldMemberID:
-		return m.MemberID()
-	case shopmember.FieldPoints:
-		return m.Points()
-	case shopmember.FieldLevelID:
-		return m.LevelID()
-	}
-	return nil, false
-}
-
-// OldField returns the old value of the field from the database. An error is
-// returned if the mutation operation is not UpdateOne, or the query to the
-// database failed.
-func (m *ShopMemberMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
-	switch name {
-	case shopmember.FieldCreatedAt:
-		return m.OldCreatedAt(ctx)
-	case shopmember.FieldUpdatedAt:
-		return m.OldUpdatedAt(ctx)
-	case shopmember.FieldShopID:
-		return m.OldShopID(ctx)
-	case shopmember.FieldMemberID:
-		return m.OldMemberID(ctx)
-	case shopmember.FieldPoints:
-		return m.OldPoints(ctx)
-	case shopmember.FieldLevelID:
-		return m.OldLevelID(ctx)
-	}
-	return nil, fmt.Errorf("unknown ShopMember field %s", name)
-}
-
-// SetField sets the value of a field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *ShopMemberMutation) SetField(name string, value ent.Value) error {
-	switch name {
-	case shopmember.FieldCreatedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCreatedAt(v)
-		return nil
-	case shopmember.FieldUpdatedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetUpdatedAt(v)
-		return nil
-	case shopmember.FieldShopID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetShopID(v)
-		return nil
-	case shopmember.FieldMemberID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetMemberID(v)
-		return nil
-	case shopmember.FieldPoints:
-		v, ok := value.(int32)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetPoints(v)
-		return nil
-	case shopmember.FieldLevelID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetLevelID(v)
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember field %s", name)
-}
-
-// AddedFields returns all numeric fields that were incremented/decremented during
-// this mutation.
-func (m *ShopMemberMutation) AddedFields() []string {
-	var fields []string
-	if m.addpoints != nil {
-		fields = append(fields, shopmember.FieldPoints)
-	}
-	return fields
-}
-
-// AddedField returns the numeric value that was incremented/decremented on a field
-// with the given name. The second boolean return value indicates that this field
-// was not set, or was not defined in the schema.
-func (m *ShopMemberMutation) AddedField(name string) (ent.Value, bool) {
-	switch name {
-	case shopmember.FieldPoints:
-		return m.AddedPoints()
-	}
-	return nil, false
-}
-
-// AddField adds the value to the field with the given name. It returns an error if
-// the field is not defined in the schema, or if the type mismatched the field
-// type.
-func (m *ShopMemberMutation) AddField(name string, value ent.Value) error {
-	switch name {
-	case shopmember.FieldPoints:
-		v, ok := value.(int32)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddPoints(v)
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember numeric field %s", name)
-}
-
-// ClearedFields returns all nullable fields that were cleared during this
-// mutation.
-func (m *ShopMemberMutation) ClearedFields() []string {
-	var fields []string
-	if m.FieldCleared(shopmember.FieldLevelID) {
-		fields = append(fields, shopmember.FieldLevelID)
-	}
-	return fields
-}
-
-// FieldCleared returns a boolean indicating if a field with the given name was
-// cleared in this mutation.
-func (m *ShopMemberMutation) FieldCleared(name string) bool {
-	_, ok := m.clearedFields[name]
-	return ok
-}
-
-// ClearField clears the value of the field with the given name. It returns an
-// error if the field is not defined in the schema.
-func (m *ShopMemberMutation) ClearField(name string) error {
-	switch name {
-	case shopmember.FieldLevelID:
-		m.ClearLevelID()
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember nullable field %s", name)
-}
-
-// ResetField resets all changes in the mutation for the field with the given name.
-// It returns an error if the field is not defined in the schema.
-func (m *ShopMemberMutation) ResetField(name string) error {
-	switch name {
-	case shopmember.FieldCreatedAt:
-		m.ResetCreatedAt()
-		return nil
-	case shopmember.FieldUpdatedAt:
-		m.ResetUpdatedAt()
-		return nil
-	case shopmember.FieldShopID:
-		m.ResetShopID()
-		return nil
-	case shopmember.FieldMemberID:
-		m.ResetMemberID()
-		return nil
-	case shopmember.FieldPoints:
-		m.ResetPoints()
-		return nil
-	case shopmember.FieldLevelID:
-		m.ResetLevelID()
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember field %s", name)
-}
-
-// AddedEdges returns all edge names that were set/added in this mutation.
-func (m *ShopMemberMutation) AddedEdges() []string {
-	edges := make([]string, 0, 3)
-	if m.shop != nil {
-		edges = append(edges, shopmember.EdgeShop)
-	}
-	if m.member != nil {
-		edges = append(edges, shopmember.EdgeMember)
-	}
-	if m.member_tier != nil {
-		edges = append(edges, shopmember.EdgeMemberTier)
-	}
-	return edges
-}
-
-// AddedIDs returns all IDs (to other nodes) that were added for the given edge
-// name in this mutation.
-func (m *ShopMemberMutation) AddedIDs(name string) []ent.Value {
-	switch name {
-	case shopmember.EdgeShop:
-		if id := m.shop; id != nil {
-			return []ent.Value{*id}
-		}
-	case shopmember.EdgeMember:
-		if id := m.member; id != nil {
-			return []ent.Value{*id}
-		}
-	case shopmember.EdgeMemberTier:
-		if id := m.member_tier; id != nil {
-			return []ent.Value{*id}
-		}
-	}
-	return nil
-}
-
-// RemovedEdges returns all edge names that were removed in this mutation.
-func (m *ShopMemberMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 3)
-	return edges
-}
-
-// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
-// the given name in this mutation.
-func (m *ShopMemberMutation) RemovedIDs(name string) []ent.Value {
-	return nil
-}
-
-// ClearedEdges returns all edge names that were cleared in this mutation.
-func (m *ShopMemberMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 3)
-	if m.clearedshop {
-		edges = append(edges, shopmember.EdgeShop)
-	}
-	if m.clearedmember {
-		edges = append(edges, shopmember.EdgeMember)
-	}
-	if m.clearedmember_tier {
-		edges = append(edges, shopmember.EdgeMemberTier)
-	}
-	return edges
-}
-
-// EdgeCleared returns a boolean which indicates if the edge with the given name
-// was cleared in this mutation.
-func (m *ShopMemberMutation) EdgeCleared(name string) bool {
-	switch name {
-	case shopmember.EdgeShop:
-		return m.clearedshop
-	case shopmember.EdgeMember:
-		return m.clearedmember
-	case shopmember.EdgeMemberTier:
-		return m.clearedmember_tier
-	}
-	return false
-}
-
-// ClearEdge clears the value of the edge with the given name. It returns an error
-// if that edge is not defined in the schema.
-func (m *ShopMemberMutation) ClearEdge(name string) error {
-	switch name {
-	case shopmember.EdgeShop:
-		m.ClearShop()
-		return nil
-	case shopmember.EdgeMember:
-		m.ClearMember()
-		return nil
-	case shopmember.EdgeMemberTier:
-		m.ClearMemberTier()
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember unique edge %s", name)
-}
-
-// ResetEdge resets all changes to the edge with the given name in this mutation.
-// It returns an error if the edge is not defined in the schema.
-func (m *ShopMemberMutation) ResetEdge(name string) error {
-	switch name {
-	case shopmember.EdgeShop:
-		m.ResetShop()
-		return nil
-	case shopmember.EdgeMember:
-		m.ResetMember()
-		return nil
-	case shopmember.EdgeMemberTier:
-		m.ResetMemberTier()
-		return nil
-	}
-	return fmt.Errorf("unknown ShopMember edge %s", name)
 }
 
 // ShopUserMutation represents an operation that mutates the ShopUser nodes in the graph.

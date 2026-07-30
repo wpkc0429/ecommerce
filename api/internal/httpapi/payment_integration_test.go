@@ -84,9 +84,9 @@ func newPaymentEnv(t *testing.T) *paymentEnv {
 	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
 	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
 
-	e.memberA1 = client.Member.Create().SetEmail("payment-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberA2 = client.Member.Create().SetEmail("payment-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
-	e.memberB1 = client.Member.Create().SetEmail("payment-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("payment-member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("payment-member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
+	e.memberB1 = client.Member.Create().SetShopID(e.shopB).SetEmail("payment-member-b1@t.dev").SetStatus(1).SaveX(ctx).ID
 
 	hash, _ := auth.HashPassword("password-123")
 	e.ownerA = client.User.Create().SetEmail("payment-owner-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID

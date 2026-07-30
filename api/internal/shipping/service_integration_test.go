@@ -41,9 +41,13 @@ func setupShippingFixtures(t *testing.T) *shippingFixtures {
 	}
 }
 
-func newMember(t *testing.T, client *ent.Client, email string) int {
+// newMember creates a customer of this fixture's shop. Since change
+// member-identity-per-shop, members carries shop_id and is tenant-owned, so
+// the shop must be set explicitly here (these fixtures run outside tenant
+// context, so nothing stamps it for them).
+func (f *shippingFixtures) newMember(t *testing.T, email string) int {
 	t.Helper()
-	return client.Member.Create().SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
+	return f.client.Member.Create().SetShopID(f.shopID).SetEmail(email).SetStatus(1).SaveX(context.Background()).ID
 }
 
 // newOrder creates a fresh, unfulfilled, uncancelled order directly via ent
@@ -67,7 +71,7 @@ func trackingNumber(s string) *string { return &s }
 
 func TestServiceCreateShipmentAdvancesFulfillmentStatus(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "flow@t.dev")
+	memberID := f.newMember(t, "flow@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -96,7 +100,7 @@ func TestServiceCreateShipmentAdvancesFulfillmentStatus(t *testing.T) {
 
 func TestServiceCreateShipmentRejectsCancelledOrder(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "cancelled@t.dev")
+	memberID := f.newMember(t, "cancelled@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -122,7 +126,7 @@ func TestServiceCreateShipmentRejectsCancelledOrder(t *testing.T) {
 
 func TestServiceCreateShipmentRejectsAlreadyShippedOrder(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "already@t.dev")
+	memberID := f.newMember(t, "already@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -150,7 +154,7 @@ func TestServiceCreateShipmentRejectsAlreadyShippedOrder(t *testing.T) {
 
 func TestServiceCreateShipmentRejectsBlankCarrier(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "blank@t.dev")
+	memberID := f.newMember(t, "blank@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -166,7 +170,7 @@ func TestServiceCreateShipmentRejectsBlankCarrier(t *testing.T) {
 
 func TestServiceAdvanceShipmentToDelivered(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "delivered@t.dev")
+	memberID := f.newMember(t, "delivered@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -197,7 +201,7 @@ func TestServiceAdvanceShipmentToDelivered(t *testing.T) {
 
 func TestServiceAdvanceShipmentToReturned(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "returned@t.dev")
+	memberID := f.newMember(t, "returned@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -225,7 +229,7 @@ func TestServiceAdvanceShipmentToReturned(t *testing.T) {
 
 func TestServiceAdvanceShipmentRejectsRepeatedDelivered(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "repeat-delivered@t.dev")
+	memberID := f.newMember(t, "repeat-delivered@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -249,7 +253,7 @@ func TestServiceAdvanceShipmentRejectsRepeatedDelivered(t *testing.T) {
 
 func TestServiceAdvanceShipmentRejectsReturnedToDelivered(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "returned-to-delivered@t.dev")
+	memberID := f.newMember(t, "returned-to-delivered@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -288,7 +292,7 @@ func TestServiceAdvanceShipmentRejectsUnshippedOrder(t *testing.T) {
 	// here we additionally prove AdvanceShipment on a nonexistent shipment
 	// ID is a 404, not a silent no-op.
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "unshipped@t.dev")
+	memberID := f.newMember(t, "unshipped@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -300,8 +304,8 @@ func TestServiceAdvanceShipmentRejectsUnshippedOrder(t *testing.T) {
 
 func TestServiceGetShipmentForMemberCrossMemberIsNotFound(t *testing.T) {
 	f := setupShippingFixtures(t)
-	ownerID := newMember(t, f.client, "owner@t.dev")
-	otherID := newMember(t, f.client, "other@t.dev")
+	ownerID := f.newMember(t, "owner@t.dev")
+	otherID := f.newMember(t, "other@t.dev")
 	ord := f.newOrder(t, ownerID)
 	ctx := context.Background()
 
@@ -317,7 +321,7 @@ func TestServiceGetShipmentForMemberCrossMemberIsNotFound(t *testing.T) {
 
 func TestServiceGetShipmentForMemberNoShipmentYetIsNotFound(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "no-shipment@t.dev")
+	memberID := f.newMember(t, "no-shipment@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -395,7 +399,7 @@ func TestServiceCreateShippingMethodRejectsNegativeFlatRate(t *testing.T) {
 
 func TestServiceAdvanceShipmentToReturnedPublishesOrderReturned(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "publish-returned@t.dev")
+	memberID := f.newMember(t, "publish-returned@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -428,7 +432,7 @@ func TestServiceAdvanceShipmentToReturnedPublishesOrderReturned(t *testing.T) {
 
 func TestServiceAdvanceShipmentToDeliveredDoesNotPublishOrderReturned(t *testing.T) {
 	f := setupShippingFixtures(t)
-	memberID := newMember(t, f.client, "publish-delivered@t.dev")
+	memberID := f.newMember(t, "publish-delivered@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 
@@ -460,7 +464,7 @@ func TestServiceAdvanceShipmentToDeliveredDoesNotPublishOrderReturned(t *testing
 // every other test in this file, via setupShippingFixtures) keeps working.
 func TestServiceAdvanceShipmentWithoutDispatcherIsNilSafe(t *testing.T) {
 	f := setupShippingFixtures(t) // Dispatcher left nil
-	memberID := newMember(t, f.client, "nil-dispatcher@t.dev")
+	memberID := f.newMember(t, "nil-dispatcher@t.dev")
 	ord := f.newOrder(t, memberID)
 	ctx := context.Background()
 

@@ -212,7 +212,13 @@ func (s *RefreshService) RotateMember(ctx context.Context, plain string, shopID 
 	if now.After(row.ExpiresAt) {
 		return 0, "", ErrRefreshInvalid
 	}
-	owner, err := s.client.Member.Query().Where(member.IDEQ(row.MemberID), member.StatusEQ(1)).Only(ctx)
+	// shop_id is explicit rather than left to the tenant interceptor (change
+	// member-identity-per-shop design D4): a token whose member belongs to a
+	// different shop can never be rotated here, whatever context this runs
+	// in. row.ShopID was already matched against shopID above.
+	owner, err := s.client.Member.Query().
+		Where(member.IDEQ(row.MemberID), member.ShopIDEQ(shopID), member.StatusEQ(1)).
+		Only(ctx)
 	if err != nil {
 		return 0, "", ErrRefreshInvalid
 	}

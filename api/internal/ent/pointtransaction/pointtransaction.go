@@ -20,8 +20,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// FieldShopID holds the string denoting the shop_id field in the database.
 	FieldShopID = "shop_id"
-	// FieldShopMemberID holds the string denoting the shop_member_id field in the database.
-	FieldShopMemberID = "shop_member_id"
+	// FieldMemberID holds the string denoting the member_id field in the database.
+	FieldMemberID = "member_id"
 	// FieldOrderID holds the string denoting the order_id field in the database.
 	FieldOrderID = "order_id"
 	// FieldPointsDelta holds the string denoting the points_delta field in the database.
@@ -32,8 +32,8 @@ const (
 	FieldReason = "reason"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
 	EdgeShop = "shop"
-	// EdgeShopMember holds the string denoting the shop_member edge name in mutations.
-	EdgeShopMember = "shop_member"
+	// EdgeMember holds the string denoting the member edge name in mutations.
+	EdgeMember = "member"
 	// EdgeOrder holds the string denoting the order edge name in mutations.
 	EdgeOrder = "order"
 	// Table holds the table name of the pointtransaction in the database.
@@ -45,13 +45,13 @@ const (
 	ShopInverseTable = "shops"
 	// ShopColumn is the table column denoting the shop relation/edge.
 	ShopColumn = "shop_id"
-	// ShopMemberTable is the table that holds the shop_member relation/edge.
-	ShopMemberTable = "point_transactions"
-	// ShopMemberInverseTable is the table name for the ShopMember entity.
-	// It exists in this package in order to avoid circular dependency with the "shopmember" package.
-	ShopMemberInverseTable = "shop_member"
-	// ShopMemberColumn is the table column denoting the shop_member relation/edge.
-	ShopMemberColumn = "shop_member_id"
+	// MemberTable is the table that holds the member relation/edge.
+	MemberTable = "point_transactions"
+	// MemberInverseTable is the table name for the Member entity.
+	// It exists in this package in order to avoid circular dependency with the "member" package.
+	MemberInverseTable = "members"
+	// MemberColumn is the table column denoting the member relation/edge.
+	MemberColumn = "member_id"
 	// OrderTable is the table that holds the order relation/edge.
 	OrderTable = "point_transactions"
 	// OrderInverseTable is the table name for the Order entity.
@@ -67,7 +67,7 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 	FieldShopID,
-	FieldShopMemberID,
+	FieldMemberID,
 	FieldOrderID,
 	FieldPointsDelta,
 	FieldKind,
@@ -118,9 +118,9 @@ func ByShopID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShopID, opts...).ToFunc()
 }
 
-// ByShopMemberID orders the results by the shop_member_id field.
-func ByShopMemberID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldShopMemberID, opts...).ToFunc()
+// ByMemberID orders the results by the member_id field.
+func ByMemberID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMemberID, opts...).ToFunc()
 }
 
 // ByOrderID orders the results by the order_id field.
@@ -150,10 +150,10 @@ func ByShopField(field string, opts ...sql.OrderTermOption) OrderOption {
 	}
 }
 
-// ByShopMemberField orders the results by shop_member field.
-func ByShopMemberField(field string, opts ...sql.OrderTermOption) OrderOption {
+// ByMemberField orders the results by member field.
+func ByMemberField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newShopMemberStep(), sql.OrderByField(field, opts...))
+		sqlgraph.OrderByNeighborTerms(s, newMemberStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -170,11 +170,11 @@ func newShopStep() *sqlgraph.Step {
 		sqlgraph.Edge(sqlgraph.M2O, false, ShopTable, ShopColumn),
 	)
 }
-func newShopMemberStep() *sqlgraph.Step {
+func newMemberStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ShopMemberInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, ShopMemberTable, ShopMemberColumn),
+		sqlgraph.To(MemberInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, MemberTable, MemberColumn),
 	)
 }
 func newOrderStep() *sqlgraph.Step {

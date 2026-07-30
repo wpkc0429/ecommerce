@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/rbac"
@@ -247,5 +248,71 @@ func TestTenantMiddlewareHTTP(t *testing.T) {
 				t.Fatalf("shop ctx %d, want %d", gotShop, tc.wantShop)
 			}
 		})
+	}
+}
+
+// ── change member-identity-per-shop: members is tenant-owned data ──────
+
+// TestMemberIdentityIsShopScoped pins spec member-identity at the data layer:
+// identity is per-shop, NULL email/phone stay distinct within a shop (design
+// D3), the tenant interceptor scopes members automatically, and a shop's
+// customer set is fully delimited by shop_id.
+func TestMemberIdentityIsShopScoped(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+
+	shopA := client.Shop.Create().SetName("Identity A").SetStatus(1).SaveX(ctx).ID
+	shopB := client.Shop.Create().SetName("Identity B").SetStatus(1).SaveX(ctx).ID
+
+	// Scenario: 同一 email 於兩家商家為獨立身分.
+	a := client.Member.Create().SetShopID(shopA).SetEmail("same@t.dev").SetPasswordHash("hash-a").SetStatus(1).SaveX(ctx)
+	b := client.Member.Create().SetShopID(shopB).SetEmail("same@t.dev").SetPasswordHash("hash-b").SetStatus(1).SaveX(ctx)
+	if a.ID == b.ID || *a.PasswordHash == *b.PasswordHash {
+		t.Fatalf("expected two independent identities, got %d/%d", a.ID, b.ID)
+	}
+
+	// Scenario: 同商家內 email 重複被拒.
+	if _, err := client.Member.Create().SetShopID(shopA).SetEmail("same@t.dev").SetStatus(1).Save(ctx); err == nil {
+		t.Fatal("expected UNIQUE(shop_id, email) to reject a duplicate within one shop")
+	}
+
+	// Scenario: 同商家內多筆 email 為 NULL 被允許 — Postgres's default NULLS
+	// DISTINCT semantics, which design D3 requires this index to keep (a
+	// NULLS NOT DISTINCT index would reject the second row here).
+	client.Member.Create().SetShopID(shopA).SetPhone("0900000001").SetStatus(1).SaveX(ctx)
+	client.Member.Create().SetShopID(shopA).SetPhone("0900000002").SetStatus(1).SaveX(ctx)
+	// …and the same for phone: two rows with both email and phone NULL.
+	client.Member.Create().SetShopID(shopA).SetStatus(1).SaveX(ctx)
+	client.Member.Create().SetShopID(shopA).SetStatus(1).SaveX(ctx)
+	if n := client.Member.Query().Where(member.ShopIDEQ(shopA), member.EmailIsNil()).CountX(ctx); n != 4 {
+		t.Fatalf("expected 4 email-NULL identities in one shop, got %d", n)
+	}
+
+	// Scenario: 租戶上下文自動範圍化顧客查詢 — no explicit shop predicate here.
+	tenantA := tenant.WithShopID(ctx, shopA)
+	rows := client.Member.Query().AllX(tenantA)
+	if len(rows) != 5 {
+		t.Fatalf("tenant-scoped query returned %d rows, want shop A's 5", len(rows))
+	}
+	for _, m := range rows {
+		if m.ShopID != shopA {
+			t.Fatalf("tenant-scoped query leaked a shop %d row", m.ShopID)
+		}
+	}
+
+	// Scenario: 刪除單一商家顧客資料不影響其他商家 (資料集自我完備). The delete
+	// carries no predicate at all — the tenant hook confines it to shop A.
+	if n := client.Member.Delete().ExecX(tenantA); n != 5 {
+		t.Fatalf("tenant-scoped delete removed %d rows, want shop A's 5", n)
+	}
+	if n := client.Member.Query().Where(member.ShopIDEQ(shopA)).CountX(ctx); n != 0 {
+		t.Fatalf("shop A still has %d customers", n)
+	}
+	survivor, err := client.Member.Query().Where(member.ShopIDEQ(shopB)).Only(ctx)
+	if err != nil {
+		t.Fatalf("shop B's customer must be untouched: %v", err)
+	}
+	if survivor.ID != b.ID || survivor.Email == nil || *survivor.Email != "same@t.dev" {
+		t.Fatalf("shop B's customer changed: %+v", survivor)
 	}
 }

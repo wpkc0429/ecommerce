@@ -5,11 +5,11 @@ package ent
 import (
 	"context"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
 	"math"
 
 	"entgo.io/ent"
@@ -22,14 +22,14 @@ import (
 // PointTransactionQuery is the builder for querying PointTransaction entities.
 type PointTransactionQuery struct {
 	config
-	ctx            *QueryContext
-	order          []pointtransaction.OrderOption
-	inters         []Interceptor
-	predicates     []predicate.PointTransaction
-	withShop       *ShopQuery
-	withShopMember *ShopMemberQuery
-	withOrder      *OrderQuery
-	modifiers      []func(*sql.Selector)
+	ctx        *QueryContext
+	order      []pointtransaction.OrderOption
+	inters     []Interceptor
+	predicates []predicate.PointTransaction
+	withShop   *ShopQuery
+	withMember *MemberQuery
+	withOrder  *OrderQuery
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -88,9 +88,9 @@ func (_q *PointTransactionQuery) QueryShop() *ShopQuery {
 	return query
 }
 
-// QueryShopMember chains the current query on the "shop_member" edge.
-func (_q *PointTransactionQuery) QueryShopMember() *ShopMemberQuery {
-	query := (&ShopMemberClient{config: _q.config}).Query()
+// QueryMember chains the current query on the "member" edge.
+func (_q *PointTransactionQuery) QueryMember() *MemberQuery {
+	query := (&MemberClient{config: _q.config}).Query()
 	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
 		if err := _q.prepareQuery(ctx); err != nil {
 			return nil, err
@@ -101,8 +101,8 @@ func (_q *PointTransactionQuery) QueryShopMember() *ShopMemberQuery {
 		}
 		step := sqlgraph.NewStep(
 			sqlgraph.From(pointtransaction.Table, pointtransaction.FieldID, selector),
-			sqlgraph.To(shopmember.Table, shopmember.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.ShopMemberTable, pointtransaction.ShopMemberColumn),
+			sqlgraph.To(member.Table, member.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, pointtransaction.MemberTable, pointtransaction.MemberColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -319,14 +319,14 @@ func (_q *PointTransactionQuery) Clone() *PointTransactionQuery {
 		return nil
 	}
 	return &PointTransactionQuery{
-		config:         _q.config,
-		ctx:            _q.ctx.Clone(),
-		order:          append([]pointtransaction.OrderOption{}, _q.order...),
-		inters:         append([]Interceptor{}, _q.inters...),
-		predicates:     append([]predicate.PointTransaction{}, _q.predicates...),
-		withShop:       _q.withShop.Clone(),
-		withShopMember: _q.withShopMember.Clone(),
-		withOrder:      _q.withOrder.Clone(),
+		config:     _q.config,
+		ctx:        _q.ctx.Clone(),
+		order:      append([]pointtransaction.OrderOption{}, _q.order...),
+		inters:     append([]Interceptor{}, _q.inters...),
+		predicates: append([]predicate.PointTransaction{}, _q.predicates...),
+		withShop:   _q.withShop.Clone(),
+		withMember: _q.withMember.Clone(),
+		withOrder:  _q.withOrder.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -345,14 +345,14 @@ func (_q *PointTransactionQuery) WithShop(opts ...func(*ShopQuery)) *PointTransa
 	return _q
 }
 
-// WithShopMember tells the query-builder to eager-load the nodes that are connected to
-// the "shop_member" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *PointTransactionQuery) WithShopMember(opts ...func(*ShopMemberQuery)) *PointTransactionQuery {
-	query := (&ShopMemberClient{config: _q.config}).Query()
+// WithMember tells the query-builder to eager-load the nodes that are connected to
+// the "member" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PointTransactionQuery) WithMember(opts ...func(*MemberQuery)) *PointTransactionQuery {
+	query := (&MemberClient{config: _q.config}).Query()
 	for _, opt := range opts {
 		opt(query)
 	}
-	_q.withShopMember = query
+	_q.withMember = query
 	return _q
 }
 
@@ -447,7 +447,7 @@ func (_q *PointTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 		_spec       = _q.querySpec()
 		loadedTypes = [3]bool{
 			_q.withShop != nil,
-			_q.withShopMember != nil,
+			_q.withMember != nil,
 			_q.withOrder != nil,
 		}
 	)
@@ -478,9 +478,9 @@ func (_q *PointTransactionQuery) sqlAll(ctx context.Context, hooks ...queryHook)
 			return nil, err
 		}
 	}
-	if query := _q.withShopMember; query != nil {
-		if err := _q.loadShopMember(ctx, query, nodes, nil,
-			func(n *PointTransaction, e *ShopMember) { n.Edges.ShopMember = e }); err != nil {
+	if query := _q.withMember; query != nil {
+		if err := _q.loadMember(ctx, query, nodes, nil,
+			func(n *PointTransaction, e *Member) { n.Edges.Member = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -522,11 +522,11 @@ func (_q *PointTransactionQuery) loadShop(ctx context.Context, query *ShopQuery,
 	}
 	return nil
 }
-func (_q *PointTransactionQuery) loadShopMember(ctx context.Context, query *ShopMemberQuery, nodes []*PointTransaction, init func(*PointTransaction), assign func(*PointTransaction, *ShopMember)) error {
+func (_q *PointTransactionQuery) loadMember(ctx context.Context, query *MemberQuery, nodes []*PointTransaction, init func(*PointTransaction), assign func(*PointTransaction, *Member)) error {
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*PointTransaction)
 	for i := range nodes {
-		fk := nodes[i].ShopMemberID
+		fk := nodes[i].MemberID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -535,7 +535,7 @@ func (_q *PointTransactionQuery) loadShopMember(ctx context.Context, query *Shop
 	if len(ids) == 0 {
 		return nil
 	}
-	query.Where(shopmember.IDIn(ids...))
+	query.Where(member.IDIn(ids...))
 	neighbors, err := query.All(ctx)
 	if err != nil {
 		return err
@@ -543,7 +543,7 @@ func (_q *PointTransactionQuery) loadShopMember(ctx context.Context, query *Shop
 	for _, n := range neighbors {
 		nodes, ok := nodeids[n.ID]
 		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "shop_member_id" returned %v`, n.ID)
+			return fmt.Errorf(`unexpected foreign-key "member_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -615,8 +615,8 @@ func (_q *PointTransactionQuery) querySpec() *sqlgraph.QuerySpec {
 		if _q.withShop != nil {
 			_spec.Node.AddColumnOnce(pointtransaction.FieldShopID)
 		}
-		if _q.withShopMember != nil {
-			_spec.Node.AddColumnOnce(pointtransaction.FieldShopMemberID)
+		if _q.withMember != nil {
+			_spec.Node.AddColumnOnce(pointtransaction.FieldMemberID)
 		}
 		if _q.withOrder != nil {
 			_spec.Node.AddColumnOnce(pointtransaction.FieldOrderID)

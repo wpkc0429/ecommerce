@@ -9,7 +9,8 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
-	"ksdevworks/ecommerce/api/internal/ent/shopmember"
+	"ksdevworks/ecommerce/api/internal/ent/membertier"
+	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -50,6 +51,12 @@ func (_c *MemberCreate) SetNillableUpdatedAt(v *time.Time) *MemberCreate {
 	if v != nil {
 		_c.SetUpdatedAt(*v)
 	}
+	return _c
+}
+
+// SetShopID sets the "shop_id" field.
+func (_c *MemberCreate) SetShopID(v int) *MemberCreate {
+	_c.mutation.SetShopID(v)
 	return _c
 }
 
@@ -109,25 +116,62 @@ func (_c *MemberCreate) SetNillableStatus(v *int16) *MemberCreate {
 	return _c
 }
 
+// SetPoints sets the "points" field.
+func (_c *MemberCreate) SetPoints(v int32) *MemberCreate {
+	_c.mutation.SetPoints(v)
+	return _c
+}
+
+// SetNillablePoints sets the "points" field if the given value is not nil.
+func (_c *MemberCreate) SetNillablePoints(v *int32) *MemberCreate {
+	if v != nil {
+		_c.SetPoints(*v)
+	}
+	return _c
+}
+
+// SetLevelID sets the "level_id" field.
+func (_c *MemberCreate) SetLevelID(v int) *MemberCreate {
+	_c.mutation.SetLevelID(v)
+	return _c
+}
+
+// SetNillableLevelID sets the "level_id" field if the given value is not nil.
+func (_c *MemberCreate) SetNillableLevelID(v *int) *MemberCreate {
+	if v != nil {
+		_c.SetLevelID(*v)
+	}
+	return _c
+}
+
 // SetMeta sets the "meta" field.
 func (_c *MemberCreate) SetMeta(v json.RawMessage) *MemberCreate {
 	_c.mutation.SetMeta(v)
 	return _c
 }
 
-// AddShopMemberIDs adds the "shop_members" edge to the ShopMember entity by IDs.
-func (_c *MemberCreate) AddShopMemberIDs(ids ...int) *MemberCreate {
-	_c.mutation.AddShopMemberIDs(ids...)
+// SetShop sets the "shop" edge to the Shop entity.
+func (_c *MemberCreate) SetShop(v *Shop) *MemberCreate {
+	return _c.SetShopID(v.ID)
+}
+
+// SetMemberTierID sets the "member_tier" edge to the MemberTier entity by ID.
+func (_c *MemberCreate) SetMemberTierID(id int) *MemberCreate {
+	_c.mutation.SetMemberTierID(id)
 	return _c
 }
 
-// AddShopMembers adds the "shop_members" edges to the ShopMember entity.
-func (_c *MemberCreate) AddShopMembers(v ...*ShopMember) *MemberCreate {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
+// SetNillableMemberTierID sets the "member_tier" edge to the MemberTier entity by ID if the given value is not nil.
+func (_c *MemberCreate) SetNillableMemberTierID(id *int) *MemberCreate {
+	if id != nil {
+		_c = _c.SetMemberTierID(*id)
 	}
-	return _c.AddShopMemberIDs(ids...)
+	return _c
+}
+
+// SetMemberTier sets the "member_tier" edge to the MemberTier entity.
+func (_c *MemberCreate) SetMemberTier(v *MemberTier) *MemberCreate {
+	return _c.SetMemberTierID(v.ID)
 }
 
 // AddRefreshTokenIDs adds the "refresh_tokens" edge to the MemberRefreshToken entity by IDs.
@@ -192,6 +236,10 @@ func (_c *MemberCreate) defaults() {
 		v := member.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.Points(); !ok {
+		v := member.DefaultPoints
+		_c.mutation.SetPoints(v)
+	}
 	if _, ok := _c.mutation.Meta(); !ok {
 		v := member.DefaultMeta
 		_c.mutation.SetMeta(v)
@@ -205,6 +253,9 @@ func (_c *MemberCreate) check() error {
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "Member.updated_at"`)}
+	}
+	if _, ok := _c.mutation.ShopID(); !ok {
+		return &ValidationError{Name: "shop_id", err: errors.New(`ent: missing required field "Member.shop_id"`)}
 	}
 	if v, ok := _c.mutation.Email(); ok {
 		if err := member.EmailValidator(v); err != nil {
@@ -224,8 +275,14 @@ func (_c *MemberCreate) check() error {
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "Member.status"`)}
 	}
+	if _, ok := _c.mutation.Points(); !ok {
+		return &ValidationError{Name: "points", err: errors.New(`ent: missing required field "Member.points"`)}
+	}
 	if _, ok := _c.mutation.Meta(); !ok {
 		return &ValidationError{Name: "meta", err: errors.New(`ent: missing required field "Member.meta"`)}
+	}
+	if len(_c.mutation.ShopIDs()) == 0 {
+		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "Member.shop"`)}
 	}
 	return nil
 }
@@ -278,24 +335,46 @@ func (_c *MemberCreate) createSpec() (*Member, *sqlgraph.CreateSpec) {
 		_spec.SetField(member.FieldStatus, field.TypeInt16, value)
 		_node.Status = value
 	}
+	if value, ok := _c.mutation.Points(); ok {
+		_spec.SetField(member.FieldPoints, field.TypeInt32, value)
+		_node.Points = value
+	}
 	if value, ok := _c.mutation.Meta(); ok {
 		_spec.SetField(member.FieldMeta, field.TypeJSON, value)
 		_node.Meta = value
 	}
-	if nodes := _c.mutation.ShopMembersIDs(); len(nodes) > 0 {
+	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.O2M,
-			Inverse: true,
-			Table:   member.ShopMembersTable,
-			Columns: []string{member.ShopMembersColumn},
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   member.ShopTable,
+			Columns: []string{member.ShopColumn},
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(shopmember.FieldID, field.TypeInt),
+				IDSpec: sqlgraph.NewFieldSpec(shop.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_node.ShopID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.MemberTierIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   member.MemberTierTable,
+			Columns: []string{member.MemberTierColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(membertier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.LevelID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.RefreshTokensIDs(); len(nodes) > 0 {
@@ -378,6 +457,18 @@ func (u *MemberUpsert) UpdateUpdatedAt() *MemberUpsert {
 	return u
 }
 
+// SetShopID sets the "shop_id" field.
+func (u *MemberUpsert) SetShopID(v int) *MemberUpsert {
+	u.Set(member.FieldShopID, v)
+	return u
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateShopID() *MemberUpsert {
+	u.SetExcluded(member.FieldShopID)
+	return u
+}
+
 // SetEmail sets the "email" field.
 func (u *MemberUpsert) SetEmail(v string) *MemberUpsert {
 	u.Set(member.FieldEmail, v)
@@ -450,6 +541,42 @@ func (u *MemberUpsert) AddStatus(v int16) *MemberUpsert {
 	return u
 }
 
+// SetPoints sets the "points" field.
+func (u *MemberUpsert) SetPoints(v int32) *MemberUpsert {
+	u.Set(member.FieldPoints, v)
+	return u
+}
+
+// UpdatePoints sets the "points" field to the value that was provided on create.
+func (u *MemberUpsert) UpdatePoints() *MemberUpsert {
+	u.SetExcluded(member.FieldPoints)
+	return u
+}
+
+// AddPoints adds v to the "points" field.
+func (u *MemberUpsert) AddPoints(v int32) *MemberUpsert {
+	u.Add(member.FieldPoints, v)
+	return u
+}
+
+// SetLevelID sets the "level_id" field.
+func (u *MemberUpsert) SetLevelID(v int) *MemberUpsert {
+	u.Set(member.FieldLevelID, v)
+	return u
+}
+
+// UpdateLevelID sets the "level_id" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateLevelID() *MemberUpsert {
+	u.SetExcluded(member.FieldLevelID)
+	return u
+}
+
+// ClearLevelID clears the value of the "level_id" field.
+func (u *MemberUpsert) ClearLevelID() *MemberUpsert {
+	u.SetNull(member.FieldLevelID)
+	return u
+}
+
 // SetMeta sets the "meta" field.
 func (u *MemberUpsert) SetMeta(v json.RawMessage) *MemberUpsert {
 	u.Set(member.FieldMeta, v)
@@ -518,6 +645,20 @@ func (u *MemberUpsertOne) SetUpdatedAt(v time.Time) *MemberUpsertOne {
 func (u *MemberUpsertOne) UpdateUpdatedAt() *MemberUpsertOne {
 	return u.Update(func(s *MemberUpsert) {
 		s.UpdateUpdatedAt()
+	})
+}
+
+// SetShopID sets the "shop_id" field.
+func (u *MemberUpsertOne) SetShopID(v int) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetShopID(v)
+	})
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateShopID() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateShopID()
 	})
 }
 
@@ -602,6 +743,48 @@ func (u *MemberUpsertOne) AddStatus(v int16) *MemberUpsertOne {
 func (u *MemberUpsertOne) UpdateStatus() *MemberUpsertOne {
 	return u.Update(func(s *MemberUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetPoints sets the "points" field.
+func (u *MemberUpsertOne) SetPoints(v int32) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetPoints(v)
+	})
+}
+
+// AddPoints adds v to the "points" field.
+func (u *MemberUpsertOne) AddPoints(v int32) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.AddPoints(v)
+	})
+}
+
+// UpdatePoints sets the "points" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdatePoints() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdatePoints()
+	})
+}
+
+// SetLevelID sets the "level_id" field.
+func (u *MemberUpsertOne) SetLevelID(v int) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetLevelID(v)
+	})
+}
+
+// UpdateLevelID sets the "level_id" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateLevelID() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateLevelID()
+	})
+}
+
+// ClearLevelID clears the value of the "level_id" field.
+func (u *MemberUpsertOne) ClearLevelID() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearLevelID()
 	})
 }
 
@@ -844,6 +1027,20 @@ func (u *MemberUpsertBulk) UpdateUpdatedAt() *MemberUpsertBulk {
 	})
 }
 
+// SetShopID sets the "shop_id" field.
+func (u *MemberUpsertBulk) SetShopID(v int) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetShopID(v)
+	})
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateShopID() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateShopID()
+	})
+}
+
 // SetEmail sets the "email" field.
 func (u *MemberUpsertBulk) SetEmail(v string) *MemberUpsertBulk {
 	return u.Update(func(s *MemberUpsert) {
@@ -925,6 +1122,48 @@ func (u *MemberUpsertBulk) AddStatus(v int16) *MemberUpsertBulk {
 func (u *MemberUpsertBulk) UpdateStatus() *MemberUpsertBulk {
 	return u.Update(func(s *MemberUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetPoints sets the "points" field.
+func (u *MemberUpsertBulk) SetPoints(v int32) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetPoints(v)
+	})
+}
+
+// AddPoints adds v to the "points" field.
+func (u *MemberUpsertBulk) AddPoints(v int32) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.AddPoints(v)
+	})
+}
+
+// UpdatePoints sets the "points" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdatePoints() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdatePoints()
+	})
+}
+
+// SetLevelID sets the "level_id" field.
+func (u *MemberUpsertBulk) SetLevelID(v int) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetLevelID(v)
+	})
+}
+
+// UpdateLevelID sets the "level_id" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateLevelID() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateLevelID()
+	})
+}
+
+// ClearLevelID clears the value of the "level_id" field.
+func (u *MemberUpsertBulk) ClearLevelID() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearLevelID()
 	})
 }
 

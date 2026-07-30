@@ -16,7 +16,7 @@ import (
 )
 
 // MemberTier is a merchant-configured loyalty tier (design D2/D7/D8):
-// min_points is compared against shop_member.points — the member's current
+// min_points is compared against members.points — the member's current
 // cached balance, not a separately-tracked lifetime-earned counter (design
 // D2 — see that decision for why current balance is the correct axis given
 // this phase has no point-spending feature). discount_percent is a reserved,
@@ -36,7 +36,7 @@ func (MemberTier) Fields() []ent.Field {
 		field.String("name").MaxLen(100).SchemaType(map[string]string{dialect.Postgres: "varchar(100)"}).NotEmpty(),
 		// min_points (design D2/D7): the points.Service recompute helper
 		// picks the highest-min_points tier whose min_points <= the member's
-		// current shop_member.points.
+		// current members.points.
 		field.Int32("min_points").Default(0),
 		// discount_percent (design Non-Goals): reserved, unused by any
 		// business logic this phase — no code path reads it to compute a
@@ -72,9 +72,13 @@ func (MemberTier) Annotations() []schema.Annotation {
 }
 
 // PointTransaction is one append-only ledger row (design D4/D6): the source
-// of truth for a shop_member's points; shop_member.points is a maintained
-// cache kept in lockstep by points.Service within the same ent.Tx as each
-// insert here (design D6) — never recomputed by summing this table on read.
+// of truth for a member's points; members.points is a maintained cache kept
+// in lockstep by points.Service within the same ent.Tx as each insert here
+// (design D6) — never recomputed by summing this table on read.
+//
+// member_id references members directly (change member-identity-per-shop
+// design D2 — the shop_member table it used to point at was merged into
+// members, which now carries shop_id itself).
 //
 // kind (design D4) is the machine-checkable idempotency/business-logic axis
 // (0 order award / 1 order-return clawback / 2 manual adjustment) — reason
@@ -98,7 +102,7 @@ func (PointTransaction) Mixin() []ent.Mixin {
 func (PointTransaction) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("shop_id"),
-		field.Int("shop_member_id"),
+		field.Int("member_id"),
 		// order_id (design D4): NULL for manual adjustments (kind 2); always
 		// set for award/clawback (kind 0/1). Real FK — mirrors Payment/
 		// Shipment's order_id (this row's entire reason to exist, when
@@ -120,14 +124,14 @@ func (PointTransaction) Fields() []ent.Field {
 func (PointTransaction) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("shop", Shop.Type).Unique().Required().Field("shop_id"),
-		edge.To("shop_member", ShopMember.Type).Unique().Required().Field("shop_member_id"),
+		edge.To("member", Member.Type).Unique().Required().Field("member_id"),
 		// One-directional, optional FK to Order (see type doc comment for why
 		// this mirrors Payment/Shipment's order_id edge but is not Required).
 		// Unlike Payment/Shipment's Required order_id (default NO ACTION on
 		// delete), ent generates ON DELETE SET NULL here because the field is
 		// optional — a hypothetical future order-deletion path would clear
 		// order_id on this row rather than being blocked or cascading the
-		// ledger row away, preserving the points_delta/reason/shop_member_id
+		// ledger row away, preserving the points_delta/reason/member_id
 		// audit trail. No Ref/inverse edge on Order — declared entirely here,
 		// so order.go does not need to change (mirrors Payment/Shipment's own
 		// edges).
@@ -141,7 +145,7 @@ func (PointTransaction) Indexes() []ent.Index {
 		// clawback per order" guard. NULL order_id (manual adjustments) is
 		// never constrained by it — see type doc comment.
 		index.Fields("order_id", "kind").Unique(),
-		index.Fields("shop_id", "shop_member_id"),
+		index.Fields("shop_id", "member_id"),
 	}
 }
 

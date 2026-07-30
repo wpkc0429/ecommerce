@@ -48,6 +48,13 @@ type MemberRefreshToken struct {
 func (MemberRefreshToken) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("member_id"),
+		// shop_id is derivable from member_id since change
+		// member-identity-per-shop gave members its own shop_id (design D5):
+		// semantically this column is now a *cached derived value*, not an
+		// independent fact. It is kept because the rotation/revocation
+		// queries index on (shop_id, token_hash) and dropping it would force
+		// a join into security-sensitive code this change deliberately does
+		// not touch.
 		field.Int("shop_id"),
 		field.String("token_hash").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).NotEmpty().Unique(),
 		field.Time("expires_at"),

@@ -56,8 +56,6 @@ type Tx struct {
 	ShippingMethod *ShippingMethodClient
 	// Shop is the client for interacting with the Shop builders.
 	Shop *ShopClient
-	// ShopMember is the client for interacting with the ShopMember builders.
-	ShopMember *ShopMemberClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -226,7 +224,6 @@ func (tx *Tx) init() {
 	tx.Shipment = NewShipmentClient(tx.config)
 	tx.ShippingMethod = NewShippingMethodClient(tx.config)
 	tx.Shop = NewShopClient(tx.config)
-	tx.ShopMember = NewShopMemberClient(tx.config)
 	tx.ShopUser = NewShopUserClient(tx.config)
 	tx.Site = NewSiteClient(tx.config)
 	tx.SiteShop = NewSiteShopClient(tx.config)

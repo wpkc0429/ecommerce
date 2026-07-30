@@ -19,6 +19,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// FieldShopID holds the string denoting the shop_id field in the database.
+	FieldShopID = "shop_id"
 	// FieldEmail holds the string denoting the email field in the database.
 	FieldEmail = "email"
 	// FieldPhone holds the string denoting the phone field in the database.
@@ -27,21 +29,34 @@ const (
 	FieldPasswordHash = "password_hash"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldPoints holds the string denoting the points field in the database.
+	FieldPoints = "points"
+	// FieldLevelID holds the string denoting the level_id field in the database.
+	FieldLevelID = "level_id"
 	// FieldMeta holds the string denoting the meta field in the database.
 	FieldMeta = "meta"
-	// EdgeShopMembers holds the string denoting the shop_members edge name in mutations.
-	EdgeShopMembers = "shop_members"
+	// EdgeShop holds the string denoting the shop edge name in mutations.
+	EdgeShop = "shop"
+	// EdgeMemberTier holds the string denoting the member_tier edge name in mutations.
+	EdgeMemberTier = "member_tier"
 	// EdgeRefreshTokens holds the string denoting the refresh_tokens edge name in mutations.
 	EdgeRefreshTokens = "refresh_tokens"
 	// Table holds the table name of the member in the database.
 	Table = "members"
-	// ShopMembersTable is the table that holds the shop_members relation/edge.
-	ShopMembersTable = "shop_member"
-	// ShopMembersInverseTable is the table name for the ShopMember entity.
-	// It exists in this package in order to avoid circular dependency with the "shopmember" package.
-	ShopMembersInverseTable = "shop_member"
-	// ShopMembersColumn is the table column denoting the shop_members relation/edge.
-	ShopMembersColumn = "member_id"
+	// ShopTable is the table that holds the shop relation/edge.
+	ShopTable = "members"
+	// ShopInverseTable is the table name for the Shop entity.
+	// It exists in this package in order to avoid circular dependency with the "shop" package.
+	ShopInverseTable = "shops"
+	// ShopColumn is the table column denoting the shop relation/edge.
+	ShopColumn = "shop_id"
+	// MemberTierTable is the table that holds the member_tier relation/edge.
+	MemberTierTable = "members"
+	// MemberTierInverseTable is the table name for the MemberTier entity.
+	// It exists in this package in order to avoid circular dependency with the "membertier" package.
+	MemberTierInverseTable = "member_tiers"
+	// MemberTierColumn is the table column denoting the member_tier relation/edge.
+	MemberTierColumn = "level_id"
 	// RefreshTokensTable is the table that holds the refresh_tokens relation/edge.
 	RefreshTokensTable = "member_refresh_tokens"
 	// RefreshTokensInverseTable is the table name for the MemberRefreshToken entity.
@@ -56,10 +71,13 @@ var Columns = []string{
 	FieldID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
+	FieldShopID,
 	FieldEmail,
 	FieldPhone,
 	FieldPasswordHash,
 	FieldStatus,
+	FieldPoints,
+	FieldLevelID,
 	FieldMeta,
 }
 
@@ -88,6 +106,8 @@ var (
 	PasswordHashValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus int16
+	// DefaultPoints holds the default value on creation for the "points" field.
+	DefaultPoints int32
 	// DefaultMeta holds the default value on creation for the "meta" field.
 	DefaultMeta json.RawMessage
 )
@@ -110,6 +130,11 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
+// ByShopID orders the results by the shop_id field.
+func ByShopID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShopID, opts...).ToFunc()
+}
+
 // ByEmail orders the results by the email field.
 func ByEmail(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEmail, opts...).ToFunc()
@@ -130,17 +155,27 @@ func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
-// ByShopMembersCount orders the results by shop_members count.
-func ByShopMembersCount(opts ...sql.OrderTermOption) OrderOption {
+// ByPoints orders the results by the points field.
+func ByPoints(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPoints, opts...).ToFunc()
+}
+
+// ByLevelID orders the results by the level_id field.
+func ByLevelID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLevelID, opts...).ToFunc()
+}
+
+// ByShopField orders the results by shop field.
+func ByShopField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newShopMembersStep(), opts...)
+		sqlgraph.OrderByNeighborTerms(s, newShopStep(), sql.OrderByField(field, opts...))
 	}
 }
 
-// ByShopMembers orders the results by shop_members terms.
-func ByShopMembers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+// ByMemberTierField orders the results by member_tier field.
+func ByMemberTierField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newShopMembersStep(), append([]sql.OrderTerm{term}, terms...)...)
+		sqlgraph.OrderByNeighborTerms(s, newMemberTierStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -157,11 +192,18 @@ func ByRefreshTokens(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newRefreshTokensStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-func newShopMembersStep() *sqlgraph.Step {
+func newShopStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ShopMembersInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.O2M, true, ShopMembersTable, ShopMembersColumn),
+		sqlgraph.To(ShopInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, ShopTable, ShopColumn),
+	)
+}
+func newMemberTierStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(MemberTierInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, MemberTierTable, MemberTierColumn),
 	)
 }
 func newRefreshTokensStep() *sqlgraph.Step {
