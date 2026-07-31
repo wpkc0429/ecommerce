@@ -25,11 +25,13 @@ import (
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcart "ksdevworks/ecommerce/api/internal/ent/cart"
+	entidem "ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	entorder "ksdevworks/ecommerce/api/internal/ent/order"
 	entorderitem "ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 )
 
 // ErrNotFound marks missing resources (handler → 404). Also returned when an
@@ -152,6 +154,21 @@ type CheckoutInput struct {
 	ShippingAddress       ShippingAddress
 	ShippingMethodID      *int
 	RequestedDeliveryDate *string
+
+	// IdempotencyReservationID names a checkout_idempotency_keys row this
+	// request already holds (change checkout-idempotency, design D3). nil — the
+	// case for every caller that predates that change, and for every request
+	// without an Idempotency-Key header — means the checkout behaves exactly as
+	// it always did.
+	//
+	// It is finalized *inside* this method's transaction, immediately before
+	// commit, so that "the order exists" and "the key is completed and points at
+	// it" are one atomic fact. The obvious alternative — commit the order, then
+	// mark the key in a second statement — leaves a window where a crash strands
+	// an order behind an unfinished key, and after the key expires a retry
+	// creates a second order: precisely the failure the mechanism exists to
+	// prevent.
+	IdempotencyReservationID *int
 }
 
 // parseRequestedDeliveryDate validates and normalizes the requested delivery
@@ -386,6 +403,37 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 			Save(ctx); err != nil {
 			_ = tx.Rollback()
 			return nil, fmt.Errorf("order: create order item: %w", err)
+		}
+	}
+
+	// change checkout-idempotency, design D3: bind the reservation to this order
+	// inside the same transaction. The conditional predicate + affected-rows
+	// check is the same idiom used above for the cart flip and the stock
+	// decrement; 0 rows means the reservation was released or completed by
+	// someone else, which must abort the whole checkout rather than produce an
+	// order no key points at.
+	//
+	// This runs *after* the stock loop, on a row this request already owns
+	// exclusively via the unique index — no other transaction contends for it, so
+	// it adds no lock wait and no new lock-ordering edge. The decrement loop
+	// above is unchanged, character for character.
+	if in.IdempotencyReservationID != nil {
+		affected, err := tx.CheckoutIdempotencyKey.Update().
+			Where(
+				entidem.IDEQ(*in.IdempotencyReservationID),
+				entidem.ShopIDEQ(shopID),
+				entidem.StatusEQ(idempotency.StatusInProgress),
+			).
+			SetStatus(idempotency.StatusCompleted).
+			SetOrderID(o.ID).
+			Save(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, fmt.Errorf("order: finalize idempotency reservation: %w", err)
+		}
+		if affected != 1 {
+			_ = tx.Rollback()
+			return nil, &ConflictError{Message: "checkout idempotency reservation is no longer held"}
 		}
 	}
 

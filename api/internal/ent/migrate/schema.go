@@ -153,6 +153,39 @@ var (
 			},
 		},
 	}
+	// CheckoutIdempotencyKeysColumns holds the columns for the "checkout_idempotency_keys" table.
+	CheckoutIdempotencyKeysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "idempotency_key", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "request_hash", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "order_id", Type: field.TypeInt, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// CheckoutIdempotencyKeysTable holds the schema information for the "checkout_idempotency_keys" table.
+	CheckoutIdempotencyKeysTable = &schema.Table{
+		Name:       "checkout_idempotency_keys",
+		Columns:    CheckoutIdempotencyKeysColumns,
+		PrimaryKey: []*schema.Column{CheckoutIdempotencyKeysColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "checkout_idempotency_keys_shops_shop",
+				Columns:    []*schema.Column{CheckoutIdempotencyKeysColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "checkoutidempotencykey_shop_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{CheckoutIdempotencyKeysColumns[8], CheckoutIdempotencyKeysColumns[3]},
+			},
+		},
+	}
 	// MembersColumns holds the columns for the "members" table.
 	MembersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1142,6 +1175,7 @@ var (
 		CartsTable,
 		CartItemsTable,
 		CategoriesTable,
+		CheckoutIdempotencyKeysTable,
 		MembersTable,
 		MemberRefreshTokensTable,
 		MemberTiersTable,
@@ -1192,6 +1226,14 @@ func init() {
 	}
 	CategoriesTable.ForeignKeys[0].RefTable = ShopsTable
 	CategoriesTable.ForeignKeys[1].RefTable = CategoriesTable
+	CheckoutIdempotencyKeysTable.ForeignKeys[0].RefTable = ShopsTable
+	CheckoutIdempotencyKeysTable.Annotation = &entsql.Annotation{
+		Table: "checkout_idempotency_keys",
+	}
+	CheckoutIdempotencyKeysTable.Annotation.Checks = map[string]string{
+		"checkout_idempotency_keys_order_id_check": "(status = 0 AND order_id IS NULL) OR (status = 1 AND order_id IS NOT NULL)",
+		"checkout_idempotency_keys_status_check":   "status IN (0, 1)",
+	}
 	MembersTable.ForeignKeys[0].RefTable = ShopsTable
 	MembersTable.ForeignKeys[1].RefTable = MemberTiersTable
 	MembersTable.Annotation = &entsql.Annotation{}

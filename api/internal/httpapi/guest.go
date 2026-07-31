@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/shipping"
@@ -45,6 +46,12 @@ type GuestHandler struct {
 	Issuer   *auth.TokenIssuer
 	Cfg      *config.Config
 	Log      *slog.Logger
+
+	// Idempotency backs the optional Idempotency-Key header (change
+	// checkout-idempotency). nil disables the header's effect — which is what
+	// most tests want, and which is why beginIdempotency logs loudly rather than
+	// failing when a real request arrives with a key and no service.
+	Idempotency *idempotency.Service
 }
 
 // writeGuestError maps guest checkout failures to design D12 responses. Errors
@@ -93,16 +100,73 @@ func (h *GuestHandler) checkout(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var in guest.CheckoutInput
-	if !decodeJSON(w, r, &in) {
+	// The body is read whole rather than streamed into a decoder because the
+	// idempotency fingerprint is taken over its raw bytes (change
+	// checkout-idempotency, design D7).
+	raw, ok := readJSONBody(w, r)
+	if !ok {
 		return
 	}
-	o, err := h.Service.Checkout(r.Context(), shopID, in)
-	if err != nil {
-		writeGuestError(w, h.Log, err)
+	gate, replayOrderID, ok := beginIdempotency(w, r, h.Idempotency, h.Log, shopID,
+		idempotency.ScopeGuestCheckout, raw)
+	if !ok {
+		return
+	}
+	if replayOrderID > 0 {
+		h.replayCheckout(w, r, shopID, replayOrderID)
 		return
 	}
 
+	var in guest.CheckoutInput
+	if !unmarshalJSON(w, raw, &in) {
+		gate.release(r)
+		return
+	}
+	in.IdempotencyReservationID = gate.reservation()
+
+	o, err := h.Service.Checkout(r.Context(), shopID, in)
+	if err != nil {
+		// Nothing was created, so the key must not stay spent (design D6): the
+		// standard "fix the field and resend with the same key" flow depends on
+		// this, and a corrected resend necessarily carries different bytes.
+		gate.release(r)
+		writeGuestError(w, h.Log, err)
+		return
+	}
+	h.writeCheckoutResult(w, shopID, o)
+}
+
+// replayCheckout answers a repeat of an already-completed checkout.
+//
+// The order is loaded fresh, not reconstructed from a stored response: what the
+// caller wants on a retry is precisely "what happened to my order", so a replay
+// that showed the state at creation time would age into a lie.
+func (h *GuestHandler) replayCheckout(w http.ResponseWriter, r *http.Request, shopID, orderID int) {
+	o, err := h.Orders.GetOrderAdmin(r.Context(), shopID, orderID)
+	if err != nil {
+		// The key says completed and points here, and the CHECK constraint makes
+		// that pairing a database fact — so a missing order means a broken
+		// invariant, not an ordinary 404.
+		h.Log.Error("guest checkout replay: order named by idempotency key is missing",
+			"shop_id", shopID, "order_id", orderID, "err", err)
+		httpx.Internal(w)
+		return
+	}
+	w.Header().Set(IdempotencyReplayedHeader, "true")
+	h.writeCheckoutResult(w, shopID, o)
+}
+
+// writeCheckoutResult renders the guest checkout response. The first attempt and
+// a replay share this one function on purpose: the two are required to be
+// indistinguishable, and two copies of a "must stay identical" serializer drift.
+//
+// The order access token is re-issued rather than stored and returned (design
+// D5). It is a bearer credential — the whole reason it is a stateless JWT is so
+// it never has to be stored — and a stored one would come back carrying its
+// original exp, so a replay a day later would hand the customer an expired
+// token: a response shaped like success and useless in fact. Re-issuing grants
+// nothing new: same order, same audience, same reach.
+func (h *GuestHandler) writeCheckoutResult(w http.ResponseWriter, shopID int, o *ent.Order) {
 	token, err := h.Issuer.IssueOrderAccess(o.ID, shopID, h.orderAccessTTL())
 	if err != nil {
 		// The order is already committed; failing here would tell the customer

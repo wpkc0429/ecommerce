@@ -62,6 +62,12 @@ var tenantOwned = map[string]bool{
 	// tenant context too, pass an explicit shop_id as always).
 	"PublishableKey":    true,
 	"ShopAllowedOrigin": true,
+	// change checkout-idempotency: carries a direct shop_id column, and the
+	// key's uniqueness scope IS (shop_id, idempotency_key) — shop A must never
+	// be able to replay shop B's key. idempotency.Service still passes shop_id
+	// explicitly on every query (same convention as members): this entry is
+	// defense in depth, not the primary guard.
+	"CheckoutIdempotencyKey": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

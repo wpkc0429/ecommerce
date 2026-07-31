@@ -11,7 +11,9 @@ TBD - created by archiving change guest-checkout. Update Purpose after archive.
 
 建立的訂單 MUST 以該身分的 `member_id` 記錄，MUST NOT 以任何「無會員訂單」的形式存在。訂單建立後的一切後續機制（點數核發、金流、物流、商家後台查詢）MUST 與會員下單完全相同。
 
-回應 MUST 在「email 為全新」「email 已是本店無密碼身分」「email 已是本店有密碼會員」三種情形下同構，MUST NOT 洩漏該 email 在本店的身分狀態。
+回應 MUST 在「email 為全新」「email 已是本店無密碼身分」「email 已是本店有密碼會員」三種情形下同構，MUST NOT 洩漏該 email 在本店的身分狀態。**帶冪等鍵的重送所回放的回應（spec checkout-idempotency）MUST 與上述三者同構**：狀態碼同為 `201`，主體形狀相同，MUST NOT 因為它是回放而改變狀態碼或主體結構。
+
+回放時系統 MUST **重新簽發**訂單存取權杖，MUST NOT 回傳原本簽發的那一枚——原本那一枚不被儲存（它是 bearer 憑證），且其有效期可能已耗盡，回傳一枚已過期的權杖會構成一個形狀像成功、實際無用的回應。重新簽發的權杖 MUST 指向同一筆訂單、具備與原本完全相同的存取範圍，MUST NOT 因回放而取得任何額外能力；回應中的有效期 MUST 描述本次回應所附的那一枚權杖。
 
 #### Scenario: 全新 email 的訪客結帳
 
@@ -37,6 +39,16 @@ TBD - created by archiving change guest-checkout. Update Purpose after archive.
 
 - **WHEN** 訪客結帳請求未附 email 或 email 格式不合法
 - **THEN** 回 422，不建立任何身分或訂單
+
+#### Scenario: 同鍵回放的回應與首次同構
+
+- **WHEN** 一次帶冪等鍵的訪客結帳成功後，以相同鍵與相同主體重送
+- **THEN** 回 201，主體含相同的訂單與一枚可用的訂單存取權杖，其形狀與第一次完全相同，MUST NOT 建立第二筆訂單或第二個顧客身分
+
+#### Scenario: 回放重新簽發訂單存取權杖
+
+- **WHEN** 一次帶冪等鍵的訪客結帳成功後，以相同鍵與主體重送
+- **THEN** 回應中的訂單存取權杖為重新簽發的一枚，其可存取範圍仍嚴格限於同一筆訂單（可讀該單、可對該單發起付款、可讀該單出貨），MUST NOT 能列出訂單歷史、取消訂單或存取其他訂單
 
 ### Requirement: 訪客結帳複用既有結帳路徑，不得存在第二條扣庫存實作
 

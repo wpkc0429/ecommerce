@@ -9,6 +9,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
+	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -103,37 +104,38 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			cart.Table:               cart.ValidColumn,
-			cartitem.Table:           cartitem.ValidColumn,
-			category.Table:           category.ValidColumn,
-			member.Table:             member.ValidColumn,
-			memberrefreshtoken.Table: memberrefreshtoken.ValidColumn,
-			membertier.Table:         membertier.ValidColumn,
-			order.Table:              order.ValidColumn,
-			orderitem.Table:          orderitem.ValidColumn,
-			page.Table:               page.ValidColumn,
-			payment.Table:            payment.ValidColumn,
-			permission.Table:         permission.ValidColumn,
-			pointtransaction.Table:   pointtransaction.ValidColumn,
-			product.Table:            product.ValidColumn,
-			productcategory.Table:    productcategory.ValidColumn,
-			productsku.Table:         productsku.ValidColumn,
-			publishablekey.Table:     publishablekey.ValidColumn,
-			role.Table:               role.ValidColumn,
-			rolepermission.Table:     rolepermission.ValidColumn,
-			roleuser.Table:           roleuser.ValidColumn,
-			shipment.Table:           shipment.ValidColumn,
-			shippingmethod.Table:     shippingmethod.ValidColumn,
-			shop.Table:               shop.ValidColumn,
-			shopallowedorigin.Table:  shopallowedorigin.ValidColumn,
-			shopuser.Table:           shopuser.ValidColumn,
-			site.Table:               site.ValidColumn,
-			siteshop.Table:           siteshop.ValidColumn,
-			theme.Table:              theme.ValidColumn,
-			themepage.Table:          themepage.ValidColumn,
-			user.Table:               user.ValidColumn,
-			userpermission.Table:     userpermission.ValidColumn,
-			userrefreshtoken.Table:   userrefreshtoken.ValidColumn,
+			cart.Table:                   cart.ValidColumn,
+			cartitem.Table:               cartitem.ValidColumn,
+			category.Table:               category.ValidColumn,
+			checkoutidempotencykey.Table: checkoutidempotencykey.ValidColumn,
+			member.Table:                 member.ValidColumn,
+			memberrefreshtoken.Table:     memberrefreshtoken.ValidColumn,
+			membertier.Table:             membertier.ValidColumn,
+			order.Table:                  order.ValidColumn,
+			orderitem.Table:              orderitem.ValidColumn,
+			page.Table:                   page.ValidColumn,
+			payment.Table:                payment.ValidColumn,
+			permission.Table:             permission.ValidColumn,
+			pointtransaction.Table:       pointtransaction.ValidColumn,
+			product.Table:                product.ValidColumn,
+			productcategory.Table:        productcategory.ValidColumn,
+			productsku.Table:             productsku.ValidColumn,
+			publishablekey.Table:         publishablekey.ValidColumn,
+			role.Table:                   role.ValidColumn,
+			rolepermission.Table:         rolepermission.ValidColumn,
+			roleuser.Table:               roleuser.ValidColumn,
+			shipment.Table:               shipment.ValidColumn,
+			shippingmethod.Table:         shippingmethod.ValidColumn,
+			shop.Table:                   shop.ValidColumn,
+			shopallowedorigin.Table:      shopallowedorigin.ValidColumn,
+			shopuser.Table:               shopuser.ValidColumn,
+			site.Table:                   site.ValidColumn,
+			siteshop.Table:               siteshop.ValidColumn,
+			theme.Table:                  theme.ValidColumn,
+			themepage.Table:              themepage.ValidColumn,
+			user.Table:                   user.ValidColumn,
+			userpermission.Table:         userpermission.ValidColumn,
+			userrefreshtoken.Table:       userrefreshtoken.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

@@ -34,6 +34,16 @@ type Config struct {
 	// email claims the identity the order is already bound to.
 	OrderAccessTokenTTL time.Duration
 
+	// CheckoutIdempotencyTTL bounds how long a checkout Idempotency-Key stays
+	// replayable (change checkout-idempotency, design D8). Its lower bound is the
+	// real retry span — a 15s client timeout, a customer reopening the tab that
+	// evening. Its upper bound is the *reverse* failure: too long, and a client
+	// that wrongly reuses a key turns a genuine second purchase into a silent
+	// replay, with no order for the merchant and no error for the customer. 24h
+	// is the boundary between "still today" and "certainly a new order", the same
+	// reasoning (and the same number) as OrderAccessTokenTTL.
+	CheckoutIdempotencyTTL time.Duration
+
 	// PaymentMockWebhookSecret keys the mock payment provider's HMAC-SHA256
 	// webhook signature (change payment-integration, design D2/D9). Unlike
 	// the JWT secrets, this is NOT required to be set in production — the
@@ -121,6 +131,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.OrderAccessTokenTTL, err = parseDuration("ORDER_ACCESS_TOKEN_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
+	if cfg.CheckoutIdempotencyTTL, err = parseDuration("CHECKOUT_IDEMPOTENCY_TTL", 24*time.Hour); err != nil {
 		return nil, err
 	}
 

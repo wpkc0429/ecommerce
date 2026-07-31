@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
+	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -55,37 +56,38 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeCart               = "Cart"
-	TypeCartItem           = "CartItem"
-	TypeCategory           = "Category"
-	TypeMember             = "Member"
-	TypeMemberRefreshToken = "MemberRefreshToken"
-	TypeMemberTier         = "MemberTier"
-	TypeOrder              = "Order"
-	TypeOrderItem          = "OrderItem"
-	TypePage               = "Page"
-	TypePayment            = "Payment"
-	TypePermission         = "Permission"
-	TypePointTransaction   = "PointTransaction"
-	TypeProduct            = "Product"
-	TypeProductCategory    = "ProductCategory"
-	TypeProductSKU         = "ProductSKU"
-	TypePublishableKey     = "PublishableKey"
-	TypeRole               = "Role"
-	TypeRolePermission     = "RolePermission"
-	TypeRoleUser           = "RoleUser"
-	TypeShipment           = "Shipment"
-	TypeShippingMethod     = "ShippingMethod"
-	TypeShop               = "Shop"
-	TypeShopAllowedOrigin  = "ShopAllowedOrigin"
-	TypeShopUser           = "ShopUser"
-	TypeSite               = "Site"
-	TypeSiteShop           = "SiteShop"
-	TypeTheme              = "Theme"
-	TypeThemePage          = "ThemePage"
-	TypeUser               = "User"
-	TypeUserPermission     = "UserPermission"
-	TypeUserRefreshToken   = "UserRefreshToken"
+	TypeCart                   = "Cart"
+	TypeCartItem               = "CartItem"
+	TypeCategory               = "Category"
+	TypeCheckoutIdempotencyKey = "CheckoutIdempotencyKey"
+	TypeMember                 = "Member"
+	TypeMemberRefreshToken     = "MemberRefreshToken"
+	TypeMemberTier             = "MemberTier"
+	TypeOrder                  = "Order"
+	TypeOrderItem              = "OrderItem"
+	TypePage                   = "Page"
+	TypePayment                = "Payment"
+	TypePermission             = "Permission"
+	TypePointTransaction       = "PointTransaction"
+	TypeProduct                = "Product"
+	TypeProductCategory        = "ProductCategory"
+	TypeProductSKU             = "ProductSKU"
+	TypePublishableKey         = "PublishableKey"
+	TypeRole                   = "Role"
+	TypeRolePermission         = "RolePermission"
+	TypeRoleUser               = "RoleUser"
+	TypeShipment               = "Shipment"
+	TypeShippingMethod         = "ShippingMethod"
+	TypeShop                   = "Shop"
+	TypeShopAllowedOrigin      = "ShopAllowedOrigin"
+	TypeShopUser               = "ShopUser"
+	TypeSite                   = "Site"
+	TypeSiteShop               = "SiteShop"
+	TypeTheme                  = "Theme"
+	TypeThemePage              = "ThemePage"
+	TypeUser                   = "User"
+	TypeUserPermission         = "UserPermission"
+	TypeUserRefreshToken       = "UserRefreshToken"
 )
 
 // CartMutation represents an operation that mutates the Cart nodes in the graph.
@@ -2874,6 +2876,856 @@ func (m *CategoryMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown Category edge %s", name)
+}
+
+// CheckoutIdempotencyKeyMutation represents an operation that mutates the CheckoutIdempotencyKey nodes in the graph.
+type CheckoutIdempotencyKeyMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *int
+	created_at      *time.Time
+	updated_at      *time.Time
+	idempotency_key *string
+	request_hash    *string
+	status          *int16
+	addstatus       *int16
+	order_id        *int
+	addorder_id     *int
+	expires_at      *time.Time
+	clearedFields   map[string]struct{}
+	shop            *int
+	clearedshop     bool
+	done            bool
+	oldValue        func(context.Context) (*CheckoutIdempotencyKey, error)
+	predicates      []predicate.CheckoutIdempotencyKey
+}
+
+var _ ent.Mutation = (*CheckoutIdempotencyKeyMutation)(nil)
+
+// checkoutidempotencykeyOption allows management of the mutation configuration using functional options.
+type checkoutidempotencykeyOption func(*CheckoutIdempotencyKeyMutation)
+
+// newCheckoutIdempotencyKeyMutation creates new mutation for the CheckoutIdempotencyKey entity.
+func newCheckoutIdempotencyKeyMutation(c config, op Op, opts ...checkoutidempotencykeyOption) *CheckoutIdempotencyKeyMutation {
+	m := &CheckoutIdempotencyKeyMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeCheckoutIdempotencyKey,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withCheckoutIdempotencyKeyID sets the ID field of the mutation.
+func withCheckoutIdempotencyKeyID(id int) checkoutidempotencykeyOption {
+	return func(m *CheckoutIdempotencyKeyMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *CheckoutIdempotencyKey
+		)
+		m.oldValue = func(ctx context.Context) (*CheckoutIdempotencyKey, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().CheckoutIdempotencyKey.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withCheckoutIdempotencyKey sets the old CheckoutIdempotencyKey of the mutation.
+func withCheckoutIdempotencyKey(node *CheckoutIdempotencyKey) checkoutidempotencykeyOption {
+	return func(m *CheckoutIdempotencyKeyMutation) {
+		m.oldValue = func(context.Context) (*CheckoutIdempotencyKey, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m CheckoutIdempotencyKeyMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m CheckoutIdempotencyKeyMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *CheckoutIdempotencyKeyMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *CheckoutIdempotencyKeyMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().CheckoutIdempotencyKey.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *CheckoutIdempotencyKeyMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *CheckoutIdempotencyKeyMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *CheckoutIdempotencyKeyMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *CheckoutIdempotencyKeyMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldIdempotencyKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+}
+
+// SetRequestHash sets the "request_hash" field.
+func (m *CheckoutIdempotencyKeyMutation) SetRequestHash(s string) {
+	m.request_hash = &s
+}
+
+// RequestHash returns the value of the "request_hash" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) RequestHash() (r string, exists bool) {
+	v := m.request_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestHash returns the old "request_hash" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldRequestHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestHash: %w", err)
+	}
+	return oldValue.RequestHash, nil
+}
+
+// ResetRequestHash resets all changes to the "request_hash" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetRequestHash() {
+	m.request_hash = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *CheckoutIdempotencyKeyMutation) SetStatus(i int16) {
+	m.status = &i
+	m.addstatus = nil
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) Status() (r int16, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldStatus(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// AddStatus adds i to the "status" field.
+func (m *CheckoutIdempotencyKeyMutation) AddStatus(i int16) {
+	if m.addstatus != nil {
+		*m.addstatus += i
+	} else {
+		m.addstatus = &i
+	}
+}
+
+// AddedStatus returns the value that was added to the "status" field in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) AddedStatus() (r int16, exists bool) {
+	v := m.addstatus
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetStatus() {
+	m.status = nil
+	m.addstatus = nil
+}
+
+// SetOrderID sets the "order_id" field.
+func (m *CheckoutIdempotencyKeyMutation) SetOrderID(i int) {
+	m.order_id = &i
+	m.addorder_id = nil
+}
+
+// OrderID returns the value of the "order_id" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) OrderID() (r int, exists bool) {
+	v := m.order_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrderID returns the old "order_id" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldOrderID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrderID: %w", err)
+	}
+	return oldValue.OrderID, nil
+}
+
+// AddOrderID adds i to the "order_id" field.
+func (m *CheckoutIdempotencyKeyMutation) AddOrderID(i int) {
+	if m.addorder_id != nil {
+		*m.addorder_id += i
+	} else {
+		m.addorder_id = &i
+	}
+}
+
+// AddedOrderID returns the value that was added to the "order_id" field in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) AddedOrderID() (r int, exists bool) {
+	v := m.addorder_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearOrderID clears the value of the "order_id" field.
+func (m *CheckoutIdempotencyKeyMutation) ClearOrderID() {
+	m.order_id = nil
+	m.addorder_id = nil
+	m.clearedFields[checkoutidempotencykey.FieldOrderID] = struct{}{}
+}
+
+// OrderIDCleared returns if the "order_id" field was cleared in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) OrderIDCleared() bool {
+	_, ok := m.clearedFields[checkoutidempotencykey.FieldOrderID]
+	return ok
+}
+
+// ResetOrderID resets all changes to the "order_id" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetOrderID() {
+	m.order_id = nil
+	m.addorder_id = nil
+	delete(m.clearedFields, checkoutidempotencykey.FieldOrderID)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *CheckoutIdempotencyKeyMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *CheckoutIdempotencyKeyMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the CheckoutIdempotencyKey entity.
+// If the CheckoutIdempotencyKey object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CheckoutIdempotencyKeyMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *CheckoutIdempotencyKeyMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *CheckoutIdempotencyKeyMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[checkoutidempotencykey.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *CheckoutIdempotencyKeyMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *CheckoutIdempotencyKeyMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *CheckoutIdempotencyKeyMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// Where appends a list predicates to the CheckoutIdempotencyKeyMutation builder.
+func (m *CheckoutIdempotencyKeyMutation) Where(ps ...predicate.CheckoutIdempotencyKey) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the CheckoutIdempotencyKeyMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *CheckoutIdempotencyKeyMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.CheckoutIdempotencyKey, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *CheckoutIdempotencyKeyMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *CheckoutIdempotencyKeyMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (CheckoutIdempotencyKey).
+func (m *CheckoutIdempotencyKeyMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *CheckoutIdempotencyKeyMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.created_at != nil {
+		fields = append(fields, checkoutidempotencykey.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, checkoutidempotencykey.FieldUpdatedAt)
+	}
+	if m.shop != nil {
+		fields = append(fields, checkoutidempotencykey.FieldShopID)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, checkoutidempotencykey.FieldIdempotencyKey)
+	}
+	if m.request_hash != nil {
+		fields = append(fields, checkoutidempotencykey.FieldRequestHash)
+	}
+	if m.status != nil {
+		fields = append(fields, checkoutidempotencykey.FieldStatus)
+	}
+	if m.order_id != nil {
+		fields = append(fields, checkoutidempotencykey.FieldOrderID)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, checkoutidempotencykey.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *CheckoutIdempotencyKeyMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case checkoutidempotencykey.FieldCreatedAt:
+		return m.CreatedAt()
+	case checkoutidempotencykey.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case checkoutidempotencykey.FieldShopID:
+		return m.ShopID()
+	case checkoutidempotencykey.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	case checkoutidempotencykey.FieldRequestHash:
+		return m.RequestHash()
+	case checkoutidempotencykey.FieldStatus:
+		return m.Status()
+	case checkoutidempotencykey.FieldOrderID:
+		return m.OrderID()
+	case checkoutidempotencykey.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *CheckoutIdempotencyKeyMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case checkoutidempotencykey.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case checkoutidempotencykey.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case checkoutidempotencykey.FieldShopID:
+		return m.OldShopID(ctx)
+	case checkoutidempotencykey.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	case checkoutidempotencykey.FieldRequestHash:
+		return m.OldRequestHash(ctx)
+	case checkoutidempotencykey.FieldStatus:
+		return m.OldStatus(ctx)
+	case checkoutidempotencykey.FieldOrderID:
+		return m.OldOrderID(ctx)
+	case checkoutidempotencykey.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown CheckoutIdempotencyKey field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CheckoutIdempotencyKeyMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case checkoutidempotencykey.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case checkoutidempotencykey.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case checkoutidempotencykey.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case checkoutidempotencykey.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	case checkoutidempotencykey.FieldRequestHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestHash(v)
+		return nil
+	case checkoutidempotencykey.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case checkoutidempotencykey.FieldOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrderID(v)
+		return nil
+	case checkoutidempotencykey.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *CheckoutIdempotencyKeyMutation) AddedFields() []string {
+	var fields []string
+	if m.addstatus != nil {
+		fields = append(fields, checkoutidempotencykey.FieldStatus)
+	}
+	if m.addorder_id != nil {
+		fields = append(fields, checkoutidempotencykey.FieldOrderID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *CheckoutIdempotencyKeyMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case checkoutidempotencykey.FieldStatus:
+		return m.AddedStatus()
+	case checkoutidempotencykey.FieldOrderID:
+		return m.AddedOrderID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *CheckoutIdempotencyKeyMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case checkoutidempotencykey.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStatus(v)
+		return nil
+	case checkoutidempotencykey.FieldOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddOrderID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *CheckoutIdempotencyKeyMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(checkoutidempotencykey.FieldOrderID) {
+		fields = append(fields, checkoutidempotencykey.FieldOrderID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *CheckoutIdempotencyKeyMutation) ClearField(name string) error {
+	switch name {
+	case checkoutidempotencykey.FieldOrderID:
+		m.ClearOrderID()
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *CheckoutIdempotencyKeyMutation) ResetField(name string) error {
+	switch name {
+	case checkoutidempotencykey.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case checkoutidempotencykey.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case checkoutidempotencykey.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case checkoutidempotencykey.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	case checkoutidempotencykey.FieldRequestHash:
+		m.ResetRequestHash()
+		return nil
+	case checkoutidempotencykey.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case checkoutidempotencykey.FieldOrderID:
+		m.ResetOrderID()
+		return nil
+	case checkoutidempotencykey.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.shop != nil {
+		edges = append(edges, checkoutidempotencykey.EdgeShop)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case checkoutidempotencykey.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedshop {
+		edges = append(edges, checkoutidempotencykey.EdgeShop)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *CheckoutIdempotencyKeyMutation) EdgeCleared(name string) bool {
+	switch name {
+	case checkoutidempotencykey.EdgeShop:
+		return m.clearedshop
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *CheckoutIdempotencyKeyMutation) ClearEdge(name string) error {
+	switch name {
+	case checkoutidempotencykey.EdgeShop:
+		m.ClearShop()
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *CheckoutIdempotencyKeyMutation) ResetEdge(name string) error {
+	switch name {
+	case checkoutidempotencykey.EdgeShop:
+		m.ResetShop()
+		return nil
+	}
+	return fmt.Errorf("unknown CheckoutIdempotencyKey edge %s", name)
 }
 
 // MemberMutation represents an operation that mutates the Member nodes in the graph.

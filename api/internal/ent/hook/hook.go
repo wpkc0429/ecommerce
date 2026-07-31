@@ -44,6 +44,18 @@ func (f CategoryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CategoryMutation", m)
 }
 
+// The CheckoutIdempotencyKeyFunc type is an adapter to allow the use of ordinary
+// function as CheckoutIdempotencyKey mutator.
+type CheckoutIdempotencyKeyFunc func(context.Context, *ent.CheckoutIdempotencyKeyMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CheckoutIdempotencyKeyFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CheckoutIdempotencyKeyMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CheckoutIdempotencyKeyMutation", m)
+}
+
 // The MemberFunc type is an adapter to allow the use of ordinary
 // function as Member mutator.
 type MemberFunc func(context.Context, *ent.MemberMutation) (ent.Value, error)

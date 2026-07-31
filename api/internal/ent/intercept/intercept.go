@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
+	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -178,6 +179,33 @@ func (f TraverseCategory) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CategoryQuery", q)
+}
+
+// The CheckoutIdempotencyKeyFunc type is an adapter to allow the use of ordinary function as a Querier.
+type CheckoutIdempotencyKeyFunc func(context.Context, *ent.CheckoutIdempotencyKeyQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f CheckoutIdempotencyKeyFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.CheckoutIdempotencyKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.CheckoutIdempotencyKeyQuery", q)
+}
+
+// The TraverseCheckoutIdempotencyKey type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseCheckoutIdempotencyKey func(context.Context, *ent.CheckoutIdempotencyKeyQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseCheckoutIdempotencyKey) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseCheckoutIdempotencyKey) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.CheckoutIdempotencyKeyQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.CheckoutIdempotencyKeyQuery", q)
 }
 
 // The MemberFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -945,6 +973,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.CartItemQuery, predicate.CartItem, cartitem.OrderOption]{typ: ent.TypeCartItem, tq: q}, nil
 	case *ent.CategoryQuery:
 		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
+	case *ent.CheckoutIdempotencyKeyQuery:
+		return &query[*ent.CheckoutIdempotencyKeyQuery, predicate.CheckoutIdempotencyKey, checkoutidempotencykey.OrderOption]{typ: ent.TypeCheckoutIdempotencyKey, tq: q}, nil
 	case *ent.MemberQuery:
 		return &query[*ent.MemberQuery, predicate.Member, member.OrderOption]{typ: ent.TypeMember, tq: q}, nil
 	case *ent.MemberRefreshTokenQuery:

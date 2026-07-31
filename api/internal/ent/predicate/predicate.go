@@ -15,6 +15,9 @@ type CartItem func(*sql.Selector)
 // Category is the predicate function for category builders.
 type Category func(*sql.Selector)
 
+// CheckoutIdempotencyKey is the predicate function for checkoutidempotencykey builders.
+type CheckoutIdempotencyKey func(*sql.Selector)
+
 // Member is the predicate function for member builders.
 type Member func(*sql.Selector)
 

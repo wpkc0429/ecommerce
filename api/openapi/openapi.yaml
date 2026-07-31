@@ -55,6 +55,28 @@ info:
     換發、訪客結帳）**可能回 `429 rate_limited`（附 `Retry-After` 標頭）**。
     為免淹沒真正有意義的資訊，端點層級只列出**呼叫端需要分辨並採取不同動作**的狀態碼。
 
+    ## 安全地重送結帳（`Idempotency-Key`）
+
+    兩條建立訂單的端點——`POST /api/v1/shop/checkout` 與 `POST /api/v1/shop/guest/checkout`
+    ——都接受**選填**的 `Idempotency-Key` 標頭。**不帶時行為與過去完全相同**，它永遠不會變成必填。
+
+    它解決的不是「顧客手滑點了兩次」（那個停用送出按鈕就能解決），而是**回應遺失**：
+    連線斷掉或逾時的時候，前端無法分辨「請求根本沒送到」與「請求送到了、訂單建好了、
+    只有回應在回程掉了」。這個分辨**只有伺服器做得到**——前端沒有訂單 id（那正是遺失的
+    那個回應要帶回來的東西），而訪客也沒有可以拿去查訂單的 session。
+
+    | 情形 | 回應 |
+    | --- | --- |
+    | 第一次 | `201` ＋ 訂單 |
+    | 同 key、同主體重送 | `201` ＋ **同一筆**訂單 ＋ `Idempotency-Replayed: true` |
+    | 同 key、**不同**主體 | `422 idempotency_key_reused` |
+    | 同 key 的另一個請求還在跑 | `409 idempotency_key_in_progress`（稍後重試是安全的） |
+    | key 格式不合 | `422 invalid_idempotency_key` |
+    | **沒建成訂單的請求** | key **不被佔用**，可以立即修正後以同一把 key 重送 |
+
+    回放**刻意無法從狀態碼或主體分辨**（那正是冪等的定義）；`Idempotency-Replayed` 標頭
+    只是為了讓你驗證接線是否正確。細節與界限見 `IdempotencyKey` 參數。
+
     ## 金額
 
     所有金額皆為**最小貨幣單位的整數**，永不為浮點數，幣別由同層的 `currency`（ISO 4217）決定。
@@ -197,6 +219,33 @@ components:
         type: string
         pattern: '^pk_[a-z2-7]+$'
         examples: ["pk_demoseedstorefrontkeynotsecret"]
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: |
+        **選填。** 帶上它，同一個請求就可以安全地重送——這是自帶前端唯一能回答
+        「網路斷了，我的訂單到底成立了沒有」的方式。**不帶時行為與過去完全相同**
+        （每次都建一筆新訂單）。
+
+        - **值是不透明字串**：8–255 個可見 ASCII 字元。不要求 UUID，不解讀內容。
+          太短會與同商家其他顧客相撞（後果是**對方**結不了帳），所以下限是硬性的。
+        - **每一次結帳產生一把新的**，重試時沿用同一把。不要跨訂單重用、不要存進
+          `localStorage` 忘了清。
+        - **重試 MUST 送出逐位元組相同的請求主體。** 同一把 key 配上不同的主體會得到
+          422 `idempotency_key_reused`——那代表「你改了內容卻沿用舊 key」。
+        - **失敗不佔用 key**：驗證失敗、庫存不足、JSON 壞掉之後，同一把 key 可以立即
+          修正重送（這正是「改好欄位再送一次」能運作的原因）。
+        - 唯一性以**商家**為界，有效期預設 **24 小時**。
+
+        回放時回應為 **201 ＋ 與第一次同構的主體**（刻意無法從狀態碼或主體分辨），
+        並帶 `Idempotency-Replayed: true` 標頭供你驗證接線是否正確。
+      schema:
+        type: string
+        minLength: 8
+        maxLength: 255
+        pattern: '^[\x21-\x7E]+$'
+        examples: ["k-mfa3x1p-9qz2h7"]
     ShopIDPath:
       name: shopID
       in: path
@@ -351,6 +400,9 @@ components:
         | 422 | `validation_failed` | 業務規則驗證失敗，`details` 帶 JSON Pointer |
         | 422 | `registration_failed` | 註冊失敗（**刻意不說明原因**：不洩漏該 email 是否已是本店顧客） |
         | 422 | `checkout_unavailable` | 訪客結帳失敗（**刻意不說明原因**：該顧客已被商家停用） |
+        | 422 | `invalid_idempotency_key` | `Idempotency-Key` 不符 8–255 個可見 ASCII 字元 |
+        | 422 | `idempotency_key_reused` | 同一把 `Idempotency-Key` 配上**不同的**請求（改了主體，或換了顧客／端點） |
+        | 409 | `idempotency_key_in_progress` | 帶同一把 `Idempotency-Key` 的另一個請求仍在處理中，結果尚未確定。**稍後重試是安全的**（不附 `Retry-After`：那是限流專屬的標頭） |
         | 429 | `rate_limited` | 超過速率限制，附 `Retry-After` |
         | 500 | `internal` | 伺服器內部錯誤 |
         | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
@@ -1684,9 +1736,15 @@ paths:
         將來源購物車標記為已轉換。任一步失敗整筆回滾（不建單、不動庫存、不動購物車）。
 
         運送方式與配送日的驗證發生在**交易之前**：驗證失敗時庫存與購物車狀態完全不受影響。
+
+        帶 `Idempotency-Key` 時，同一把 key 的重送會**回放**原本那筆訂單（201 ＋
+        `Idempotency-Replayed: true`），不會建立第二筆。這解決的不是雙擊——購物車的
+        「已轉換」保護早就擋住雙擊了，但它回的 409 **不告訴你訂單是哪一筆**，於是回應
+        遺失時你仍然無從得知購買是否成立。
       security: [{ memberJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1703,12 +1761,26 @@ paths:
                   requested_delivery_date: "2026-08-05"
       responses:
         "201":
-          description: 訂單成立。
+          description: |
+            訂單成立。帶 `Idempotency-Key` 的重送回放原訂單時**同樣是 201、同樣的主體**，
+            差別只在 `Idempotency-Replayed` 標頭。
+          headers:
+            Idempotency-Replayed:
+              description: 僅在這是一次回放時出現，值為 `true`。第一次請求不帶此標頭。
+              schema: { type: string, examples: ["true"] }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
         "400": { $ref: '#/components/responses/BadRequest' }
         "401": { $ref: '#/components/responses/Unauthorized' }
+        "409":
+          description: |
+            帶同一把 `Idempotency-Key` 的另一個請求仍在處理中（`idempotency_key_in_progress`），
+            結果尚未確定。稍後以相同 key 與相同主體重試即可——屆時會拿到回放，或（前一次失敗
+            並釋放了 key 時）一次全新的結帳。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
   /api/v1/shop/orders:
@@ -1891,9 +1963,15 @@ paths:
 
         回應帶一枚**訂單存取權杖**，用它查這一筆訂單、發起付款、查出貨。
         它不是 session——邊界見 Security Schemes 的 `orderAccessToken`。
+
+        **請帶 `Idempotency-Key`。** 這條端點自帶完整品項、天然可重入，不帶 key 時
+        重送就是第二筆訂單。帶了之後，網路逾時後的重試是安全的：回放原訂單（201 ＋
+        `Idempotency-Replayed: true`），並**重新簽發**一枚訂單存取權杖
+        （原本那枚不被儲存，且可能已過期）。
       security: []
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -1915,16 +1993,32 @@ paths:
                   requested_delivery_date: "2026-08-05"
       responses:
         "201":
-          description: 訂單成立（幾乎總是同時帶回訂單存取權杖）。
+          description: |
+            訂單成立（幾乎總是同時帶回訂單存取權杖）。帶 `Idempotency-Key` 的重送
+            回放原訂單時**同樣是 201、同樣的主體**，差別只在 `Idempotency-Replayed` 標頭。
+          headers:
+            Idempotency-Replayed:
+              description: 僅在這是一次回放時出現，值為 `true`。第一次請求不帶此標頭。
+              schema: { type: string, examples: ["true"] }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GuestCheckoutResult' }
         "400": { $ref: '#/components/responses/BadRequest' }
+        "409":
+          description: |
+            帶同一把 `Idempotency-Key` 的另一個請求仍在處理中（`idempotency_key_in_progress`），
+            結果尚未確定。稍後以相同 key 與相同主體重試即可。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         "422":
           description: |
-            驗證失敗。除了一般的 `validation_failed`，還有一個專屬 code：
-            **`checkout_unavailable`** —— 該顧客已被商家停用，訊息刻意中性，
-            訪客結帳不得成為繞過停用的路徑。
+            驗證失敗。除了一般的 `validation_failed`，還有三個專屬 code：
+
+            - **`checkout_unavailable`** —— 該顧客已被商家停用，訊息刻意中性，
+              訪客結帳不得成為繞過停用的路徑。
+            - **`invalid_idempotency_key`** —— `Idempotency-Key` 不符 8–255 個可見 ASCII 字元。
+            - **`idempotency_key_reused`** —— 同一把 key 配上不同的請求主體。
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

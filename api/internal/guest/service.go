@@ -91,6 +91,13 @@ type CheckoutInput struct {
 	ShippingAddress       order.ShippingAddress `json:"shipping_address"`
 	ShippingMethodID      *int                  `json:"shipping_method_id"`
 	RequestedDeliveryDate *string               `json:"requested_delivery_date"`
+
+	// IdempotencyReservationID is set by the handler from the Idempotency-Key
+	// header, never by the client (change checkout-idempotency) — hence
+	// json:"-", so a request body cannot inject someone else's reservation.
+	// Passed straight through to order.Service.Checkout, which finalizes it
+	// inside the checkout transaction.
+	IdempotencyReservationID *int `json:"-"`
 }
 
 // Checkout places an order for an unauthenticated visitor.
@@ -129,9 +136,10 @@ func (s *Service) Checkout(ctx context.Context, shopID int, in CheckoutInput) (*
 		return nil, err
 	}
 	return s.Orders.Checkout(ctx, shopID, m.ID, order.CheckoutInput{
-		ShippingAddress:       in.ShippingAddress,
-		ShippingMethodID:      in.ShippingMethodID,
-		RequestedDeliveryDate: in.RequestedDeliveryDate,
+		ShippingAddress:          in.ShippingAddress,
+		ShippingMethodID:         in.ShippingMethodID,
+		RequestedDeliveryDate:    in.RequestedDeliveryDate,
+		IdempotencyReservationID: in.IdempotencyReservationID,
 	})
 }
 

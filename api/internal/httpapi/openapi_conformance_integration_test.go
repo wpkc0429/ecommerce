@@ -49,6 +49,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
@@ -237,6 +238,7 @@ type conformanceEnv struct {
 	memberID int
 
 	shippingSvc   *shipping.Service
+	idemSvc       *idempotency.Service
 	webhookSecret string
 }
 
@@ -305,6 +307,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	}
 	e.shippingSvc = &shipping.Service{Client: client, Orders: orderSvc, Dispatcher: dispatcher}
 	guestSvc := &guest.Service{Client: client, Cart: cartSvc, Orders: orderSvc}
+	e.idemSvc = &idempotency.Service{Client: client, TTL: time.Hour}
 	cfg := &config.Config{OrderAccessTokenTTL: time.Hour}
 
 	e.router = New(Deps{
@@ -323,6 +326,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 			Client: client, Service: guestSvc, Orders: orderSvc,
 			Payments: paymentSvc, Shipping: e.shippingSvc,
 			Issuer: issuer, Cfg: cfg, Log: log,
+			Idempotency: e.idemSvc,
 		},
 	})
 	return e
@@ -331,6 +335,14 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 // do issues a storefront request with the publishable key set, mirroring how a
 // self-hosted front end actually calls this API.
 func (e *conformanceEnv) do(t *testing.T, method, path, bearer string, body any) (int, []byte) {
+	t.Helper()
+	code, raw, _ := e.doWithKey(t, method, path, bearer, "", body)
+	return code, raw
+}
+
+// doWithKey is do plus an optional Idempotency-Key, returning headers too
+// (change checkout-idempotency: the replay marker is a header, not a body key).
+func (e *conformanceEnv) doWithKey(t *testing.T, method, path, bearer, idemKey string, body any) (int, []byte, http.Header) {
 	t.Helper()
 	var reader io.Reader = http.NoBody
 	if body != nil {
@@ -349,9 +361,12 @@ func (e *conformanceEnv) do(t *testing.T, method, path, bearer string, body any)
 	if bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
+	if idemKey != "" {
+		req.Header.Set(IdempotencyKeyHeader, idemKey)
+	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
-	return rec.Code, rec.Body.Bytes()
+	return rec.Code, rec.Body.Bytes(), rec.Result().Header
 }
 
 func decodeInto(t *testing.T, body []byte, dst any) {
@@ -544,6 +559,66 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 		t.Errorf("422 必須帶 details[].pointer（自帶前端唯一能定位錯誤欄位的資訊），實際：%s", truncate(body))
 	}
 
+	// ── 冪等鍵：回放與三個新錯誤碼（change checkout-idempotency）────────
+	//
+	// 回放的回應**刻意**與第一次同構，所以它也必須通過同一份 201 schema——
+	// 若哪天回放改成回 200 或改了主體形狀，這裡會轉紅。
+	idemBody := map[string]any{
+		"email": "conformance-idem@t.dev",
+		"items": []map[string]any{{"sku_id": e.skuID, "quantity": 1}},
+		"shipping_address": map[string]any{
+			"recipient_name": "王小明", "phone": "0912345678", "line1": "台北市信義區信義路五段7號",
+		},
+	}
+	const idemKey = "k-conformance-0001"
+	code, body, hdr := e.doWithKey(t, http.MethodPost, "/api/v1/shop/guest/checkout", "", idemKey, idemBody)
+	requireStatus(t, code, http.StatusCreated, body)
+	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusCreated, body)
+	if got := hdr.Get(IdempotencyReplayedHeader); got != "" {
+		t.Errorf("第一次請求不得帶 %s，實際 %q", IdempotencyReplayedHeader, got)
+	}
+
+	code, body, hdr = e.doWithKey(t, http.MethodPost, "/api/v1/shop/guest/checkout", "", idemKey, idemBody)
+	requireStatus(t, code, http.StatusCreated, body)
+	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusCreated, body)
+	if got := hdr.Get(IdempotencyReplayedHeader); got != "true" {
+		t.Errorf("回放必須帶 %s: true，實際 %q", IdempotencyReplayedHeader, got)
+	}
+
+	// 422 invalid_idempotency_key
+	code, body, _ = e.doWithKey(t, http.MethodPost, "/api/v1/shop/guest/checkout", "", "short", idemBody)
+	requireStatus(t, code, http.StatusUnprocessableEntity, body)
+	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusUnprocessableEntity, body)
+	assertErrorCode(t, body, "invalid_idempotency_key")
+
+	// 422 idempotency_key_reused
+	reusedBody := map[string]any{
+		"email": "conformance-idem@t.dev",
+		"items": []map[string]any{{"sku_id": e.skuID, "quantity": 2}},
+		"shipping_address": map[string]any{
+			"recipient_name": "王小明", "phone": "0912345678", "line1": "台北市信義區信義路五段7號",
+		},
+	}
+	code, body, _ = e.doWithKey(t, http.MethodPost, "/api/v1/shop/guest/checkout", "", idemKey, reusedBody)
+	requireStatus(t, code, http.StatusUnprocessableEntity, body)
+	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusUnprocessableEntity, body)
+	assertErrorCode(t, body, "idempotency_key_reused")
+
+	// 409 idempotency_key_in_progress — 直接種一列 in_progress，而不是靠並發：
+	// 契約驗證要的是「這個回應的形狀對不對」，用競態去產生它只會讓這支測試變得
+	// 不穩定。真正的並發行為由 idempotency_integration_test.go 的 -race 測試證明。
+	const stuckKey = "k-conformance-stuck"
+	e.client.CheckoutIdempotencyKey.Create().
+		SetShopID(e.shopID).SetIdempotencyKey(stuckKey).
+		SetRequestHash(idempotency.Fingerprint(idempotency.ScopeGuestCheckout, mustJSON(t, idemBody))).
+		SetStatus(idempotency.StatusInProgress).
+		SetExpiresAt(time.Now().Add(time.Hour)).
+		SaveX(context.Background())
+	code, body, _ = e.doWithKey(t, http.MethodPost, "/api/v1/shop/guest/checkout", "", stuckKey, idemBody)
+	requireStatus(t, code, http.StatusConflict, body)
+	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusConflict, body)
+	assertErrorCode(t, body, "idempotency_key_in_progress")
+
 	// ── 規則 2：共用 schema 覆蓋 ──────────────────────────────────────
 	var uncovered []string
 	for _, name := range requiredSchemas {
@@ -562,6 +637,33 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	}
 	sort.Strings(names)
 	t.Logf("以真實回應驗證了 %d 個共用 schema：%s", len(names), strings.Join(names, ", "))
+}
+
+// assertErrorCode checks the machine-readable code a consumer branches on.
+// The envelope's *shape* is validated by assertResponse; this pins the value,
+// because a code silently renamed would pass the schema and break every client.
+func assertErrorCode(t *testing.T, body []byte, want string) {
+	t.Helper()
+	var parsed struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	decodeInto(t, body, &parsed)
+	if parsed.Error.Code != want {
+		t.Errorf("error.code = %q, want %q; body=%s", parsed.Error.Code, want, truncate(body))
+	}
+}
+
+// mustJSON reproduces the exact bytes doWithKey sends, so a fingerprint computed
+// here matches the one the handler will compute.
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	raw, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return raw
 }
 
 func requireStatus(t *testing.T, got, want int, body []byte) {

@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
@@ -148,7 +149,22 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// active cart directly via ent (design D9); member routes are RBAC-free
 	// like Cart, admin routes reuse the same authz engine as Products.
 	orderService := &order.Service{Client: client}
-	deps.Orders = &httpapi.OrderHandler{Client: client, Service: orderService, Authz: authz, Log: a.log}
+
+	// Checkout idempotency (change checkout-idempotency): one service shared by
+	// both order-placing endpoints, so there is exactly one implementation of the
+	// duplicate-submission guard — the same discipline that keeps stock deduction
+	// to one implementation.
+	//
+	// NOTE: nothing in `go test ./...` reaches this file (every integration test
+	// builds its own router), so forgetting to attach idempotencyService to a
+	// handler below would leave the whole suite green while the real server
+	// silently ignored Idempotency-Key. e2e/commerce-path.mjs asserts the replay
+	// for exactly this reason.
+	idempotencyService := &idempotency.Service{Client: client, TTL: cfg.CheckoutIdempotencyTTL}
+	deps.Orders = &httpapi.OrderHandler{
+		Client: client, Service: orderService, Authz: authz, Log: a.log,
+		Idempotency: idempotencyService,
+	}
 
 	// Payment integration (change payment-integration): a provider registry
 	// of one demo/reference provider today (design D1/D2/D9) — adding a
@@ -186,14 +202,15 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// token names.
 	guestService := &guest.Service{Client: client, Cart: cartService, Orders: orderService}
 	deps.Guest = &httpapi.GuestHandler{
-		Client:   client,
-		Service:  guestService,
-		Orders:   orderService,
-		Payments: paymentService,
-		Shipping: shippingService,
-		Issuer:   issuer,
-		Cfg:      cfg,
-		Log:      a.log,
+		Client:      client,
+		Service:     guestService,
+		Orders:      orderService,
+		Payments:    paymentService,
+		Shipping:    shippingService,
+		Issuer:      issuer,
+		Cfg:         cfg,
+		Log:         a.log,
+		Idempotency: idempotencyService,
 	}
 
 	deps.Render = &httpapi.RenderHandler{

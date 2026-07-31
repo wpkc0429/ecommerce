@@ -58,8 +58,18 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 				// X-Site-Path are gone: the only endpoint that still reads
 				// X-Site-Domain is called server-to-server by the SSR, never
 				// from a browser.
-				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+PublishableKeyHeader)
-				h.Set("Access-Control-Expose-Headers", "X-Cache")
+				//
+				// Idempotency-Key carries the same MUST (change
+				// checkout-idempotency): a browser that is not told the header
+				// is allowed fails the actual checkout after a successful
+				// preflight, and the symptom reads as "checkout broke when we
+				// added retries".
+				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+
+					PublishableKeyHeader+", "+IdempotencyKeyHeader)
+				// Idempotency-Replayed is exposed so a storefront can verify its
+				// own retry logic; without Expose-Headers, JS cannot read it and
+				// the header's entire diagnostic value is lost.
+				h.Set("Access-Control-Expose-Headers", "X-Cache, "+IdempotencyReplayedHeader)
 				h.Set("Access-Control-Max-Age", "600")
 				if r.Method == http.MethodOptions {
 					w.WriteHeader(http.StatusNoContent)

@@ -132,7 +132,11 @@ const { shipping_methods } = await res.json();
 ```js
 const res = await fetch(`${API}/api/v1/shop/guest/checkout`, {
   method: "POST",
-  headers: { ...headers, "Content-Type": "application/json" },   // 沒有 Authorization
+  headers: {
+    ...headers,
+    "Content-Type": "application/json",           // 沒有 Authorization
+    "Idempotency-Key": state.submitKey,           // 選填但**強烈建議**，見第 5.5 節
+  },
   body: JSON.stringify({
     email: form.email,                       // 必填：這是顧客身分的鍵
     items: cart.map(l => ({
@@ -163,8 +167,9 @@ API 的合併鍵是 `(sku_id, gift_message)`：**同一款花配兩張不同卡�
 前端的去重鍵**必須把訊息算進去**，否則第二張卡片會覆蓋第一張。
 上限 **500 個字元**（以字元計，中英文一樣算 500）；沒有卡片就送空字串或整個省略，回應裡永遠是字串（不會是 `null`）。
 
-**③ 送出按鈕要在請求期間停用。**
-訪客結帳**沒有冪等鍵**，雙擊會建立兩筆訂單。
+**③ 送出按鈕要在請求期間停用，而且要帶 `Idempotency-Key`。**
+停用按鈕擋的是雙擊；**擋不住網路逾時後的重試**，而那才是真正會建立兩筆訂單的路徑。
+兩者都要做，見第 5.5 節。
 
 ### 還有
 
@@ -206,6 +211,109 @@ API 的合併鍵是 `(sku_id, gift_message)`：**同一款花配兩張不同卡�
 - **送出前**（結帳畫面）：API 還不知道這張單，只能由前端預估——用自己算的小計 ＋
   第 4 節拿到的 `flat_rate`。這是「顯示」，不是「權威」。
 - **送出後的任何畫面**（訂單確認頁、訂單查詢、寄給顧客的訊息）：**一律用回應的 `total_amount`**。
+
+---
+
+## 5.5 安全地重送：`Idempotency-Key`
+
+### 為什麼需要它（不是為了雙擊）
+
+雙擊由「送出中就停用按鈕」解決。真正的問題是另一個：**回應遺失時，你分不出
+「請求根本沒送到」與「請求送到了、訂單建好了、只有回應在回程掉了」。**
+
+顧客看到「訂單送出失敗，請檢查網路」，唯一合理的動作就是再按一次——
+而你沒有任何辦法先確認訂單存不存在（你沒有訂單 id，那正是遺失的那個回應要帶回來的東西；
+而訪客也沒有可以拿去查訂單的登入 session）。
+
+**這個分辨只有伺服器做得到。** 帶上 `Idempotency-Key`，重送就變成安全操作。
+
+> 這條端點不帶 key 時**每次都建一筆新訂單**，這是刻意保留的預設行為。
+> 兩條結帳端點都接受它：`POST /api/v1/shop/guest/checkout` 與 `POST /api/v1/shop/checkout`。
+
+### key 怎麼產生
+
+```js
+// 進入結帳流程時產生一次，整個流程（含所有重試）沿用同一把。
+function newSubmitKey() {
+  return crypto.randomUUID?.()
+    ?? `k-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+```
+
+- **8–255 個可見 ASCII 字元**，不符會得到 `422 invalid_idempotency_key`。
+- **不要求 UUID**，上面兩種形式都可以。
+- **不要用固定值、不要用遞增數字。** 太短或太可預測會與同商家其他顧客相撞，
+  而相撞的後果會落在**對方**身上（他結不了帳）。
+- **每次進入結帳產生新的一把；下單成功後丟掉。**
+  存進 `localStorage` 忘了清，會讓顧客隔天的真實訂單被靜默地當成重試——
+  沒有訂單、沒有錯誤，兩邊都看不出來。
+
+### 重試邏輯
+
+```js
+async function submitOrder(key, payload) {
+  const bodyText = JSON.stringify(payload);   // ← 重試時必須送「同一串字」
+  const res = await fetch(`${API}/api/v1/shop/guest/checkout`, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json", "Idempotency-Key": key },
+    body: bodyText,
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (res.status === 201) {
+    // 第一次成功，或是一次回放——兩者刻意無法分辨，而且你不需要分辨。
+    return { ok: true, order: (await res.json()).order };
+  }
+  if (res.status === 409) {
+    // idempotency_key_in_progress：同一把 key 的另一個請求還在跑。
+    // 稍等 1–2 秒重試（同一把 key），會拿到回放或一次全新的結帳。
+    return { ok: false, retryable: true };
+  }
+  if (res.status === 422) {
+    // 欄位錯誤：讓顧客修正後**沿用同一把 key** 再送（失敗不佔用 key）。
+    return { ok: false, retryable: false, error: await res.json() };
+  }
+  // 逾時、5xx、或 fetch 直接 reject：結果未知 → 重試是安全的（同一把 key）。
+  return { ok: false, retryable: true };
+}
+```
+
+**重試 MUST 送出逐位元組相同的請求主體。** 從同一份 state 重新 `JSON.stringify` 就是相同的；
+若你在重試前改了任何內容，那已經是另一筆訂單意圖，請產生新的 key。
+用舊 key 配新內容會得到 `422 idempotency_key_reused`。
+
+### 回放時你會看到什麼
+
+**和第一次一模一樣**：`201` ＋ 同樣形狀的主體 ＋ 同一個 `order.id`。這是刻意的——
+冪等的定義就是「重試的表現要像原本那次請求」，所以你的 `if (status === 201)` 分支不必改。
+
+兩個差異：
+
+- 回應多一個 **`Idempotency-Replayed: true`** 標頭（只用來讓你驗證接線，不必據此改變邏輯）。
+- `order_access_token` 是**重新簽發**的一枚（原本那枚不被儲存，且可能已過期）。
+  它指向同一筆訂單、能做的事完全相同，`expires_in` 永遠描述**這次回應裡這一枚**。
+- 訂單內容是**當下**的狀態：期間若已付款或已被取消，回放會如實反映。
+
+### 失敗不會佔用 key
+
+驗證失敗（422）、庫存不足、JSON 壞掉（400）之後，**同一把 key 立刻可以重用**。
+「顧客改好欄位再送一次」就是靠這個運作的。
+
+### 有效期
+
+預設 **24 小時**，唯一性以**商家**為界（同一把 key 在別家商家是完全不相干的一列）。
+超過之後同一把 key 會建立一筆**新**訂單——那時它已經不是重試了。
+
+### 常見錯誤
+
+| 現象 | 原因 |
+| --- | --- |
+| 瀏覽器 CORS 錯誤，提到 `Idempotency-Key` | 該 origin 沒登記（第 1 節②）。平台已在允許的標頭清單中包含它 |
+| `422 invalid_idempotency_key` | key 太短（< 8）、有空白／換行／中文 |
+| `422 idempotency_key_reused` | 重試時主體變了（或換了顧客／換了端點）。要嘛送回原本的位元組，要嘛用新 key |
+| `409 idempotency_key_in_progress` | 同一把 key 的另一個請求還在跑。等一下再用**同一把** key 重試 |
+| 重送卻建了第二筆訂單 | 沒帶標頭，或每次重試都產生了新的 key |
+| 顧客隔天下單卻拿回舊訂單 | key 被跨訂單重用了（例如存進 `localStorage` 沒清） |
 
 ---
 
@@ -307,9 +415,12 @@ POST /api/v1/shop/auth/register   { "email": "…", "password": "…" }   → To
 | 404 | `unknown_publishable_key` | **金鑰打錯、未帶、或已被撤銷。** |
 | 404 | `not_found` | 資源不存在；訪客端點帶了 token 仍 404，多半是路徑打錯（訪客端點**不接受**訂單 id），或該訂單尚未出貨。 |
 | 409 | `conflict` | 與訂單當下狀態衝突（對已取消／已付款的訂單發起付款）。 |
+| 409 | `idempotency_key_in_progress` | 同一把 `Idempotency-Key` 的另一個請求還在跑。**稍後以同一把 key 重試是安全的**（無 `Retry-After`）。 |
 | 422 | `validation_failed` | 見下表的 pointer 對照。 |
 | 422 | `registration_failed` | 註冊失敗，**刻意不說明原因**。 |
 | 422 | `checkout_unavailable` | 該 email 的顧客身分已被商家停用，**刻意不說明原因**。 |
+| 422 | `invalid_idempotency_key` | `Idempotency-Key` 不是 8–255 個可見 ASCII 字元。 |
+| 422 | `idempotency_key_reused` | 同一把 key 配上**不同的**請求主體（第 5.5 節）。 |
 | 429 | `rate_limited` | 短時間內太多次；`Retry-After` 標頭是秒數。 |
 | 500 | `internal` | 平台端問題，**任何端點都可能出現**。 |
 | 503 | `shop_disabled` | 商家被停用（金鑰與網域同時失效）。前台應呈現維護頁而非錯誤頁。 |
@@ -335,6 +446,8 @@ POST /api/v1/shop/auth/register   { "email": "…", "password": "…" }   → To
 | 合計比預期少了運費 | 忘了送 `shipping_method_id`（不送＝免運）。 |
 | 金額差了 100 倍 | 讀第 0 節。 |
 | 第二張卡片覆蓋了第一張 | 前端的購物車去重鍵沒有把 `gift_message` 算進去（第 5 節②）。 |
+| 網路逾時後重送，結果建了兩筆訂單 | 沒帶 `Idempotency-Key`，或每次重試都產生新 key（第 5.5 節）。 |
+| 顧客隔天下單卻拿回昨天那筆訂單 | key 被跨訂單重用了（第 5.5 節）。 |
 
 ---
 

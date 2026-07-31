@@ -402,6 +402,58 @@ async function commercePath() {
   check("the member can cancel an unpaid order", cancelled.status === 200 && cancelled.json.status === 1, brief(cancelled));
   check("cancellation restores the stock it held",
     (await skuStock(BOUQUET_SKU)) === stockBeforeCancel, String(stockBeforeCancel));
+
+  // ── ⑩ 冪等鍵：重送不會建立第二筆訂單 ──
+  //
+  // This section exists for one reason that no Go test can cover: every
+  // integration test builds its own router, so nothing in `go test ./...`
+  // reaches internal/app/wire.go. Forget to attach the idempotency service
+  // there and the whole suite stays green while the real server silently
+  // ignores Idempotency-Key — the exact failure mode change commerce-demo-seed
+  // measured for the event subscriptions. This is the only assertion standing
+  // between that mistake and duplicate orders in production.
+  section("⑩ Idempotency-Key: a re-sent checkout replays instead of duplicating");
+  const idemKey = `e2e-idem-${runID}`;
+  const idemBody = {
+    email: `e2e-idem-${runID}@example.com`,
+    items: [{ sku_id: sku.id, quantity: 1 }],
+    shipping_address: { recipient_name: "E2E 重送", phone: "0912345678", line1: "台北市中山區南京東路一段 1 號" },
+  };
+  const stockBeforeIdem = await skuStock(BOUQUET_SKU);
+  const idemFirst = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK, headers: { "Idempotency-Key": idemKey }, body: idemBody,
+  });
+  need(idemFirst.status === 201, `idempotent guest checkout failed: ${brief(idemFirst)}`);
+  check("the first keyed checkout is not marked as a replay",
+    idemFirst.headers.get("Idempotency-Replayed") === null, String(idemFirst.headers.get("Idempotency-Replayed")));
+  const stockAfterFirstIdem = await skuStock(BOUQUET_SKU);
+
+  const idemReplay = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK, headers: { "Idempotency-Key": idemKey }, body: idemBody,
+  });
+  check("re-sending the same key returns 201, indistinguishable from the original",
+    idemReplay.status === 201, brief(idemReplay));
+  check("the replay is the SAME order, not a second one",
+    idemReplay.json?.order?.id === idemFirst.json.order.id,
+    `${idemReplay.json?.order?.id} vs ${idemFirst.json.order.id}`);
+  check("the replay is marked with Idempotency-Replayed",
+    idemReplay.headers.get("Idempotency-Replayed") === "true",
+    String(idemReplay.headers.get("Idempotency-Replayed")));
+  check("the replay does NOT deduct stock a second time",
+    (await skuStock(BOUQUET_SKU)) === stockAfterFirstIdem,
+    `${stockBeforeIdem} → ${stockAfterFirstIdem} → ${await skuStock(BOUQUET_SKU)}`);
+  check("the replay hands back a usable order access token",
+    typeof idemReplay.json?.order_access_token === "string" && idemReplay.json.order_access_token.length > 0);
+
+  const reused = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK, headers: { "Idempotency-Key": idemKey },
+    body: { ...idemBody, items: [{ sku_id: sku.id, quantity: 2 }] },
+  });
+  check("the same key with a different body is refused", reused.status === 422, brief(reused));
+  check("...with the idempotency_key_reused code",
+    reused.json?.error?.code === "idempotency_key_reused", brief(reused));
+  check("a refused reuse touches no stock",
+    (await skuStock(BOUQUET_SKU)) === stockAfterFirstIdem, String(stockAfterFirstIdem));
 }
 
 // Entry-point detection: when run directly this script owns the exit code;

@@ -7,6 +7,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
+	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -168,6 +169,61 @@ func init() {
 	categoryDescPosition := categoryFields[4].Descriptor()
 	// category.DefaultPosition holds the default value on creation for the position field.
 	category.DefaultPosition = categoryDescPosition.Default.(int32)
+	checkoutidempotencykeyMixin := schema.CheckoutIdempotencyKey{}.Mixin()
+	checkoutidempotencykeyMixinFields0 := checkoutidempotencykeyMixin[0].Fields()
+	_ = checkoutidempotencykeyMixinFields0
+	checkoutidempotencykeyFields := schema.CheckoutIdempotencyKey{}.Fields()
+	_ = checkoutidempotencykeyFields
+	// checkoutidempotencykeyDescCreatedAt is the schema descriptor for created_at field.
+	checkoutidempotencykeyDescCreatedAt := checkoutidempotencykeyMixinFields0[0].Descriptor()
+	// checkoutidempotencykey.DefaultCreatedAt holds the default value on creation for the created_at field.
+	checkoutidempotencykey.DefaultCreatedAt = checkoutidempotencykeyDescCreatedAt.Default.(func() time.Time)
+	// checkoutidempotencykeyDescUpdatedAt is the schema descriptor for updated_at field.
+	checkoutidempotencykeyDescUpdatedAt := checkoutidempotencykeyMixinFields0[1].Descriptor()
+	// checkoutidempotencykey.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	checkoutidempotencykey.DefaultUpdatedAt = checkoutidempotencykeyDescUpdatedAt.Default.(func() time.Time)
+	// checkoutidempotencykey.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	checkoutidempotencykey.UpdateDefaultUpdatedAt = checkoutidempotencykeyDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// checkoutidempotencykeyDescIdempotencyKey is the schema descriptor for idempotency_key field.
+	checkoutidempotencykeyDescIdempotencyKey := checkoutidempotencykeyFields[1].Descriptor()
+	// checkoutidempotencykey.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	checkoutidempotencykey.IdempotencyKeyValidator = func() func(string) error {
+		validators := checkoutidempotencykeyDescIdempotencyKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(idempotency_key string) error {
+			for _, fn := range fns {
+				if err := fn(idempotency_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// checkoutidempotencykeyDescRequestHash is the schema descriptor for request_hash field.
+	checkoutidempotencykeyDescRequestHash := checkoutidempotencykeyFields[2].Descriptor()
+	// checkoutidempotencykey.RequestHashValidator is a validator for the "request_hash" field. It is called by the builders before save.
+	checkoutidempotencykey.RequestHashValidator = func() func(string) error {
+		validators := checkoutidempotencykeyDescRequestHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(request_hash string) error {
+			for _, fn := range fns {
+				if err := fn(request_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// checkoutidempotencykeyDescStatus is the schema descriptor for status field.
+	checkoutidempotencykeyDescStatus := checkoutidempotencykeyFields[3].Descriptor()
+	// checkoutidempotencykey.DefaultStatus holds the default value on creation for the status field.
+	checkoutidempotencykey.DefaultStatus = checkoutidempotencykeyDescStatus.Default.(int16)
 	memberMixin := schema.Member{}.Mixin()
 	memberMixinFields0 := memberMixin[0].Fields()
 	_ = memberMixinFields0

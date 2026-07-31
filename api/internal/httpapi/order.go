@@ -10,6 +10,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 )
 
@@ -22,6 +23,14 @@ type OrderHandler struct {
 	Service *order.Service
 	Authz   *AuthzMW
 	Log     *slog.Logger
+
+	// Idempotency backs the optional Idempotency-Key header on member checkout
+	// (change checkout-idempotency). The cart Active→Converted CAS already stops
+	// a double submit from creating two orders, but it answers with a 409 that
+	// does not say *which* order — so it cannot tell a client whose response was
+	// lost whether its purchase exists. That is a different problem, and this is
+	// what solves it.
+	Idempotency *idempotency.Service
 }
 
 // writeOrderError maps order errors to design D12 responses (mirrors
@@ -131,20 +140,53 @@ func (h *OrderHandler) checkout(w http.ResponseWriter, r *http.Request) {
 	// wrapper (design D11). Nesting would break every existing caller to buy
 	// nothing but symmetry with the guest endpoint; adding sibling keys leaves
 	// every previously-valid request valid, byte for byte.
+	// Read whole rather than streamed: the idempotency fingerprint is taken over
+	// the raw bytes (change checkout-idempotency, design D7).
+	raw, ok := readJSONBody(w, r)
+	if !ok {
+		return
+	}
+	// The member id belongs in the fingerprint scope, and this is not decoration
+	// (design D7): this endpoint's body is nothing but a shipping address, so two
+	// customers sending to the same address produce byte-identical bodies. Keyed
+	// on the body alone, a key collision between them would hand one customer the
+	// other's order.
+	gate, replayOrderID, ok := beginIdempotency(w, r, h.Idempotency, h.Log, shopID,
+		idempotency.MemberCheckoutScope(memberID), raw)
+	if !ok {
+		return
+	}
+	if replayOrderID > 0 {
+		// Member-scoped lookup, not the shop-scoped one: defense in depth, so
+		// that even a broken fingerprint could never become horizontal
+		// escalation. A foreign order surfaces as the ordinary 404.
+		o, err := h.Service.GetOrder(r.Context(), shopID, memberID, replayOrderID)
+		if err != nil {
+			writeOrderError(w, h.Log, err)
+			return
+		}
+		w.Header().Set(IdempotencyReplayedHeader, "true")
+		httpx.WriteJSON(w, http.StatusCreated, orderJSON(o))
+		return
+	}
+
 	var body struct {
 		order.ShippingAddress
 		ShippingMethodID      *int    `json:"shipping_method_id"`
 		RequestedDeliveryDate *string `json:"requested_delivery_date"`
 	}
-	if !decodeJSON(w, r, &body) {
+	if !unmarshalJSON(w, raw, &body) {
+		gate.release(r)
 		return
 	}
 	o, err := h.Service.Checkout(r.Context(), shopID, memberID, order.CheckoutInput{
-		ShippingAddress:       body.ShippingAddress,
-		ShippingMethodID:      body.ShippingMethodID,
-		RequestedDeliveryDate: body.RequestedDeliveryDate,
+		ShippingAddress:          body.ShippingAddress,
+		ShippingMethodID:         body.ShippingMethodID,
+		RequestedDeliveryDate:    body.RequestedDeliveryDate,
+		IdempotencyReservationID: gate.reservation(),
 	})
 	if err != nil {
+		gate.release(r)
 		writeOrderError(w, h.Log, err)
 		return
 	}

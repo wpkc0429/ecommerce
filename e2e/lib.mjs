@@ -36,7 +36,7 @@ export function section(title) {
   console.log(`\n${title}`);
 }
 
-/** Sends a request and always returns {status, json, text} — never throws on 4xx/5xx. */
+/** Sends a request and always returns {status, json, text, headers} — never throws on 4xx/5xx. */
 export async function req(method, path, { headers = {}, body, token, pk } = {}) {
   const h = { ...headers };
   if (body !== undefined) h["Content-Type"] = "application/json";
@@ -54,7 +54,7 @@ export async function req(method, path, { headers = {}, body, token, pk } = {}) 
   } catch {
     /* non-JSON body: callers fall back to .text */
   }
-  return { status: res.status, json, text };
+  return { status: res.status, json, text, headers: res.headers };
 }
 
 /** Compact one-line rendering of a response, for assertion failure messages. */

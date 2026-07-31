@@ -233,3 +233,91 @@ func (OrderItem) Indexes() []ent.Index {
 		index.Fields("shop_id"),
 	}
 }
+
+// CheckoutIdempotencyKey records one client-supplied idempotency key and the
+// order it produced (change checkout-idempotency, design D3). It is shop-owned
+// tenant data and is registered in api/internal/tenant.tenantOwned.
+//
+// The whole mechanism rests on UNIQUE(shop_id, idempotency_key) being the
+// arbiter: reserving a key is an INSERT, and losing that INSERT is how a
+// duplicate request learns it is a duplicate — never an application-level
+// read-then-write. That is the same discipline as payments(provider,
+// provider_reference), shipments(order_id) and point_transactions(order_id,
+// kind); completion and release reuse the other half of it (a conditional
+// UPDATE/DELETE plus an affected-rows check).
+//
+// The unique index is Postgres's default NULLS DISTINCT, which is immaterial
+// here because both columns are NOT NULL. Stated explicitly because this
+// codebase has two handwritten NULLS NOT DISTINCT constraints (site_shop,
+// role_user) that must NOT be copied onto this table.
+//
+// shop_id scopes the key: shop A can never replay shop B's key, because a key
+// string used by both is simply two rows. That is a tenant-isolation
+// requirement, not a nicety.
+type CheckoutIdempotencyKey struct {
+	ent.Schema
+}
+
+func (CheckoutIdempotencyKey) Mixin() []ent.Mixin {
+	return []ent.Mixin{TimeMixin{}}
+}
+
+func (CheckoutIdempotencyKey) Fields() []ent.Field {
+	return []ent.Field{
+		field.Int("shop_id"),
+		// The raw client-supplied value, treated as opaque (design D2): no
+		// structure is required or parsed, only bounds (8–255 printable ASCII)
+		// enforced in the service layer before anything reaches this column.
+		field.String("idempotency_key").MaxLen(255).
+			SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).NotEmpty(),
+		// SHA-256 hex of "caller scope \n raw request body" (design D7). The
+		// caller scope is what stops two customers of one shop who picked the
+		// same weak key and posted a byte-identical body from seeing each
+		// other's order.
+		field.String("request_hash").MaxLen(64).
+			SchemaType(map[string]string{dialect.Postgres: "char(64)"}).NotEmpty(),
+		// 0 in_progress / 1 completed. Constants live in internal/idempotency.
+		field.Int16("status").Default(0),
+		// Informational only — no edge, no FK, exactly like
+		// orders.shipping_method_id and order_items.product_id/sku_id. An
+		// optional ent edge would generate ON DELETE SET NULL, which would
+		// directly violate the completed⇔has-order CHECK below; this API has no
+		// order-deletion path at all, so the FK buys nothing and risks a
+		// self-contradicting row.
+		field.Int("order_id").Optional().Nillable(),
+		// Each row carries its own deadline rather than being compared against
+		// "created_at + current config" (design D8): changing the setting must
+		// not retroactively redefine how long an existing row promised to live,
+		// and expiry then reduces to a plain column comparison.
+		field.Time("expires_at"),
+	}
+}
+
+func (CheckoutIdempotencyKey) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("shop", Shop.Type).Unique().Required().Field("shop_id"),
+	}
+}
+
+func (CheckoutIdempotencyKey) Indexes() []ent.Index {
+	return []ent.Index{
+		// The arbiter (design D3/D4). Scoped by shop, so the same key string in
+		// two shops is two independent rows.
+		index.Fields("shop_id", "idempotency_key").Unique(),
+	}
+}
+
+func (CheckoutIdempotencyKey) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Table: "checkout_idempotency_keys"},
+		entsql.Annotation{
+			Checks: map[string]string{
+				"checkout_idempotency_keys_status_check": "status IN (0, 1)",
+				// completed ⇔ has an order. A database fact rather than a
+				// convention that only lives in Go, so the next writer of this
+				// table does not have to remember it.
+				"checkout_idempotency_keys_order_id_check": "(status = 0 AND order_id IS NULL) OR (status = 1 AND order_id IS NOT NULL)",
+			},
+		},
+	}
+}

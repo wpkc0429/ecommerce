@@ -20,6 +20,8 @@ type Tx struct {
 	CartItem *CartItemClient
 	// Category is the client for interacting with the Category builders.
 	Category *CategoryClient
+	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
+	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
 	// Member is the client for interacting with the Member builders.
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
@@ -210,6 +212,7 @@ func (tx *Tx) init() {
 	tx.Cart = NewCartClient(tx.config)
 	tx.CartItem = NewCartItemClient(tx.config)
 	tx.Category = NewCategoryClient(tx.config)
+	tx.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)
 	tx.MemberTier = NewMemberTierClient(tx.config)

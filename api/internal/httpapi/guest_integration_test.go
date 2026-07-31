@@ -22,6 +22,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
@@ -47,6 +48,7 @@ type guestEnv struct {
 	cartSvc     *cart.Service
 	orderSvc    *order.Service
 	shippingSvc *shipping.Service
+	idemSvc     *idempotency.Service
 
 	webhookSecret string
 
@@ -97,6 +99,11 @@ func newGuestEnv(t *testing.T) *guestEnv {
 
 	e.cartSvc = &cart.Service{Client: client}
 	e.orderSvc = &order.Service{Client: client}
+	// change checkout-idempotency: wired on both checkout handlers below. Every
+	// pre-existing test in this file sends no Idempotency-Key header and is
+	// therefore completely unaffected — that is the point of the header being
+	// optional, and their unmodified passing is the evidence for it.
+	e.idemSvc = &idempotency.Service{Client: client, TTL: time.Hour}
 	mock := payment.NewMockProvider(e.webhookSecret)
 	paymentSvc := &payment.Service{
 		Client:          client,
@@ -117,7 +124,7 @@ func newGuestEnv(t *testing.T) *guestEnv {
 		OrderAccessMW: httpapi.NewOrderAccessMiddleware(issuer),
 		MemberAuth:    &httpapi.MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: log},
 		Cart:          &httpapi.CartHandler{Client: client, Service: e.cartSvc, Log: log},
-		Orders:        &httpapi.OrderHandler{Client: client, Service: e.orderSvc, Log: log},
+		Orders:        &httpapi.OrderHandler{Client: client, Service: e.orderSvc, Log: log, Idempotency: e.idemSvc},
 		Payments:      &httpapi.PaymentHandler{Client: client, Service: paymentSvc, Log: log},
 		Shipping:      &httpapi.ShippingHandler{Client: client, Service: e.shippingSvc, Log: log},
 		Points:        &httpapi.PointsHandler{Client: client, Service: pointsSvc, Log: log},
@@ -125,6 +132,7 @@ func newGuestEnv(t *testing.T) *guestEnv {
 			Client: client, Service: guestSvc, Orders: e.orderSvc,
 			Payments: paymentSvc, Shipping: e.shippingSvc,
 			Issuer: issuer, Cfg: &config.Config{OrderAccessTokenTTL: time.Hour}, Log: log,
+			Idempotency: e.idemSvc,
 		},
 	})
 	return e
