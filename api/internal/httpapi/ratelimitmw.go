@@ -192,6 +192,26 @@ func NewMemberRegisterRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig
 	})
 }
 
+// NewGuestCheckoutRateLimit builds the rate limit middleware for
+// POST /api/v1/shop/guest/checkout (change guest-checkout, design D9). MUST run
+// after TenantMW so tenant.ShopID is resolved.
+//
+// Same two dimensions as the auth endpoints, no new machinery: shop+IP broad,
+// shop+IP+email tight (peekEmail finds the address because the guest checkout
+// body carries `email` at the top level, same as register/login). This is the
+// only unauthenticated endpoint that writes business data and holds stock, so
+// it gets its own thresholds rather than borrowing register's.
+//
+// Deliberately no per-key dimension: publishable keys are many-to-one with
+// shops, so a per-key quota would let a merchant self-serve more quota by
+// minting keys (change storefront-client-auth, design D9).
+func NewGuestCheckoutRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig) func(http.Handler) http.Handler {
+	return newAuthRateLimitMW(l, []rateLimitRule{
+		shopIPRule("guest_checkout", cfg.GuestCheckoutBroadLimit, cfg.GuestCheckoutBroadWindow),
+		shopIPEmailRule("guest_checkout", cfg.GuestCheckoutTightLimit, cfg.GuestCheckoutTightWindow),
+	})
+}
+
 // NewMemberRefreshRateLimit builds the rate limit middleware for
 // POST /api/v1/shop/auth/refresh. MUST run after TenantMW (design D2:
 // shop+IP-only).

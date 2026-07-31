@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -496,5 +497,121 @@ func TestCartCrossMemberAndCrossShopIsolation(t *testing.T) {
 	_, b1Cart := e.callJSON(t, e.memberB1, e.shopB, e.shopBDomain, "GET", "/api/v1/shop/cart", nil)
 	if itemsB, _ := b1Cart["items"].([]any); len(itemsB) != 0 {
 		t.Fatalf("shop B member must not see shop A cart data: %+v", itemsB)
+	}
+}
+
+// ── cart.Service.ReplaceItems (change guest-checkout, design D7) ────────
+//
+// ReplaceItems has no HTTP route of its own — guest checkout is its only
+// caller — so it is exercised at the service level here, next to the AddItem
+// semantics it mirrors.
+
+func (e *cartEnv) cartService() *cart.Service { return &cart.Service{Client: e.client} }
+
+func TestReplaceItemsSwapsContentsAtomically(t *testing.T) {
+	e := newCartEnv(t)
+	ctx := context.Background()
+	svc := e.cartService()
+	_, oldSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, true)
+	_, newSKU := e.newSKU(t, e.shopA, 900, "TWD", 10, true, true)
+
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, oldSKU, 3); err != nil {
+		t.Fatal(err)
+	}
+	view, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, []cart.ItemInput{{SKUID: newSKU, Quantity: 2}})
+	if err != nil {
+		t.Fatalf("ReplaceItems: %v", err)
+	}
+	if len(view.Items) != 1 || *view.Items[0].SKUID != newSKU || view.Items[0].Quantity != 2 {
+		t.Fatalf("cart must hold exactly the replacement line, got %+v", view.Items)
+	}
+	if view.Subtotal != 1800 {
+		t.Fatalf("want subtotal 1800, got %d", view.Subtotal)
+	}
+}
+
+func TestReplaceItemsAccumulatesDuplicateSKUs(t *testing.T) {
+	e := newCartEnv(t)
+	ctx := context.Background()
+	svc := e.cartService()
+	_, skuID := e.newSKU(t, e.shopA, 100, "TWD", 10, true, true)
+
+	view, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, []cart.ItemInput{
+		{SKUID: skuID, Quantity: 2},
+		{SKUID: skuID, Quantity: 3},
+	})
+	if err != nil {
+		t.Fatalf("ReplaceItems: %v", err)
+	}
+	if len(view.Items) != 1 || view.Items[0].Quantity != 5 {
+		t.Fatalf("duplicate SKUs must accumulate onto one line (AddItem semantics), got %+v", view.Items)
+	}
+}
+
+func TestReplaceItemsRejectsAndLeavesCartUntouched(t *testing.T) {
+	e := newCartEnv(t)
+	ctx := context.Background()
+	svc := e.cartService()
+	_, keptSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, true)
+	_, foreignSKU := e.newSKU(t, e.shopB, 500, "TWD", 10, true, true)
+	_, inactiveSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, false, true)
+	_, draftSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, false)
+	_, thinSKU := e.newSKU(t, e.shopA, 500, "TWD", 1, true, true)
+	_, usdSKU := e.newSKU(t, e.shopA, 500, "USD", 10, true, true)
+
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, keptSKU, 4); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name  string
+		lines []cart.ItemInput
+	}{
+		{"empty", nil},
+		{"zero quantity", []cart.ItemInput{{SKUID: keptSKU, Quantity: 0}}},
+		{"foreign shop sku", []cart.ItemInput{{SKUID: keptSKU, Quantity: 1}, {SKUID: foreignSKU, Quantity: 1}}},
+		{"inactive sku", []cart.ItemInput{{SKUID: inactiveSKU, Quantity: 1}}},
+		{"unpublished product", []cart.ItemInput{{SKUID: draftSKU, Quantity: 1}}},
+		{"beyond stock", []cart.ItemInput{{SKUID: thinSKU, Quantity: 2}}},
+		{"accumulated beyond stock", []cart.ItemInput{{SKUID: thinSKU, Quantity: 1}, {SKUID: thinSKU, Quantity: 1}}},
+		{"mixed currency", []cart.ItemInput{{SKUID: keptSKU, Quantity: 1}, {SKUID: usdSKU, Quantity: 1}}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, tc.lines)
+			var ve *cart.ValidationError
+			if !errors.As(err, &ve) {
+				t.Fatalf("want *cart.ValidationError, got %v", err)
+			}
+			view, err := svc.GetCartView(ctx, e.shopA, e.memberA1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(view.Items) != 1 || *view.Items[0].SKUID != keptSKU || view.Items[0].Quantity != 4 {
+				t.Fatalf("a rejected replace must leave the cart exactly as it was, got %+v", view.Items)
+			}
+		})
+	}
+}
+
+// A cart's currency is locked by its contents, so emptying it must release the
+// lock — otherwise a shop selling in two currencies could never replace a TWD
+// cart with a USD one.
+func TestReplaceItemsRelocksCurrency(t *testing.T) {
+	e := newCartEnv(t)
+	ctx := context.Background()
+	svc := e.cartService()
+	_, twdSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, true)
+	_, usdSKU := e.newSKU(t, e.shopA, 500, "USD", 10, true, true)
+
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, twdSKU, 1); err != nil {
+		t.Fatal(err)
+	}
+	view, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, []cart.ItemInput{{SKUID: usdSKU, Quantity: 1}})
+	if err != nil {
+		t.Fatalf("ReplaceItems across currencies: %v", err)
+	}
+	if view.Currency != "USD" {
+		t.Fatalf("want the cart relocked to USD, got %q", view.Currency)
 	}
 }

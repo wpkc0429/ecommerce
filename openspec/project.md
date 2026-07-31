@@ -51,8 +51,9 @@
 - PostgreSQL 15+ 才有 UNIQUE NULLS NOT DISTINCT（環境鎖定 PG16）
 - Redis 僅作 cache：所有快取路徑皆有 DB fallback，Redis 故障是 degrade 不是 down
 - jsonb 不保留物件鍵順序：schema 驅動表單的欄位順序非撰寫順序（如需固定順序需另訂 x-editor 排序約定）
-- `members.email/phone` 唯一性以商家為界（`UNIQUE(shop_id, email/phone)`，change member-identity-per-shop），註冊/登入回應不得洩漏該 email 是否為本店顧客
+- `members.email/phone` 唯一性以商家為界（`UNIQUE(shop_id, email/phone)`，change member-identity-per-shop），註冊/登入的**失敗**回應不得洩漏原因；可由回應區分的邊界是「該 email 於本店是否已設定密碼」（change guest-checkout design D5）
 - publishable key 是公開識別碼不是憑證：明文儲存、可完整顯示、MUST NOT 作為授權依據（change storefront-client-auth design D1）
+- 扣庫存只有一份實作：任何下單入口 MUST 呼叫 `order.Service.Checkout`（change guest-checkout design D1）；訂單存取 token（`aud=order:{shop_id}`）只能觸及它指名的那一筆訂單，MUST NOT 演化成 session
 
 ## External Dependencies
 

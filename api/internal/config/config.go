@@ -26,6 +26,14 @@ type Config struct {
 	RefreshTokenTTL time.Duration
 	PreviewTokenTTL time.Duration
 
+	// OrderAccessTokenTTL bounds how long a guest's order access token stays
+	// usable (change guest-checkout, design D3). Its lower bound is the payment
+	// round trip, its upper bound is "this is an unrevocable bearer value" —
+	// 24h covers "place the order, come back later today" and expires the next
+	// day. Long-term access is not this token's job: registering with the same
+	// email claims the identity the order is already bound to.
+	OrderAccessTokenTTL time.Duration
+
 	// PaymentMockWebhookSecret keys the mock payment provider's HMAC-SHA256
 	// webhook signature (change payment-integration, design D2/D9). Unlike
 	// the JWT secrets, this is NOT required to be set in production — the
@@ -62,6 +70,18 @@ type RateLimitConfig struct {
 
 	RefreshLimit  int
 	RefreshWindow time.Duration
+
+	// Guest checkout (change guest-checkout, design D9) gets its own pair
+	// rather than borrowing Register's: it is the only unauthenticated endpoint
+	// that writes business data and holds stock, so it needs its own dial. The
+	// broad rule stays generous because CGNAT and corporate egress routinely
+	// put many real buyers behind one IP, and a false 429 here loses a sale;
+	// the tight (per-email) rule is what actually bounds "mass-create orders
+	// under one address" and "probe for addresses".
+	GuestCheckoutBroadLimit  int
+	GuestCheckoutBroadWindow time.Duration
+	GuestCheckoutTightLimit  int
+	GuestCheckoutTightWindow time.Duration
 }
 
 // Load reads configuration from the environment. A .env file (searched in the
@@ -100,6 +120,9 @@ func Load() (*Config, error) {
 	if cfg.PreviewTokenTTL, err = parseDuration("PREVIEW_TOKEN_TTL", 10*time.Minute); err != nil {
 		return nil, err
 	}
+	if cfg.OrderAccessTokenTTL, err = parseDuration("ORDER_ACCESS_TOKEN_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
 
 	// Rate limiting (design auth-rate-limiting D2/D4): sane defaults, no
 	// production-only requirement (unlike the JWT secrets) — thresholds are
@@ -132,6 +155,18 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.RateLimit.RefreshWindow, err = parseDuration("RATE_LIMIT_REFRESH_WINDOW", 5*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.GuestCheckoutBroadLimit, err = parseInt("RATE_LIMIT_GUEST_CHECKOUT_BROAD_LIMIT", 20); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.GuestCheckoutBroadWindow, err = parseDuration("RATE_LIMIT_GUEST_CHECKOUT_BROAD_WINDOW", 10*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.GuestCheckoutTightLimit, err = parseInt("RATE_LIMIT_GUEST_CHECKOUT_TIGHT_LIMIT", 5); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.GuestCheckoutTightWindow, err = parseDuration("RATE_LIMIT_GUEST_CHECKOUT_TIGHT_WINDOW", 10*time.Minute); err != nil {
 		return nil, err
 	}
 

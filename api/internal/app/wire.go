@@ -13,6 +13,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
+	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
@@ -64,6 +65,9 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.MemberAuth = &httpapi.MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: a.log}
 	deps.AdminMW = httpapi.NewAdminMiddleware(issuer)
 	deps.MemberMW = httpapi.NewMemberMiddleware(issuer)
+	// change guest-checkout: a third token family (aud=order:{shop}) guarding
+	// only the routes that act on the one order it names.
+	deps.OrderAccessMW = httpapi.NewOrderAccessMiddleware(issuer)
 
 	// Auth endpoint rate limiting (design auth-rate-limiting): reuses the
 	// same Redis client as the render/authz caches — rate limiting is
@@ -74,6 +78,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.MemberLoginRateLimit = httpapi.NewMemberLoginRateLimit(limiter, cfg.RateLimit)
 	deps.MemberRegisterRateLimit = httpapi.NewMemberRegisterRateLimit(limiter, cfg.RateLimit)
 	deps.MemberRefreshRateLimit = httpapi.NewMemberRefreshRateLimit(limiter, cfg.RateLimit)
+	deps.GuestCheckoutRateLimit = httpapi.NewGuestCheckoutRateLimit(limiter, cfg.RateLimit)
 
 	engine := rbac.NewEngine(client, rdb, a.log)
 	authz := &httpapi.AuthzMW{Engine: engine}
@@ -172,6 +177,24 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// member-tiers-and-points HTTP layer (points.Service was already
 	// constructed and subscribed above, alongside the render invalidator).
 	deps.Points = &httpapi.PointsHandler{Client: client, Service: pointsService, Authz: authz, Log: a.log}
+
+	// Guest checkout (change guest-checkout): a coordinator over the services
+	// already constructed above — it creates no state of its own and, in
+	// particular, calls orderService.Checkout rather than reimplementing it
+	// (design D1). The handler additionally reuses paymentService and
+	// shippingService so a guest can pay for and track the one order its access
+	// token names.
+	guestService := &guest.Service{Client: client, Cart: cartService, Orders: orderService}
+	deps.Guest = &httpapi.GuestHandler{
+		Client:   client,
+		Service:  guestService,
+		Orders:   orderService,
+		Payments: paymentService,
+		Shipping: shippingService,
+		Issuer:   issuer,
+		Cfg:      cfg,
+		Log:      a.log,
+	}
 
 	deps.Render = &httpapi.RenderHandler{
 		Resolver:  resolver,

@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
@@ -37,6 +40,8 @@ func rlThresholds() config.RateLimitConfig {
 		RegisterBroadLimit: 10, RegisterBroadWindow: window,
 		RegisterTightLimit: 2, RegisterTightWindow: window,
 		RefreshLimit: 2, RefreshWindow: window,
+		GuestCheckoutBroadLimit: 10, GuestCheckoutBroadWindow: window,
+		GuestCheckoutTightLimit: 2, GuestCheckoutTightWindow: window,
 	}
 }
 
@@ -74,6 +79,17 @@ func newRLEnv(t *testing.T) *rlEnv {
 		MemberLoginRateLimit:    httpapi.NewMemberLoginRateLimit(limiter, cfg),
 		MemberRegisterRateLimit: httpapi.NewMemberRegisterRateLimit(limiter, cfg),
 		MemberRefreshRateLimit:  httpapi.NewMemberRefreshRateLimit(limiter, cfg),
+		// change guest-checkout: the guest handler only needs to exist for the
+		// route to be mounted — the limiter runs before it, so these tests
+		// never depend on real SKUs or shipping data.
+		Guest: &httpapi.GuestHandler{
+			Client:  client,
+			Service: &guest.Service{Client: client, Cart: &cart.Service{Client: client}, Orders: &order.Service{Client: client}},
+			Orders:  &order.Service{Client: client},
+			Issuer:  issuer,
+			Log:     log,
+		},
+		GuestCheckoutRateLimit: httpapi.NewGuestCheckoutRateLimit(limiter, cfg),
 	})
 	return &rlEnv{client: client, router: router, shopA: shopA.ID, shopB: shopB.ID}
 }
@@ -273,5 +289,63 @@ func TestRateLimitBlocksRefreshOverThreshold(t *testing.T) {
 		map[string]string{"refresh_token": refreshToken})
 	if code != http.StatusOK || rotated["refresh_token"] == "" {
 		t.Fatalf("after window elapsed, the still-valid token must rotate successfully: code=%d body=%v", code, rotated)
+	}
+}
+
+// Scenario (guest-checkout/訪客結帳的速率限制): 同一 email 大量建單被限流 —
+// the tight (shop + IP + email) rule bounds "mass-create orders under one
+// address" on the only unauthenticated endpoint that writes business data.
+//
+// The requests never need to be *valid*: the limiter runs ahead of the handler
+// and counts every attempt, which is exactly the property being asserted.
+func TestRateLimitBlocksGuestCheckoutOverThreshold(t *testing.T) {
+	e := newRLEnv(t)
+	ip := "203.0.113.8:5001"
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
+	body := map[string]any{
+		"email":            "bulk@test.dev",
+		"items":            []map[string]any{{"sku_id": 999999, "quantity": 1}},
+		"shipping_address": map[string]any{"recipient_name": "王", "phone": "0912345678", "line1": "地址"},
+	}
+
+	for i := 0; i < 2; i++ { // tight limit is 2
+		code, _, _ := e.do(t, "POST", "/api/v1/shop/guest/checkout", ip, hostA, body)
+		if code == http.StatusTooManyRequests {
+			t.Fatalf("attempt %d: unexpected 429 under threshold", i)
+		}
+	}
+	code, parsed, retryAfter := e.do(t, "POST", "/api/v1/shop/guest/checkout", ip, hostA, body)
+	if code != http.StatusTooManyRequests {
+		t.Fatalf("3rd attempt: want 429, got %d", code)
+	}
+	if retryAfter == "" {
+		t.Fatal("429 response missing Retry-After header")
+	}
+	errObj, ok := parsed["error"].(map[string]any)
+	if !ok || errObj["code"] != "rate_limited" {
+		t.Fatalf("unexpected error body: %v", parsed)
+	}
+}
+
+// Scenario (guest-checkout/訪客結帳的速率限制): 跨商家的訪客結帳限流互不干擾.
+func TestRateLimitGuestCheckoutShopScopeIsolation(t *testing.T) {
+	e := newRLEnv(t)
+	ip := "203.0.113.9:5001"
+	hostA := map[string]string{httpapi.PublishableKeyHeader: keyShopA}
+	hostB := map[string]string{httpapi.PublishableKeyHeader: keyShopB}
+	body := map[string]any{
+		"email":            "shared@test.dev",
+		"items":            []map[string]any{{"sku_id": 999999, "quantity": 1}},
+		"shipping_address": map[string]any{"recipient_name": "王", "phone": "0912345678", "line1": "地址"},
+	}
+
+	for i := 0; i < 3; i++ {
+		e.do(t, "POST", "/api/v1/shop/guest/checkout", ip, hostA, body)
+	}
+	if code, _, _ := e.do(t, "POST", "/api/v1/shop/guest/checkout", ip, hostA, body); code != http.StatusTooManyRequests {
+		t.Fatalf("shop A must be exhausted, got %d", code)
+	}
+	if code, _, _ := e.do(t, "POST", "/api/v1/shop/guest/checkout", ip, hostB, body); code == http.StatusTooManyRequests {
+		t.Fatal("shop B must not be blocked by shop A's exhausted quota")
 	}
 }

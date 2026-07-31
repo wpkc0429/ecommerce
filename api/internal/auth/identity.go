@@ -33,3 +33,23 @@ func MemberFrom(ctx context.Context) (int, bool) {
 	id, ok := ctx.Value(memberKey{}).(int)
 	return id, ok
 }
+
+type orderAccessKey struct{}
+
+// WithOrderAccess attaches the order id named by a verified order access token
+// (change guest-checkout, design D4).
+//
+// Deliberately a separate context key from memberKey: an order access token
+// MUST NOT satisfy anything that asks for a member identity. Should a guest
+// route ever be mis-mounted under the member group, memberFrom simply misses
+// and the handler answers 401 rather than treating an order id as a member id.
+func WithOrderAccess(ctx context.Context, orderID int) context.Context {
+	return context.WithValue(ctx, orderAccessKey{}, orderID)
+}
+
+// OrderAccessFrom returns the order id named by the verified order access
+// token, if any.
+func OrderAccessFrom(ctx context.Context) (int, bool) {
+	id, ok := ctx.Value(orderAccessKey{}).(int)
+	return id, ok
+}

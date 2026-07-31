@@ -272,6 +272,142 @@ func (s *Service) AddItem(ctx context.Context, shopID, memberID, skuID int, quan
 	return s.GetCartView(ctx, shopID, memberID)
 }
 
+// ItemInput is one requested line of ReplaceItems.
+type ItemInput struct {
+	SKUID    int   `json:"sku_id"`
+	Quantity int32 `json:"quantity"`
+}
+
+// ReplaceItems atomically replaces the member's active cart contents with
+// lines (change guest-checkout, design D7): one ent.Tx that finds-or-creates
+// the active cart, deletes every existing line, then validates and writes the
+// requested ones. Any failure rolls the whole thing back — the cart is left
+// byte-for-byte as it was, never half-populated.
+//
+// Why replace and not merge: the sole caller (guest checkout) submits the
+// complete order contents in one request, so merging would bill the customer
+// for items this order never selected.
+//
+// Why a dedicated method and not ClearCart + N × AddItem: those are N+1
+// separate transactions, so a validation failure on line 3 would leave a
+// cleared cart holding lines 1-2. For an identity that was later claimed and
+// is shopping on another device, that is silent data loss.
+//
+// Validation mirrors AddItem exactly (SKU belongs to the shop, is active, its
+// product is published, currency matches the cart's locked currency, quantity
+// > 0 and within current stock); repeated sku_ids accumulate, same as calling
+// AddItem twice. The stock check here is advisory, exactly as in AddItem — the
+// authoritative one is checkout's atomic conditional decrement.
+//
+// No HTTP endpoint exposes this: guest checkout is its only caller, and a
+// member-facing batch route would be a public contract with no consumer.
+func (s *Service) ReplaceItems(ctx context.Context, shopID, memberID int, lines []ItemInput) (*CartView, error) {
+	if len(lines) == 0 {
+		return nil, validationErr("/items", "at least one item is required")
+	}
+
+	// Collapse duplicate SKUs first so each SKU is validated once against the
+	// total quantity actually being requested (mirrors AddItem's accumulate).
+	skuOrder := make([]int, 0, len(lines))
+	wanted := make(map[int]int32, len(lines))
+	for i, l := range lines {
+		if l.Quantity <= 0 {
+			return nil, validationErr(fmt.Sprintf("/items/%d/quantity", i), "quantity must be greater than zero")
+		}
+		if _, seen := wanted[l.SKUID]; !seen {
+			skuOrder = append(skuOrder, l.SKUID)
+		}
+		wanted[l.SKUID] += l.Quantity
+	}
+
+	// Resolve and validate every SKU before touching the cart: nothing is
+	// written until the whole request is known to be satisfiable.
+	skus := make(map[int]*ent.ProductSKU, len(skuOrder))
+	var currency string
+	for i, skuID := range skuOrder {
+		sku, err := s.Client.ProductSKU.Query().
+			Where(entproductsku.IDEQ(skuID), entproductsku.ShopIDEQ(shopID)).
+			WithProduct().
+			Only(ctx)
+		pointer := fmt.Sprintf("/items/%d/sku_id", i)
+		switch {
+		case ent.IsNotFound(err):
+			return nil, validationErr(pointer, "sku does not exist in this shop")
+		case err != nil:
+			return nil, fmt.Errorf("cart: query sku: %w", err)
+		case !sku.IsActive:
+			return nil, validationErr(pointer, "sku is not active")
+		case sku.Edges.Product == nil || sku.Edges.Product.Status != 1:
+			return nil, validationErr(pointer, "product is not published")
+		case sku.StockQty < wanted[skuID]:
+			return nil, validationErr(fmt.Sprintf("/items/%d/quantity", i), "quantity exceeds available stock")
+		}
+		// One cart, one currency (design D4). The first line sets it; a
+		// mismatch is a client error, not something to silently coerce.
+		if currency == "" {
+			currency = sku.Currency
+		} else if sku.Currency != currency {
+			return nil, &ValidationError{
+				Message: "items must share a single currency",
+				Details: []Detail{{Pointer: pointer, Message: fmt.Sprintf("expected %s, sku currency is %s", currency, sku.Currency)}},
+			}
+		}
+		skus[skuID] = sku
+	}
+
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cart: begin tx: %w", err)
+	}
+
+	c, err := tx.Cart.Query().
+		Where(entcart.ShopIDEQ(shopID), entcart.MemberIDEQ(memberID), entcart.StatusEQ(StatusActive)).
+		Only(ctx)
+	switch {
+	case ent.IsNotFound(err):
+		c, err = tx.Cart.Create().
+			SetShopID(shopID).SetMemberID(memberID).SetStatus(StatusActive).SetCurrency(currency).
+			Save(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, fmt.Errorf("cart: create cart: %w", err)
+		}
+	case err != nil:
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("cart: query active cart: %w", err)
+	default:
+		// Emptying the cart also releases its locked currency (design D4): the
+		// replacement set defines it, exactly as the first AddItem would for a
+		// brand-new cart.
+		if _, err := tx.CartItem.Delete().Where(entcartitem.CartIDEQ(c.ID)).Exec(ctx); err != nil {
+			_ = tx.Rollback()
+			return nil, fmt.Errorf("cart: clear cart for replace: %w", err)
+		}
+		if c.Currency != currency {
+			if _, err := c.Update().SetCurrency(currency).Save(ctx); err != nil {
+				_ = tx.Rollback()
+				return nil, fmt.Errorf("cart: relock cart currency: %w", err)
+			}
+		}
+	}
+
+	for _, skuID := range skuOrder {
+		sku := skus[skuID]
+		if _, err := tx.CartItem.Create().
+			SetShopID(shopID).SetCartID(c.ID).SetSkuID(skuID).
+			SetQuantity(wanted[skuID]).SetPriceAmount(sku.PriceAmount).SetCurrency(sku.Currency).
+			Save(ctx); err != nil {
+			_ = tx.Rollback()
+			return nil, fmt.Errorf("cart: create item: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("cart: commit replace items: %w", err)
+	}
+	return s.GetCartView(ctx, shopID, memberID)
+}
+
 // ownedItem loads a cart item scoped to shopID and verifies it belongs to a
 // cart owned by memberID, returning ErrNotFound (not a permission error) on
 // any mismatch so the handler's 404 does not confirm or deny another

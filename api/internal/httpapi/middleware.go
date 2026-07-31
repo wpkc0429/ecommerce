@@ -129,6 +129,35 @@ func NewMemberMiddleware(issuer *auth.TokenIssuer) func(http.Handler) http.Handl
 	}
 }
 
+// NewOrderAccessMiddleware authenticates the guest order routes with an order
+// access token (change guest-checkout, design D3/D4). Like the member
+// middleware it requires the tenant middleware to have resolved the shop first:
+// the token audience must equal order:{resolved shop}, so a token minted by one
+// shop is inert at another.
+//
+// It puts only the order id the token names into the context — never a member
+// id. Whatever this token can reach is therefore limited to that single order
+// by construction, and a member-only handler reached with one of these tokens
+// finds no member identity and answers 401.
+func NewOrderAccessMiddleware(issuer *auth.TokenIssuer) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			shopID, ok := tenant.ShopID(r.Context())
+			if !ok {
+				httpx.Unauthorized(w)
+				return
+			}
+			orderID, err := issuer.VerifyOrderAccess(bearerToken(r), shopID)
+			if err != nil {
+				httpx.Unauthorized(w)
+				return
+			}
+			ctx := auth.WithOrderAccess(r.Context(), orderID)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 // requestLogger emits one structured line per request.
 func requestLogger(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {

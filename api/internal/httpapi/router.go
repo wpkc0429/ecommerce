@@ -37,10 +37,12 @@ type Deps struct {
 	Shipping   *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
 	Points     *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
 	ClientAuth *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
+	Guest      *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
 
-	AdminMW  func(http.Handler) http.Handler // admin JWT authentication
-	TenantMW func(http.Handler) http.Handler // storefront tenant resolution
-	MemberMW func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
+	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
+	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
+	MemberMW      func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
+	OrderAccessMW func(http.Handler) http.Handler // order access token auth (requires TenantMW)
 
 	// CORSOrigins resolves per-shop registered browser origins (change
 	// storefront-client-auth). nil → only Cfg.CORSAllowedOrigins applies,
@@ -55,6 +57,7 @@ type Deps struct {
 	MemberLoginRateLimit    func(http.Handler) http.Handler
 	MemberRegisterRateLimit func(http.Handler) http.Handler
 	MemberRefreshRateLimit  func(http.Handler) http.Handler
+	GuestCheckoutRateLimit  func(http.Handler) http.Handler
 }
 
 // New assembles the full router.
@@ -193,6 +196,23 @@ func New(d Deps) http.Handler {
 						}
 						if d.Points != nil {
 							d.Points.MountShop(mr)
+						}
+					})
+				}
+				// change guest-checkout: an unauthenticated checkout plus the
+				// routes an order access token can reach. Mounted inside the
+				// tenant-resolved group but deliberately OUTSIDE MemberMW —
+				// these callers have no member identity, and the token-guarded
+				// routes carry their own middleware whose context value is not
+				// the one member handlers read (design D4).
+				if d.Guest != nil {
+					sr.Route("/guest", func(gr chi.Router) {
+						d.Guest.MountShop(gr, d.GuestCheckoutRateLimit)
+						if d.OrderAccessMW != nil {
+							gr.Group(func(tr chi.Router) {
+								tr.Use(d.OrderAccessMW)
+								d.Guest.MountOrderAccess(tr)
+							})
 						}
 					})
 				}

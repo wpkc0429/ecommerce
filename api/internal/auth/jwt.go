@@ -12,11 +12,27 @@ import (
 // Two fully isolated JWT systems (design D9): admin tokens (aud=admin) and
 // member tokens (aud=shop:{id}) are signed with different secrets, so a token
 // from one system can never validate in the other.
+//
+// Each system carries a second, narrower token family that reuses its secret
+// but takes a disjoint audience, so the jwt library rejects cross-family use
+// during verification rather than leaving it to a handler-side check:
+//
+//	admin secret  → aud=admin           back-office access token
+//	              → aud=preview         page preview (short-lived, one page)
+//	member secret → aud=shop:{id}       member access token
+//	              → aud=order:{id}      order access token (change
+//	                                    guest-checkout: short-lived, one order,
+//	                                    not a session — no refresh, no history)
+//
+// Both narrow families bind their target into the claims (preview: shop+slug;
+// order access: the order id in `sub`) and their shop into the audience, so
+// cross-shop reuse fails at audience validation.
 
 const (
 	AdminAudience    = "admin"
 	adminIssuerSfx   = ""
 	memberAudPrefix  = "shop:"
+	orderAudPrefix   = "order:"
 	minSecretEntropy = 8 // sanity floor; production secrets are validated in config
 )
 
@@ -184,4 +200,65 @@ func (ti *TokenIssuer) VerifyMember(token string, shopID int) (int, error) {
 		return 0, ErrInvalidToken
 	}
 	return mid, nil
+}
+
+// OrderAccessClaims bind a short-lived order access token to exactly one order
+// (change guest-checkout, design D3): sub = order id, aud = order:{shop_id}.
+// Signed with the member secret because this is a storefront customer-facing
+// token, but its audience makes it unusable as a member access token (and vice
+// versa) — VerifyMember demands aud=shop:{id}.
+//
+// This is deliberately NOT a session: there is no refresh counterpart, it
+// cannot list order history, cannot touch the identity's credentials, points or
+// any other order. ShopID is redundant with the audience and kept as defense in
+// depth plus log readability.
+type OrderAccessClaims struct {
+	ShopID int `json:"shop_id"`
+	jwt.RegisteredClaims
+}
+
+// OrderAud renders the audience of an order access token for a shop.
+func OrderAud(shopID int) string { return orderAudPrefix + strconv.Itoa(shopID) }
+
+// IssueOrderAccess signs an order access token naming exactly one order. ttl is
+// supplied by the caller (config.OrderAccessTokenTTL) rather than reusing
+// accessTTL — this token's lifetime is a product decision about how long a
+// guest's confirmation page stays usable, not a session length (mirrors
+// IssuePreview's parameterized ttl).
+func (ti *TokenIssuer) IssueOrderAccess(orderID, shopID int, ttl time.Duration) (string, error) {
+	now := ti.now()
+	claims := OrderAccessClaims{
+		ShopID: shopID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   strconv.Itoa(orderID),
+			Issuer:    ti.issuer,
+			Audience:  jwt.ClaimStrings{OrderAud(shopID)},
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(ti.memberSecret)
+}
+
+// VerifyOrderAccess validates an order access token against the expected shop
+// context and returns the order id it names. Any audience mismatch (cross-shop
+// reuse, or a member/admin/preview token) fails.
+func (ti *TokenIssuer) VerifyOrderAccess(token string, shopID int) (int, error) {
+	claims := &OrderAccessClaims{}
+	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+		return ti.memberSecret, nil
+	},
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithIssuer(ti.issuer),
+		jwt.WithAudience(OrderAud(shopID)),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil || !parsed.Valid {
+		return 0, ErrInvalidToken
+	}
+	oid, err := strconv.Atoi(claims.Subject)
+	if err != nil || oid <= 0 || claims.ShopID != shopID {
+		return 0, ErrInvalidToken
+	}
+	return oid, nil
 }

@@ -89,6 +89,10 @@ const FulfillmentStatusUnfulfilled int16 = 0
 // (same convention as Product.meta/ProductSKU.options) — this struct is the
 // only place the shape is defined; shipping-logistics may add further
 // *optional* fields to it later without invalidating existing rows.
+//
+// Every key except line2 is always serialized, including the optional ones, so
+// the stored shape and the API response shape stay stable whether or not the
+// merchant's form collects them (change guest-checkout, design D8).
 type ShippingAddress struct {
 	RecipientName string `json:"recipient_name"`
 	Phone         string `json:"phone"`
@@ -99,9 +103,21 @@ type ShippingAddress struct {
 	Country       string `json:"country"`
 }
 
-// validate checks the required subset of ShippingAddress fields (design D8).
-// Line2 is the only optional field.
-func (a ShippingAddress) validate() error {
+// Validate checks the required subset of ShippingAddress fields.
+//
+// Required: recipient_name, phone, line1 — the minimum that is meaningful
+// everywhere. city/postal_code/country are optional (change guest-checkout,
+// design D8): no code in this API reads them, address structure differs by
+// locale (a Taiwanese single-line address already contains the city), and
+// demanding country:"TW" from a single-country florist produces ceremony, not
+// validation. Relaxing is safe for v1 — every request that used to be accepted
+// still is, byte for byte.
+//
+// When a later capability genuinely needs a structured city or postal code
+// (shipping zones, say), it defines when it is required — rather than the
+// platform teaching every merchant to fill these with placeholder values,
+// which would leave them worthless precisely when they start to matter.
+func (a ShippingAddress) Validate() error {
 	var details []Detail
 	require := func(v, field string) {
 		if v == "" {
@@ -111,9 +127,6 @@ func (a ShippingAddress) validate() error {
 	require(a.RecipientName, "recipient_name")
 	require(a.Phone, "phone")
 	require(a.Line1, "line1")
-	require(a.City, "city")
-	require(a.PostalCode, "postal_code")
-	require(a.Country, "country")
 	if len(details) > 0 {
 		return &ValidationError{Message: "shipping address is incomplete", Details: details}
 	}
@@ -132,7 +145,14 @@ type Service struct {
 // ── checkout ────────────────────────────────────────────────────────────
 
 // Checkout converts the member's active cart into an order (design D3), all
-// within a single ent.Tx:
+// within a single ent.Tx. It is the *only* implementation of order creation
+// and stock deduction in this API: every entry point that places an order —
+// member self-service checkout, guest checkout (change guest-checkout, design
+// D1), and anything added later — MUST call this method rather than reproduce
+// its logic. New entry points differ only in how they obtain the customer
+// identity and the cart contents.
+//
+// Steps:
 //  1. load the active cart with items/sku/product eagerly fetched
 //  2. reject an empty or missing cart
 //  3. validate every item's purchasability (sku exists, active, product
@@ -149,7 +169,7 @@ type Service struct {
 // Any failure at any step rolls back the whole transaction — no partial
 // stock deduction, no orphaned order, no converted cart left behind.
 func (s *Service) Checkout(ctx context.Context, shopID, memberID int, addr ShippingAddress) (*ent.Order, error) {
-	if err := addr.validate(); err != nil {
+	if err := addr.Validate(); err != nil {
 		return nil, err
 	}
 
