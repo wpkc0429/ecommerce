@@ -1,0 +1,384 @@
+# v1 表面鎖 — 每一行是 /api/v1 已對外做出的一個承諾。
+#
+# 產生方式：cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface
+#
+# 檢查規則（internal/httpapi/openapi_contract_test.go）：本檔的每一行都必須仍存在於
+# api/openapi/openapi.yaml 中。**新增自由，刪除必須手動刪掉這裡的那一行。**
+#
+# 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉：
+# 後續的破壞性變更 MUST 改走新端點或 /api/v2，MUST NOT 再引用「尚無外部消費者」。
+#
+# 行的兩種形式：
+#   METHOD /path            一條公開路由
+#   SchemaName.property     一個具名 component schema 的屬性
+AllowedOrigin.created_at
+AllowedOrigin.id
+AllowedOrigin.origin
+Cart.currency
+Cart.id
+Cart.item_count
+Cart.items
+Cart.status
+Cart.subtotal
+Cart.total
+CartItem.currency
+CartItem.gift_message
+CartItem.id
+CartItem.line_total
+CartItem.price_amount
+CartItem.purchasable
+CartItem.quantity
+CartItem.sku_code
+CartItem.sku_id
+CartItem.unavailable_reason
+Category.id
+Category.name
+Category.parent_id
+Category.position
+Category.shop_id
+Category.slug
+Category.updated_at
+CategoryNode.children
+CategoryNode.id
+CategoryNode.name
+CategoryNode.parent_id
+CategoryNode.position
+CategoryNode.slug
+DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID}
+DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID}
+DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+DELETE /api/v1/admin/shops/{shopID}/pages/{pageID}
+DELETE /api/v1/admin/shops/{shopID}/products/{productID}
+DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID}
+DELETE /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID}
+DELETE /api/v1/admin/sites/{siteID}
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID}
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID}
+DELETE /api/v1/admin/users/{userID}/roles/{roleID}
+DELETE /api/v1/shop/cart/items
+DELETE /api/v1/shop/cart/items/{itemID}
+Error.error
+GET /api/v1/admin/me
+GET /api/v1/admin/permissions
+GET /api/v1/admin/roles
+GET /api/v1/admin/shops
+GET /api/v1/admin/shops/{shopID}
+GET /api/v1/admin/shops/{shopID}/allowed-origins
+GET /api/v1/admin/shops/{shopID}/categories
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID}
+GET /api/v1/admin/shops/{shopID}/content
+GET /api/v1/admin/shops/{shopID}/member-tiers
+GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions
+GET /api/v1/admin/shops/{shopID}/orders
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/payments
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments
+GET /api/v1/admin/shops/{shopID}/page-types
+GET /api/v1/admin/shops/{shopID}/pages
+GET /api/v1/admin/shops/{shopID}/pages/{pageID}
+GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token
+GET /api/v1/admin/shops/{shopID}/products
+GET /api/v1/admin/shops/{shopID}/products/{productID}
+GET /api/v1/admin/shops/{shopID}/publishable-keys
+GET /api/v1/admin/shops/{shopID}/roles
+GET /api/v1/admin/shops/{shopID}/shipping-methods
+GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+GET /api/v1/admin/shops/{shopID}/theme/precheck
+GET /api/v1/admin/shops/{shopID}/themes
+GET /api/v1/admin/shops/{shopID}/users
+GET /api/v1/admin/sites
+GET /api/v1/admin/themes
+GET /api/v1/admin/themes/{themeID}
+GET /api/v1/render/page
+GET /api/v1/render/preview
+GET /api/v1/shop/cart
+GET /api/v1/shop/guest/order
+GET /api/v1/shop/guest/order/shipment
+GET /api/v1/shop/me
+GET /api/v1/shop/orders
+GET /api/v1/shop/orders/{orderID}
+GET /api/v1/shop/orders/{orderID}/shipment
+GET /api/v1/shop/points
+GET /api/v1/shop/points/transactions
+GET /api/v1/shop/products
+GET /api/v1/shop/products/{slug}
+GET /api/v1/shop/shipping-methods
+GET /healthz
+GuestCheckoutItem.gift_message
+GuestCheckoutItem.quantity
+GuestCheckoutItem.sku_id
+GuestCheckoutRequest.email
+GuestCheckoutRequest.items
+GuestCheckoutRequest.requested_delivery_date
+GuestCheckoutRequest.shipping_address
+GuestCheckoutRequest.shipping_method_id
+GuestCheckoutResult.expires_in
+GuestCheckoutResult.order
+GuestCheckoutResult.order_access_token
+GuestCheckoutResult.token_type
+HealthStatus.status
+MemberCheckoutRequest.city
+MemberCheckoutRequest.country
+MemberCheckoutRequest.line1
+MemberCheckoutRequest.line2
+MemberCheckoutRequest.phone
+MemberCheckoutRequest.postal_code
+MemberCheckoutRequest.recipient_name
+MemberCheckoutRequest.requested_delivery_date
+MemberCheckoutRequest.shipping_method_id
+MemberPoints.level
+MemberPoints.level_id
+MemberPoints.member_id
+MemberPoints.points
+MemberPoints.shop_id
+MemberTier.created_at
+MemberTier.discount_percent
+MemberTier.id
+MemberTier.min_points
+MemberTier.name
+MemberTier.shop_id
+MemberTier.updated_at
+Order.cancelled_at
+Order.created_at
+Order.currency
+Order.fulfillment_status
+Order.id
+Order.items
+Order.member_id
+Order.payment_status
+Order.requested_delivery_date
+Order.shipping_address
+Order.shipping_fee
+Order.shipping_method_id
+Order.shipping_method_name
+Order.shop_id
+Order.status
+Order.subtotal_amount
+Order.total_amount
+Order.updated_at
+OrderItem.currency
+OrderItem.gift_message
+OrderItem.id
+OrderItem.line_total
+OrderItem.price_amount
+OrderItem.product_id
+OrderItem.product_title
+OrderItem.quantity
+OrderItem.sku_code
+OrderItem.sku_id
+OrderPage.orders
+OrderPage.page
+OrderPage.page_size
+OrderPage.total
+POST /api/v1/admin/auth/login
+POST /api/v1/admin/auth/logout
+POST /api/v1/admin/auth/refresh
+POST /api/v1/admin/permissions
+POST /api/v1/admin/roles
+POST /api/v1/admin/shops
+POST /api/v1/admin/shops/{shopID}/allowed-origins
+POST /api/v1/admin/shops/{shopID}/categories
+POST /api/v1/admin/shops/{shopID}/member-tiers
+POST /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/cancel
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments
+POST /api/v1/admin/shops/{shopID}/pages
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/publish
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish
+POST /api/v1/admin/shops/{shopID}/products
+POST /api/v1/admin/shops/{shopID}/publishable-keys
+POST /api/v1/admin/shops/{shopID}/shipping-methods
+POST /api/v1/admin/shops/{shopID}/theme
+POST /api/v1/admin/shops/{shopID}/users/{userID}/roles
+POST /api/v1/admin/sites
+POST /api/v1/admin/sites/{siteID}/shops
+POST /api/v1/admin/themes
+POST /api/v1/admin/themes/{themeID}/pages
+POST /api/v1/admin/users/{userID}/roles
+POST /api/v1/shop/auth/login
+POST /api/v1/shop/auth/logout
+POST /api/v1/shop/auth/refresh
+POST /api/v1/shop/auth/register
+POST /api/v1/shop/cart/items
+POST /api/v1/shop/checkout
+POST /api/v1/shop/guest/checkout
+POST /api/v1/shop/guest/order/payments
+POST /api/v1/shop/orders/{orderID}/cancel
+POST /api/v1/shop/orders/{orderID}/payments
+POST /api/v1/webhooks/payments/{provider}
+PUT /api/v1/admin/roles/{roleID}/permissions
+PUT /api/v1/admin/shops/{shopID}
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}
+PUT /api/v1/admin/shops/{shopID}/content
+PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+PUT /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID}
+PUT /api/v1/admin/shops/{shopID}/pages/{pageID}
+PUT /api/v1/admin/shops/{shopID}/products/{productID}
+PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID}
+PUT /api/v1/admin/themes/{themeID}
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID}
+PUT /api/v1/shop/cart/items/{itemID}
+Page.content_json
+Page.id
+Page.incompatible
+Page.meta
+Page.page_schema
+Page.published_json
+Page.slug
+Page.status
+Page.title
+Page.type_key
+Page.updated_at
+PageListEntry.id
+PageListEntry.incompatible
+PageListEntry.slug
+PageListEntry.status
+PageListEntry.title
+PageListEntry.type_key
+PageListEntry.updated_at
+Payment.amount
+Payment.created_at
+Payment.currency
+Payment.id
+Payment.order_id
+Payment.provider
+Payment.provider_reference
+Payment.status
+Payment.updated_at
+PaymentInitiateResult.amount
+PaymentInitiateResult.created_at
+PaymentInitiateResult.currency
+PaymentInitiateResult.id
+PaymentInitiateResult.order_id
+PaymentInitiateResult.provider
+PaymentInitiateResult.provider_reference
+PaymentInitiateResult.redirect_url
+PaymentInitiateResult.status
+PaymentInitiateResult.updated_at
+Permission.description
+Permission.id
+Permission.name
+PointTransaction.created_at
+PointTransaction.id
+PointTransaction.kind
+PointTransaction.member_id
+PointTransaction.order_id
+PointTransaction.points_delta
+PointTransaction.reason
+PointTransactionPage.page
+PointTransactionPage.page_size
+PointTransactionPage.total
+PointTransactionPage.transactions
+Product.category_ids
+Product.description
+Product.id
+Product.meta
+Product.shop_id
+Product.skus
+Product.slug
+Product.status
+Product.title
+Product.updated_at
+ProductPage.page
+ProductPage.page_size
+ProductPage.products
+ProductPage.total
+ProductSKU.currency
+ProductSKU.id
+ProductSKU.is_active
+ProductSKU.options
+ProductSKU.price_amount
+ProductSKU.sku_code
+ProductSKU.stock_qty
+PublicShippingMethod.carrier
+PublicShippingMethod.flat_rate
+PublicShippingMethod.id
+PublicShippingMethod.name
+PublishableKey.created_at
+PublishableKey.id
+PublishableKey.key
+PublishableKey.label
+PublishableKey.revoked_at
+RenderBundle.page
+RenderBundle.shop
+Role.id
+Role.name
+Role.permissions
+Role.scope
+Shipment.carrier
+Shipment.created_at
+Shipment.delivered_at
+Shipment.id
+Shipment.order_id
+Shipment.shipped_at
+Shipment.status
+Shipment.tracking_number
+Shipment.updated_at
+ShippingAddress.city
+ShippingAddress.country
+ShippingAddress.line1
+ShippingAddress.line2
+ShippingAddress.phone
+ShippingAddress.postal_code
+ShippingAddress.recipient_name
+ShippingAddressInput.city
+ShippingAddressInput.country
+ShippingAddressInput.line1
+ShippingAddressInput.line2
+ShippingAddressInput.phone
+ShippingAddressInput.postal_code
+ShippingAddressInput.recipient_name
+ShippingMethod.carrier
+ShippingMethod.created_at
+ShippingMethod.flat_rate
+ShippingMethod.id
+ShippingMethod.is_active
+ShippingMethod.name
+ShippingMethod.shop_id
+ShippingMethod.updated_at
+Shop.content_json
+Shop.id
+Shop.meta
+Shop.name
+Shop.status
+Shop.theme_id
+Shop.updated_at
+ShopPage.page
+ShopPage.page_size
+ShopPage.shops
+ShopPage.total
+ShopUser.email
+ShopUser.roles
+ShopUser.status
+ShopUser.user_id
+Site.domain
+Site.id
+Site.shops
+Site.ssl_status
+SiteShopBinding.is_primary
+SiteShopBinding.path_prefix
+SiteShopBinding.shop_id
+Theme.code
+Theme.config_schema
+Theme.id
+Theme.is_active
+Theme.layout_key
+Theme.name
+Theme.pages
+ThemePage.component_key
+ThemePage.id
+ThemePage.page_schema
+ThemePage.type_key
+ThemeSummary.code
+ThemeSummary.id
+ThemeSummary.name
+TokenResponse.access_token
+TokenResponse.expires_in
+TokenResponse.refresh_token
+TokenResponse.token_type
+ValidationDetail.message
+ValidationDetail.pointer

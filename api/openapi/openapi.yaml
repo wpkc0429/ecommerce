@@ -1,0 +1,4459 @@
+# 多網站電商 SaaS — /api/v1 契約
+#
+# 這份檔案是手寫的，並由四道自動化檢查守著（design openapi-contract D1/D2）：
+#
+#   1. 路由覆蓋   internal/httpapi/openapi_contract_test.go   chi.Walk 雙向比對
+#   2. 金額單位   同上                                        金額欄位必須 $ref MinorUnitAmount
+#   3. 回應結構   internal/httpapi/openapi_conformance_integration_test.go
+#   4. v1 表面鎖  同 1，比對 api/openapi/v1-surface.txt
+#
+# 全部住在 `go test ./...` 裡，因此自動在 CI 內執行。
+# 改動任何端點時，這個檔案必須同步修改，否則 CI 轉紅。
+openapi: 3.1.0
+
+info:
+  title: 多網站電商 SaaS API
+  version: "1.0.0"
+  summary: 多租戶電商 headless API：CMS 渲染、商品目錄、購物車、訂單、金流、物流、會員點數。
+  description: |
+    本 API 是整個平台唯一的資料權威。`/web`（Next.js SSR storefront）、`/admin`（薄殼 SPA）
+    與任何商家自帶的前端都只是它的消費端。
+
+    ## 版本策略
+
+    公開端點一律掛在 `/api/v1`。**v1 只接受 additive 變更**：新增端點、新增選填請求鍵、
+    新增回應鍵。移除或改名任何已公開的路徑或回應鍵都是破壞性變更，必須改走新端點或 `/api/v2`。
+    這條規則由 `api/openapi/v1-surface.txt` 鎖檔機械化強制。
+
+    消費端請對應地採取寬進策略：**忽略未知的回應鍵**。本文件的回應 schema 標示
+    `additionalProperties: false`，那是為了讓契約測試抓得到「實作多回了一個沒記載的鍵」；
+    它描述的是「截至本版本，回應有這些鍵」，**不是**「未來永遠只會有這些鍵」。
+
+    ## 租戶解析（`/api/v1/shop/**`）
+
+    前台端點不在 URL 裡帶 shop id。伺服器依下列順序解析租戶：
+
+    1. **`X-Publishable-Key`**（優先）— 若標頭存在就用它解析。金鑰未知或已撤銷即回 **404**
+       （`unknown_publishable_key`），**不回退**至 Host。
+    2. **`Host`** — 未帶金鑰時，以請求的 Host 找到該網域綁定的預設商家。
+
+    publishable key **是識別碼，不是憑證**（`pk_` + base32）：它公開、明文儲存、可完整顯示，
+    只回答「你代表哪一家商家」，**不參與任何授權判定**。帶著它去打會員端點仍然是 401。
+    它因此**不出現在下方的 Security Schemes**，而是一個一般的請求標頭參數。
+
+    `X-Site-Domain` 只在 `GET /api/v1/render/page` 一個端點上有效（第一方 SSR 中繼訪客 Host 用）。
+
+    後台端點（`/api/v1/admin/**`）不做租戶解析：目標 shop 一律來自 URL 的 `{shopID}`，
+    並由 RBAC 判定，**不信任任何 payload**。
+
+    ## 錯誤格式
+
+    所有錯誤回應共用同一個 envelope：`{"error": {"code", "message", "details"}}`。
+    詳見 `Error` schema，其中列出全部已知的 `code`。
+
+    **每一條端點都可能回 `500 internal`**，掛了速率限制的端點（後台登入／換發、會員註冊／登入／
+    換發、訪客結帳）**可能回 `429 rate_limited`（附 `Retry-After` 標頭）**。
+    為免淹沒真正有意義的資訊，端點層級只列出**呼叫端需要分辨並採取不同動作**的狀態碼。
+
+    ## 金額
+
+    所有金額皆為**最小貨幣單位的整數**，永不為浮點數，幣別由同層的 `currency`（ISO 4217）決定。
+    見 `MinorUnitAmount`。**這是最容易出錯的一件事**：TWD 的最小貨幣單位是「元」，
+    所以 `3400` 就是 NT$3,400；但若某天出現 USD，`340000` 才是 US$3,400.00。
+
+    ## 已知的文件限制
+
+    - 端點說明中提到的 **RBAC 權限節點是人工維護的敘述**，沒有自動化驗證。權威是
+      `internal/httpapi/*.go` 的 `RequireShopPermission` / `RequirePlatformPermission` 呼叫。
+    - `additionalProperties: false` 的意義見上方「版本策略」。
+    - 契約與實作不一致時，**實作是權威**（除非實作違反了 `openspec/specs/` 的行為驗收）。
+  contact:
+    name: 契約與接入說明
+    url: https://example.invalid/docs/storefront-integration.md
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+
+servers:
+  - url: http://localhost:8080
+    description: 本機開發（`make dev`）。前台端點的租戶由 `X-Publishable-Key` 或 `Host` 決定。
+  - url: "{scheme}://{host}"
+    description: 任何部署。
+    variables:
+      scheme:
+        default: https
+        enum: [https, http]
+      host:
+        default: api.example.com
+        description: API 的主機名稱。前台端點若不帶 publishable key，租戶取自這個 Host。
+
+tags:
+  - name: health
+    description: 健康檢查。
+  - name: storefront-catalog
+    description: 前台公開目錄（無認證，僅需租戶解析）。
+  - name: storefront-auth
+    description: 前台會員註冊／登入／換發／登出。
+  - name: storefront-cart
+    description: 會員購物車（會員 JWT）。
+  - name: storefront-order
+    description: 會員訂單、付款與出貨查詢（會員 JWT）。
+  - name: storefront-points
+    description: 會員點數與異動明細（會員 JWT）。
+  - name: guest
+    description: 訪客結帳與訂單存取 token 可觸及的端點。
+  - name: webhooks
+    description: 金流服務商回呼（簽章認證）。
+  - name: render
+    description: 渲染 bundle（SSR／原生 APP 消費的 SDUI 契約）。
+  - name: admin-auth
+    description: 後台登入／換發／登出。
+  - name: admin-platform
+    description: 平台層資源（網域、商家、主題、權限與角色目錄）。
+  - name: admin-cms
+    description: 商家層 CMS（頁面、全站內容、主題套用）。
+  - name: admin-catalog
+    description: 商家層目錄（分類、商品）。
+  - name: admin-commerce
+    description: 商家層交易（訂單、付款紀錄、運送方式、出貨、會員等級與點數）。
+  - name: admin-client
+    description: 商家層前端接入（publishable keys、允許的瀏覽器 origin）。
+  - name: admin-rbac
+    description: 商家層使用者與角色指派。
+
+security: []
+
+components:
+
+  # ───────────────────────── securitySchemes ─────────────────────────
+  #
+  # 四種**互斥**的機制。publishable key 刻意不在此處 — 它是識別碼不是憑證，
+  # 見 parameters/PublishableKey。
+  securitySchemes:
+    adminJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        後台存取權杖，`aud=admin`。由 `POST /api/v1/admin/auth/login` 或 `.../refresh` 取得。
+        後台與前台是**兩套完全獨立的簽章金鑰與 audience**：會員權杖在此一律 401。
+
+        失敗行為：無權杖／權杖無效／audience 不符 → **401**；通過認證但權限不足或跨商家存取 → **403**。
+    memberJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        前台會員存取權杖，`aud=shop:{shopID}`。由 `POST /api/v1/shop/auth/{register,login,refresh}` 取得。
+
+        **audience 綁定商家**：A 店簽發的權杖拿到 B 店（即租戶解析出不同的 shop）一律 **401**，
+        即使 email 與密碼在兩店都存在——顧客身分以商家為界，兩者是互不相干的身分。
+
+        必須在租戶已解析的前提下使用（即帶 `X-Publishable-Key` 或正確的 `Host`）。
+    orderAccessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        訂單存取權杖，`aud=order:{shopID}`。由 `POST /api/v1/shop/guest/checkout` 的回應取得，
+        預設有效 24 小時。
+
+        **它不是 session。** 明確的邊界：
+
+        - 只能存取它**指名的那一筆訂單**；其路由**不接受路徑上的訂單 id**（沒有 id 可以竄改）。
+        - **不能**列訂單歷史、**不能**取消訂單、**不能**換發或延長。
+        - 拿它去打會員端點會得到 401（它不帶會員身分）。
+        - 跨商家無效（audience 綁定 shop）。
+
+        遺失即失效——顧客要再次取得訂單存取權，正確路徑是以同一個 email 註冊會員身分
+        （見 `POST /api/v1/shop/auth/register` 的「認領」說明）。
+    providerSignature:
+      type: apiKey
+      in: header
+      name: X-Signature
+      description: |
+        金流服務商的回呼簽章。**實際的標頭名稱與演算法由各服務商決定**，此處的
+        `X-Signature` 只是佔位；驗證由 `payment.Provider.VerifyWebhook` 對**原始位元組**執行。
+
+        這是 `/api/v1/webhooks/payments/{provider}` 唯一的認證方式：該端點刻意掛在所有
+        租戶／會員／後台中介層之外——呼叫者是服務商的伺服器，它不知道我們的網域配置，
+        也沒有 JWT。簽章不符 → **401**。
+
+  # ───────────────────────── parameters ─────────────────────────
+  parameters:
+    PublishableKey:
+      name: X-Publishable-Key
+      in: header
+      required: false
+      description: |
+        **識別碼，不是憑證。** 宣告本次請求代表哪一家商家（`pk_` + base32）。
+
+        - 公開值：明文儲存、後台可完整顯示、可以寫進前端原始碼與 git。
+        - **不參與任何授權判定**：帶著它去打需要會員身分的端點仍然是 401。
+        - 標頭存在時**優先於 `Host`**；金鑰未知或已撤銷 → **404 `unknown_publishable_key`**，
+          **不回退**至 Host（否則撤銷就失去意義）。
+        - 省略時，租戶取自 `Host`。
+      schema:
+        type: string
+        pattern: '^pk_[a-z2-7]+$'
+        examples: ["pk_demoseedstorefrontkeynotsecret"]
+    ShopIDPath:
+      name: shopID
+      in: path
+      required: true
+      description: 目標商家。後台的授權判定一律以這個值為準，不看任何 payload。
+      schema: { type: integer, minimum: 1 }
+    Page:
+      name: page
+      in: query
+      required: false
+      description: 第幾頁（從 1 起算）。缺漏或無法解析時使用伺服器預設，**不會回 400**。
+      schema: { type: integer, minimum: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      required: false
+      description: 每頁筆數。缺漏或超出上限時由伺服器夾為預設值，**不會回 400**。
+      schema: { type: integer, minimum: 1 }
+
+  # ───────────────────────── 共用回應 ─────────────────────────
+  responses:
+    BadRequest:
+      description: 請求本身無法解析（JSON 格式錯誤、body 過大、必要的查詢參數缺漏）。`code = bad_request`。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: |
+        未認證或憑證無效。`code = unauthorized`。
+        涵蓋：無 `Authorization` 標頭、權杖過期／簽章錯誤、audience 不符（跨商家重用）、
+        以及帳號密碼錯誤——**登入失敗一律是同一個回應**，不區分帳號不存在／密碼錯誤／帳號停用。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: 已認證但權限不足，或跨商家存取。`code = forbidden`。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NotFound:
+      description: |
+        資源不存在。`code = not_found`；**publishable key 無效時另有專屬的 `unknown_publishable_key`**，
+        讓正在接入的商家能把「金鑰寫錯」與「這個頁面不存在」分開。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: 與資源當下的狀態衝突（例如對已取消的訂單發起付款、對已出貨的訂單重複建立出貨）。`code = conflict`。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ValidationFailed:
+      description: |
+        輸入通過了 JSON 解析但違反業務規則。`code = validation_failed`，
+        `details` 是 **JSON Pointer 陣列**，指出**哪個欄位**錯了——這是前端最需要的資訊。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          examples:
+            shippingMethod:
+              summary: 運送方式已被商家停用
+              value:
+                error:
+                  code: validation_failed
+                  message: "shipping method is not selectable"
+                  details:
+                    - pointer: /shipping_method_id
+                      message: "unknown or inactive shipping method"
+            giftMessage:
+              summary: 第 2 個品項的卡片訊息超過 500 字元
+              value:
+                error:
+                  code: validation_failed
+                  message: "gift_message is too long"
+                  details:
+                    - pointer: /items/1/gift_message
+                      message: "must be at most 500 characters"
+    TooManyRequests:
+      description: |
+        超過速率限制。`code = rate_limited`，附 `Retry-After`（整數秒，最小 1）。
+        僅適用於掛了限流的端點：後台登入／換發、會員註冊／登入／換發、訪客結帳。
+      headers:
+        Retry-After:
+          description: 建議等待的秒數。
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ShopDisabled:
+      description: 商家已被停用。`code = shop_disabled`。前台應呈現維護頁而非錯誤頁。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    NoContent:
+      description: 成功，無回應主體。
+
+  # ───────────────────────── schemas ─────────────────────────
+  schemas:
+
+    MinorUnitAmount:
+      type: integer
+      format: int64
+      minimum: 0
+      description: |
+        **金額，以最小貨幣單位計的整數。永遠不是浮點數，永遠不是字串。**
+        幣別由**同一層的 `currency`**（ISO 4217，三碼大寫）決定。
+
+        - `TWD`：最小貨幣單位是「元」→ `3400` 表示 **NT$3,400**。
+        - `JPY`：同理 → `3400` 表示 **¥3,400**。
+        - `USD`：最小貨幣單位是「分」→ `340000` 表示 **US$3,400.00**。
+
+        前端顯示時**不得**先除以 100——是否要除、除多少，取決於 `currency`。
+        在單一 TWD 商家上，正確的顯示是把這個整數直接當作元。
+      examples: [3400]
+
+    ValidationDetail:
+      type: object
+      additionalProperties: false
+      required: [pointer, message]
+      description: 單一欄位的驗證錯誤位置。
+      properties:
+        pointer:
+          type: string
+          description: |
+            指向出錯欄位的 JSON Pointer，相對於**請求主體**。
+            巢狀與陣列同樣適用：`/items/1/gift_message`、`/shipping_address/phone`。
+            少數與整體狀態有關的錯誤使用非欄位指標，例如 `/cart`（購物車是空的）。
+          examples: ["/shipping_method_id", "/items/1/gift_message", "/shipping_address/phone", "/cart"]
+        message:
+          type: string
+          description: 給開發者看的英文說明。**不適合直接顯示給終端使用者**。
+          examples: ["unknown or inactive shipping method"]
+
+    Error:
+      type: object
+      additionalProperties: false
+      required: [error]
+      description: |
+        全 API 統一的錯誤 envelope。
+
+        **已知的 `code` 全集**（狀態碼 → code → 意義）：
+
+        | 狀態 | `code` | 意義 |
+        | --- | --- | --- |
+        | 400 | `bad_request` | JSON 無法解析、body 超過 1 MiB、必要查詢參數缺漏 |
+        | 401 | `unauthorized` | 未認證、權杖無效／過期／audience 不符、登入失敗 |
+        | 403 | `forbidden` | 已認證但權限不足，或跨商家存取 |
+        | 404 | `not_found` | 資源不存在 |
+        | 404 | `unknown_publishable_key` | publishable key 未知或已撤銷（**不會回退至 Host**） |
+        | 405 | `method_not_allowed` | 路徑存在但不支援該方法 |
+        | 409 | `conflict` | 與資源當下狀態衝突 |
+        | 422 | `validation_failed` | 業務規則驗證失敗，`details` 帶 JSON Pointer |
+        | 422 | `registration_failed` | 註冊失敗（**刻意不說明原因**：不洩漏該 email 是否已是本店顧客） |
+        | 422 | `checkout_unavailable` | 訪客結帳失敗（**刻意不說明原因**：該顧客已被商家停用） |
+        | 429 | `rate_limited` | 超過速率限制，附 `Retry-After` |
+        | 500 | `internal` | 伺服器內部錯誤 |
+        | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
+        | 503 | `unhealthy` | `/healthz` 的相依檢查失敗 |
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: 機讀的錯誤代碼。全集見上表。
+              examples: ["validation_failed"]
+            message:
+              type: string
+              description: 給開發者看的英文說明。**不適合直接顯示給終端使用者**。
+            details:
+              description: |
+                補充資訊。`validation_failed` 時是 `ValidationDetail` 陣列；
+                其餘 code 多半省略此鍵。
+              oneOf:
+                - type: array
+                  items: { $ref: '#/components/schemas/ValidationDetail' }
+                - type: object
+                - type: 'null'
+
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, examples: ["ok"] }
+
+    TokenResponse:
+      type: object
+      additionalProperties: false
+      required: [access_token, refresh_token, token_type, expires_in]
+      description: |
+        後台與前台共用的權杖回應形狀。
+
+        `refresh_token` 是**一次性**的：每次換發都會旋轉，舊值立即失效。
+        重複使用同一個 refresh token 會得到 401。
+      properties:
+        access_token:
+          type: string
+          description: "放進 `Authorization: Bearer <access_token>`。"
+        refresh_token:
+          type: string
+          description: 只用於 `.../auth/refresh` 與 `.../auth/logout`。**一次性，用過即換新**。
+        token_type: { type: string, examples: ["Bearer"] }
+        expires_in:
+          type: integer
+          description: access token 的有效秒數。
+          examples: [900]
+
+    # ── 目錄 ──────────────────────────────────────────────────
+    ProductSKU:
+      type: object
+      additionalProperties: false
+      required: [id, sku_code, options, price_amount, currency, stock_qty, is_active]
+      description: 商品的可購買單位。價格與庫存都掛在 SKU 上，不在商品上。
+      properties:
+        id: { type: integer }
+        sku_code:
+          type: string
+          description: 商家自訂的料號，於同一商品內唯一。
+          examples: ["BQ-ROSE-M"]
+        options:
+          type: object
+          description: |
+            以屬性名為鍵的選項值，例如 `{"size":"M"}`。內容由商家自由決定，平台不解讀。
+            **是物件不是陣列**——永遠以已知的鍵查找，不依賴顯示順序。
+          examples: [{ "size": "M" }]
+        price_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        currency:
+          type: string
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 三碼。`price_amount` 的單位由它決定。
+          examples: ["TWD"]
+        stock_qty:
+          type: integer
+          format: int32
+          description: |
+            目前庫存。**這是查詢當下的快照，不是保留**——真正的扣減發生在結帳的單一交易內
+            （條件式扣減 + 受影響列數檢查），所以「看到有貨」不保證「結得成帳」。
+        is_active:
+          type: boolean
+          description: 停用的 SKU 不可加入購物車也不可結帳（會回 422）。
+
+    Product:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, title, slug, description, status, meta, updated_at]
+      description: |
+        商品。公開端點與後台端點回傳**同一個形狀**，差別只在公開端點僅回傳
+        `status = 1`（已發佈）的商品。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        title: { type: string, examples: ["溫室玫瑰花束"] }
+        slug:
+          type: string
+          description: 商家內唯一的網址片段，公開端點以它查詢單一商品。
+          examples: ["greenhouse-rose-bouquet"]
+        description: { type: string }
+        status:
+          type: integer
+          enum: [0, 1]
+          description: "`0` 草稿（僅後台可見）／`1` 已發佈（公開端點可見）。"
+        meta:
+          type: object
+          description: 商家自訂的附加資料（jsonb），平台不解讀。
+        updated_at: { type: string, format: date-time }
+        skus:
+          type: array
+          description: |
+            SKU 集合，**依 `id` 遞增排序**（公開與後台一致）。
+            列表端點與單一端點都會帶。
+          items: { $ref: '#/components/schemas/ProductSKU' }
+        category_ids:
+          type: array
+          description: 所屬分類。後台端點才會帶。
+          items: { type: integer }
+
+    ProductPage:
+      type: object
+      additionalProperties: false
+      required: [products, page, page_size, total]
+      properties:
+        products:
+          type: array
+          items: { $ref: '#/components/schemas/Product' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total:
+          type: integer
+          description: 符合條件的**總筆數**（不是金額）。
+
+    Category:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, parent_id, name, slug, position, updated_at]
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        parent_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 上層分類；`null` 表示位於根層。
+        name: { type: string }
+        slug: { type: string }
+        position: { type: integer, format: int32 }
+        updated_at: { type: string, format: date-time }
+
+    CategoryNode:
+      type: object
+      additionalProperties: false
+      required: [id, parent_id, name, slug, position, children]
+      description: 樹狀形式的分類（`GET .../categories` 的預設輸出）。
+      properties:
+        id: { type: integer }
+        parent_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        name: { type: string }
+        slug: { type: string }
+        position: { type: integer, format: int32 }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/CategoryNode' }
+
+    # ── 購物車 ────────────────────────────────────────────────
+    CartItem:
+      type: object
+      additionalProperties: false
+      required: [id, sku_id, sku_code, quantity, price_amount, currency, line_total, gift_message, purchasable, unavailable_reason]
+      properties:
+        id: { type: integer }
+        sku_id: { type: integer }
+        sku_code: { type: string }
+        quantity: { type: integer, format: int32, minimum: 1 }
+        price_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 加入購物車當下鎖定的單價快照，**不隨商家改價變動**。
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        line_total:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: "`price_amount × quantity`。"
+        gift_message:
+          type: string
+          maxLength: 500
+          description: |
+            卡片訊息，**永遠是字串、永不為 `null`**（沒有留言就是空字串）。
+            上限 500 **字元**（以 rune 計，中英文一致）。
+
+            **它是購物車品項的合併鍵的一部分**：同一個 SKU 配不同訊息是**兩列**，
+            不是數量 2。前端的去重鍵必須把它算進去。
+        purchasable:
+          type: boolean
+          description: 此列目前是否可結帳。為 `false` 時結帳會整筆失敗。
+        unavailable_reason:
+          type: string
+          enum: ["", "sku_inactive", "product_unpublished", "insufficient_stock", "sku_deleted"]
+          description: "`purchasable = false` 的原因；可購買時為空字串。"
+
+    Cart:
+      type: object
+      additionalProperties: false
+      required: [id, status, currency, items, subtotal, total, item_count]
+      description: |
+        會員的購物車。購物車是**暫存**：結帳成功後它的 `status` 變為 `1`（converted），
+        下次加入品項會開一張新的。
+      properties:
+        id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 尚未加入任何品項時為 `null`（此時購物車只是一個概念，沒有資料列）。
+        status:
+          type: integer
+          enum: [0, 1, 2]
+          description: "`0` 使用中／`1` 已轉為訂單／`2` 已放棄（保留值，本階段不產生）。"
+        currency:
+          oneOf: [{ type: string, minLength: 3, maxLength: 3 }, { type: 'null' }]
+          description: |
+            由**第一個加入的品項**鎖定，其後整車單一幣別。尚無資料列時為 `null`。
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CartItem' }
+        subtotal:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: Σ(`line_total`)。**不含運費**——運費要到結帳選定運送方式時才存在。
+        total:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 本階段等於 `subtotal`（購物車層沒有折扣與運費）。
+        item_count:
+          type: integer
+          description: 品項**列數**（不是總數量）。
+
+    # ── 訂單 ──────────────────────────────────────────────────
+    ShippingAddress:
+      type: object
+      additionalProperties: false
+      required: [recipient_name, phone, line1, city, postal_code, country]
+      description: |
+        訂單上的收件資訊（**回應形狀**）。所有鍵一律存在；沒填的欄位是**空字串而不是 `null`**
+        （`line2` 為空時可能整個缺席）。
+
+        請求端的形狀是 `ShippingAddressInput`，必填只有三個。
+      properties:
+        recipient_name: { type: string, examples: ["王小明"] }
+        phone: { type: string, examples: ["0912345678"] }
+        line1: { type: string, examples: ["台北市大安區復興南路一段 100 號 5 樓"] }
+        line2: { type: string }
+        city: { type: string }
+        postal_code: { type: string }
+        country: { type: string }
+
+    ShippingAddressInput:
+      type: object
+      additionalProperties: false
+      required: [recipient_name, phone, line1]
+      description: |
+        送出時的收件資訊。**必填只有 `recipient_name` / `phone` / `line1`**——
+        台灣的單行地址本身就含縣市，強迫填 `country: "TW"` 只會製造儀式而非驗證。
+        缺少必填欄位時 422，指標為 `/shipping_address/{field}`。
+      properties:
+        recipient_name: { type: string, examples: ["王小明"] }
+        phone: { type: string, examples: ["0912345678"] }
+        line1: { type: string, examples: ["台北市大安區復興南路一段 100 號 5 樓"] }
+        line2: { type: string }
+        city: { type: string }
+        postal_code: { type: string }
+        country: { type: string }
+
+    OrderItem:
+      type: object
+      additionalProperties: false
+      required: [id, product_id, product_title, sku_id, sku_code, quantity, price_amount, currency, line_total, gift_message]
+      description: |
+        訂單品項是**永久快照**：商品改名、改價、下架、刪除，都不會改變已成立訂單的顯示內容。
+      properties:
+        id: { type: integer }
+        product_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: |
+            **資訊性欄位，無外鍵**。商品被刪除後這個值可能指向不存在的列。
+            呼叫端 **MUST NOT** 倚賴它能解析——顯示所需的一切已快照在本物件內。
+        product_title:
+          type: string
+          description: 下單當下的商品標題快照。
+        sku_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 同 `product_id`，資訊性、無外鍵、可能無法解析。
+        sku_code: { type: string }
+        quantity: { type: integer, format: int32, minimum: 1 }
+        price_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 下單當下的單價快照。
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        line_total:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: "`price_amount × quantity`。"
+        gift_message:
+          type: string
+          maxLength: 500
+          description: 卡片訊息快照，永遠是字串、永不為 `null`。
+
+    Order:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - shop_id
+        - member_id
+        - status
+        - payment_status
+        - fulfillment_status
+        - currency
+        - total_amount
+        - subtotal_amount
+        - shipping_fee
+        - shipping_method_id
+        - shipping_method_name
+        - requested_delivery_date
+        - shipping_address
+        - cancelled_at
+        - items
+        - created_at
+        - updated_at
+      description: |
+        訂單。三個獨立的狀態軸（`status` / `payment_status` / `fulfillment_status`）互不取代。
+
+        **金額由資料庫約束保證恆等**：`total_amount = subtotal_amount + shipping_fee`。
+        呼叫端**不要自己加**——顯示與請款都用 `total_amount`。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        member_id:
+          type: integer
+          description: |
+            下單的顧客身分。訪客結帳也有：系統會為該 email 建立一個**無密碼身分**，
+            日後以同一 email 註冊即「認領」它，訂單與點數自動浮現。
+        status:
+          type: integer
+          enum: [0, 1]
+          description: "`0` 已建立／`1` 已取消。"
+        payment_status:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`0` 未付款／`1` 已付款／`2` 已退款／`3` 部分退款（後兩者為保留值，本階段不產生）。"
+        fulfillment_status:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`0` 未出貨／`1` 已出貨／`2` 已送達／`3` 已退回。"
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        total_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: |
+            **應付總額 ＝ `subtotal_amount` ＋ `shipping_fee`，也是向金流請款的金額。**
+            前端顯示合計時**直接用這個值**，不要用品項自行加總——那樣會漏掉運費。
+        subtotal_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: |
+            品項小計 ＝ Σ(`items[].line_total`)。
+            **點數以此為基準核發，運費不計點。**
+        shipping_fee:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 結帳當下所選運送方式 `flat_rate` 的快照；未選運送方式時為 `0`。**永不重算**。
+        shipping_method_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: |
+            **資訊性欄位，無外鍵**。商家刪除該運送方式後可能無法解析——
+            對帳與顯示所需的 `shipping_method_name` 與 `shipping_fee` 已快照在此物件內。
+        shipping_method_name:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: 運送方式名稱快照，**不因日後改名或刪除而變動**。
+          examples: ["台北市當日配送"]
+        requested_delivery_date:
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+          description: |
+            顧客指定的配送日，**`YYYY-MM-DD` 的日曆日**（沒有時刻、沒有時區）。未指定為 `null`。
+          examples: ["2026-08-05"]
+        shipping_address: { $ref: '#/components/schemas/ShippingAddress' }
+        cancelled_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    OrderPage:
+      type: object
+      additionalProperties: false
+      required: [orders, page, page_size, total]
+      properties:
+        orders:
+          type: array
+          items: { $ref: '#/components/schemas/Order' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total:
+          type: integer
+          description: 符合條件的**總筆數**（不是金額）。
+
+    MemberCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required: [recipient_name, phone, line1]
+      description: |
+        會員結帳的請求主體。**主體本身就是收件資訊**（平鋪），兩個訂單層選填鍵是它的兄弟鍵——
+        這是既有形狀，刻意不改成巢狀（改了會打斷每一個既有呼叫端，只換到與訪客端點的外觀一致）。
+
+        品項來自會員**目前的 active 購物車**，不在請求主體中。
+
+        （這裡刻意把地址欄位寫開而不用 `allOf` 組合：`allOf` 的每個子 schema 各自套用自己的
+        `additionalProperties: false`，於是任何一個鍵都會被另一個子 schema 判為多餘——
+        那是一個看起來優雅但永遠驗不過的 schema。）
+      properties:
+        recipient_name: { type: string, examples: ["王小明"] }
+        phone: { type: string, examples: ["0912345678"] }
+        line1: { type: string, examples: ["台北市大安區復興南路一段 100 號 5 樓"] }
+        line2: { type: string }
+        city: { type: string }
+        postal_code: { type: string }
+        country: { type: string }
+        shipping_method_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: |
+            由 `GET /api/v1/shop/shipping-methods` 取得的 `id`。**選填**：不送即免運
+            （`shipping_fee = 0`）。不存在／屬於其他商家／已停用 → **422**，指標 `/shipping_method_id`，
+            **訂單不會建立、庫存不會動**。
+        requested_delivery_date:
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+          description: |
+            **選填**，嚴格 `YYYY-MM-DD`。唯一的伺服器端規則是「不得是在任何時區都已過去的日期」
+            （即不得早於 UTC 昨日）。**沒有**前置天數、截單時刻或最遠可預訂日——那些是商家自己的
+            營業規則，要擋請在前端擋。格式錯誤或不存在的日期（如 `2026-02-31`）→ 422。
+          examples: ["2026-08-05"]
+
+    GuestCheckoutItem:
+      type: object
+      additionalProperties: false
+      required: [sku_id, quantity]
+      properties:
+        sku_id: { type: integer }
+        quantity: { type: integer, format: int32, minimum: 1 }
+        gift_message:
+          type: string
+          maxLength: 500
+          description: |
+            選填。上限 500 **字元**（rune）。
+            **同一個 `sku_id` 配不同訊息會成為兩個獨立品項**，前端不要先自行合併數量。
+
+    GuestCheckoutRequest:
+      type: object
+      additionalProperties: false
+      required: [email, items, shipping_address]
+      properties:
+        email:
+          type: string
+          format: email
+          description: |
+            訪客的 email。系統會在**本商家**找出或建立一個**無密碼身分**綁定這筆訂單。
+            日後以同一 email 在本店註冊即「認領」該身分，歷史訂單與點數自動浮現。
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/GuestCheckoutItem' }
+        shipping_address: { $ref: '#/components/schemas/ShippingAddressInput' }
+        shipping_method_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 同 `MemberCheckoutRequest.shipping_method_id`。
+        requested_delivery_date:
+          oneOf: [{ type: string, format: date }, { type: 'null' }]
+          description: 同 `MemberCheckoutRequest.requested_delivery_date`。
+
+    GuestCheckoutResult:
+      type: object
+      additionalProperties: false
+      required: [order]
+      description: |
+        訪客結帳成功的回應。
+
+        **`order_access_token` 在極少數情況下可能缺席**：訂單已經成立但簽發權杖失敗時，
+        伺服器仍回 201 並附上訂單（告訴顧客「你的訂單沒成立」才是更糟的謊）。
+        前端必須容忍這個鍵不存在——此時顧客要查訂單，路徑是以同一 email 註冊。
+      properties:
+        order: { $ref: '#/components/schemas/Order' }
+        order_access_token:
+          type: string
+          description: |
+            放進 `Authorization: Bearer <token>` 存取 `/api/v1/shop/guest/order*`。
+            **只能存取這一筆訂單**，不是 session（不能列訂單、不能取消、不能換發）。
+        token_type: { type: string, examples: ["Bearer"] }
+        expires_in:
+          type: integer
+          description: 有效秒數（預設 86400）。
+          examples: [86400]
+
+    # ── 金流 ──────────────────────────────────────────────────
+    Payment:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, provider, provider_reference, amount, currency, status, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        order_id: { type: integer }
+        provider:
+          type: string
+          description: 服務商代號，也是 webhook 路徑上的 `{provider}` 片段。
+          examples: ["mock"]
+        provider_reference:
+          type: string
+          description: 服務商端的交易識別碼；webhook 以 (`provider`, `provider_reference`) 做冪等查找。
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 請款金額，**等於訂單的 `total_amount`（含運費）**。本階段只支援全額付款。
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        status:
+          type: integer
+          enum: [0, 1, 2, 3]
+          description: "`0` 待付款／`1` 成功／`2` 失敗／`3` 已退款（保留值，本階段不產生）。"
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PaymentInitiateResult:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, provider, provider_reference, amount, currency, status, created_at, updated_at, redirect_url]
+      description: 發起付款的回應：一筆 `Payment` 加上要把顧客導去的位置。
+      properties:
+        id: { type: integer }
+        order_id: { type: integer }
+        provider: { type: string }
+        provider_reference: { type: string }
+        amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 請款金額，等於訂單的 `total_amount`。
+        currency: { type: string, minLength: 3, maxLength: 3 }
+        status: { type: integer, enum: [0, 1, 2, 3] }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        redirect_url:
+          type: string
+          description: |
+            把顧客導向這個位置完成付款。付款結果**不會**經由這個轉導回來——
+            權威是服務商送到 `/api/v1/webhooks/payments/{provider}` 的回呼。
+            前端在轉導回來後應重新查詢訂單的 `payment_status`。
+
+    # ── 物流 ──────────────────────────────────────────────────
+    Shipment:
+      type: object
+      additionalProperties: false
+      required: [id, order_id, carrier, tracking_number, status, shipped_at, delivered_at, created_at, updated_at]
+      description: 出貨紀錄。**一張訂單最多一筆**（由資料庫唯一索引保證）。
+      properties:
+        id: { type: integer }
+        order_id: { type: integer }
+        carrier: { type: string, examples: ["黑貓宅急便"] }
+        tracking_number:
+          oneOf: [{ type: string }, { type: 'null' }]
+        status:
+          type: integer
+          enum: [1, 2, 3]
+          description: |
+            `1` 已出貨／`2` 已送達／`3` 已退回。**沒有 `0`**——沒有出貨紀錄本身就等於未出貨
+            （訂單的 `fulfillment_status = 0`）。
+        shipped_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        delivered_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    ShippingMethod:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, name, carrier, flat_rate, is_active, created_at, updated_at]
+      description: 後台形狀的運送方式。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        name: { type: string, examples: ["台北市當日配送"] }
+        carrier: { type: string, examples: ["自有車隊"] }
+        flat_rate:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 固定運費。結帳選定此方式時，這個值會被**複製**成訂單的 `shipping_fee`。
+        is_active:
+          type: boolean
+          description: 停用的方式不出現在公開端點，且結帳選它會 422。
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PublicShippingMethod:
+      type: object
+      additionalProperties: false
+      required: [id, name, carrier, flat_rate]
+      description: |
+        公開形狀的運送方式，**刻意小於後台形狀**：只回傳啟用中的方式，
+        所以 `is_active` 沒有資訊量；時間戳是後台的簿記。
+        v1 只能 additive，公開最小集合是唯一還能長大的方向。
+      properties:
+        id: { type: integer }
+        name: { type: string, examples: ["台北市當日配送"] }
+        carrier: { type: string, examples: ["自有車隊"] }
+        flat_rate:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 固定運費，幣別同商品。
+
+    # ── 會員等級與點數 ─────────────────────────────────────────
+    MemberTier:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, name, min_points, discount_percent, created_at, updated_at]
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        name: { type: string, examples: ["金卡"] }
+        min_points:
+          type: integer
+          format: int32
+          description: 達到此點數即進入本等級。**這是點數不是金額。**
+        discount_percent:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 保留欄位，本階段**沒有任何邏輯讀它**來計算折扣。
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    MemberPoints:
+      type: object
+      additionalProperties: false
+      required: [shop_id, member_id, points, level_id, level]
+      properties:
+        shop_id: { type: integer }
+        member_id: { type: integer }
+        points:
+          type: integer
+          format: int32
+          description: 目前點數餘額。**這是點數不是金額。**
+        level_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        level:
+          oneOf:
+            - $ref: '#/components/schemas/MemberTier'
+            - type: 'null'
+          description: 目前等級的完整內容；尚未達到任何等級時為 `null`。
+
+    PointTransaction:
+      type: object
+      additionalProperties: false
+      required: [id, member_id, order_id, points_delta, kind, reason, created_at]
+      properties:
+        id: { type: integer }
+        member_id: { type: integer }
+        order_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 人工調整（`kind = 2`）時為 `null`；核發與扣回一定有值。
+        points_delta:
+          type: integer
+          format: int32
+          description: 有號的點數異動量。**這是點數不是金額。**
+        kind:
+          type: integer
+          enum: [0, 1, 2]
+          description: "`0` 訂單核發／`1` 訂單退貨扣回／`2` 人工調整。"
+        reason: { type: string, examples: ["訂單付款回饋"] }
+        created_at: { type: string, format: date-time }
+
+    PointTransactionPage:
+      type: object
+      additionalProperties: false
+      required: [transactions, page, page_size, total]
+      properties:
+        transactions:
+          type: array
+          items: { $ref: '#/components/schemas/PointTransaction' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total:
+          type: integer
+          description: 總筆數（不是金額，也不是點數）。
+
+    # ── 前端接入 ──────────────────────────────────────────────
+    PublishableKey:
+      type: object
+      additionalProperties: false
+      required: [id, key, label, created_at, revoked_at]
+      properties:
+        id: { type: integer }
+        key:
+          type: string
+          description: |
+            **完整值，永遠不遮罩**——它是公開識別碼，遮罩只會妨礙正在接入的人而保護不了任何東西。
+          examples: ["pk_demoseedstorefrontkeynotsecret"]
+        label: { type: string, maxLength: 100 }
+        created_at: { type: string, format: date-time }
+        revoked_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+          description: |
+            已撤銷的金鑰**仍留在列表中**：「那些流量用的是哪把金鑰、什麼時候切斷的」正是
+            軟刪除要回答的問題。撤銷**立即生效**，不等快取過期。
+
+    AllowedOrigin:
+      type: object
+      additionalProperties: false
+      required: [id, origin, created_at]
+      description: |
+        允許以瀏覽器呼叫本 API 的 origin。CORS 的允許集合 ＝ 平台環境變數清單 ∪ 本表。
+        origin 是**全域競爭的命名空間**，所以登記需要平台層權限，不是商家自助。
+      properties:
+        id: { type: integer }
+        origin:
+          type: string
+          description: "`scheme://host[:port]`，不含路徑、不含萬用字元。全域唯一。"
+          examples: ["https://ondo.example.com"]
+        created_at: { type: string, format: date-time }
+
+    # ── 後台：租戶與 CMS ───────────────────────────────────────
+    Shop:
+      type: object
+      additionalProperties: false
+      required: [id, name, theme_id, status, content_json, meta, updated_at]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        theme_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        status:
+          type: integer
+          enum: [0, 1, 2]
+          description: "`0` 停用（前台回 503）／`1` 啟用／`2` 審核中（前台回 404）。"
+        content_json:
+          type: object
+          description: 全站內容，依當前主題的 `config_schema` 驗證。
+        meta:
+          type: object
+        updated_at: { type: string, format: date-time }
+
+    ShopPage:
+      type: object
+      additionalProperties: false
+      required: [shops, page, page_size, total]
+      properties:
+        shops:
+          type: array
+          items: { $ref: '#/components/schemas/Shop' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer, description: 總筆數（不是金額）。 }
+
+    SiteShopBinding:
+      type: object
+      additionalProperties: false
+      required: [shop_id, path_prefix, is_primary]
+      properties:
+        shop_id: { type: integer }
+        path_prefix:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: "`null` 表示這是該網域的**預設商家**；否則如 `/shop-a`。"
+        is_primary:
+          type: boolean
+          description: 該商家的主網域。
+
+    Site:
+      type: object
+      additionalProperties: false
+      required: [id, domain, ssl_status, shops]
+      properties:
+        id: { type: integer }
+        domain: { type: string, examples: ["demo.localhost"] }
+        ssl_status: { type: string }
+        shops:
+          type: array
+          items: { $ref: '#/components/schemas/SiteShopBinding' }
+
+    ThemePage:
+      type: object
+      additionalProperties: false
+      required: [id, type_key, component_key]
+      properties:
+        id: { type: integer }
+        type_key:
+          type: string
+          description: 頁型代號。頁面以它動態綁定當前主題，換主題免資料遷移。
+          examples: ["home"]
+        component_key:
+          type: string
+          description: 前端元件庫中的元件名稱。
+        page_schema:
+          type: object
+          description: 該頁型的 JSON Schema（驅動後端驗證與 admin 表單）。單一主題查詢才會帶。
+
+    Theme:
+      type: object
+      additionalProperties: false
+      required: [id, code, name, layout_key, is_active, config_schema]
+      properties:
+        id: { type: integer }
+        code: { type: string, examples: ["starter"] }
+        name: { type: string }
+        layout_key: { type: string }
+        is_active: { type: boolean }
+        config_schema:
+          type: object
+          description: 全站內容的 JSON Schema。
+        pages:
+          type: array
+          description: 頁型清單；只有單一主題查詢會帶。
+          items: { $ref: '#/components/schemas/ThemePage' }
+
+    ThemeSummary:
+      type: object
+      additionalProperties: false
+      required: [id, code, name]
+      description: 商家可選主題的精簡形狀。
+      properties:
+        id: { type: integer }
+        code: { type: string }
+        name: { type: string }
+
+    Page:
+      type: object
+      additionalProperties: false
+      required: [id, type_key, title, slug, status, content_json, published_json, meta, updated_at]
+      description: |
+        CMS 頁面。**草稿與線上是兩個獨立欄位**：編輯只寫 `content_json`，
+        發佈才把它複製進 `published_json`。前台渲染只讀 `published_json`。
+      properties:
+        id: { type: integer }
+        type_key: { type: string }
+        title: { type: string }
+        slug:
+          type: string
+          description: "商家內唯一。`home` 是保留字（對應網站根路徑），其 slug 不可修改。"
+        status:
+          type: integer
+          enum: [0, 1]
+          description: "`0` 草稿／`1` 已發佈。"
+        content_json:
+          type: object
+          description: 工作副本（草稿）。
+        published_json:
+          oneOf: [{ type: object }, { type: 'null' }]
+          description: 線上內容；從未發佈過為 `null`。
+        meta: { type: object }
+        updated_at: { type: string, format: date-time }
+        page_schema:
+          oneOf: [{ type: object }, { type: 'null' }]
+          description: 目前主題對應此 `type_key` 的 schema；主題不支援此頁型時為 `null`。單一頁面查詢才會帶。
+        incompatible:
+          type: boolean
+          description: 目前主題是否**不**支援此頁型。單一頁面查詢才會帶。
+
+    PageListEntry:
+      type: object
+      additionalProperties: false
+      required: [id, type_key, title, slug, status, incompatible, updated_at]
+      properties:
+        id: { type: integer }
+        type_key: { type: string }
+        title: { type: string }
+        slug: { type: string }
+        status: { type: integer, enum: [0, 1] }
+        incompatible: { type: boolean }
+        updated_at: { type: string, format: date-time }
+
+    # ── 後台：RBAC ────────────────────────────────────────────
+    Permission:
+      type: object
+      additionalProperties: false
+      required: [id, name, description]
+      properties:
+        id: { type: integer }
+        name:
+          type: string
+          description: 權限節點，如 `product.edit`、`order.cancel`。
+          examples: ["product.edit"]
+        description: { type: string }
+
+    Role:
+      type: object
+      additionalProperties: false
+      required: [id, name, scope, permissions]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        scope:
+          type: string
+          enum: [platform, merchant]
+          description: "`platform` 角色跨全站；`merchant` 角色在指派時綁定單一商家。"
+        permissions:
+          type: array
+          description: 權限節點名稱。
+          items: { type: string }
+
+    ShopUser:
+      type: object
+      additionalProperties: false
+      required: [user_id]
+      description: 商家的後台使用者及其在**本商家**的角色。
+      properties:
+        user_id: { type: integer }
+        email: { type: string }
+        status: { type: integer }
+        roles:
+          oneOf:
+            - type: array
+              items:
+                type: object
+                additionalProperties: false
+                required: [id, name]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+            - type: 'null'
+
+    # ── 渲染 ──────────────────────────────────────────────────
+    RenderBundle:
+      type: object
+      additionalProperties: false
+      required: [shop, page]
+      description: |
+        用戶端無關的 SDUI 契約：web SSR 與未來的原生 APP 消費**同一個結構**。
+        消費端遇到未知的區塊型別 MUST 優雅略過，不得整頁崩潰。
+      properties:
+        shop:
+          type: object
+          additionalProperties: false
+          required: [id, name, theme, content]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            theme:
+              type: object
+              additionalProperties: false
+              required: [code, layout_key]
+              properties:
+                code: { type: string }
+                layout_key: { type: string }
+            content:
+              description: 全站內容（已依 schema 補齊預設值、剔除未定義鍵）。
+        page:
+          type: object
+          additionalProperties: false
+          required: [type_key, component_key, title, content, seo]
+          properties:
+            type_key: { type: string }
+            component_key: { type: string }
+            title: { type: string }
+            content:
+              description: 頁面內容（已 hydrate）。
+            seo:
+              description: SEO 中繼資料。
+
+paths:
+
+  # ═══════════════════════ health ═══════════════════════
+  /healthz:
+    get:
+      tags: [health]
+      operationId: healthz
+      summary: 健康檢查
+      description: 唯一不在 `/api/v1` 底下的路由。相依檢查失敗時回 503 `unhealthy`。
+      security: []
+      responses:
+        "200":
+          description: 健康。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthStatus' }
+        "503":
+          description: 相依檢查失敗。`code = unhealthy`。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  # ═══════════════════════ 前台公開目錄 ═══════════════════════
+  /api/v1/shop/products:
+    get:
+      tags: [storefront-catalog]
+      operationId: listPublishedProducts
+      summary: 列出已發佈商品
+      description: |
+        **無需任何認證**，只需租戶解析（`X-Publishable-Key` 或 `Host`）。
+        只回傳 `status = 1` 的商品；每個商品都帶 `skus`（依 `id` 遞增）。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 已發佈商品的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPage' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/products/{slug}:
+    get:
+      tags: [storefront-catalog]
+      operationId: getPublishedProduct
+      summary: 以 slug 取得單一已發佈商品
+      description: 無需認證。草稿商品在此一律 404（不區分「不存在」與「未發佈」）。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: slug
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: 商品（含 `skus`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/shipping-methods:
+    get:
+      tags: [storefront-catalog]
+      operationId: listPublicShippingMethods
+      summary: 列出可選的運送方式與運費
+      description: |
+        **無需認證**——買家必須在還沒有任何身分之前就看得到運費。
+        **只回傳啟用中的方式**：商家在後台停用某方式後，前端下次抓就看不到它（不必自行過濾）。
+
+        結帳時把選中的 `id` 送回 `shipping_method_id`。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 啟用中的運送方式。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shipping_methods]
+                properties:
+                  shipping_methods:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublicShippingMethod' }
+              examples:
+                twoMethods:
+                  value:
+                    shipping_methods:
+                      - { id: 1, name: "台北市當日配送", carrier: "自有車隊", flat_rate: 200 }
+                      - { id: 2, name: "門市自取", carrier: "門市", flat_rate: 0 }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  # ═══════════════════════ 前台會員認證 ═══════════════════════
+  /api/v1/shop/auth/register:
+    post:
+      tags: [storefront-auth]
+      operationId: memberRegister
+      summary: 註冊本商家的會員身分
+      description: |
+        **顧客身分以商家為界**：同一個 email 在兩家商家是**兩筆互不相干的身分與密碼**，
+        沒有任何跨店沿用的路徑。
+
+        **「認領」分支**：若這個 email 在本店已有一個**無密碼身分**（訪客結帳留下的），
+        本次註冊會為它設定密碼並登入——該身分的歷史訂單與點數因此自動浮現，無需任何資料搬移。
+        成功回應與全新註冊**逐位元組相同**。
+
+        失敗一律回 `422 registration_failed` 且**不說明原因**（不洩漏該 email 是否已是本店顧客）。
+        唯二會說明原因的是格式問題：email 格式、密碼長度不足 8。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: 註冊（或認領）成功，直接取得權杖。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/auth/login:
+    post:
+      tags: [storefront-auth]
+      operationId: memberLogin
+      summary: 會員登入
+      description: |
+        僅比對**本商家**的身分。在別家商家設定的密碼在此一律 401，即使 email 與密碼都相同。
+        無密碼身分（訪客結帳留下的）也一律 401——它要先經由註冊被認領。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: 登入成功。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/auth/refresh:
+    post:
+      tags: [storefront-auth]
+      operationId: memberRefresh
+      summary: 換發會員權杖
+      description: refresh token **一次性**：成功後舊值立即失效，回應帶新的一組。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: 換發成功。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/shop/auth/logout:
+    post:
+      tags: [storefront-auth]
+      operationId: memberLogout
+      summary: 撤銷會員 refresh token
+      description: 撤銷指定的 refresh token。已失效或不存在的值同樣回 204（冪等）。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+
+  /api/v1/shop/me:
+    get:
+      tags: [storefront-auth]
+      operationId: memberMe
+      summary: 目前登入的會員
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: |
+            會員基本資料。`email` / `phone` **只在有值時出現**（不是回 `null`）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id]
+                properties:
+                  id: { type: integer }
+                  email: { type: string }
+                  phone: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ═══════════════════════ 購物車 ═══════════════════════
+  /api/v1/shop/cart:
+    get:
+      tags: [storefront-cart]
+      operationId: getCart
+      summary: 取得目前的購物車
+      description: |
+        沒有存取控制參數：購物車一律是「權杖裡的 `member_id` 的那一台」，
+        路由不接受購物車 id 也不接受會員 id——**沒有 id 可以竄改**。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 購物車（可能是空的）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/shop/cart/items:
+    post:
+      tags: [storefront-cart]
+      operationId: addCartItem
+      summary: 加入品項
+      description: |
+        **合併鍵是 `(sku_id, gift_message)`**：訊息相同才累加數量，訊息不同就是新的一列。
+        回應是**整台購物車**（不是單一品項）。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [sku_id, quantity]
+              properties:
+                sku_id: { type: integer }
+                quantity: { type: integer, format: int32, minimum: 1 }
+                gift_message:
+                  type: string
+                  maxLength: 500
+                  description: 選填，上限 500 字元（rune）。省略即空字串。
+      responses:
+        "201":
+          description: 加入成功，回傳整台購物車。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [storefront-cart]
+      operationId: clearCart
+      summary: 清空購物車
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/shop/cart/items/{itemID}:
+    parameters:
+      - $ref: '#/components/parameters/PublishableKey'
+      - name: itemID
+        in: path
+        required: true
+        description: 品項列的 id。歸屬驗證在服務層完成——別人的品項一律 404。
+        schema: { type: integer, minimum: 1 }
+    put:
+      tags: [storefront-cart]
+      operationId: updateCartItemQuantity
+      summary: 修改品項數量
+      description: |
+        **刻意只收 `quantity`，不收 `gift_message`。** 改訊息等於改變這一列的
+        `(sku, message)` 身分，於是可以人工製造出兩列完全相同的品項——那是加入時的累加語意
+        永遠不會產生、也沒有任何東西會修復的狀態。要改訊息請「移除再重新加入」。
+      security: [{ memberJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  format: int32
+                  description: 設為 `0` 等同移除該列。
+      responses:
+        "200":
+          description: 修改成功，回傳整台購物車。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cart' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [storefront-cart]
+      operationId: removeCartItem
+      summary: 移除品項
+      security: [{ memberJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 會員訂單 ═══════════════════════
+  /api/v1/shop/checkout:
+    post:
+      tags: [storefront-order]
+      operationId: memberCheckout
+      summary: 以目前購物車結帳
+      description: |
+        在**單一資料庫交易**內完成：驗證每個品項可購買 → 原子扣庫存 → 建立訂單與訂單品項 →
+        將來源購物車標記為已轉換。任一步失敗整筆回滾（不建單、不動庫存、不動購物車）。
+
+        運送方式與配送日的驗證發生在**交易之前**：驗證失敗時庫存與購物車狀態完全不受影響。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MemberCheckoutRequest' }
+            examples:
+              withShipping:
+                summary: 指定運送方式與配送日
+                value:
+                  recipient_name: "王小明"
+                  phone: "0912345678"
+                  line1: "台北市大安區復興南路一段 100 號 5 樓"
+                  shipping_method_id: 1
+                  requested_delivery_date: "2026-08-05"
+      responses:
+        "201":
+          description: 訂單成立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/shop/orders:
+    get:
+      tags: [storefront-order]
+      operationId: listMyOrders
+      summary: 列出自己的訂單
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 訂單的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/shop/orders/{orderID}:
+    get:
+      tags: [storefront-order]
+      operationId: getMyOrder
+      summary: 取得自己的單一訂單
+      description: 別人的訂單一律 **404**（不是 403——不確認它存在）。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 訂單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/shop/orders/{orderID}/cancel:
+    post:
+      tags: [storefront-order]
+      operationId: cancelMyOrder
+      summary: 取消自己的訂單
+      description: |
+        取消會**歸還庫存**。已付款或已出貨的訂單不可取消（409）。重複取消同樣是 409。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已取消的訂單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/shop/orders/{orderID}/payments:
+    post:
+      tags: [storefront-order]
+      operationId: initiateMyPayment
+      summary: 對自己的訂單發起付款
+      description: |
+        請款金額是訂單的 **`total_amount`（含運費）**，由伺服器決定，請求無法指定金額。
+
+        請求主體**可省略**；省略時使用伺服器的預設服務商。
+        已取消或已付款的訂單回 409。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                provider:
+                  type: string
+                  description: 服務商代號；省略即用預設。
+      responses:
+        "201":
+          description: 已建立付款嘗試。把顧客導向 `redirect_url`。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentInitiateResult' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/shop/orders/{orderID}/shipment:
+    get:
+      tags: [storefront-order]
+      operationId: getMyShipment
+      summary: 查詢自己訂單的出貨紀錄
+      description: 尚未出貨時回 **404**（沒有出貨紀錄本身就是「未出貨」）。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 出貨紀錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 會員點數 ═══════════════════════
+  /api/v1/shop/points:
+    get:
+      tags: [storefront-points]
+      operationId: getMyPoints
+      summary: 自己的點數與等級
+      description: |
+        點數在訂單**付款成功**後由事件核發，基準是訂單的 **`subtotal_amount`（商品金額），
+        運費不計點**。文案請寫「商品金額每 100 元 1 點（運費不計）」。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 點數與等級。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPoints' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/shop/points/transactions:
+    get:
+      tags: [storefront-points]
+      operationId: listMyPointTransactions
+      summary: 自己的點數異動明細
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 異動明細的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PointTransactionPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ═══════════════════════ 訪客 ═══════════════════════
+  /api/v1/shop/guest/checkout:
+    post:
+      tags: [guest]
+      operationId: guestCheckout
+      summary: 訪客結帳（無需登入）
+      description: |
+        **不需要任何憑證**，只需租戶解析。這是自帶前端最重要的一條端點。
+
+        流程：驗證輸入 → 在本商家找出或建立該 email 的**無密碼身分** →
+        以送來的品項原子取代該身分的購物車 → 走**與會員完全相同**的結帳實作。
+        因此扣庫存的並發保護、金額組成、點數核發在兩條路徑上逐字相同。
+
+        回應帶一枚**訂單存取權杖**，用它查這一筆訂單、發起付款、查出貨。
+        它不是 session——邊界見 Security Schemes 的 `orderAccessToken`。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/GuestCheckoutRequest' }
+            examples:
+              twoCards:
+                summary: 同一款花配兩張不同卡片＋當日配送
+                value:
+                  email: "customer@example.com"
+                  items:
+                    - { sku_id: 12, quantity: 1, gift_message: "給媽媽" }
+                    - { sku_id: 12, quantity: 1, gift_message: "給岳母" }
+                  shipping_address:
+                    recipient_name: "王小明"
+                    phone: "0912345678"
+                    line1: "台北市大安區復興南路一段 100 號 5 樓"
+                  shipping_method_id: 1
+                  requested_delivery_date: "2026-08-05"
+      responses:
+        "201":
+          description: 訂單成立（幾乎總是同時帶回訂單存取權杖）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GuestCheckoutResult' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "422":
+          description: |
+            驗證失敗。除了一般的 `validation_failed`，還有一個專屬 code：
+            **`checkout_unavailable`** —— 該顧客已被商家停用，訊息刻意中性，
+            訪客結帳不得成為繞過停用的路徑。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/guest/order:
+    get:
+      tags: [guest]
+      operationId: getGuestOrder
+      summary: 以訂單存取權杖查詢該筆訂單
+      description: |
+        **路徑上沒有訂單 id**——權杖自己指名了那一筆訂單。這不是設計上的省略，
+        是刻意讓「沒有識別碼可以竄改」成為結構性事實。
+      security: [{ orderAccessToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 訂單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/shop/guest/order/payments:
+    post:
+      tags: [guest]
+      operationId: initiateGuestPayment
+      summary: 以訂單存取權杖發起付款
+      description: 請款金額是該訂單的 `total_amount`。已取消或已付款回 409。
+      security: [{ orderAccessToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                provider: { type: string }
+      responses:
+        "201":
+          description: 已建立付款嘗試。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentInitiateResult' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/shop/guest/order/shipment:
+    get:
+      tags: [guest]
+      operationId: getGuestShipment
+      summary: 以訂單存取權杖查詢出貨紀錄
+      description: 尚未出貨回 404。
+      security: [{ orderAccessToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 出貨紀錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 金流回呼 ═══════════════════════
+  /api/v1/webhooks/payments/{provider}:
+    post:
+      tags: [webhooks]
+      operationId: paymentWebhook
+      summary: 金流服務商回呼
+      description: |
+        **刻意掛在所有租戶／會員／後台中介層之外**：呼叫者是服務商的伺服器，
+        它不知道我們的網域配置，也沒有 JWT。身分由簽章決定。
+
+        請求主體是**服務商自訂的格式**，本 API 對它不做任何形狀假設——
+        簽章驗證必須跑在**原始位元組**上（body 上限 64 KiB）。
+
+        **冪等**：同一筆回呼重送多次結果相同。認不出 `provider_reference` 時
+        回 **200 `{"status":"ignored"}`** 而不是 404——簽章已經證明呼叫者身分，
+        回錯誤只會招來無止境的重試，也會洩漏我們認不認得這筆交易。
+      security: [{ providerSignature: [] }]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: 服務商代號。未註冊的服務商回 404。
+          schema: { type: string }
+          examples:
+            mock: { value: "mock" }
+      requestBody:
+        required: true
+        description: 服務商自訂的酬載（原始位元組，上限 64 KiB）。
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 形狀由各服務商決定。
+      responses:
+        "200":
+          description: 已受理。`ok` 表示狀態已更新；`ignored` 表示認不出這筆交易。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok, ignored] }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 渲染 ═══════════════════════
+  /api/v1/render/page:
+    get:
+      tags: [render]
+      operationId: renderPage
+      summary: 取得已發佈頁面的渲染 bundle
+      description: |
+        回傳用戶端無關的 SDUI bundle。**只回已發佈內容**（`published_json`），永不回草稿。
+
+        租戶解析順序：`X-Publishable-Key` → **`X-Site-Domain`** → `Host`。
+
+        **這是全 API 唯一仍接受 `X-Site-Domain` 的端點。** 它的呼叫者是第一方 SSR 伺服器，
+        而 SSR 唯一能傳達「訪客實際請求的網域」的方式就是中繼這個標頭（API 看到的 Host 是 API 自己的）。
+        該標頭可偽造，而在此無害：回應是已發佈的公開內容，偽造它得到的與直接造訪那家商家的網站相同。
+        本端點不寫入、不簽發權杖、不接受任何已認證身分。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: X-Site-Domain
+          in: header
+          required: false
+          description: 第一方 SSR 中繼的訪客 Host。**僅本端點有效。**
+          schema: { type: string }
+        - name: path
+          in: query
+          required: false
+          description: 訪客請求的原始路徑；省略即 `/`（對應保留 slug `home`）。
+          schema: { type: string, default: "/" }
+      responses:
+        "200":
+          description: 渲染 bundle。
+          headers:
+            X-Cache:
+              description: 快取命中與否，供煙霧測試判讀。
+              schema: { type: string, enum: [HIT, MISS] }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RenderBundle' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/render/preview:
+    get:
+      tags: [render]
+      operationId: renderPreview
+      summary: 以預覽權杖取得工作副本的渲染 bundle
+      description: |
+        回傳**工作副本**（`content_json`，即草稿），**完全不經過快取**。
+        權杖由 `GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token` 簽發，
+        且每次請求都會**重新確認**持有者當下仍具備該商家的 `page.view` 權限——
+        撤權後舊權杖立即失效。
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          description: 短效預覽權杖。
+          schema: { type: string }
+      responses:
+        "200":
+          description: "工作副本的渲染 bundle（`Cache-Control: no-store`）。"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RenderBundle' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 後台認證 ═══════════════════════
+  /api/v1/admin/auth/login:
+    post:
+      tags: [admin-auth]
+      operationId: adminLogin
+      summary: 後台登入
+      description: |
+        失敗一律是同一個 401，**不區分**帳號不存在／密碼錯誤／帳號停用。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
+      responses:
+        "200":
+          description: 登入成功。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/auth/refresh:
+    post:
+      tags: [admin-auth]
+      operationId: adminRefresh
+      summary: 換發後台權杖
+      description: refresh token 一次性，成功後舊值立即失效。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "200":
+          description: 換發成功。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TokenResponse' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/auth/logout:
+    post:
+      tags: [admin-auth]
+      operationId: adminLogout
+      summary: 撤銷後台 refresh token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+
+  /api/v1/admin/me:
+    get:
+      tags: [admin-auth]
+      operationId: adminMe
+      summary: 目前登入的後台使用者
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 使用者與其可存取的商家清單。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, email, sids]
+                properties:
+                  id: { type: integer }
+                  email: { type: string }
+                  sids:
+                    oneOf:
+                      - type: array
+                        items: { type: integer }
+                      - type: 'null'
+                    description: 該使用者具有成員資格的商家 id 集合。
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ═══════════════════════ 平台層：權限與角色 ═══════════════════════
+  /api/v1/admin/permissions:
+    get:
+      tags: [admin-platform]
+      operationId: listPermissions
+      summary: 列出權限目錄
+      description: 需要平台層 `user.manage_roles`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 依名稱排序的權限目錄。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [permissions]
+                properties:
+                  permissions:
+                    type: array
+                    items: { $ref: '#/components/schemas/Permission' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createPermission
+      summary: 新增權限節點
+      description: 需要平台層 `user.manage_roles`。名稱重複回 422。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string }
+                description: { type: string }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, name]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/roles:
+    get:
+      tags: [admin-platform]
+      operationId: listAllRoles
+      summary: 列出全部角色（含權限）
+      description: 需要平台層 `user.manage_roles`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 全部角色。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [roles]
+                properties:
+                  roles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Role' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createRole
+      summary: 新增角色
+      description: 需要平台層 `user.manage_roles`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, scope]
+              properties:
+                name: { type: string }
+                scope: { type: string, enum: [platform, merchant] }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, name, scope]
+                properties:
+                  id: { type: integer }
+                  name: { type: string }
+                  scope: { type: string, enum: [platform, merchant] }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/roles/{roleID}/permissions:
+    put:
+      tags: [admin-platform]
+      operationId: setRolePermissions
+      summary: 全量取代角色的權限集合
+      description: |
+        需要平台層 `user.manage_roles`。**授權／撤權立即生效**——
+        持有此角色的每個人在下一次請求就看到變化，不等快取過期。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: roleID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [permission_ids]
+              properties:
+                permission_ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200":
+          description: 已套用。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [role_id, permission_ids]
+                properties:
+                  role_id: { type: integer }
+                  permission_ids:
+                    oneOf:
+                      - type: array
+                        items: { type: integer }
+                      - type: 'null'
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/users/{userID}/roles:
+    post:
+      tags: [admin-platform]
+      operationId: assignPlatformRole
+      summary: 指派平台層角色給使用者
+      description: 需要平台層 `user.manage_roles`。角色必須是 `platform` scope，否則 422。冪等。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role_id]
+              properties:
+                role_id: { type: integer }
+      responses:
+        "200":
+          description: 已指派。`shop_id` 恆為 `null`（平台層指派不綁商家）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [user_id, role_id, shop_id]
+                properties:
+                  user_id: { type: integer }
+                  role_id: { type: integer }
+                  shop_id:
+                    oneOf: [{ type: integer }, { type: 'null' }]
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/users/{userID}/roles/{roleID}:
+    delete:
+      tags: [admin-platform]
+      operationId: removePlatformRole
+      summary: 移除使用者的平台層角色
+      description: 需要平台層 `user.manage_roles`。未持有該角色回 404。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: roleID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 平台層：網域綁定 ═══════════════════════
+  /api/v1/admin/sites:
+    get:
+      tags: [admin-platform]
+      operationId: listSites
+      summary: 列出網域與其商家綁定
+      description: 需要平台層 `shop.manage_domains`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 全部網域。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [sites]
+                properties:
+                  sites:
+                    type: array
+                    items: { $ref: '#/components/schemas/Site' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createSite
+      summary: 登記網域
+      description: |
+        需要平台層 `shop.manage_domains`。網域會被正規化為小寫；格式不符或重複回 422。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [domain]
+              properties:
+                domain: { type: string, examples: ["demo.localhost"] }
+      responses:
+        "201":
+          description: 已登記。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, domain]
+                properties:
+                  id: { type: integer }
+                  domain: { type: string }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/sites/{siteID}:
+    delete:
+      tags: [admin-platform]
+      operationId: deleteSite
+      summary: 刪除網域（連同其全部商家綁定）
+      description: 需要平台層 `shop.manage_domains`。刪除後路由解析快取立即失效。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: siteID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/sites/{siteID}/shops:
+    post:
+      tags: [admin-platform]
+      operationId: bindShopToSite
+      summary: 將商家綁定到網域
+      description: |
+        需要平台層 `shop.manage_domains`。
+        `path_prefix` 省略或為 `/` 表示**該網域的預設商家**（每個網域只能有一個）。
+        違反唯一性約束（重複預設商家、重複前綴、重複主網域）一律 422。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: siteID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [shop_id]
+              properties:
+                shop_id: { type: integer }
+                path_prefix:
+                  oneOf: [{ type: string }, { type: 'null' }]
+                  description: "如 `/shop-a`；`null`／`/`／省略表示預設商家。"
+                is_primary: { type: boolean }
+      responses:
+        "201":
+          description: 已綁定。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [site_id, shop_id, path_prefix, is_primary]
+                properties:
+                  site_id: { type: integer }
+                  shop_id: { type: integer }
+                  path_prefix:
+                    oneOf: [{ type: string }, { type: 'null' }]
+                  is_primary: { type: boolean }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/sites/{siteID}/shops/{shopID}:
+    parameters:
+      - name: siteID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - $ref: '#/components/parameters/ShopIDPath'
+    put:
+      tags: [admin-platform]
+      operationId: updateSiteShopBinding
+      summary: 修改綁定
+      description: 需要平台層 `shop.manage_domains`。只送要改的鍵；未送的維持不變。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                path_prefix:
+                  oneOf: [{ type: string }, { type: 'null' }]
+                is_primary: { type: boolean }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [site_id, shop_id]
+                properties:
+                  site_id: { type: integer }
+                  shop_id: { type: integer }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-platform]
+      operationId: unbindShopFromSite
+      summary: 解除綁定
+      description: 需要平台層 `shop.manage_domains`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 平台層：商家 ═══════════════════════
+  /api/v1/admin/shops:
+    get:
+      tags: [admin-platform]
+      operationId: listShops
+      summary: 列出商家
+      description: 需要平台層 `shop.list`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 商家的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createShop
+      summary: 建立商家
+      description: |
+        需要平台層 `shop.create`。建立時會**自動建立一張 slug 為 `home` 的首頁**（草稿）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: { type: string }
+                theme_id:
+                  oneOf: [{ type: integer }, { type: 'null' }]
+                status: { type: integer, enum: [0, 1, 2] }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shop' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-platform]
+      operationId: getShop
+      summary: 取得單一商家
+      description: |
+        需要平台層 `shop.view`。
+
+        **實作備註：** 這條路由與下方 `/api/v1/admin/shops/{shopID}/**` 的子 router 掛在
+        同一個樣板上，因此 `chi.Walk` 列不到它（見 change openapi-contract design D3a）。
+        它在執行期完全正常，且契約測試會對它做實際的可達性探測。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 商家。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shop' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-platform]
+      operationId: updateShop
+      summary: 修改商家
+      description: |
+        需要平台層 `shop.update`。只送要改的鍵。
+        `status` 實際變動時，該商家所有綁定網域的路由解析快取立即失效。
+
+        **實作備註：** 同上，`chi.Walk` 列不到這條路由（design D3a）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string }
+                status: { type: integer, enum: [0, 1, 2] }
+                meta: { type: object }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shop' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 平台層：主題 ═══════════════════════
+  /api/v1/admin/themes:
+    get:
+      tags: [admin-platform]
+      operationId: listThemes
+      summary: 列出全部主題
+      description: 需要平台層 `theme.manage`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 全部主題（不含頁型）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [themes]
+                properties:
+                  themes:
+                    type: array
+                    items: { $ref: '#/components/schemas/Theme' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createTheme
+      summary: 建立主題
+      description: |
+        需要平台層 `theme.manage`。`config_schema` 必須是合法的 JSON Schema（draft 2020-12），
+        否則 422。`code` 重複亦 422。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code, name, layout_key]
+              properties:
+                code: { type: string }
+                name: { type: string }
+                layout_key: { type: string }
+                config_schema: { type: object }
+                is_active: { type: boolean }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Theme' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/themes/{themeID}:
+    parameters:
+      - name: themeID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-platform]
+      operationId: getTheme
+      summary: 取得單一主題（含頁型與其 schema）
+      description: 需要平台層 `theme.manage`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 主題（`pages` 依 `id` 遞增）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Theme' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-platform]
+      operationId: updateTheme
+      summary: 修改主題
+      description: 需要平台層 `theme.manage`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                code: { type: string }
+                name: { type: string }
+                layout_key: { type: string }
+                config_schema: { type: object }
+                is_active: { type: boolean }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Theme' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/themes/{themeID}/pages:
+    post:
+      tags: [admin-platform]
+      operationId: createThemePage
+      summary: 新增主題頁型
+      description: |
+        需要平台層 `theme.manage`。同一主題內 `type_key` 重複回 422；
+        `page_schema` 必須是合法的 JSON Schema。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: themeID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type_key, component_key]
+              properties:
+                type_key: { type: string }
+                component_key: { type: string }
+                page_schema: { type: object }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, type_key, component_key]
+                properties:
+                  id: { type: integer }
+                  type_key: { type: string }
+                  component_key: { type: string }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/themes/{themeID}/pages/{themePageID}:
+    parameters:
+      - name: themeID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - name: themePageID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    put:
+      tags: [admin-platform]
+      operationId: updateThemePage
+      summary: 修改主題頁型
+      description: 需要平台層 `theme.manage`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                type_key: { type: string }
+                component_key: { type: string }
+                page_schema: { type: object }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, type_key, component_key]
+                properties:
+                  id: { type: integer }
+                  type_key: { type: string }
+                  component_key: { type: string }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-platform]
+      operationId: deleteThemePage
+      summary: 刪除主題頁型
+      description: 需要平台層 `theme.manage`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 商家層：CMS ═══════════════════════
+  /api/v1/admin/shops/{shopID}/pages:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: listPages
+      summary: 列出頁面
+      description: 需要商家層 `page.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 頁面清單（精簡形狀）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [pages]
+                properties:
+                  pages:
+                    type: array
+                    items: { $ref: '#/components/schemas/PageListEntry' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-cms]
+      operationId: createPage
+      summary: 建立頁面
+      description: |
+        需要商家層 `page.create`。`type_key` 必須被商家**當前主題**支援，否則 422
+        （指標 `/type_key`）。`content` 會依該頁型的 schema 驗證。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [type_key, title, slug]
+              properties:
+                type_key: { type: string }
+                title: { type: string }
+                slug: { type: string }
+                content: { type: object }
+                meta: { type: object }
+      responses:
+        "201":
+          description: 已建立（草稿）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/pages/{pageID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: pageID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-cms]
+      operationId: getPage
+      summary: 取得單一頁面（含其頁型 schema）
+      description: 需要商家層 `page.view`。當前主題不支援此頁型時 `page_schema` 為 `null` 且 `incompatible` 為 `true`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 頁面。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-cms]
+      operationId: updatePage
+      summary: 修改頁面（只寫草稿）
+      description: |
+        需要商家層 `page.edit`。**只寫工作副本，不影響線上內容**——要上線必須另外呼叫發佈。
+        `home` 頁的 slug 不可修改。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: { type: string }
+                slug: { type: string }
+                content: { type: object }
+                meta: { type: object }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-cms]
+      operationId: deletePage
+      summary: 刪除頁面
+      description: 需要商家層 `page.delete`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/pages/{pageID}/publish:
+    post:
+      tags: [admin-cms]
+      operationId: publishPage
+      summary: 發佈頁面
+      description: |
+        需要商家層 `page.publish`。把草稿複製進線上欄位並使渲染快取失效——**前台立即看到**。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: pageID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已發佈。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish:
+    post:
+      tags: [admin-cms]
+      operationId: unpublishPage
+      summary: 取消發佈
+      description: 需要商家層 `page.publish`。草稿保留不動。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: pageID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已下線。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Page' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token:
+    get:
+      tags: [admin-cms]
+      operationId: issuePreviewToken
+      summary: 簽發草稿預覽權杖
+      description: |
+        需要商家層 `page.view`。權杖交給 `GET /api/v1/render/preview` 使用；
+        每次預覽都會重新確認持有者當下仍有 `page.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: pageID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 短效預覽權杖。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [preview_token, expires_in, slug]
+                properties:
+                  preview_token: { type: string }
+                  expires_in: { type: integer }
+                  slug: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: getShopContent
+      summary: 取得全站內容與其 schema
+      description: 需要商家層 `shop.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 全站內容與當前主題的 `config_schema`。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [content, config_schema]
+                properties:
+                  content:
+                    description: 已依 schema 補齊預設值的全站內容。
+                  config_schema:
+                    oneOf: [{ type: object }, { type: 'null' }]
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-cms]
+      operationId: updateShopContent
+      summary: 更新全站內容
+      description: 需要商家層 `shop.update`。依當前主題的 `config_schema` 驗證，失敗回 422 並帶 JSON Pointer。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content]
+              properties:
+                content: { type: object }
+      responses:
+        "200":
+          description: 已更新。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shop_id, content]
+                properties:
+                  shop_id: { type: integer }
+                  content: { type: object }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/page-types:
+    get:
+      tags: [admin-cms]
+      operationId: listPageTypes
+      summary: 列出當前主題支援的頁型
+      description: 需要商家層 `page.view`。商家尚未套用主題時回空陣列。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 頁型清單（依 `id` 遞增）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [page_types]
+                properties:
+                  page_types:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [type_key, component_key]
+                      properties:
+                        type_key: { type: string }
+                        component_key: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/themes:
+    get:
+      tags: [admin-cms]
+      operationId: listSelectableThemes
+      summary: 列出商家可選的主題
+      description: 需要商家層 `theme.view`。只回啟用中的主題，形狀刻意精簡。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 可選主題。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [themes]
+                properties:
+                  themes:
+                    type: array
+                    items: { $ref: '#/components/schemas/ThemeSummary' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/theme/precheck:
+    get:
+      tags: [admin-cms]
+      operationId: precheckThemeSwitch
+      summary: 換主題前的相容性預檢
+      description: |
+        需要商家層 `shop.update`。回報**換過去之後會變成不相容**的頁面
+        （新主題不支援其 `type_key`）。缺 `theme_id` 查詢參數時回 400。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: theme_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 不相容頁面清單。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [incompatible_pages]
+                properties:
+                  incompatible_pages:
+                    oneOf:
+                      - type: array
+                        items: { type: object }
+                      - type: 'null'
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/theme:
+    post:
+      tags: [admin-cms]
+      operationId: switchTheme
+      summary: 套用主題
+      description: |
+        需要商家層 `shop.update`。**頁面不需要遷移**——頁面以 `type_key` 動態綁定當前主題，
+        新主題不支援的頁型會被標為不相容並回報，但資料不會被刪除。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [theme_id]
+              properties:
+                theme_id: { type: integer }
+      responses:
+        "200":
+          description: 已套用，附不相容頁面清單。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [theme_id, incompatible_pages]
+                properties:
+                  theme_id: { type: integer }
+                  incompatible_pages:
+                    oneOf:
+                      - type: array
+                        items: { type: object }
+                      - type: 'null'
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 商家層：RBAC ═══════════════════════
+  /api/v1/admin/shops/{shopID}/roles:
+    get:
+      tags: [admin-rbac]
+      operationId: listMerchantRoles
+      summary: 列出可指派的商家角色
+      description: 需要商家層 `user.view`。只回 `merchant` scope 的角色。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 商家角色。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [roles]
+                properties:
+                  roles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Role' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/users:
+    get:
+      tags: [admin-rbac]
+      operationId: listShopUsers
+      summary: 列出商家的後台使用者及其角色
+      description: 需要商家層 `user.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 使用者清單。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [users]
+                properties:
+                  users:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShopUser' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/users/{userID}/roles:
+    post:
+      tags: [admin-rbac]
+      operationId: assignShopRole
+      summary: 指派商家角色
+      description: |
+        需要商家層 `user.manage_roles`。角色必須是 `merchant` scope 且目標使用者必須是本商家成員，
+        否則 422。冪等。**授權立即生效。**
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role_id]
+              properties:
+                role_id: { type: integer }
+      responses:
+        "200":
+          description: 已指派。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [user_id, role_id, shop_id]
+                properties:
+                  user_id: { type: integer }
+                  role_id: { type: integer }
+                  shop_id: { type: integer }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID}:
+    delete:
+      tags: [admin-rbac]
+      operationId: removeShopRole
+      summary: 移除商家角色指派
+      description: 需要商家層 `user.manage_roles`。**撤權立即生效。**
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: roleID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 商家層：目錄 ═══════════════════════
+  /api/v1/admin/shops/{shopID}/categories:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-catalog]
+      operationId: listCategories
+      summary: 列出分類
+      description: |
+        需要商家層 `category.view`。**預設回樹狀**（`children` 巢狀）；
+        帶 `flat=1` 改回扁平清單。兩種形狀的 `categories` 是同一個鍵、不同的元素形狀。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: flat
+          in: query
+          required: false
+          description: 帶 `1` 時回扁平清單而非樹狀。
+          schema: { type: string, enum: ["1"] }
+      responses:
+        "200":
+          description: 分類（樹狀或扁平）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/CategoryNode'
+                        - $ref: '#/components/schemas/Category'
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-catalog]
+      operationId: createCategory
+      summary: 建立分類
+      description: 需要商家層 `category.create`。`parent_id` 必須屬於同一商家，否則 422。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, slug]
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                parent_id:
+                  oneOf: [{ type: integer }, { type: 'null' }]
+                position: { type: integer, format: int32 }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/categories/{categoryID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: categoryID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-catalog]
+      operationId: getCategory
+      summary: 取得單一分類
+      description: 需要商家層 `category.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 分類。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-catalog]
+      operationId: updateCategory
+      summary: 修改分類
+      description: |
+        需要商家層 `category.edit`。`parent_id` 與 `clear_parent` 分別表達「改掛父層」
+        與「移到根層」——兩者都省略即維持不變。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string }
+                slug: { type: string }
+                parent_id:
+                  oneOf: [{ type: integer }, { type: 'null' }]
+                clear_parent: { type: boolean, description: 設為 `true` 把此分類移到根層。 }
+                position: { type: integer, format: int32 }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Category' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-catalog]
+      operationId: deleteCategory
+      summary: 刪除分類
+      description: 需要商家層 `category.delete`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/products:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-catalog]
+      operationId: listProductsAdmin
+      summary: 列出商品（含草稿）
+      description: 需要商家層 `product.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: category_id
+          in: query
+          required: false
+          schema: { type: integer }
+        - name: status
+          in: query
+          required: false
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200":
+          description: 商品的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-catalog]
+      operationId: createProduct
+      summary: 建立商品（含巢狀 SKU）
+      description: |
+        需要商家層 `product.create`。`skus` 在同一交易內一併建立。
+        `price_amount` 是**最小貨幣單位整數**。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [title, slug]
+              properties:
+                title: { type: string }
+                slug: { type: string }
+                description: { type: string }
+                status: { type: integer, enum: [0, 1] }
+                meta: { type: object }
+                category_ids:
+                  type: array
+                  items: { type: integer }
+                skus:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [sku_code, price_amount]
+                    properties:
+                      sku_code: { type: string }
+                      options: { type: object }
+                      price_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+                      currency: { type: string, minLength: 3, maxLength: 3 }
+                      stock_qty: { type: integer, format: int32, minimum: 0 }
+                      is_active: { type: boolean }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/products/{productID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: productID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-catalog]
+      operationId: getProductAdmin
+      summary: 取得單一商品
+      description: 需要商家層 `product.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 商品（含 `skus`、`category_ids`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-catalog]
+      operationId: updateProduct
+      summary: 修改商品（分類全量取代、SKU upsert）
+      description: |
+        需要商家層 `product.edit`。
+
+        - 送出 `category_ids` 即**全量取代**分類關聯。
+        - 送出 `skus` 即 upsert：帶 `id` 的更新、不帶 `id` 的新建、
+          **既有但未出現在酬載中的會被刪除**。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                title: { type: string }
+                slug: { type: string }
+                description: { type: string }
+                status: { type: integer, enum: [0, 1] }
+                meta: { type: object }
+                category_ids:
+                  type: array
+                  items: { type: integer }
+                skus:
+                  type: array
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [sku_code, price_amount]
+                    properties:
+                      id: { type: integer, description: 帶 `id` 表示更新既有 SKU。 }
+                      sku_code: { type: string }
+                      options: { type: object }
+                      price_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+                      currency: { type: string, minLength: 3, maxLength: 3 }
+                      stock_qty: { type: integer, format: int32, minimum: 0 }
+                      is_active: { type: boolean }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Product' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-catalog]
+      operationId: deleteProduct
+      summary: 刪除商品
+      description: |
+        需要商家層 `product.delete`。既有訂單品項**不受影響**——它們是快照，不是關聯。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 商家層：訂單與金流 ═══════════════════════
+  /api/v1/admin/shops/{shopID}/orders:
+    get:
+      tags: [admin-commerce]
+      operationId: listOrdersAdmin
+      summary: 列出商家訂單
+      description: 需要商家層 `order.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          required: false
+          schema: { type: integer, enum: [0, 1] }
+      responses:
+        "200":
+          description: 訂單的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/orders/{orderID}:
+    get:
+      tags: [admin-commerce]
+      operationId: getOrderAdmin
+      summary: 取得單一訂單
+      description: 需要商家層 `order.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 訂單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/orders/{orderID}/cancel:
+    post:
+      tags: [admin-commerce]
+      operationId: cancelOrderAdmin
+      summary: 商家取消訂單
+      description: |
+        需要商家層 `order.cancel`。歸還庫存。已付款或已出貨回 409。
+        訂單已核發的點數會由事件扣回。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已取消的訂單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shops/{shopID}/orders/{orderID}/payments:
+    get:
+      tags: [admin-commerce]
+      operationId: listOrderPayments
+      summary: 列出訂單的付款紀錄
+      description: 需要商家層 `payment.view`。同一訂單可能有多次嘗試。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 付款紀錄。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [payments]
+                properties:
+                  payments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Payment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 商家層：物流 ═══════════════════════
+  /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: orderID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-commerce]
+      operationId: listShipments
+      summary: 列出訂單的出貨紀錄
+      description: 需要商家層 `shipment.view`。一張訂單最多一筆。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 出貨紀錄。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shipments]
+                properties:
+                  shipments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Shipment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [admin-commerce]
+      operationId: createShipment
+      summary: 建立出貨紀錄（＝出貨事件本身）
+      description: |
+        需要商家層 `shipment.create`。**建立這筆紀錄就是「出貨」這個事件**，
+        因此狀態直接是 `1`（已出貨）並同步訂單的 `fulfillment_status`。
+        重複建立回 409（資料庫唯一索引把關）。`carrier` 必填。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [carrier]
+              properties:
+                carrier: { type: string }
+                tracking_number:
+                  oneOf: [{ type: string }, { type: 'null' }]
+      responses:
+        "201":
+          description: 已出貨。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipment' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID}:
+    put:
+      tags: [admin-commerce]
+      operationId: advanceShipment
+      summary: 推進出貨狀態
+      description: |
+        需要商家層 `shipment.update`。只接受 `"delivered"` 或 `"returned"`，兩者皆為終態。
+        推進到 `returned` 會觸發點數扣回。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - name: shipmentID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [status]
+              properties:
+                status: { type: string, enum: [delivered, returned] }
+      responses:
+        "200":
+          description: 已推進。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Shipment' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/shipping-methods:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-commerce]
+      operationId: listShippingMethodsAdmin
+      summary: 列出運送方式（含已停用）
+      description: 需要商家層 `shipping_method.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 全部運送方式。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shipping_methods]
+                properties:
+                  shipping_methods:
+                    type: array
+                    items: { $ref: '#/components/schemas/ShippingMethod' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-commerce]
+      operationId: createShippingMethod
+      summary: 建立運送方式
+      description: |
+        需要商家層 `shipping_method.create`。`flat_rate` 是最小貨幣單位整數，
+        且**以訂單幣別計價**（本階段運送方式沒有自己的幣別欄位）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, carrier, flat_rate]
+              properties:
+                name: { type: string }
+                carrier: { type: string }
+                flat_rate: { $ref: '#/components/schemas/MinorUnitAmount' }
+                is_active: { type: boolean }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingMethod' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: shippingMethodID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-commerce]
+      operationId: getShippingMethod
+      summary: 取得單一運送方式
+      description: 需要商家層 `shipping_method.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 運送方式。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingMethod' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-commerce]
+      operationId: updateShippingMethod
+      summary: 修改運送方式
+      description: |
+        需要商家層 `shipping_method.edit`。
+        **改價不影響既有訂單**——運費在結帳當下已快照進訂單。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string }
+                carrier: { type: string }
+                flat_rate: { $ref: '#/components/schemas/MinorUnitAmount' }
+                is_active: { type: boolean }
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShippingMethod' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-commerce]
+      operationId: deleteShippingMethod
+      summary: 刪除運送方式
+      description: |
+        需要商家層 `shipping_method.delete`。
+        **既有訂單不受影響**：訂單上的 `shipping_method_id` 是無外鍵的資訊性欄位，
+        名稱與運費早已快照。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ 商家層：會員等級與點數 ═══════════════════════
+  /api/v1/admin/shops/{shopID}/member-tiers:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-commerce]
+      operationId: listMemberTiers
+      summary: 列出會員等級
+      description: 需要商家層 `member_tier.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 會員等級。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [member_tiers]
+                properties:
+                  member_tiers:
+                    type: array
+                    items: { $ref: '#/components/schemas/MemberTier' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-commerce]
+      operationId: createMemberTier
+      summary: 建立會員等級
+      description: 需要商家層 `member_tier.create`。`min_points` 是**點數**不是金額。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name, min_points]
+              properties:
+                name: { type: string }
+                min_points: { type: integer, format: int32, minimum: 0 }
+                discount_percent:
+                  oneOf: [{ type: integer, minimum: 0, maximum: 100 }, { type: 'null' }]
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberTier' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: memberTierID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-commerce]
+      operationId: getMemberTier
+      summary: 取得單一會員等級
+      description: 需要商家層 `member_tier.view`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 會員等級。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberTier' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-commerce]
+      operationId: updateMemberTier
+      summary: 修改會員等級
+      description: 需要商家層 `member_tier.edit`。調整門檻後，會員等級在下一次點數異動時重新評估。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: { type: string }
+                min_points: { type: integer, format: int32, minimum: 0 }
+                discount_percent:
+                  oneOf: [{ type: integer, minimum: 0, maximum: 100 }, { type: 'null' }]
+      responses:
+        "200":
+          description: 已修改。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberTier' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    delete:
+      tags: [admin-commerce]
+      operationId: deleteMemberTier
+      summary: 刪除會員等級
+      description: 需要商家層 `member_tier.delete`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/members/{memberID}/points:
+    get:
+      tags: [admin-commerce]
+      operationId: getMemberPointsAdmin
+      summary: 查詢顧客的點數與等級
+      description: |
+        需要商家層 `point.view`。`{memberID}` 直接指向 `members` 列——
+        顧客身分以商家為界，跨商家的 id 在此一律 404。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: memberID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 點數與等級。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPoints' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions:
+    get:
+      tags: [admin-commerce]
+      operationId: listMemberPointTransactionsAdmin
+      summary: 查詢顧客的點數異動明細
+      description: 需要商家層 `point.view`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: memberID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 異動明細的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PointTransactionPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust:
+    post:
+      tags: [admin-commerce]
+      operationId: adjustMemberPoints
+      summary: 人工調整顧客點數
+      description: |
+        需要商家層 `point.adjust`。`points_delta` 必須非零、`reason` 必須非空——
+        人工調整永遠留下可稽核的理由。調整後等級立即重新評估。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: memberID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [points_delta, reason]
+              properties:
+                points_delta:
+                  type: integer
+                  format: int32
+                  description: 有號、非零。**這是點數不是金額。**
+                reason: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: 調整後的點數與等級。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPoints' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 商家層：前端接入 ═══════════════════════
+  /api/v1/admin/shops/{shopID}/publishable-keys:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-client]
+      operationId: listPublishableKeys
+      summary: 列出 publishable keys（含已撤銷）
+      description: |
+        需要商家層 `publishable_key.view`。金鑰值**完整回傳、不遮罩**——它是公開識別碼。
+        已撤銷的金鑰仍留在列表中，帶 `revoked_at`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 金鑰清單（依 `id` 遞增）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [keys]
+                properties:
+                  keys:
+                    type: array
+                    items: { $ref: '#/components/schemas/PublishableKey' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [admin-client]
+      operationId: createPublishableKey
+      summary: 產生新的 publishable key
+      description: |
+        需要商家層 `publishable_key.create`（**商家自助**：金鑰值是隨機的，
+        命名空間不存在競爭，輪替是商家自己的作業節奏）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                label: { type: string, maxLength: 100 }
+      responses:
+        "201":
+          description: 已產生。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishableKey' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/publishable-keys/{keyID}:
+    delete:
+      tags: [admin-client]
+      operationId: revokePublishableKey
+      summary: 撤銷 publishable key
+      description: |
+        需要商家層 `publishable_key.revoke`。**撤銷立即生效**，不等快取過期。
+        軟刪除：金鑰仍留在列表中並帶上 `revoked_at`。重複撤銷同樣回 204。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: keyID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/allowed-origins:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-client]
+      operationId: listAllowedOrigins
+      summary: 列出商家登記的瀏覽器 origin
+      description: |
+        **需要平台層 `shop.manage_client_origins`**（不是商家層）——
+        origin 是全域競爭的命名空間，與網域綁定同理。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已登記的 origin（依 `id` 遞增）。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [origins]
+                properties:
+                  origins:
+                    type: array
+                    items: { $ref: '#/components/schemas/AllowedOrigin' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [admin-client]
+      operationId: createAllowedOrigin
+      summary: 登記瀏覽器 origin
+      description: |
+        **需要平台層 `shop.manage_client_origins`**。origin **全域唯一**：
+        第二個宣稱同一個 origin 的商家會被拒（422），不會靜默共用 CORS 授權。
+        格式必須是 `scheme://host[:port]`，不含路徑、不含萬用字元。**立即生效。**
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [origin]
+              properties:
+                origin: { type: string, examples: ["https://ondo.example.com"] }
+      responses:
+        "201":
+          description: 已登記。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AllowedOrigin' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/allowed-origins/{originID}:
+    delete:
+      tags: [admin-client]
+      operationId: deleteAllowedOrigin
+      summary: 移除瀏覽器 origin
+      description: "**需要平台層 `shop.manage_client_origins`**。立即生效。"
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: originID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }

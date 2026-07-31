@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen seed seed-demo web-dev admin-dev
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen seed seed-demo web-dev admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -26,6 +26,19 @@ test-int: up ## API unit + integration tests (requires docker infra)
 
 lint: ## golangci-lint over /api
 	cd api && golangci-lint run
+
+# ── API 契約（change openapi-contract）──────────────────────────────────
+# 這三個 target 都是「給人用的捷徑」。CI 的保證來自既有的 `go test ./...`：
+# 四道檢查是普通的 Go 測試，不需要任何額外接線（design D2）。
+
+openapi: ## Run the four contract checks (routes / money units / responses / v1 surface)
+	cd api && INTEGRATION=1 go test ./internal/httpapi/ -run TestOpenAPI -count=1 -v
+
+openapi-mock: ## Mock server from the contract, no DB/Redis needed (npx, :4010)
+	npx --yes @stoplight/prism-cli mock api/openapi/openapi.yaml
+
+openapi-ui: ## Browsable API docs (npx, :8081)
+	npx --yes @redocly/cli preview-docs api/openapi/openapi.yaml --port 8081
 
 migrate: ## Apply pending migrations to DATABASE_URL
 	cd api && go run ./cmd/migrate -direction up
