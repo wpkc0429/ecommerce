@@ -288,3 +288,119 @@ func TestPublicCatalogCrossShopIsolation(t *testing.T) {
 		t.Fatalf("unbound domain: want 404, got %d", code)
 	}
 }
+
+// skuIDs extracts the SKU ids of a serialized product, preserving order.
+func skuIDs(t *testing.T, product map[string]any) []int {
+	t.Helper()
+	raw, _ := product["skus"].([]any)
+	out := make([]int, 0, len(raw))
+	for _, s := range raw {
+		out = append(out, int(s.(map[string]any)["id"].(float64)))
+	}
+	return out
+}
+
+func ascending(ids []int) bool {
+	for i := 1; i < len(ids); i++ {
+		if ids[i] <= ids[i-1] {
+			return false
+		}
+	}
+	return true
+}
+
+// Scenario: 同一筆商品重複查詢的 SKU 順序一致 / 公開與後台端點的 SKU 順序一致 /
+// 更新 SKU 不改變既有 SKU 的相對順序 (spec product-catalog: Deterministic SKU
+// ordering in product responses, change commerce-demo-seed design D8).
+func TestProductSKUOrderingIsDeterministic(t *testing.T) {
+	e := newCatalogEnv(t)
+
+	_, created := e.callJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, "/products"), map[string]any{
+		"title": "多尺寸花束", "slug": "multi-size-bouquet", "status": 1,
+		"skus": []map[string]any{
+			{"sku_code": "BQ-S", "options": map[string]any{"size": "S"}, "price_amount": 3400, "currency": "TWD", "stock_qty": 5},
+			{"sku_code": "BQ-M", "options": map[string]any{"size": "M"}, "price_amount": 3800, "currency": "TWD", "stock_qty": 5},
+			{"sku_code": "BQ-L", "options": map[string]any{"size": "L"}, "price_amount": 4400, "currency": "TWD", "stock_qty": 5},
+		},
+	})
+	productID := int(created["id"].(float64))
+	if code, _ := e.callJSON(t, e.ownerA, "PUT", e.shopPath(e.shopA, fmt.Sprintf("/products/%d", productID)), map[string]any{"status": 1}); code != http.StatusOK {
+		t.Fatalf("publish product")
+	}
+
+	// Repeated public reads agree with each other and are id ascending.
+	var first []int
+	for i := 0; i < 4; i++ {
+		code, body := e.public(t, "GET", "/api/v1/shop/products/multi-size-bouquet", e.shopADomain)
+		if code != http.StatusOK {
+			t.Fatalf("public detail: %d %s", code, body)
+		}
+		var detail map[string]any
+		if err := json.Unmarshal([]byte(body), &detail); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		ids := skuIDs(t, detail)
+		if len(ids) != 3 {
+			t.Fatalf("want 3 skus, got %d", len(ids))
+		}
+		if !ascending(ids) {
+			t.Fatalf("public detail sku order is not id ascending: %v", ids)
+		}
+		if first == nil {
+			first = ids
+		} else if fmt.Sprint(ids) != fmt.Sprint(first) {
+			t.Fatalf("public detail sku order changed between reads: %v then %v", first, ids)
+		}
+	}
+
+	// The public list agrees with the public detail.
+	code, listBody := e.public(t, "GET", "/api/v1/shop/products", e.shopADomain)
+	if code != http.StatusOK {
+		t.Fatalf("public list: %d %s", code, listBody)
+	}
+	var list struct {
+		Products []map[string]any `json:"products"`
+	}
+	if err := json.Unmarshal([]byte(listBody), &list); err != nil {
+		t.Fatalf("unmarshal list: %v", err)
+	}
+	for _, p := range list.Products {
+		if int(p["id"].(float64)) != productID {
+			continue
+		}
+		if got := fmt.Sprint(skuIDs(t, p)); got != fmt.Sprint(first) {
+			t.Fatalf("public list sku order %s != public detail %v", got, first)
+		}
+	}
+
+	// The back office agrees with the storefront: one product, one order.
+	_, adminDetail := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/products/%d", productID)), nil)
+	if got := fmt.Sprint(skuIDs(t, adminDetail)); got != fmt.Sprint(first) {
+		t.Fatalf("admin detail sku order %s != public %v", got, first)
+	}
+	_, adminList := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products"), nil)
+	for _, p := range adminList["products"].([]any) {
+		pm := p.(map[string]any)
+		if int(pm["id"].(float64)) != productID {
+			continue
+		}
+		if got := fmt.Sprint(skuIDs(t, pm)); got != fmt.Sprint(first) {
+			t.Fatalf("admin list sku order %s != public %v", got, first)
+		}
+	}
+
+	// Updating an existing SKU must not move it: upsert keeps its id.
+	code, updated := e.callJSON(t, e.ownerA, "PUT", e.shopPath(e.shopA, fmt.Sprintf("/products/%d", productID)), map[string]any{
+		"skus": []map[string]any{
+			{"id": first[2], "sku_code": "BQ-L", "price_amount": 4500, "stock_qty": 5},
+			{"id": first[1], "sku_code": "BQ-M", "price_amount": 3800, "stock_qty": 5},
+			{"id": first[0], "sku_code": "BQ-S", "price_amount": 3400, "stock_qty": 5},
+		},
+	})
+	if code != http.StatusOK {
+		t.Fatalf("update skus: %d %+v", code, updated)
+	}
+	if got := fmt.Sprint(skuIDs(t, updated)); got != fmt.Sprint(first) {
+		t.Fatalf("sku order changed after an in-place update: %s != %v", got, first)
+	}
+}

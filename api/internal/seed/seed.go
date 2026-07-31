@@ -16,12 +16,18 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
+	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
+	entmember "ksdevworks/ecommerce/api/internal/ent/member"
+	entmembertier "ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
+	entpublishablekey "ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
+	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
+	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -459,6 +465,26 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 	if err := seedDemoCatalog(ctx, tx, shopID); err != nil {
 		return err
 	}
+	// change commerce-demo-seed: the four blocks below are what makes the full
+	// commerce chain (browse → checkout → pay → ship → award → return →
+	// clawback) runnable on seeded data alone. Each carries its own natural-key
+	// guard rather than sharing seedDemoCatalog's (design D4), so a database
+	// seeded before this change gets the missing rows on the next run.
+	if err := seedDemoFloral(ctx, tx, shopID); err != nil {
+		return err
+	}
+	if err := seedDemoShipping(ctx, tx, shopID); err != nil {
+		return err
+	}
+	if err := seedDemoTiers(ctx, tx, shopID); err != nil {
+		return err
+	}
+	if err := seedDemoStorefrontClient(ctx, tx, shopID); err != nil {
+		return err
+	}
+	if err := seedDemoCustomer(ctx, tx, shopID); err != nil {
+		return err
+	}
 
 	// Demo merchant owner account for admin-UI/RBAC testing.
 	const ownerEmail = "demo-owner@example.com"
@@ -609,5 +635,350 @@ func seedDemoCatalog(ctx context.Context, tx *ent.Tx, shopID int) error {
 		return fmt.Errorf("seed: demo draft product: %w", err)
 	}
 
+	return nil
+}
+
+// ── change commerce-demo-seed ───────────────────────────────────────────
+//
+// Everything below exists so that `make seed-demo` alone is enough to run the
+// full commerce chain. Before this change the demo shop had a catalog and
+// nothing else: shipping_methods, member_tiers, publishable_keys,
+// shop_allowed_origins and members were all empty, which meant three features
+// that had already shipped could not be exercised on demo data at all
+// (checkout with a shipping method, publishable-key tenant resolution, and the
+// "a qualifying tier exists" half of the loyalty level recompute).
+
+// demoFloralPrices mirrors ONDO 溫度花室's own pricing shape (design D3/D10):
+// a base price per bouquet plus the size deltas S −400 / M 0 / L +600. The
+// numbers are not decoration — they are load-bearing.
+//
+// The pre-existing demo catalog tops out at 1290, so a plausible order there
+// awards 25 points (subtotal/100, floor). Any tier ladder a merchant would
+// actually configure is therefore unreachable, and points.recomputeLevel
+// answers "no qualifying tier" forever. With a bouquet at 3200–4400 a single
+// single-item order clears the 30-point tier below, so BOTH the upgrade and
+// the downgrade-on-return path are observable on seeded data.
+//
+// Keep these in step with demoTiers: changing one without the other silently
+// removes the only reason either exists.
+var demoFloralProducts = []struct {
+	Title, Slug, Description string
+	SKUPrefix                string
+	BasePrice                int64
+}{
+	{
+		Title:       "深紅｜週年束",
+		Slug:        "anniversary-bouquet",
+		Description: "深紅玫瑰與酒紅葉材，為紀念日而生。可附手寫卡片。",
+		SKUPrefix:   "BQ-ANNI",
+		BasePrice:   3800,
+	},
+	{
+		Title:       "白日｜洋甘菊",
+		Slug:        "daisy-day-bouquet",
+		Description: "洋甘菊與小花的組合，像午後的窗邊。可附手寫卡片。",
+		SKUPrefix:   "BQ-DAISY",
+		BasePrice:   3600,
+	},
+}
+
+// demoFloralSizes are ONDO's own three sizes and price deltas. Stock is sized
+// for repeated E2E runs, not for realism-at-any-cost (design D7): a returned
+// order does NOT restore stock (only cancellation does), so every commerce E2E
+// run permanently consumes a few units. These numbers allow well over a dozen
+// runs before a re-seed is needed, while still reading like a florist's stock
+// rather than a placeholder.
+var demoFloralSizes = []struct {
+	Suffix string
+	Size   string
+	Delta  int64
+	Stock  int32
+}{
+	{"S", "S", -400, 24},
+	{"M", "M", 0, 36},
+	{"L", "L", 600, 18},
+}
+
+// seedDemoFloral adds the high-ticket, multi-size, gift-message-friendly
+// product line the commerce chain needs. It does NOT touch the pre-existing
+// shoes/bags catalog: those rows are seedDemoCatalog's own idempotency anchor
+// and are referenced by product-catalog's spec examples (design D10).
+//
+// Idempotent on its own natural key so a database seeded before this change
+// picks the block up on the next run — seedDemoCatalog's guard would have
+// skipped it (design D4).
+func seedDemoFloral(ctx context.Context, tx *ent.Tx, shopID int) error {
+	hasFloral, err := tx.Product.Query().
+		Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ(demoFloralProducts[0].Slug)).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo floral product: %w", err)
+	}
+	if hasFloral {
+		return nil
+	}
+
+	// Looked up rather than blindly created: the block guard above is on the
+	// product, and a partially hand-edited development database may already
+	// hold the category.
+	const floralSlug = "floral-gifts"
+	floral, err := tx.Category.Query().
+		Where(entcategory.ShopIDEQ(shopID), entcategory.SlugEQ(floralSlug)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		floral, err = tx.Category.Create().
+			SetShopID(shopID).SetName("花藝禮品").SetSlug(floralSlug).Save(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("seed: demo category floral-gifts: %w", err)
+	}
+
+	for _, p := range demoFloralProducts {
+		prod, err := tx.Product.Create().
+			SetShopID(shopID).
+			SetTitle(p.Title).
+			SetSlug(p.Slug).
+			SetDescription(p.Description).
+			SetStatus(1).
+			Save(ctx)
+		if err != nil {
+			return fmt.Errorf("seed: demo product %s: %w", p.Slug, err)
+		}
+		if _, err := tx.ProductCategory.Create().
+			SetShopID(shopID).SetProductID(prod.ID).SetCategoryID(floral.ID).Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo product_category %s: %w", p.Slug, err)
+		}
+		// Created in S → M → L order on purpose: catalog responses order SKUs
+		// by id (change commerce-demo-seed, design D8), so creation order is
+		// what a storefront's size selector will show.
+		for _, sz := range demoFloralSizes {
+			code := p.SKUPrefix + "-" + sz.Suffix
+			options, _ := json.Marshal(map[string]any{"size": sz.Size})
+			if _, err := tx.ProductSKU.Create().
+				SetShopID(shopID).
+				SetProductID(prod.ID).
+				SetSkuCode(code).
+				SetOptions(options).
+				SetPriceAmount(p.BasePrice + sz.Delta).
+				SetCurrency("TWD").
+				SetStockQty(sz.Stock).
+				Save(ctx); err != nil {
+				return fmt.Errorf("seed: demo sku %s: %w", code, err)
+			}
+		}
+	}
+	return nil
+}
+
+// demoShippingMethods are ONDO's three real options plus one deliberately
+// deactivated row.
+//
+// The inactive one is the same discipline as the draft product above: change
+// order-extras requires that a deactivated method never appears on the public
+// list and that checkout refuses it with 422. Without a deactivated row in the
+// seed those two rules can only ever be checked against a test fixture — not
+// against the data a merchant or an integrator actually sees (design D9).
+var demoShippingMethods = []struct {
+	Name     string
+	Carrier  string
+	FlatRate int64
+	IsActive bool
+}{
+	{"台北市當日配送", "自有車隊", 200, true},
+	{"全台隔日配送", "黑貓宅急便", 150, true},
+	{"門市自取", "門市", 0, true},
+	{"離島加價配送", "中華郵政", 350, false},
+}
+
+// seedDemoShipping provisions the demo shop's shipping methods.
+//
+// Idempotent per row on (shop_id, name) rather than as one block: the rows are
+// independent of each other, so adding a method to this list later must reach
+// databases that were already seeded — the same "existing ones stay, missing
+// ones get created" shape seedStarterTheme uses for theme pages (design D4).
+// Existing rows are never updated: flat_rate and is_active are merchant
+// operational data, and re-running the seed must not undo a value someone
+// changed in the back office.
+func seedDemoShipping(ctx context.Context, tx *ent.Tx, shopID int) error {
+	for _, sm := range demoShippingMethods {
+		exists, err := tx.ShippingMethod.Query().
+			Where(entshippingmethod.ShopIDEQ(shopID), entshippingmethod.NameEQ(sm.Name)).
+			Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("seed: query demo shipping method %s: %w", sm.Name, err)
+		}
+		if exists {
+			continue
+		}
+		if _, err := tx.ShippingMethod.Create().
+			SetShopID(shopID).
+			SetName(sm.Name).
+			SetCarrier(sm.Carrier).
+			SetFlatRate(sm.FlatRate).
+			SetIsActive(sm.IsActive).
+			Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo shipping method %s: %w", sm.Name, err)
+		}
+	}
+	return nil
+}
+
+// demoTiers is the loyalty ladder, chosen together with demoFloralProducts
+// (design D3) — see that comment for why the two cannot be picked separately.
+//
+//	一般會員   0 pts  — min_points 0 means anyone with any ledger activity has a
+//	                   tier, which is the shape merchants actually configure.
+//	                   The "no tier" state stays observable anyway: a customer
+//	                   who has never earned a point still has level_id NULL.
+//	銀卡會員  30 pts  — reachable by ONE bouquet (3200–4400 → 32–44 points), so
+//	                   the upgrade path runs on a realistic order.
+//	金卡會員 100 pts  — reachable by three, so the ladder has a top that is not
+//	                   merely decorative.
+//
+// discount_percent is reserved and unused this phase (member-tiers-and-points
+// Non-Goals); it is populated so the back office has something to display.
+var demoTiers = []struct {
+	Name            string
+	MinPoints       int32
+	DiscountPercent *int16
+}{
+	{"一般會員", 0, nil},
+	{"銀卡會員", 30, ptr[int16](5)},
+	{"金卡會員", 100, ptr[int16](10)},
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// seedDemoTiers provisions the demo shop's member tiers, idempotent per row on
+// (shop_id, name) for the same reasons as seedDemoShipping.
+func seedDemoTiers(ctx context.Context, tx *ent.Tx, shopID int) error {
+	for _, t := range demoTiers {
+		exists, err := tx.MemberTier.Query().
+			Where(entmembertier.ShopIDEQ(shopID), entmembertier.NameEQ(t.Name)).
+			Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("seed: query demo member tier %s: %w", t.Name, err)
+		}
+		if exists {
+			continue
+		}
+		create := tx.MemberTier.Create().
+			SetShopID(shopID).SetName(t.Name).SetMinPoints(t.MinPoints)
+		if t.DiscountPercent != nil {
+			create.SetDiscountPercent(*t.DiscountPercent)
+		}
+		if _, err := create.Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo member tier %s: %w", t.Name, err)
+		}
+	}
+	return nil
+}
+
+// DemoPublishableKey is the demo shop's publishable key. Fixed, not random,
+// and deliberately self-describing (design D5).
+//
+// Three reasons, weakest first:
+//
+//  1. Idempotency becomes exact — the natural key IS the value, so "already
+//     there?" is one primary-key lookup. Keying it on `label` instead would
+//     contradict that column's own schema comment ("purely descriptive — no
+//     code path makes any decision from it").
+//  2. It can be pasted into docs, curl commands and an integrator's front end
+//     without first logging into the back office to fetch it.
+//  3. (decisive) It widens nothing. A publishable key is an IDENTIFIER, NOT A
+//     CREDENTIAL (change storefront-client-auth, design D1: "its disclosure is
+//     not a security incident. It grants nothing"), and the demo shop is
+//     already resolvable with no key at all via `Host: demo.localhost`. The
+//     entropy in a generated key exists to stop enumeration of which shops the
+//     platform hosts; "demo.localhost hosts a demo shop" is not a secret.
+//
+// The value uses only the random segment's own alphabet (a–z). It deliberately
+// does NOT use an underscore-delimited segment like "pk_demo_…": design D8 of
+// storefront-client-auth reserves that grammar for a future environment infix
+// ("pk_test_…"), and "demo" sitting in that position would read as one.
+//
+// Exported so E2E and tooling can address the demo shop without a round trip.
+const DemoPublishableKey = "pk_demoseedstorefrontkeynotsecret"
+
+// DemoAllowedOrigin is registered for the demo shop so the per-shop CORS path
+// (change storefront-client-auth) has real data behind it — the platform's own
+// CORS_ALLOWED_ORIGINS covers localhost:3000/3001 but not the demo host.
+const DemoAllowedOrigin = "http://demo.localhost:3000"
+
+// seedDemoStorefrontClient provisions the demo shop's storefront client
+// identity: one publishable key and one registered browser origin. Both are
+// idempotent on their own globally-unique columns.
+func seedDemoStorefrontClient(ctx context.Context, tx *ent.Tx, shopID int) error {
+	hasKey, err := tx.PublishableKey.Query().
+		Where(entpublishablekey.KeyEQ(DemoPublishableKey)).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo publishable key: %w", err)
+	}
+	if !hasKey {
+		if _, err := tx.PublishableKey.Create().
+			SetShopID(shopID).
+			SetKey(DemoPublishableKey).
+			SetLabel("demo storefront (seed)").
+			Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo publishable key: %w", err)
+		}
+	}
+
+	hasOrigin, err := tx.ShopAllowedOrigin.Query().
+		Where(entshopallowedorigin.OriginEQ(DemoAllowedOrigin)).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo allowed origin: %w", err)
+	}
+	if !hasOrigin {
+		if _, err := tx.ShopAllowedOrigin.Create().
+			SetShopID(shopID).
+			SetOrigin(DemoAllowedOrigin).
+			Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo allowed origin: %w", err)
+		}
+	}
+	return nil
+}
+
+// Demo customer credentials, same convention as the demo merchant owner above.
+const (
+	DemoCustomerEmail    = "demo-customer@example.com"
+	DemoCustomerPassword = "demo-customer-change-me"
+)
+
+// seedDemoCustomer provisions a demo shop customer that can log in.
+//
+// Its purpose is not decoration: the member checkout path needs an identity,
+// and having one already seeded means E2E does not have to call the register
+// endpoint on every run — which would burn the registration rate-limit budget
+// and make repeated runs flaky (design D7). It also gives the back office a
+// customer to look at on a freshly seeded database.
+//
+// The query carries shop_id explicitly: seeding runs outside tenant context,
+// so the interceptor adds nothing (change member-identity-per-shop, design D4).
+func seedDemoCustomer(ctx context.Context, tx *ent.Tx, shopID int) error {
+	exists, err := tx.Member.Query().
+		Where(entmember.ShopIDEQ(shopID), entmember.EmailEQ(DemoCustomerEmail)).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo customer: %w", err)
+	}
+	if exists {
+		return nil
+	}
+	hash, err := auth.HashPassword(DemoCustomerPassword)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Member.Create().
+		SetShopID(shopID).
+		SetEmail(DemoCustomerEmail).
+		SetPasswordHash(hash).
+		SetStatus(1).
+		Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo customer: %w", err)
+	}
 	return nil
 }

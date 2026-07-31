@@ -663,10 +663,29 @@ func (s *Service) DeleteProduct(ctx context.Context, shopID, productID int) erro
 	return s.Client.Product.DeleteOne(p).Exec(ctx)
 }
 
+// orderSkusByID pins the order of every eager-loaded SKU collection to id
+// ascending — i.e. the order the merchant entered them (change
+// commerce-demo-seed, design D8).
+//
+// Without it ent emits a bare `WHERE product_id IN (...)` and Postgres is free
+// to return the rows in whatever order the plan produces; measured output for a
+// two-SKU product was [id=2, id=1]. For a consumer the SKU array IS the size
+// selector, so an undefined order is a size picker that reshuffles itself
+// between page loads, with nothing in the API telling anyone not to rely on it.
+//
+// id ascending rather than sku_code or price: sku_code is merchant-authored
+// free text whose lexical order is not size order ("L" < "M" < "S"), and price
+// order is undefined again among equally-priced SKUs. Creation order is the
+// only answer the merchant already controls without a new column. It also
+// matches every other list endpoint in this codebase — ListShippingMethods,
+// ListActiveShippingMethods and ListMemberTiers all order explicitly; none
+// leaves it to the database.
+func orderSkusByID(q *ent.ProductSKUQuery) { q.Order(entproductsku.ByID()) }
+
 func (s *Service) GetProduct(ctx context.Context, shopID, productID int) (*ent.Product, error) {
 	p, err := s.Client.Product.Query().
 		Where(entproduct.IDEQ(productID), entproduct.ShopIDEQ(shopID)).
-		WithSkus().
+		WithSkus(orderSkusByID).
 		WithCategories().
 		Only(ctx)
 	if err != nil {
@@ -720,7 +739,7 @@ func (s *Service) ListProducts(ctx context.Context, shopID int, params ProductLi
 		return nil, err
 	}
 	products, err := q.
-		WithSkus().
+		WithSkus(orderSkusByID).
 		WithCategories().
 		Order(entproduct.ByID()).
 		Limit(pageSize).
@@ -752,7 +771,7 @@ func (s *Service) ListPublishedProducts(ctx context.Context, shopID int, params 
 		return nil, err
 	}
 	products, err := q.
-		WithSkus().
+		WithSkus(orderSkusByID).
 		WithCategories().
 		Order(entproduct.ByID()).
 		Limit(pageSize).
@@ -769,7 +788,7 @@ func (s *Service) ListPublishedProducts(ctx context.Context, shopID int, params 
 func (s *Service) GetPublishedProductBySlug(ctx context.Context, shopID int, slug string) (*ent.Product, error) {
 	p, err := s.Client.Product.Query().
 		Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ(strings.ToLower(strings.TrimSpace(slug))), entproduct.StatusEQ(1)).
-		WithSkus().
+		WithSkus(orderSkusByID).
 		WithCategories().
 		Only(ctx)
 	if err != nil {

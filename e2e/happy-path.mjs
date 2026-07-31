@@ -2,30 +2,26 @@
 // seed 建店 → (網域已綁 demo.localhost) → admin UI 登入 → 編輯全域內容與首頁
 // → 發佈 → 前台渲染 → 換版 → 前台反映新主題。
 //
+// Since change commerce-demo-seed this script is the "run everything" entry
+// point: after the CMS flow above it also runs the commerce chain
+// (e2e/commerce-path.mjs) and reports one combined result. Keeping both behind
+// the single documented command is deliberate — a second entry point nobody is
+// told to run is a suite nobody runs (design D2). The commerce path needs no
+// browser and can also be run on its own: `node commerce-path.mjs`.
+//
 // Prereqs: API on :8080, web on :3000, admin on :3001, seeded demo shop
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { chromium } from "playwright";
 
-const API = "http://localhost:8080";
-const ADMIN_EMAIL = "admin@example.com";
-const ADMIN_PASSWORD = "admin-change-me";
+import { check, fail, failureCount, req } from "./lib.mjs";
+import { runCommercePath } from "./commerce-path.mjs";
 
-let failures = 0;
-function check(name, cond, extra = "") {
-  if (cond) {
-    console.log(`  ✓ ${name}`);
-  } else {
-    failures++;
-    console.error(`  ✗ ${name} ${extra}`);
-  }
-}
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin-change-me";
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
-page.on("pageerror", (err) => {
-  failures++;
-  console.error("  ✗ page JS error:", err.message);
-});
+page.on("pageerror", (err) => fail(`page JS error: ${err.message}`));
 
 try {
   // ── 9.1 登入 ──
@@ -107,15 +103,13 @@ try {
   // ── 換版 → 前台反映新主題 ──
   console.log("⑦ Theme switch reflected on the storefront");
   // Create a second theme via the API (admin UI has no theme manager — 平台端).
-  const login = await (await fetch(`${API}/api/v1/admin/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: ADMIN_EMAIL, password: ADMIN_PASSWORD }),
-  })).json();
-  const authed = { "Content-Type": "application/json", Authorization: `Bearer ${login.access_token}` };
-  const theme = await (await fetch(`${API}/api/v1/admin/themes`, {
-    method: "POST", headers: authed,
-    body: JSON.stringify({
+  const login = await req("POST", "/api/v1/admin/auth/login", {
+    body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+  });
+  const adminToken = login.json.access_token;
+  const themeRes = await req("POST", "/api/v1/admin/themes", {
+    token: adminToken,
+    body: {
       code: "starter-v2", name: "Starter V2", layout_key: "starter/main",
       config_schema: {
         type: "object", additionalProperties: false,
@@ -137,12 +131,13 @@ try {
                 href: { type: "string", default: "/" } } } } } },
         },
       },
-    }),
-  })).json();
+    },
+  });
+  const theme = themeRes.json;
   check("v2 theme created", Boolean(theme.id), JSON.stringify(theme));
-  const tp = await (await fetch(`${API}/api/v1/admin/themes/${theme.id}/pages`, {
-    method: "POST", headers: authed,
-    body: JSON.stringify({
+  const tp = await req("POST", `/api/v1/admin/themes/${theme.id}/pages`, {
+    token: adminToken,
+    body: {
       type_key: "home", component_key: "starter/home",
       page_schema: {
         type: "object", additionalProperties: false,
@@ -157,20 +152,21 @@ try {
             cta_href: { type: "string", default: "/" },
           } }] } } },
       },
-    }),
-  })).json();
-  check("v2 home page type registered", Boolean(tp.id), JSON.stringify(tp));
-  const sw = await (await fetch(`${API}/api/v1/admin/shops/1/theme`, {
-    method: "POST", headers: authed, body: JSON.stringify({ theme_id: theme.id }),
-  })).json();
-  check("theme switched", sw.theme_id === theme.id, JSON.stringify(sw));
+    },
+  });
+  check("v2 home page type registered", Boolean(tp.json.id), tp.text);
+  const sw = await req("POST", "/api/v1/admin/shops/1/theme", {
+    token: adminToken, body: { theme_id: theme.id },
+  });
+  check("theme switched", sw.json.theme_id === theme.id, sw.text);
 
   // The bundle now carries the v2 theme, and keys the v2 schema does not
   // define are pruned from the hydrated output (design D6) — while existing
   // payload values (site_title from step ⑥) are preserved, not reset.
-  const bundle = await (await fetch(`${API}/api/v1/render/page?path=/`, {
+  const bundleRes = await req("GET", "/api/v1/render/page?path=/", {
     headers: { "X-Site-Domain": "demo.localhost" },
-  })).json();
+  });
+  const bundle = bundleRes.json;
   check("bundle switches to the v2 theme immediately",
     bundle.shop?.theme?.code === "starter-v2", JSON.stringify(bundle.shop?.theme));
   check("keys undefined in the v2 schema are pruned",
@@ -185,15 +181,25 @@ try {
     heroStill?.includes("E2E 全新首頁標題"), heroStill ?? "");
 
   // Switch back to starter for repeatability.
-  await fetch(`${API}/api/v1/admin/shops/1/theme`, {
-    method: "POST", headers: authed, body: JSON.stringify({ theme_id: 1 }),
+  await req("POST", "/api/v1/admin/shops/1/theme", {
+    token: adminToken, body: { theme_id: 1 },
   });
+} catch (err) {
+  // Record and carry on: an admin/web outage must not hide the commerce
+  // results, which need only the API.
+  fail(`CMS path aborted: ${err?.stack ?? err}`);
 } finally {
   await browser.close();
 }
 
-if (failures > 0) {
-  console.error(`\nE2E FAILED with ${failures} failed check(s)`);
+// ── 電商鏈（change commerce-demo-seed）──
+// No browser involved; shares lib.mjs's failure counter so the exit below
+// reflects both halves.
+console.log("\n════ Commerce path ════");
+await runCommercePath();
+
+if (failureCount() > 0) {
+  console.error(`\nE2E FAILED with ${failureCount()} failed check(s)`);
   process.exit(1);
 }
-console.log("\nE2E happy path PASSED");
+console.log("\nE2E happy path PASSED (CMS + commerce)");

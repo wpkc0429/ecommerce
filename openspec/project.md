@@ -33,7 +33,9 @@
 
 - 單元測試無外部依賴（`make test`）；整合測試以 `INTEGRATION=1` gate、共用 test DB 串行執行（`make test-int`）
 - specs 的 WHEN/THEN 場景即驗收：RBAC 判定矩陣、token 隔離矩陣、hydration/section 補全、多租戶解析與隔離皆有對應測試
-- 瀏覽器 E2E：`e2e/happy-path.mjs`（admin 編輯→發佈→前台渲染→換版）
+- E2E 兩支共用 `e2e/lib.mjs`（單一失敗計數器）：`happy-path.mjs` 為總入口（瀏覽器 CMS 流程 ＋ 電商鏈），`commerce-path.mjs` 為無瀏覽器、可重複執行的電商子集
+- **`internal/app/wire.go` 的領域事件訂閱只由 e2e 覆蓋**（change commerce-demo-seed design D1）：每支 integration test 都自建 dispatcher，故刪掉 `wire.go` 的訂閱不會讓任何 Go 測試轉紅（已實測）。改動事件鏈或 wire 後 MUST 跑 `commerce-path.mjs`
+- demo seed 是可測的契約而非佈景（spec `demo-seed`）：`internal/seed` 的整合測試守著佈建完整性、冪等性、以及「等級門檻必須能被 seed 目錄的單筆訂單跨過」這條內部一致性不變式
 
 ### Git Workflow
 
@@ -56,6 +58,7 @@
 - 扣庫存只有一份實作：任何下單入口 MUST 呼叫 `order.Service.Checkout`（change guest-checkout design D1）；訂單存取 token（`aud=order:{shop_id}`）只能觸及它指名的那一筆訂單，MUST NOT 演化成 session
 - 訂單金額：`total_amount = subtotal_amount + shipping_fee`（DB CHECK 強制，change order-extras design D6/D7），`total_amount` 是**應付總額**也是請款金額；**點數以 `subtotal_amount` 核發，運費不計點**（design D5）
 - D13 的 v1 破例窗口已在 change order-extras 用盡並關閉：後續破壞性變更 MUST 走新端點或 `/api/v2`，MUST NOT 再引用「尚無外部消費者」
+- 回傳集合的端點 MUST 明訂順序，MUST NOT 交給資料庫決定（change commerce-demo-seed design D8）：商品的 SKU 集合依 id 遞增，公開與後台一致
 
 ## External Dependencies
 
