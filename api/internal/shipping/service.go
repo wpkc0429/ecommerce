@@ -168,6 +168,29 @@ func (s *Service) ListShippingMethods(ctx context.Context, shopID int) ([]*ent.S
 	return rows, nil
 }
 
+// ListActiveShippingMethods returns only the shop's selectable shipping
+// methods, ordered by id — the storefront-facing counterpart of
+// ListShippingMethods (change order-extras, design D4).
+//
+// shipping-logistics design D7 declined to expose this, on the grounds that no
+// consumer existed and a read-only endpoint nobody calls can only be tested for
+// response shape. A merchant-owned storefront now needs the fees the platform
+// will actually charge, so the premise no longer holds.
+//
+// Deactivated methods are omitted rather than flagged: a method the merchant
+// retired is not offerable, and checkout refuses it anyway
+// (order.Service.resolveShippingMethod).
+func (s *Service) ListActiveShippingMethods(ctx context.Context, shopID int) ([]*ent.ShippingMethod, error) {
+	rows, err := s.Client.ShippingMethod.Query().
+		Where(entshippingmethod.ShopIDEQ(shopID), entshippingmethod.IsActiveEQ(true)).
+		Order(entshippingmethod.ByID()).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("shipping: list active shipping methods: %w", err)
+	}
+	return rows, nil
+}
+
 func (s *Service) UpdateShippingMethod(ctx context.Context, shopID, id int, in ShippingMethodUpdate) (*ent.ShippingMethod, error) {
 	sm, err := s.Client.ShippingMethod.Query().
 		Where(entshippingmethod.IDEQ(id), entshippingmethod.ShopIDEQ(shopID)).

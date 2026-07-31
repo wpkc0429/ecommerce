@@ -95,6 +95,11 @@ func Currency(v string) predicate.CartItem {
 	return predicate.CartItem(sql.FieldEQ(FieldCurrency, v))
 }
 
+// GiftMessage applies equality check predicate on the "gift_message" field. It's identical to GiftMessageEQ.
+func GiftMessage(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldEQ(FieldGiftMessage, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.CartItem {
 	return predicate.CartItem(sql.FieldEQ(FieldCreatedAt, v))
@@ -388,6 +393,71 @@ func CurrencyEqualFold(v string) predicate.CartItem {
 // CurrencyContainsFold applies the ContainsFold predicate on the "currency" field.
 func CurrencyContainsFold(v string) predicate.CartItem {
 	return predicate.CartItem(sql.FieldContainsFold(FieldCurrency, v))
+}
+
+// GiftMessageEQ applies the EQ predicate on the "gift_message" field.
+func GiftMessageEQ(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldEQ(FieldGiftMessage, v))
+}
+
+// GiftMessageNEQ applies the NEQ predicate on the "gift_message" field.
+func GiftMessageNEQ(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldNEQ(FieldGiftMessage, v))
+}
+
+// GiftMessageIn applies the In predicate on the "gift_message" field.
+func GiftMessageIn(vs ...string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldIn(FieldGiftMessage, vs...))
+}
+
+// GiftMessageNotIn applies the NotIn predicate on the "gift_message" field.
+func GiftMessageNotIn(vs ...string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldNotIn(FieldGiftMessage, vs...))
+}
+
+// GiftMessageGT applies the GT predicate on the "gift_message" field.
+func GiftMessageGT(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldGT(FieldGiftMessage, v))
+}
+
+// GiftMessageGTE applies the GTE predicate on the "gift_message" field.
+func GiftMessageGTE(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldGTE(FieldGiftMessage, v))
+}
+
+// GiftMessageLT applies the LT predicate on the "gift_message" field.
+func GiftMessageLT(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldLT(FieldGiftMessage, v))
+}
+
+// GiftMessageLTE applies the LTE predicate on the "gift_message" field.
+func GiftMessageLTE(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldLTE(FieldGiftMessage, v))
+}
+
+// GiftMessageContains applies the Contains predicate on the "gift_message" field.
+func GiftMessageContains(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldContains(FieldGiftMessage, v))
+}
+
+// GiftMessageHasPrefix applies the HasPrefix predicate on the "gift_message" field.
+func GiftMessageHasPrefix(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldHasPrefix(FieldGiftMessage, v))
+}
+
+// GiftMessageHasSuffix applies the HasSuffix predicate on the "gift_message" field.
+func GiftMessageHasSuffix(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldHasSuffix(FieldGiftMessage, v))
+}
+
+// GiftMessageEqualFold applies the EqualFold predicate on the "gift_message" field.
+func GiftMessageEqualFold(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldEqualFold(FieldGiftMessage, v))
+}
+
+// GiftMessageContainsFold applies the ContainsFold predicate on the "gift_message" field.
+func GiftMessageContainsFold(v string) predicate.CartItem {
+	return predicate.CartItem(sql.FieldContainsFold(FieldGiftMessage, v))
 }
 
 // HasShop applies the HasEdge predicate on the "shop" edge.

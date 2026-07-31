@@ -32,6 +32,16 @@ const (
 	FieldCurrency = "currency"
 	// FieldTotalAmount holds the string denoting the total_amount field in the database.
 	FieldTotalAmount = "total_amount"
+	// FieldSubtotalAmount holds the string denoting the subtotal_amount field in the database.
+	FieldSubtotalAmount = "subtotal_amount"
+	// FieldShippingFee holds the string denoting the shipping_fee field in the database.
+	FieldShippingFee = "shipping_fee"
+	// FieldShippingMethodID holds the string denoting the shipping_method_id field in the database.
+	FieldShippingMethodID = "shipping_method_id"
+	// FieldShippingMethodName holds the string denoting the shipping_method_name field in the database.
+	FieldShippingMethodName = "shipping_method_name"
+	// FieldRequestedDeliveryDate holds the string denoting the requested_delivery_date field in the database.
+	FieldRequestedDeliveryDate = "requested_delivery_date"
 	// FieldShippingAddress holds the string denoting the shipping_address field in the database.
 	FieldShippingAddress = "shipping_address"
 	// FieldCancelledAt holds the string denoting the cancelled_at field in the database.
@@ -79,6 +89,11 @@ var Columns = []string{
 	FieldFulfillmentStatus,
 	FieldCurrency,
 	FieldTotalAmount,
+	FieldSubtotalAmount,
+	FieldShippingFee,
+	FieldShippingMethodID,
+	FieldShippingMethodName,
+	FieldRequestedDeliveryDate,
 	FieldShippingAddress,
 	FieldCancelledAt,
 }
@@ -108,6 +123,10 @@ var (
 	DefaultFulfillmentStatus int16
 	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	CurrencyValidator func(string) error
+	// DefaultShippingFee holds the default value on creation for the "shipping_fee" field.
+	DefaultShippingFee int64
+	// ShippingMethodNameValidator is a validator for the "shipping_method_name" field. It is called by the builders before save.
+	ShippingMethodNameValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the Order queries.
@@ -161,6 +180,31 @@ func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 // ByTotalAmount orders the results by the total_amount field.
 func ByTotalAmount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTotalAmount, opts...).ToFunc()
+}
+
+// BySubtotalAmount orders the results by the subtotal_amount field.
+func BySubtotalAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubtotalAmount, opts...).ToFunc()
+}
+
+// ByShippingFee orders the results by the shipping_fee field.
+func ByShippingFee(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShippingFee, opts...).ToFunc()
+}
+
+// ByShippingMethodID orders the results by the shipping_method_id field.
+func ByShippingMethodID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShippingMethodID, opts...).ToFunc()
+}
+
+// ByShippingMethodName orders the results by the shipping_method_name field.
+func ByShippingMethodName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShippingMethodName, opts...).ToFunc()
+}
+
+// ByRequestedDeliveryDate orders the results by the requested_delivery_date field.
+func ByRequestedDeliveryDate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestedDeliveryDate, opts...).ToFunc()
 }
 
 // ByCancelledAt orders the results by the cancelled_at field.

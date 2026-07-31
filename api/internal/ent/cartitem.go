@@ -36,6 +36,8 @@ type CartItem struct {
 	PriceAmount int64 `json:"price_amount,omitempty"`
 	// Currency holds the value of the "currency" field.
 	Currency string `json:"currency,omitempty"`
+	// GiftMessage holds the value of the "gift_message" field.
+	GiftMessage string `json:"gift_message,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the CartItemQuery when eager-loading is set.
 	Edges        CartItemEdges `json:"edges"`
@@ -95,7 +97,7 @@ func (*CartItem) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case cartitem.FieldID, cartitem.FieldShopID, cartitem.FieldCartID, cartitem.FieldSkuID, cartitem.FieldQuantity, cartitem.FieldPriceAmount:
 			values[i] = new(sql.NullInt64)
-		case cartitem.FieldCurrency:
+		case cartitem.FieldCurrency, cartitem.FieldGiftMessage:
 			values[i] = new(sql.NullString)
 		case cartitem.FieldCreatedAt, cartitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -168,6 +170,12 @@ func (_m *CartItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field currency", values[i])
 			} else if value.Valid {
 				_m.Currency = value.String
+			}
+		case cartitem.FieldGiftMessage:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field gift_message", values[i])
+			} else if value.Valid {
+				_m.GiftMessage = value.String
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -245,6 +253,9 @@ func (_m *CartItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("currency=")
 	builder.WriteString(_m.Currency)
+	builder.WriteString(", ")
+	builder.WriteString("gift_message=")
+	builder.WriteString(_m.GiftMessage)
 	builder.WriteByte(')')
 	return builder.String()
 }

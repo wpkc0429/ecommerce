@@ -29,6 +29,7 @@ import (
 	entorderitem "ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
+	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 )
 
 // ErrNotFound marks missing resources (handler → 404). Also returned when an
@@ -133,6 +134,58 @@ func (a ShippingAddress) Validate() error {
 	return nil
 }
 
+// deliveryDateLayout is the only accepted wire format for a requested delivery
+// date (change order-extras, design D3). time.Parse with this layout also
+// rejects dates that do not exist (2026-02-31), not just malformed strings.
+const deliveryDateLayout = "2006-01-02"
+
+// CheckoutInput is everything a checkout request carries beyond the cart
+// itself (change order-extras, design D11). Both entry points — member
+// checkout and guest checkout — build this same value, so "what is a valid
+// delivery date" and "what is a selectable shipping method" have exactly one
+// definition and produce byte-identical 422s on both paths.
+//
+// RequestedDeliveryDate is the raw wire string rather than a parsed time on
+// purpose: parsing it here keeps every date rule inside this package, so no
+// HTTP handler has to know any of them.
+type CheckoutInput struct {
+	ShippingAddress       ShippingAddress
+	ShippingMethodID      *int
+	RequestedDeliveryDate *string
+}
+
+// parseRequestedDeliveryDate validates and normalizes the requested delivery
+// date (change order-extras, design D3). nil/empty means "not requested".
+//
+// Exactly two rules, deliberately:
+//
+//   - strict YYYY-MM-DD, which also rejects impossible dates;
+//   - not a day that has already passed in *every* timezone on earth.
+//
+// The second rule's one-day slack is not sloppiness. The system stores no
+// per-shop timezone, so the server cannot know which calendar day "today" is
+// for this merchant: at 07:00 in Taipei it is still yesterday in UTC, and at
+// 18:00 in Los Angeles it is already tomorrow. Bounding at UTC-yesterday
+// catches the thing worth catching (a mistyped year) without ever rejecting a
+// customer ordering legitimately for today in their own timezone. Merchant
+// lead times, cut-off hours and blackout dates are explicitly out of scope —
+// they need a timezone and a holiday model, not one more field.
+func parseRequestedDeliveryDate(raw *string) (*time.Time, error) {
+	if raw == nil || *raw == "" {
+		return nil, nil
+	}
+	d, err := time.Parse(deliveryDateLayout, *raw)
+	if err != nil {
+		return nil, validationErr("/requested_delivery_date", "requested_delivery_date must be a valid date in YYYY-MM-DD format")
+	}
+	now := time.Now().UTC()
+	earliest := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, -1)
+	if d.Before(earliest) {
+		return nil, validationErr("/requested_delivery_date", "requested_delivery_date must not be in the past")
+	}
+	return &d, nil
+}
+
 // Service implements order operations, all scoped by explicit shopID/
 // memberID parameters (never ambient tenant/member context — same
 // convention as cart.Service/catalog.Service: keeps the package testable
@@ -140,6 +193,38 @@ func (a ShippingAddress) Validate() error {
 // single place responsible for extracting identity from the request).
 type Service struct {
 	Client *ent.Client
+}
+
+// resolveShippingMethod validates the selected shipping method and returns the
+// values to snapshot onto the order (change order-extras, design D4). nil
+// selection is the ordinary case and yields a zero fee, i.e. exactly the
+// behavior every request had before this change.
+//
+// A missing, foreign or deactivated method is a 422 on a request-body value —
+// the same treatment /items/{i}/sku_id already gets for a foreign SKU — not a
+// 404, and never a silent "charge nothing": the merchant retiring an option
+// means they no longer want to sell it at that price.
+//
+// This runs *outside* the checkout transaction, alongside the existing
+// purchasability validation. A merchant re-pricing a method in that window is a
+// benign race: the customer is charged the price they were shown.
+func (s *Service) resolveShippingMethod(ctx context.Context, shopID int, methodID *int) (*ent.ShippingMethod, error) {
+	if methodID == nil {
+		return nil, nil
+	}
+	sm, err := s.Client.ShippingMethod.Query().
+		Where(entshippingmethod.IDEQ(*methodID), entshippingmethod.ShopIDEQ(shopID)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, validationErr("/shipping_method_id", "shipping method does not exist in this shop")
+	}
+	if err != nil {
+		return nil, fmt.Errorf("order: query shipping method: %w", err)
+	}
+	if !sm.IsActive {
+		return nil, validationErr("/shipping_method_id", "shipping method is not active")
+	}
+	return sm, nil
 }
 
 // ── checkout ────────────────────────────────────────────────────────────
@@ -168,9 +253,30 @@ type Service struct {
 //
 // Any failure at any step rolls back the whole transaction — no partial
 // stock deduction, no orphaned order, no converted cart left behind.
-func (s *Service) Checkout(ctx context.Context, shopID, memberID int, addr ShippingAddress) (*ent.Order, error) {
-	if err := addr.Validate(); err != nil {
+//
+// Change order-extras added the delivery date and shipping method to this
+// method rather than to its callers, and did so strictly *around* the
+// transaction: both are parsed and validated before it opens (a bad shipping
+// method must not consume the cart or touch stock), and the resulting fee only
+// enters the arithmetic that composes the order row. The conditional stock
+// decrement and its affected-rows check below are unchanged, character for
+// character — they remain the single implementation every order-placing entry
+// point shares.
+func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in CheckoutInput) (*ent.Order, error) {
+	if err := in.ShippingAddress.Validate(); err != nil {
 		return nil, err
+	}
+	deliveryDate, err := parseRequestedDeliveryDate(in.RequestedDeliveryDate)
+	if err != nil {
+		return nil, err
+	}
+	shippingMethod, err := s.resolveShippingMethod(ctx, shopID, in.ShippingMethodID)
+	if err != nil {
+		return nil, err
+	}
+	var shippingFee int64
+	if shippingMethod != nil {
+		shippingFee = shippingMethod.FlatRate
 	}
 
 	c, err := s.Client.Cart.Query().
@@ -215,7 +321,7 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, addr Shipp
 	// Step 5 (design D2): atomic conditional decrement per line. The first
 	// insufficient-stock line rolls back everything, including the cart
 	// flip above.
-	var total int64
+	var subtotal int64
 	for i, it := range c.Edges.Items {
 		affected, err := tx.ProductSKU.Update().
 			Where(entproductsku.IDEQ(*it.SkuID), entproductsku.ShopIDEQ(shopID), entproductsku.StockQtyGTE(it.Quantity)).
@@ -232,24 +338,35 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, addr Shipp
 				Details: []Detail{{Pointer: fmt.Sprintf("/items/%d", i), Message: "insufficient stock"}},
 			}
 		}
-		total += it.PriceAmount * int64(it.Quantity)
+		subtotal += it.PriceAmount * int64(it.Quantity)
 	}
 
-	addrJSON, err := json.Marshal(addr)
+	addrJSON, err := json.Marshal(in.ShippingAddress)
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("order: marshal shipping address: %w", err)
 	}
 
-	o, err := tx.Order.Create().
+	// change order-extras, design D6/D7: total_amount is the payable total.
+	// The DB's orders_total_amount_composition_check enforces this same
+	// equation, so no other path can create an order where it does not hold.
+	create := tx.Order.Create().
 		SetShopID(shopID).SetMemberID(memberID).
 		SetStatus(StatusCreated).
 		SetPaymentStatus(PaymentStatusUnpaid).
 		SetFulfillmentStatus(FulfillmentStatusUnfulfilled).
 		SetCurrency(c.Currency).
-		SetTotalAmount(total).
-		SetShippingAddress(addrJSON).
-		Save(ctx)
+		SetSubtotalAmount(subtotal).
+		SetShippingFee(shippingFee).
+		SetTotalAmount(subtotal + shippingFee).
+		SetShippingAddress(addrJSON)
+	if shippingMethod != nil {
+		create.SetShippingMethodID(shippingMethod.ID).SetShippingMethodName(shippingMethod.Name)
+	}
+	if deliveryDate != nil {
+		create.SetRequestedDeliveryDate(*deliveryDate)
+	}
+	o, err := create.Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, fmt.Errorf("order: create order: %w", err)
@@ -265,6 +382,7 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, addr Shipp
 			SetProductID(product.ID).SetProductTitle(product.Title).
 			SetSkuID(*it.SkuID).SetSkuCode(sku.SkuCode).
 			SetQuantity(it.Quantity).SetPriceAmount(it.PriceAmount).SetCurrency(it.Currency).
+			SetGiftMessage(it.GiftMessage).
 			Save(ctx); err != nil {
 			_ = tx.Rollback()
 			return nil, fmt.Errorf("order: create order item: %w", err)

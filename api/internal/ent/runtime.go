@@ -109,6 +109,10 @@ func init() {
 			return nil
 		}
 	}()
+	// cartitemDescGiftMessage is the schema descriptor for gift_message field.
+	cartitemDescGiftMessage := cartitemFields[6].Descriptor()
+	// cartitem.DefaultGiftMessage holds the default value on creation for the gift_message field.
+	cartitem.DefaultGiftMessage = cartitemDescGiftMessage.Default.(string)
 	categoryMixin := schema.Category{}.Mixin()
 	categoryMixinFields0 := categoryMixin[0].Fields()
 	_ = categoryMixinFields0
@@ -309,6 +313,14 @@ func init() {
 			return nil
 		}
 	}()
+	// orderDescShippingFee is the schema descriptor for shipping_fee field.
+	orderDescShippingFee := orderFields[8].Descriptor()
+	// order.DefaultShippingFee holds the default value on creation for the shipping_fee field.
+	order.DefaultShippingFee = orderDescShippingFee.Default.(int64)
+	// orderDescShippingMethodName is the schema descriptor for shipping_method_name field.
+	orderDescShippingMethodName := orderFields[10].Descriptor()
+	// order.ShippingMethodNameValidator is a validator for the "shipping_method_name" field. It is called by the builders before save.
+	order.ShippingMethodNameValidator = orderDescShippingMethodName.Validators[0].(func(string) error)
 	orderitemMixin := schema.OrderItem{}.Mixin()
 	orderitemMixinFields0 := orderitemMixin[0].Fields()
 	_ = orderitemMixinFields0
@@ -378,6 +390,10 @@ func init() {
 			return nil
 		}
 	}()
+	// orderitemDescGiftMessage is the schema descriptor for gift_message field.
+	orderitemDescGiftMessage := orderitemFields[9].Descriptor()
+	// orderitem.DefaultGiftMessage holds the default value on creation for the gift_message field.
+	orderitem.DefaultGiftMessage = orderitemDescGiftMessage.Default.(string)
 	pageMixin := schema.Page{}.Mixin()
 	pageMixinFields0 := pageMixin[0].Fields()
 	_ = pageMixinFields0

@@ -65,6 +65,15 @@ func (h *ShippingHandler) MountShop(r chi.Router) {
 	r.Get("/orders/{orderID}/shipment", h.getMineShipment)
 }
 
+// MountPublic: the storefront-facing shipping method list (change
+// order-extras, design D4), mounted in the tenant-resolved /shop group with no
+// authentication at all — same placement and reasoning as
+// ProductsHandler.MountPublic. A buyer must be able to see what shipping costs
+// before there is any identity to speak of.
+func (h *ShippingHandler) MountPublic(r chi.Router) {
+	r.Get("/shipping-methods", h.publicListShippingMethods)
+}
+
 // ── JSON serialization ────────────────────────────────────────────────
 
 func shippingMethodJSON(sm *ent.ShippingMethod) map[string]any {
@@ -73,6 +82,20 @@ func shippingMethodJSON(sm *ent.ShippingMethod) map[string]any {
 		"name": sm.Name, "carrier": sm.Carrier,
 		"flat_rate": sm.FlatRate, "is_active": sm.IsActive,
 		"created_at": sm.CreatedAt, "updated_at": sm.UpdatedAt,
+	}
+}
+
+// publicShippingMethodJSON is deliberately smaller than the back-office shape
+// (change order-extras, design D4). v1 accepts additive changes only, so every
+// key published here is a permanent commitment; is_active would carry no
+// information (all rows returned are active) and the timestamps are back-office
+// bookkeeping. Publishing the minimum is the only direction that can still grow.
+//
+// flat_rate is minor currency units in the order's currency — the cart, and
+// therefore the order, is single-currency this phase (design D4's known limit).
+func publicShippingMethodJSON(sm *ent.ShippingMethod) map[string]any {
+	return map[string]any{
+		"id": sm.ID, "name": sm.Name, "carrier": sm.Carrier, "flat_rate": sm.FlatRate,
 	}
 }
 
@@ -98,6 +121,27 @@ func (h *ShippingHandler) listShippingMethods(w http.ResponseWriter, r *http.Req
 	out := make([]map[string]any, 0, len(rows))
 	for _, sm := range rows {
 		out = append(out, shippingMethodJSON(sm))
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"shipping_methods": out})
+}
+
+// publicListShippingMethods answers the storefront's "what can I choose and
+// what does it cost". Tenant comes from the resolved shop context (publishable
+// key, else Host), never from the request body.
+func (h *ShippingHandler) publicListShippingMethods(w http.ResponseWriter, r *http.Request) {
+	shopID, ok := shopFrom(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.Service.ListActiveShippingMethods(r.Context(), shopID)
+	if err != nil {
+		h.Log.Error("list active shipping methods", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	out := make([]map[string]any, 0, len(rows))
+	for _, sm := range rows {
+		out = append(out, publicShippingMethodJSON(sm))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"shipping_methods": out})
 }

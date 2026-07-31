@@ -59,9 +59,55 @@ func (Order) Fields() []ent.Field {
 		field.Int16("fulfillment_status").Default(0),
 		field.String("currency").MaxLen(3).SchemaType(map[string]string{dialect.Postgres: "varchar(3)"}).NotEmpty(),
 		// Money: integer minor units, BIGINT/int64 (product-catalog design
-		// D1). Snapshot of order_items totals at checkout time — never float,
-		// never recomputed after creation.
+		// D1). Never float, never recomputed after creation.
+		//
+		// Three amounts, fixed relative to each other by a DB CHECK (change
+		// order-extras, design D6/D7):
+		//
+		//	subtotal_amount = Σ(order_items.price_amount × quantity)
+		//	shipping_fee    = the selected shipping method's flat_rate, or 0
+		//	total_amount    = subtotal_amount + shipping_fee   ← what is charged
+		//
+		// total_amount changed meaning in change order-extras: it used to be the
+		// item subtotal alone, which meant payment.InitiatePayment charged less
+		// than the storefront displayed. No stored value moved (the backfill set
+		// subtotal_amount = total_amount, shipping_fee = 0, under which every
+		// pre-existing row was already correct); what changed is that a future
+		// order may have total_amount > Σ(items).
+		//
+		// Loyalty points are awarded on subtotal_amount, NOT total_amount
+		// (design D5): shipping is a pass-through cost, and awarding on it would
+		// pay a customer more for choosing the more expensive courier.
 		field.Int64("total_amount"),
+		field.Int64("subtotal_amount"),
+		field.Int64("shipping_fee").Default(0),
+		// Informational only (change order-extras, design D4) — no edge, no FK,
+		// exactly like OrderItem.product_id/sku_id. A real FK would change an
+		// existing endpoint's behavior: DELETE /shipping-methods/{id} would
+		// either start failing for any method ever used, or SET NULL its way
+		// through historical orders. Everything this order needs to display and
+		// reconcile is snapshotted below; callers must never depend on this id
+		// resolving.
+		field.Int("shipping_method_id").Optional().Nillable(),
+		// Denormalized text snapshot — what the customer actually chose and
+		// agreed to pay for, surviving a later rename or deletion of the method.
+		// carrier is deliberately NOT snapshotted (design D4): shipping.Service.
+		// CreateShipment requires the back office to state the carrier
+		// explicitly, so nothing breaks without it.
+		field.String("shipping_method_name").MaxLen(100).
+			SchemaType(map[string]string{dialect.Postgres: "varchar(100)"}).Optional().Nillable(),
+		// requested_delivery_date (change order-extras, design D3): a calendar
+		// day, stored as Postgres `date` — NOT a timestamp. The customer picks a
+		// day, not an instant; storing 2026-08-05T00:00:00Z would be 08-04 in
+		// every timezone west of UTC, and that off-by-one would be written into
+		// the data rather than merely displayed.
+		//
+		// Deliberately its own column rather than an optional key inside
+		// shipping_address: that jsonb answers "where to", this answers "when" —
+		// and a jsonb string is neither validatable nor indexable, which kills
+		// the one query a florist actually wants ("what ships tomorrow").
+		field.Time("requested_delivery_date").Optional().Nillable().
+			SchemaType(map[string]string{dialect.Postgres: "date"}),
 		// Structured recipient/address info (design D8) — jsonb, opaque at
 		// the ent/DB layer like Product.meta/ProductSKU.options; shape is
 		// order.ShippingAddress in api/internal/order, validated at checkout.
@@ -101,6 +147,12 @@ func (Order) Annotations() []schema.Annotation {
 				"orders_payment_status_check":     "payment_status >= 0",
 				"orders_fulfillment_status_check": "fulfillment_status >= 0",
 				"orders_total_amount_check":       "total_amount >= 0",
+				"orders_subtotal_amount_check":    "subtotal_amount >= 0",
+				"orders_shipping_fee_check":       "shipping_fee >= 0",
+				// change order-extras, design D7: the composition of the three
+				// amounts is a database fact, not a line of Go arithmetic that
+				// the next order-creating path could forget to reproduce.
+				"orders_total_amount_composition_check": "total_amount = subtotal_amount + shipping_fee",
 			},
 		},
 	}
@@ -152,6 +204,16 @@ func (OrderItem) Fields() []ent.Field {
 		// — never a live SKU re-query.
 		field.Int64("price_amount"),
 		field.String("currency").MaxLen(3).SchemaType(map[string]string{dialect.Postgres: "varchar(3)"}).NotEmpty(),
+		// gift_message (change order-extras, design D1): copied from the source
+		// cart_item at checkout, then frozen — same discipline as
+		// product_title/sku_code. The customer's own words belong in the
+		// permanent snapshot, not behind a join to a converted cart that a
+		// future cleanup job is entitled to delete.
+		// No ent MaxLen validator, for the same byte-vs-character reason as
+		// CartItem.gift_message; the value arriving here has already passed
+		// cart.Service's character-counted check.
+		field.String("gift_message").
+			SchemaType(map[string]string{dialect.Postgres: "varchar(500)"}).Default(""),
 	}
 }
 

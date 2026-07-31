@@ -62,6 +62,7 @@ var (
 		{Name: "quantity", Type: field.TypeInt32},
 		{Name: "price_amount", Type: field.TypeInt64},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "gift_message", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(500)"}},
 		{Name: "cart_id", Type: field.TypeInt},
 		{Name: "shop_id", Type: field.TypeInt},
 		{Name: "sku_id", Type: field.TypeInt, Nullable: true},
@@ -74,19 +75,19 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "cart_items_carts_items",
-				Columns:    []*schema.Column{CartItemsColumns[6]},
+				Columns:    []*schema.Column{CartItemsColumns[7]},
 				RefColumns: []*schema.Column{CartsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "cart_items_shops_shop",
-				Columns:    []*schema.Column{CartItemsColumns[7]},
+				Columns:    []*schema.Column{CartItemsColumns[8]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "cart_items_product_skus_sku",
-				Columns:    []*schema.Column{CartItemsColumns[8]},
+				Columns:    []*schema.Column{CartItemsColumns[9]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -95,12 +96,12 @@ var (
 			{
 				Name:    "cartitem_cart_id",
 				Unique:  false,
-				Columns: []*schema.Column{CartItemsColumns[6]},
+				Columns: []*schema.Column{CartItemsColumns[7]},
 			},
 			{
 				Name:    "cartitem_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{CartItemsColumns[8]},
+				Columns: []*schema.Column{CartItemsColumns[9]},
 			},
 		},
 	}
@@ -277,6 +278,11 @@ var (
 		{Name: "fulfillment_status", Type: field.TypeInt16, Default: 0},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
 		{Name: "total_amount", Type: field.TypeInt64},
+		{Name: "subtotal_amount", Type: field.TypeInt64},
+		{Name: "shipping_fee", Type: field.TypeInt64, Default: 0},
+		{Name: "shipping_method_id", Type: field.TypeInt, Nullable: true},
+		{Name: "shipping_method_name", Type: field.TypeString, Nullable: true, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "requested_delivery_date", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "date"}},
 		{Name: "shipping_address", Type: field.TypeJSON},
 		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
 		{Name: "shop_id", Type: field.TypeInt},
@@ -290,13 +296,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "orders_shops_shop",
-				Columns:    []*schema.Column{OrdersColumns[10]},
+				Columns:    []*schema.Column{OrdersColumns[15]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "orders_members_member",
-				Columns:    []*schema.Column{OrdersColumns[11]},
+				Columns:    []*schema.Column{OrdersColumns[16]},
 				RefColumns: []*schema.Column{MembersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -305,12 +311,12 @@ var (
 			{
 				Name:    "order_shop_id_member_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrdersColumns[10], OrdersColumns[11]},
+				Columns: []*schema.Column{OrdersColumns[15], OrdersColumns[16]},
 			},
 			{
 				Name:    "order_shop_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{OrdersColumns[10], OrdersColumns[3]},
+				Columns: []*schema.Column{OrdersColumns[15], OrdersColumns[3]},
 			},
 		},
 	}
@@ -326,6 +332,7 @@ var (
 		{Name: "quantity", Type: field.TypeInt32},
 		{Name: "price_amount", Type: field.TypeInt64},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
+		{Name: "gift_message", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(500)"}},
 		{Name: "order_id", Type: field.TypeInt},
 		{Name: "shop_id", Type: field.TypeInt},
 	}
@@ -337,13 +344,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "order_items_orders_items",
-				Columns:    []*schema.Column{OrderItemsColumns[10]},
+				Columns:    []*schema.Column{OrderItemsColumns[11]},
 				RefColumns: []*schema.Column{OrdersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "order_items_shops_shop",
-				Columns:    []*schema.Column{OrderItemsColumns[11]},
+				Columns:    []*schema.Column{OrderItemsColumns[12]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -352,12 +359,12 @@ var (
 			{
 				Name:    "orderitem_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[10]},
+				Columns: []*schema.Column{OrderItemsColumns[11]},
 			},
 			{
 				Name:    "orderitem_shop_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[11]},
+				Columns: []*schema.Column{OrderItemsColumns[12]},
 			},
 		},
 	}
@@ -1205,10 +1212,13 @@ func init() {
 	OrdersTable.ForeignKeys[1].RefTable = MembersTable
 	OrdersTable.Annotation = &entsql.Annotation{}
 	OrdersTable.Annotation.Checks = map[string]string{
-		"orders_fulfillment_status_check": "fulfillment_status >= 0",
-		"orders_payment_status_check":     "payment_status >= 0",
-		"orders_status_check":             "status IN (0, 1)",
-		"orders_total_amount_check":       "total_amount >= 0",
+		"orders_fulfillment_status_check":       "fulfillment_status >= 0",
+		"orders_payment_status_check":           "payment_status >= 0",
+		"orders_shipping_fee_check":             "shipping_fee >= 0",
+		"orders_status_check":                   "status IN (0, 1)",
+		"orders_subtotal_amount_check":          "subtotal_amount >= 0",
+		"orders_total_amount_check":             "total_amount >= 0",
+		"orders_total_amount_composition_check": "total_amount = subtotal_amount + shipping_fee",
 	}
 	OrderItemsTable.ForeignKeys[0].RefTable = OrdersTable
 	OrderItemsTable.ForeignKeys[1].RefTable = ShopsTable

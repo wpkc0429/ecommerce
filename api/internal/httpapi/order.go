@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -67,7 +68,20 @@ func orderItemJSON(it *ent.OrderItem) map[string]any {
 		"sku_id": it.SkuID, "sku_code": it.SkuCode,
 		"quantity": it.Quantity, "price_amount": it.PriceAmount, "currency": it.Currency,
 		"line_total": it.PriceAmount * int64(it.Quantity),
+		// change order-extras: always a string, never null.
+		"gift_message": it.GiftMessage,
 	}
+}
+
+// deliveryDateJSON renders a requested delivery date as a bare YYYY-MM-DD
+// string (or null): the column is a calendar day, and emitting a full timestamp
+// would invite clients to reintroduce the timezone shift the date type exists
+// to avoid (change order-extras, design D3).
+func deliveryDateJSON(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return t.Format("2006-01-02")
 }
 
 func orderJSON(o *ent.Order) map[string]any {
@@ -78,8 +92,14 @@ func orderJSON(o *ent.Order) map[string]any {
 	return map[string]any{
 		"id": o.ID, "shop_id": o.ShopID, "member_id": o.MemberID,
 		"status": o.Status, "payment_status": o.PaymentStatus, "fulfillment_status": o.FulfillmentStatus,
-		"currency": o.Currency, "total_amount": o.TotalAmount,
-		"shipping_address": o.ShippingAddress, "cancelled_at": o.CancelledAt,
+		"currency": o.Currency,
+		// change order-extras, design D6: total_amount is the PAYABLE total —
+		// subtotal_amount + shipping_fee — and is what payment charges. It used
+		// to be the item subtotal alone; subtotal_amount now carries that.
+		"total_amount": o.TotalAmount, "subtotal_amount": o.SubtotalAmount, "shipping_fee": o.ShippingFee,
+		"shipping_method_id": o.ShippingMethodID, "shipping_method_name": o.ShippingMethodName,
+		"requested_delivery_date": deliveryDateJSON(o.RequestedDeliveryDate),
+		"shipping_address":        o.ShippingAddress, "cancelled_at": o.CancelledAt,
 		"items": items, "created_at": o.CreatedAt, "updated_at": o.UpdatedAt,
 	}
 }
@@ -105,11 +125,25 @@ func (h *OrderHandler) checkout(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var addr order.ShippingAddress
-	if !decodeJSON(w, r, &addr) {
+	// The body has always been the shipping address itself, and change
+	// order-extras keeps it that way: the two new keys are embedded flat
+	// alongside the address fields rather than nesting the address under a
+	// wrapper (design D11). Nesting would break every existing caller to buy
+	// nothing but symmetry with the guest endpoint; adding sibling keys leaves
+	// every previously-valid request valid, byte for byte.
+	var body struct {
+		order.ShippingAddress
+		ShippingMethodID      *int    `json:"shipping_method_id"`
+		RequestedDeliveryDate *string `json:"requested_delivery_date"`
+	}
+	if !decodeJSON(w, r, &body) {
 		return
 	}
-	o, err := h.Service.Checkout(r.Context(), shopID, memberID, addr)
+	o, err := h.Service.Checkout(r.Context(), shopID, memberID, order.CheckoutInput{
+		ShippingAddress:       body.ShippingAddress,
+		ShippingMethodID:      body.ShippingMethodID,
+		RequestedDeliveryDate: body.RequestedDeliveryDate,
+	})
 	if err != nil {
 		writeOrderError(w, h.Log, err)
 		return

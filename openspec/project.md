@@ -54,6 +54,8 @@
 - `members.email/phone` 唯一性以商家為界（`UNIQUE(shop_id, email/phone)`，change member-identity-per-shop），註冊/登入的**失敗**回應不得洩漏原因；可由回應區分的邊界是「該 email 於本店是否已設定密碼」（change guest-checkout design D5）
 - publishable key 是公開識別碼不是憑證：明文儲存、可完整顯示、MUST NOT 作為授權依據（change storefront-client-auth design D1）
 - 扣庫存只有一份實作：任何下單入口 MUST 呼叫 `order.Service.Checkout`（change guest-checkout design D1）；訂單存取 token（`aud=order:{shop_id}`）只能觸及它指名的那一筆訂單，MUST NOT 演化成 session
+- 訂單金額：`total_amount = subtotal_amount + shipping_fee`（DB CHECK 強制，change order-extras design D6/D7），`total_amount` 是**應付總額**也是請款金額；**點數以 `subtotal_amount` 核發，運費不計點**（design D5）
+- D13 的 v1 破例窗口已在 change order-extras 用盡並關閉：後續破壞性變更 MUST 走新端點或 `/api/v2`，MUST NOT 再引用「尚無外部消費者」
 
 ## External Dependencies
 

@@ -1,6 +1,10 @@
 package order
 
-import "testing"
+import (
+	"errors"
+	"testing"
+	"time"
+)
 
 func TestShippingAddressValidate(t *testing.T) {
 	complete := ShippingAddress{
@@ -99,5 +103,67 @@ func TestNormalizePage(t *testing.T) {
 			t.Errorf("normalizePage(%d, %d) = (%d, %d), want (%d, %d)",
 				tc.page, tc.pageSize, gotPage, gotPageSize, tc.wantPage, tc.wantPageSize)
 		}
+	}
+}
+
+// ── change order-extras: requested delivery date (design D3) ───────────
+
+func TestParseRequestedDeliveryDateAbsent(t *testing.T) {
+	empty := ""
+	for name, in := range map[string]*string{"nil": nil, "empty string": &empty} {
+		got, err := parseRequestedDeliveryDate(in)
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", name, err)
+		}
+		if got != nil {
+			t.Fatalf("%s: expected no date, got %v", name, got)
+		}
+	}
+}
+
+func TestParseRequestedDeliveryDateAccepts(t *testing.T) {
+	// Relative to today so the test does not rot: tomorrow, and the lower
+	// bound itself (UTC yesterday), which must be accepted because the server
+	// does not know the shop's timezone.
+	now := time.Now().UTC()
+	for _, offset := range []int{-1, 0, 1, 400} {
+		raw := now.AddDate(0, 0, offset).Format(deliveryDateLayout)
+		got, err := parseRequestedDeliveryDate(&raw)
+		if err != nil {
+			t.Fatalf("%s (offset %d): unexpected error: %v", raw, offset, err)
+		}
+		if got == nil || got.Format(deliveryDateLayout) != raw {
+			t.Fatalf("%s: round-trip mismatch, got %v", raw, got)
+		}
+	}
+}
+
+func TestParseRequestedDeliveryDateRejects(t *testing.T) {
+	twoDaysAgo := time.Now().UTC().AddDate(0, 0, -2).Format(deliveryDateLayout)
+	cases := map[string]string{
+		"slashes":            "2026/08/05",
+		"nonexistent day":    "2026-02-31",
+		"month 13":           "2026-13-01",
+		"timestamp":          "2026-08-05T00:00:00Z",
+		"prose":              "next wednesday",
+		"two-digit year":     "26-08-05",
+		"unambiguously past": twoDaysAgo,
+		// The typo this rule actually exists to catch.
+		"mistyped year": "2025-08-05",
+	}
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			got, err := parseRequestedDeliveryDate(&raw)
+			if err == nil {
+				t.Fatalf("expected %q to be rejected, got %v", raw, got)
+			}
+			var ve *ValidationError
+			if !errors.As(err, &ve) {
+				t.Fatalf("expected a ValidationError (422), got %T", err)
+			}
+			if len(ve.Details) != 1 || ve.Details[0].Pointer != "/requested_delivery_date" {
+				t.Fatalf("expected the error to point at /requested_delivery_date, got %+v", ve.Details)
+			}
+		})
 	}
 }

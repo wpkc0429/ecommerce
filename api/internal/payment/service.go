@@ -159,9 +159,12 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 			return nil, fmt.Errorf("payment: mark order paid: %w", err)
 		}
 		if s.Dispatcher != nil {
+			// SubtotalAmount, not TotalAmount: points are awarded on goods, not
+			// on the courier's fee (change order-extras, design D5). The amount
+			// charged above is still ord.TotalAmount.
 			s.Dispatcher.Publish(ctx, events.OrderPaymentSucceeded{
 				ShopID: ord.ShopID, OrderID: ord.ID, MemberID: ord.MemberID,
-				TotalAmount: ord.TotalAmount, Currency: ord.Currency,
+				SubtotalAmount: ord.SubtotalAmount, Currency: ord.Currency,
 			})
 		}
 	}

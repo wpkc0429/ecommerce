@@ -120,6 +120,68 @@ func (_c *OrderCreate) SetTotalAmount(v int64) *OrderCreate {
 	return _c
 }
 
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (_c *OrderCreate) SetSubtotalAmount(v int64) *OrderCreate {
+	_c.mutation.SetSubtotalAmount(v)
+	return _c
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (_c *OrderCreate) SetShippingFee(v int64) *OrderCreate {
+	_c.mutation.SetShippingFee(v)
+	return _c
+}
+
+// SetNillableShippingFee sets the "shipping_fee" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableShippingFee(v *int64) *OrderCreate {
+	if v != nil {
+		_c.SetShippingFee(*v)
+	}
+	return _c
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (_c *OrderCreate) SetShippingMethodID(v int) *OrderCreate {
+	_c.mutation.SetShippingMethodID(v)
+	return _c
+}
+
+// SetNillableShippingMethodID sets the "shipping_method_id" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableShippingMethodID(v *int) *OrderCreate {
+	if v != nil {
+		_c.SetShippingMethodID(*v)
+	}
+	return _c
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (_c *OrderCreate) SetShippingMethodName(v string) *OrderCreate {
+	_c.mutation.SetShippingMethodName(v)
+	return _c
+}
+
+// SetNillableShippingMethodName sets the "shipping_method_name" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableShippingMethodName(v *string) *OrderCreate {
+	if v != nil {
+		_c.SetShippingMethodName(*v)
+	}
+	return _c
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (_c *OrderCreate) SetRequestedDeliveryDate(v time.Time) *OrderCreate {
+	_c.mutation.SetRequestedDeliveryDate(v)
+	return _c
+}
+
+// SetNillableRequestedDeliveryDate sets the "requested_delivery_date" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableRequestedDeliveryDate(v *time.Time) *OrderCreate {
+	if v != nil {
+		_c.SetRequestedDeliveryDate(*v)
+	}
+	return _c
+}
+
 // SetShippingAddress sets the "shipping_address" field.
 func (_c *OrderCreate) SetShippingAddress(v json.RawMessage) *OrderCreate {
 	_c.mutation.SetShippingAddress(v)
@@ -220,6 +282,10 @@ func (_c *OrderCreate) defaults() {
 		v := order.DefaultFulfillmentStatus
 		_c.mutation.SetFulfillmentStatus(v)
 	}
+	if _, ok := _c.mutation.ShippingFee(); !ok {
+		v := order.DefaultShippingFee
+		_c.mutation.SetShippingFee(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -255,6 +321,17 @@ func (_c *OrderCreate) check() error {
 	}
 	if _, ok := _c.mutation.TotalAmount(); !ok {
 		return &ValidationError{Name: "total_amount", err: errors.New(`ent: missing required field "Order.total_amount"`)}
+	}
+	if _, ok := _c.mutation.SubtotalAmount(); !ok {
+		return &ValidationError{Name: "subtotal_amount", err: errors.New(`ent: missing required field "Order.subtotal_amount"`)}
+	}
+	if _, ok := _c.mutation.ShippingFee(); !ok {
+		return &ValidationError{Name: "shipping_fee", err: errors.New(`ent: missing required field "Order.shipping_fee"`)}
+	}
+	if v, ok := _c.mutation.ShippingMethodName(); ok {
+		if err := order.ShippingMethodNameValidator(v); err != nil {
+			return &ValidationError{Name: "shipping_method_name", err: fmt.Errorf(`ent: validator failed for field "Order.shipping_method_name": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.ShippingAddress(); !ok {
 		return &ValidationError{Name: "shipping_address", err: errors.New(`ent: missing required field "Order.shipping_address"`)}
@@ -319,6 +396,26 @@ func (_c *OrderCreate) createSpec() (*Order, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.TotalAmount(); ok {
 		_spec.SetField(order.FieldTotalAmount, field.TypeInt64, value)
 		_node.TotalAmount = value
+	}
+	if value, ok := _c.mutation.SubtotalAmount(); ok {
+		_spec.SetField(order.FieldSubtotalAmount, field.TypeInt64, value)
+		_node.SubtotalAmount = value
+	}
+	if value, ok := _c.mutation.ShippingFee(); ok {
+		_spec.SetField(order.FieldShippingFee, field.TypeInt64, value)
+		_node.ShippingFee = value
+	}
+	if value, ok := _c.mutation.ShippingMethodID(); ok {
+		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)
+		_node.ShippingMethodID = &value
+	}
+	if value, ok := _c.mutation.ShippingMethodName(); ok {
+		_spec.SetField(order.FieldShippingMethodName, field.TypeString, value)
+		_node.ShippingMethodName = &value
+	}
+	if value, ok := _c.mutation.RequestedDeliveryDate(); ok {
+		_spec.SetField(order.FieldRequestedDeliveryDate, field.TypeTime, value)
+		_node.RequestedDeliveryDate = &value
 	}
 	if value, ok := _c.mutation.ShippingAddress(); ok {
 		_spec.SetField(order.FieldShippingAddress, field.TypeJSON, value)
@@ -550,6 +647,102 @@ func (u *OrderUpsert) AddTotalAmount(v int64) *OrderUpsert {
 	return u
 }
 
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (u *OrderUpsert) SetSubtotalAmount(v int64) *OrderUpsert {
+	u.Set(order.FieldSubtotalAmount, v)
+	return u
+}
+
+// UpdateSubtotalAmount sets the "subtotal_amount" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateSubtotalAmount() *OrderUpsert {
+	u.SetExcluded(order.FieldSubtotalAmount)
+	return u
+}
+
+// AddSubtotalAmount adds v to the "subtotal_amount" field.
+func (u *OrderUpsert) AddSubtotalAmount(v int64) *OrderUpsert {
+	u.Add(order.FieldSubtotalAmount, v)
+	return u
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (u *OrderUpsert) SetShippingFee(v int64) *OrderUpsert {
+	u.Set(order.FieldShippingFee, v)
+	return u
+}
+
+// UpdateShippingFee sets the "shipping_fee" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateShippingFee() *OrderUpsert {
+	u.SetExcluded(order.FieldShippingFee)
+	return u
+}
+
+// AddShippingFee adds v to the "shipping_fee" field.
+func (u *OrderUpsert) AddShippingFee(v int64) *OrderUpsert {
+	u.Add(order.FieldShippingFee, v)
+	return u
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (u *OrderUpsert) SetShippingMethodID(v int) *OrderUpsert {
+	u.Set(order.FieldShippingMethodID, v)
+	return u
+}
+
+// UpdateShippingMethodID sets the "shipping_method_id" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateShippingMethodID() *OrderUpsert {
+	u.SetExcluded(order.FieldShippingMethodID)
+	return u
+}
+
+// AddShippingMethodID adds v to the "shipping_method_id" field.
+func (u *OrderUpsert) AddShippingMethodID(v int) *OrderUpsert {
+	u.Add(order.FieldShippingMethodID, v)
+	return u
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (u *OrderUpsert) ClearShippingMethodID() *OrderUpsert {
+	u.SetNull(order.FieldShippingMethodID)
+	return u
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (u *OrderUpsert) SetShippingMethodName(v string) *OrderUpsert {
+	u.Set(order.FieldShippingMethodName, v)
+	return u
+}
+
+// UpdateShippingMethodName sets the "shipping_method_name" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateShippingMethodName() *OrderUpsert {
+	u.SetExcluded(order.FieldShippingMethodName)
+	return u
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (u *OrderUpsert) ClearShippingMethodName() *OrderUpsert {
+	u.SetNull(order.FieldShippingMethodName)
+	return u
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (u *OrderUpsert) SetRequestedDeliveryDate(v time.Time) *OrderUpsert {
+	u.Set(order.FieldRequestedDeliveryDate, v)
+	return u
+}
+
+// UpdateRequestedDeliveryDate sets the "requested_delivery_date" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateRequestedDeliveryDate() *OrderUpsert {
+	u.SetExcluded(order.FieldRequestedDeliveryDate)
+	return u
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (u *OrderUpsert) ClearRequestedDeliveryDate() *OrderUpsert {
+	u.SetNull(order.FieldRequestedDeliveryDate)
+	return u
+}
+
 // SetShippingAddress sets the "shipping_address" field.
 func (u *OrderUpsert) SetShippingAddress(v json.RawMessage) *OrderUpsert {
 	u.Set(order.FieldShippingAddress, v)
@@ -762,6 +955,118 @@ func (u *OrderUpsertOne) AddTotalAmount(v int64) *OrderUpsertOne {
 func (u *OrderUpsertOne) UpdateTotalAmount() *OrderUpsertOne {
 	return u.Update(func(s *OrderUpsert) {
 		s.UpdateTotalAmount()
+	})
+}
+
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (u *OrderUpsertOne) SetSubtotalAmount(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetSubtotalAmount(v)
+	})
+}
+
+// AddSubtotalAmount adds v to the "subtotal_amount" field.
+func (u *OrderUpsertOne) AddSubtotalAmount(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddSubtotalAmount(v)
+	})
+}
+
+// UpdateSubtotalAmount sets the "subtotal_amount" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateSubtotalAmount() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateSubtotalAmount()
+	})
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (u *OrderUpsertOne) SetShippingFee(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingFee(v)
+	})
+}
+
+// AddShippingFee adds v to the "shipping_fee" field.
+func (u *OrderUpsertOne) AddShippingFee(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddShippingFee(v)
+	})
+}
+
+// UpdateShippingFee sets the "shipping_fee" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateShippingFee() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingFee()
+	})
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (u *OrderUpsertOne) SetShippingMethodID(v int) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingMethodID(v)
+	})
+}
+
+// AddShippingMethodID adds v to the "shipping_method_id" field.
+func (u *OrderUpsertOne) AddShippingMethodID(v int) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddShippingMethodID(v)
+	})
+}
+
+// UpdateShippingMethodID sets the "shipping_method_id" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateShippingMethodID() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingMethodID()
+	})
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (u *OrderUpsertOne) ClearShippingMethodID() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearShippingMethodID()
+	})
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (u *OrderUpsertOne) SetShippingMethodName(v string) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingMethodName(v)
+	})
+}
+
+// UpdateShippingMethodName sets the "shipping_method_name" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateShippingMethodName() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingMethodName()
+	})
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (u *OrderUpsertOne) ClearShippingMethodName() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearShippingMethodName()
+	})
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (u *OrderUpsertOne) SetRequestedDeliveryDate(v time.Time) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetRequestedDeliveryDate(v)
+	})
+}
+
+// UpdateRequestedDeliveryDate sets the "requested_delivery_date" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateRequestedDeliveryDate() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateRequestedDeliveryDate()
+	})
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (u *OrderUpsertOne) ClearRequestedDeliveryDate() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearRequestedDeliveryDate()
 	})
 }
 
@@ -1148,6 +1453,118 @@ func (u *OrderUpsertBulk) AddTotalAmount(v int64) *OrderUpsertBulk {
 func (u *OrderUpsertBulk) UpdateTotalAmount() *OrderUpsertBulk {
 	return u.Update(func(s *OrderUpsert) {
 		s.UpdateTotalAmount()
+	})
+}
+
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (u *OrderUpsertBulk) SetSubtotalAmount(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetSubtotalAmount(v)
+	})
+}
+
+// AddSubtotalAmount adds v to the "subtotal_amount" field.
+func (u *OrderUpsertBulk) AddSubtotalAmount(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddSubtotalAmount(v)
+	})
+}
+
+// UpdateSubtotalAmount sets the "subtotal_amount" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateSubtotalAmount() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateSubtotalAmount()
+	})
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (u *OrderUpsertBulk) SetShippingFee(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingFee(v)
+	})
+}
+
+// AddShippingFee adds v to the "shipping_fee" field.
+func (u *OrderUpsertBulk) AddShippingFee(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddShippingFee(v)
+	})
+}
+
+// UpdateShippingFee sets the "shipping_fee" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateShippingFee() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingFee()
+	})
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (u *OrderUpsertBulk) SetShippingMethodID(v int) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingMethodID(v)
+	})
+}
+
+// AddShippingMethodID adds v to the "shipping_method_id" field.
+func (u *OrderUpsertBulk) AddShippingMethodID(v int) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddShippingMethodID(v)
+	})
+}
+
+// UpdateShippingMethodID sets the "shipping_method_id" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateShippingMethodID() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingMethodID()
+	})
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (u *OrderUpsertBulk) ClearShippingMethodID() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearShippingMethodID()
+	})
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (u *OrderUpsertBulk) SetShippingMethodName(v string) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetShippingMethodName(v)
+	})
+}
+
+// UpdateShippingMethodName sets the "shipping_method_name" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateShippingMethodName() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateShippingMethodName()
+	})
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (u *OrderUpsertBulk) ClearShippingMethodName() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearShippingMethodName()
+	})
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (u *OrderUpsertBulk) SetRequestedDeliveryDate(v time.Time) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetRequestedDeliveryDate(v)
+	})
+}
+
+// UpdateRequestedDeliveryDate sets the "requested_delivery_date" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateRequestedDeliveryDate() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateRequestedDeliveryDate()
+	})
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (u *OrderUpsertBulk) ClearRequestedDeliveryDate() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearRequestedDeliveryDate()
 	})
 }
 

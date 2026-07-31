@@ -36,6 +36,8 @@ const (
 	FieldPriceAmount = "price_amount"
 	// FieldCurrency holds the string denoting the currency field in the database.
 	FieldCurrency = "currency"
+	// FieldGiftMessage holds the string denoting the gift_message field in the database.
+	FieldGiftMessage = "gift_message"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
 	EdgeShop = "shop"
 	// EdgeOrder holds the string denoting the order edge name in mutations.
@@ -72,6 +74,7 @@ var Columns = []string{
 	FieldQuantity,
 	FieldPriceAmount,
 	FieldCurrency,
+	FieldGiftMessage,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -97,6 +100,8 @@ var (
 	SkuCodeValidator func(string) error
 	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	CurrencyValidator func(string) error
+	// DefaultGiftMessage holds the default value on creation for the "gift_message" field.
+	DefaultGiftMessage string
 )
 
 // OrderOption defines the ordering options for the OrderItem queries.
@@ -160,6 +165,11 @@ func ByPriceAmount(opts ...sql.OrderTermOption) OrderOption {
 // ByCurrency orders the results by the currency field.
 func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCurrency, opts...).ToFunc()
+}
+
+// ByGiftMessage orders the results by the gift_message field.
+func ByGiftMessage(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGiftMessage, opts...).ToFunc()
 }
 
 // ByShopField orders the results by shop field.

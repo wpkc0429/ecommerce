@@ -918,6 +918,7 @@ type CartItemMutation struct {
 	price_amount    *int64
 	addprice_amount *int64
 	currency        *string
+	gift_message    *string
 	clearedFields   map[string]struct{}
 	shop            *int
 	clearedshop     bool
@@ -1369,6 +1370,42 @@ func (m *CartItemMutation) ResetCurrency() {
 	m.currency = nil
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (m *CartItemMutation) SetGiftMessage(s string) {
+	m.gift_message = &s
+}
+
+// GiftMessage returns the value of the "gift_message" field in the mutation.
+func (m *CartItemMutation) GiftMessage() (r string, exists bool) {
+	v := m.gift_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGiftMessage returns the old "gift_message" field's value of the CartItem entity.
+// If the CartItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CartItemMutation) OldGiftMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGiftMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGiftMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGiftMessage: %w", err)
+	}
+	return oldValue.GiftMessage, nil
+}
+
+// ResetGiftMessage resets all changes to the "gift_message" field.
+func (m *CartItemMutation) ResetGiftMessage() {
+	m.gift_message = nil
+}
+
 // ClearShop clears the "shop" edge to the Shop entity.
 func (m *CartItemMutation) ClearShop() {
 	m.clearedshop = true
@@ -1484,7 +1521,7 @@ func (m *CartItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CartItemMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, cartitem.FieldCreatedAt)
 	}
@@ -1508,6 +1545,9 @@ func (m *CartItemMutation) Fields() []string {
 	}
 	if m.currency != nil {
 		fields = append(fields, cartitem.FieldCurrency)
+	}
+	if m.gift_message != nil {
+		fields = append(fields, cartitem.FieldGiftMessage)
 	}
 	return fields
 }
@@ -1533,6 +1573,8 @@ func (m *CartItemMutation) Field(name string) (ent.Value, bool) {
 		return m.PriceAmount()
 	case cartitem.FieldCurrency:
 		return m.Currency()
+	case cartitem.FieldGiftMessage:
+		return m.GiftMessage()
 	}
 	return nil, false
 }
@@ -1558,6 +1600,8 @@ func (m *CartItemMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldPriceAmount(ctx)
 	case cartitem.FieldCurrency:
 		return m.OldCurrency(ctx)
+	case cartitem.FieldGiftMessage:
+		return m.OldGiftMessage(ctx)
 	}
 	return nil, fmt.Errorf("unknown CartItem field %s", name)
 }
@@ -1622,6 +1666,13 @@ func (m *CartItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCurrency(v)
+		return nil
+	case cartitem.FieldGiftMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGiftMessage(v)
 		return nil
 	}
 	return fmt.Errorf("unknown CartItem field %s", name)
@@ -1731,6 +1782,9 @@ func (m *CartItemMutation) ResetField(name string) error {
 		return nil
 	case cartitem.FieldCurrency:
 		m.ResetCurrency()
+		return nil
+	case cartitem.FieldGiftMessage:
+		m.ResetGiftMessage()
 		return nil
 	}
 	return fmt.Errorf("unknown CartItem field %s", name)
@@ -5569,34 +5623,42 @@ func (m *MemberTierMutation) ResetEdge(name string) error {
 // OrderMutation represents an operation that mutates the Order nodes in the graph.
 type OrderMutation struct {
 	config
-	op                     Op
-	typ                    string
-	id                     *int
-	created_at             *time.Time
-	updated_at             *time.Time
-	status                 *int16
-	addstatus              *int16
-	payment_status         *int16
-	addpayment_status      *int16
-	fulfillment_status     *int16
-	addfulfillment_status  *int16
-	currency               *string
-	total_amount           *int64
-	addtotal_amount        *int64
-	shipping_address       *json.RawMessage
-	appendshipping_address json.RawMessage
-	cancelled_at           *time.Time
-	clearedFields          map[string]struct{}
-	shop                   *int
-	clearedshop            bool
-	member                 *int
-	clearedmember          bool
-	items                  map[int]struct{}
-	removeditems           map[int]struct{}
-	cleareditems           bool
-	done                   bool
-	oldValue               func(context.Context) (*Order, error)
-	predicates             []predicate.Order
+	op                      Op
+	typ                     string
+	id                      *int
+	created_at              *time.Time
+	updated_at              *time.Time
+	status                  *int16
+	addstatus               *int16
+	payment_status          *int16
+	addpayment_status       *int16
+	fulfillment_status      *int16
+	addfulfillment_status   *int16
+	currency                *string
+	total_amount            *int64
+	addtotal_amount         *int64
+	subtotal_amount         *int64
+	addsubtotal_amount      *int64
+	shipping_fee            *int64
+	addshipping_fee         *int64
+	shipping_method_id      *int
+	addshipping_method_id   *int
+	shipping_method_name    *string
+	requested_delivery_date *time.Time
+	shipping_address        *json.RawMessage
+	appendshipping_address  json.RawMessage
+	cancelled_at            *time.Time
+	clearedFields           map[string]struct{}
+	shop                    *int
+	clearedshop             bool
+	member                  *int
+	clearedmember           bool
+	items                   map[int]struct{}
+	removeditems            map[int]struct{}
+	cleareditems            bool
+	done                    bool
+	oldValue                func(context.Context) (*Order, error)
+	predicates              []predicate.Order
 }
 
 var _ ent.Mutation = (*OrderMutation)(nil)
@@ -6101,6 +6163,286 @@ func (m *OrderMutation) ResetTotalAmount() {
 	m.addtotal_amount = nil
 }
 
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (m *OrderMutation) SetSubtotalAmount(i int64) {
+	m.subtotal_amount = &i
+	m.addsubtotal_amount = nil
+}
+
+// SubtotalAmount returns the value of the "subtotal_amount" field in the mutation.
+func (m *OrderMutation) SubtotalAmount() (r int64, exists bool) {
+	v := m.subtotal_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubtotalAmount returns the old "subtotal_amount" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldSubtotalAmount(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubtotalAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubtotalAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubtotalAmount: %w", err)
+	}
+	return oldValue.SubtotalAmount, nil
+}
+
+// AddSubtotalAmount adds i to the "subtotal_amount" field.
+func (m *OrderMutation) AddSubtotalAmount(i int64) {
+	if m.addsubtotal_amount != nil {
+		*m.addsubtotal_amount += i
+	} else {
+		m.addsubtotal_amount = &i
+	}
+}
+
+// AddedSubtotalAmount returns the value that was added to the "subtotal_amount" field in this mutation.
+func (m *OrderMutation) AddedSubtotalAmount() (r int64, exists bool) {
+	v := m.addsubtotal_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSubtotalAmount resets all changes to the "subtotal_amount" field.
+func (m *OrderMutation) ResetSubtotalAmount() {
+	m.subtotal_amount = nil
+	m.addsubtotal_amount = nil
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (m *OrderMutation) SetShippingFee(i int64) {
+	m.shipping_fee = &i
+	m.addshipping_fee = nil
+}
+
+// ShippingFee returns the value of the "shipping_fee" field in the mutation.
+func (m *OrderMutation) ShippingFee() (r int64, exists bool) {
+	v := m.shipping_fee
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShippingFee returns the old "shipping_fee" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldShippingFee(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShippingFee is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShippingFee requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShippingFee: %w", err)
+	}
+	return oldValue.ShippingFee, nil
+}
+
+// AddShippingFee adds i to the "shipping_fee" field.
+func (m *OrderMutation) AddShippingFee(i int64) {
+	if m.addshipping_fee != nil {
+		*m.addshipping_fee += i
+	} else {
+		m.addshipping_fee = &i
+	}
+}
+
+// AddedShippingFee returns the value that was added to the "shipping_fee" field in this mutation.
+func (m *OrderMutation) AddedShippingFee() (r int64, exists bool) {
+	v := m.addshipping_fee
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShippingFee resets all changes to the "shipping_fee" field.
+func (m *OrderMutation) ResetShippingFee() {
+	m.shipping_fee = nil
+	m.addshipping_fee = nil
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (m *OrderMutation) SetShippingMethodID(i int) {
+	m.shipping_method_id = &i
+	m.addshipping_method_id = nil
+}
+
+// ShippingMethodID returns the value of the "shipping_method_id" field in the mutation.
+func (m *OrderMutation) ShippingMethodID() (r int, exists bool) {
+	v := m.shipping_method_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShippingMethodID returns the old "shipping_method_id" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldShippingMethodID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShippingMethodID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShippingMethodID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShippingMethodID: %w", err)
+	}
+	return oldValue.ShippingMethodID, nil
+}
+
+// AddShippingMethodID adds i to the "shipping_method_id" field.
+func (m *OrderMutation) AddShippingMethodID(i int) {
+	if m.addshipping_method_id != nil {
+		*m.addshipping_method_id += i
+	} else {
+		m.addshipping_method_id = &i
+	}
+}
+
+// AddedShippingMethodID returns the value that was added to the "shipping_method_id" field in this mutation.
+func (m *OrderMutation) AddedShippingMethodID() (r int, exists bool) {
+	v := m.addshipping_method_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (m *OrderMutation) ClearShippingMethodID() {
+	m.shipping_method_id = nil
+	m.addshipping_method_id = nil
+	m.clearedFields[order.FieldShippingMethodID] = struct{}{}
+}
+
+// ShippingMethodIDCleared returns if the "shipping_method_id" field was cleared in this mutation.
+func (m *OrderMutation) ShippingMethodIDCleared() bool {
+	_, ok := m.clearedFields[order.FieldShippingMethodID]
+	return ok
+}
+
+// ResetShippingMethodID resets all changes to the "shipping_method_id" field.
+func (m *OrderMutation) ResetShippingMethodID() {
+	m.shipping_method_id = nil
+	m.addshipping_method_id = nil
+	delete(m.clearedFields, order.FieldShippingMethodID)
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (m *OrderMutation) SetShippingMethodName(s string) {
+	m.shipping_method_name = &s
+}
+
+// ShippingMethodName returns the value of the "shipping_method_name" field in the mutation.
+func (m *OrderMutation) ShippingMethodName() (r string, exists bool) {
+	v := m.shipping_method_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShippingMethodName returns the old "shipping_method_name" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldShippingMethodName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShippingMethodName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShippingMethodName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShippingMethodName: %w", err)
+	}
+	return oldValue.ShippingMethodName, nil
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (m *OrderMutation) ClearShippingMethodName() {
+	m.shipping_method_name = nil
+	m.clearedFields[order.FieldShippingMethodName] = struct{}{}
+}
+
+// ShippingMethodNameCleared returns if the "shipping_method_name" field was cleared in this mutation.
+func (m *OrderMutation) ShippingMethodNameCleared() bool {
+	_, ok := m.clearedFields[order.FieldShippingMethodName]
+	return ok
+}
+
+// ResetShippingMethodName resets all changes to the "shipping_method_name" field.
+func (m *OrderMutation) ResetShippingMethodName() {
+	m.shipping_method_name = nil
+	delete(m.clearedFields, order.FieldShippingMethodName)
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (m *OrderMutation) SetRequestedDeliveryDate(t time.Time) {
+	m.requested_delivery_date = &t
+}
+
+// RequestedDeliveryDate returns the value of the "requested_delivery_date" field in the mutation.
+func (m *OrderMutation) RequestedDeliveryDate() (r time.Time, exists bool) {
+	v := m.requested_delivery_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedDeliveryDate returns the old "requested_delivery_date" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldRequestedDeliveryDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedDeliveryDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedDeliveryDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedDeliveryDate: %w", err)
+	}
+	return oldValue.RequestedDeliveryDate, nil
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (m *OrderMutation) ClearRequestedDeliveryDate() {
+	m.requested_delivery_date = nil
+	m.clearedFields[order.FieldRequestedDeliveryDate] = struct{}{}
+}
+
+// RequestedDeliveryDateCleared returns if the "requested_delivery_date" field was cleared in this mutation.
+func (m *OrderMutation) RequestedDeliveryDateCleared() bool {
+	_, ok := m.clearedFields[order.FieldRequestedDeliveryDate]
+	return ok
+}
+
+// ResetRequestedDeliveryDate resets all changes to the "requested_delivery_date" field.
+func (m *OrderMutation) ResetRequestedDeliveryDate() {
+	m.requested_delivery_date = nil
+	delete(m.clearedFields, order.FieldRequestedDeliveryDate)
+}
+
 // SetShippingAddress sets the "shipping_address" field.
 func (m *OrderMutation) SetShippingAddress(jm json.RawMessage) {
 	m.shipping_address = &jm
@@ -6343,7 +6685,7 @@ func (m *OrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OrderMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 16)
 	if m.created_at != nil {
 		fields = append(fields, order.FieldCreatedAt)
 	}
@@ -6370,6 +6712,21 @@ func (m *OrderMutation) Fields() []string {
 	}
 	if m.total_amount != nil {
 		fields = append(fields, order.FieldTotalAmount)
+	}
+	if m.subtotal_amount != nil {
+		fields = append(fields, order.FieldSubtotalAmount)
+	}
+	if m.shipping_fee != nil {
+		fields = append(fields, order.FieldShippingFee)
+	}
+	if m.shipping_method_id != nil {
+		fields = append(fields, order.FieldShippingMethodID)
+	}
+	if m.shipping_method_name != nil {
+		fields = append(fields, order.FieldShippingMethodName)
+	}
+	if m.requested_delivery_date != nil {
+		fields = append(fields, order.FieldRequestedDeliveryDate)
 	}
 	if m.shipping_address != nil {
 		fields = append(fields, order.FieldShippingAddress)
@@ -6403,6 +6760,16 @@ func (m *OrderMutation) Field(name string) (ent.Value, bool) {
 		return m.Currency()
 	case order.FieldTotalAmount:
 		return m.TotalAmount()
+	case order.FieldSubtotalAmount:
+		return m.SubtotalAmount()
+	case order.FieldShippingFee:
+		return m.ShippingFee()
+	case order.FieldShippingMethodID:
+		return m.ShippingMethodID()
+	case order.FieldShippingMethodName:
+		return m.ShippingMethodName()
+	case order.FieldRequestedDeliveryDate:
+		return m.RequestedDeliveryDate()
 	case order.FieldShippingAddress:
 		return m.ShippingAddress()
 	case order.FieldCancelledAt:
@@ -6434,6 +6801,16 @@ func (m *OrderMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldCurrency(ctx)
 	case order.FieldTotalAmount:
 		return m.OldTotalAmount(ctx)
+	case order.FieldSubtotalAmount:
+		return m.OldSubtotalAmount(ctx)
+	case order.FieldShippingFee:
+		return m.OldShippingFee(ctx)
+	case order.FieldShippingMethodID:
+		return m.OldShippingMethodID(ctx)
+	case order.FieldShippingMethodName:
+		return m.OldShippingMethodName(ctx)
+	case order.FieldRequestedDeliveryDate:
+		return m.OldRequestedDeliveryDate(ctx)
 	case order.FieldShippingAddress:
 		return m.OldShippingAddress(ctx)
 	case order.FieldCancelledAt:
@@ -6510,6 +6887,41 @@ func (m *OrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetTotalAmount(v)
 		return nil
+	case order.FieldSubtotalAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubtotalAmount(v)
+		return nil
+	case order.FieldShippingFee:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShippingFee(v)
+		return nil
+	case order.FieldShippingMethodID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShippingMethodID(v)
+		return nil
+	case order.FieldShippingMethodName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShippingMethodName(v)
+		return nil
+	case order.FieldRequestedDeliveryDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedDeliveryDate(v)
+		return nil
 	case order.FieldShippingAddress:
 		v, ok := value.(json.RawMessage)
 		if !ok {
@@ -6544,6 +6956,15 @@ func (m *OrderMutation) AddedFields() []string {
 	if m.addtotal_amount != nil {
 		fields = append(fields, order.FieldTotalAmount)
 	}
+	if m.addsubtotal_amount != nil {
+		fields = append(fields, order.FieldSubtotalAmount)
+	}
+	if m.addshipping_fee != nil {
+		fields = append(fields, order.FieldShippingFee)
+	}
+	if m.addshipping_method_id != nil {
+		fields = append(fields, order.FieldShippingMethodID)
+	}
 	return fields
 }
 
@@ -6560,6 +6981,12 @@ func (m *OrderMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedFulfillmentStatus()
 	case order.FieldTotalAmount:
 		return m.AddedTotalAmount()
+	case order.FieldSubtotalAmount:
+		return m.AddedSubtotalAmount()
+	case order.FieldShippingFee:
+		return m.AddedShippingFee()
+	case order.FieldShippingMethodID:
+		return m.AddedShippingMethodID()
 	}
 	return nil, false
 }
@@ -6597,6 +7024,27 @@ func (m *OrderMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddTotalAmount(v)
 		return nil
+	case order.FieldSubtotalAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSubtotalAmount(v)
+		return nil
+	case order.FieldShippingFee:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShippingFee(v)
+		return nil
+	case order.FieldShippingMethodID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShippingMethodID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Order numeric field %s", name)
 }
@@ -6605,6 +7053,15 @@ func (m *OrderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *OrderMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(order.FieldShippingMethodID) {
+		fields = append(fields, order.FieldShippingMethodID)
+	}
+	if m.FieldCleared(order.FieldShippingMethodName) {
+		fields = append(fields, order.FieldShippingMethodName)
+	}
+	if m.FieldCleared(order.FieldRequestedDeliveryDate) {
+		fields = append(fields, order.FieldRequestedDeliveryDate)
+	}
 	if m.FieldCleared(order.FieldCancelledAt) {
 		fields = append(fields, order.FieldCancelledAt)
 	}
@@ -6622,6 +7079,15 @@ func (m *OrderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OrderMutation) ClearField(name string) error {
 	switch name {
+	case order.FieldShippingMethodID:
+		m.ClearShippingMethodID()
+		return nil
+	case order.FieldShippingMethodName:
+		m.ClearShippingMethodName()
+		return nil
+	case order.FieldRequestedDeliveryDate:
+		m.ClearRequestedDeliveryDate()
+		return nil
 	case order.FieldCancelledAt:
 		m.ClearCancelledAt()
 		return nil
@@ -6659,6 +7125,21 @@ func (m *OrderMutation) ResetField(name string) error {
 		return nil
 	case order.FieldTotalAmount:
 		m.ResetTotalAmount()
+		return nil
+	case order.FieldSubtotalAmount:
+		m.ResetSubtotalAmount()
+		return nil
+	case order.FieldShippingFee:
+		m.ResetShippingFee()
+		return nil
+	case order.FieldShippingMethodID:
+		m.ResetShippingMethodID()
+		return nil
+	case order.FieldShippingMethodName:
+		m.ResetShippingMethodName()
+		return nil
+	case order.FieldRequestedDeliveryDate:
+		m.ResetRequestedDeliveryDate()
 		return nil
 	case order.FieldShippingAddress:
 		m.ResetShippingAddress()
@@ -6809,6 +7290,7 @@ type OrderItemMutation struct {
 	price_amount    *int64
 	addprice_amount *int64
 	currency        *string
+	gift_message    *string
 	clearedFields   map[string]struct{}
 	shop            *int
 	clearedshop     bool
@@ -7421,6 +7903,42 @@ func (m *OrderItemMutation) ResetCurrency() {
 	m.currency = nil
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (m *OrderItemMutation) SetGiftMessage(s string) {
+	m.gift_message = &s
+}
+
+// GiftMessage returns the value of the "gift_message" field in the mutation.
+func (m *OrderItemMutation) GiftMessage() (r string, exists bool) {
+	v := m.gift_message
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGiftMessage returns the old "gift_message" field's value of the OrderItem entity.
+// If the OrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderItemMutation) OldGiftMessage(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGiftMessage is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGiftMessage requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGiftMessage: %w", err)
+	}
+	return oldValue.GiftMessage, nil
+}
+
+// ResetGiftMessage resets all changes to the "gift_message" field.
+func (m *OrderItemMutation) ResetGiftMessage() {
+	m.gift_message = nil
+}
+
 // ClearShop clears the "shop" edge to the Shop entity.
 func (m *OrderItemMutation) ClearShop() {
 	m.clearedshop = true
@@ -7509,7 +8027,7 @@ func (m *OrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.created_at != nil {
 		fields = append(fields, orderitem.FieldCreatedAt)
 	}
@@ -7543,6 +8061,9 @@ func (m *OrderItemMutation) Fields() []string {
 	if m.currency != nil {
 		fields = append(fields, orderitem.FieldCurrency)
 	}
+	if m.gift_message != nil {
+		fields = append(fields, orderitem.FieldGiftMessage)
+	}
 	return fields
 }
 
@@ -7573,6 +8094,8 @@ func (m *OrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.PriceAmount()
 	case orderitem.FieldCurrency:
 		return m.Currency()
+	case orderitem.FieldGiftMessage:
+		return m.GiftMessage()
 	}
 	return nil, false
 }
@@ -7604,6 +8127,8 @@ func (m *OrderItemMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldPriceAmount(ctx)
 	case orderitem.FieldCurrency:
 		return m.OldCurrency(ctx)
+	case orderitem.FieldGiftMessage:
+		return m.OldGiftMessage(ctx)
 	}
 	return nil, fmt.Errorf("unknown OrderItem field %s", name)
 }
@@ -7689,6 +8214,13 @@ func (m *OrderItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCurrency(v)
+		return nil
+	case orderitem.FieldGiftMessage:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGiftMessage(v)
 		return nil
 	}
 	return fmt.Errorf("unknown OrderItem field %s", name)
@@ -7837,6 +8369,9 @@ func (m *OrderItemMutation) ResetField(name string) error {
 		return nil
 	case orderitem.FieldCurrency:
 		m.ResetCurrency()
+		return nil
+	case orderitem.FieldGiftMessage:
+		m.ResetGiftMessage()
 		return nil
 	}
 	return fmt.Errorf("unknown OrderItem field %s", name)

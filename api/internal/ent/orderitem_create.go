@@ -122,6 +122,20 @@ func (_c *OrderItemCreate) SetCurrency(v string) *OrderItemCreate {
 	return _c
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (_c *OrderItemCreate) SetGiftMessage(v string) *OrderItemCreate {
+	_c.mutation.SetGiftMessage(v)
+	return _c
+}
+
+// SetNillableGiftMessage sets the "gift_message" field if the given value is not nil.
+func (_c *OrderItemCreate) SetNillableGiftMessage(v *string) *OrderItemCreate {
+	if v != nil {
+		_c.SetGiftMessage(*v)
+	}
+	return _c
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_c *OrderItemCreate) SetShop(v *Shop) *OrderItemCreate {
 	return _c.SetShopID(v.ID)
@@ -175,6 +189,10 @@ func (_c *OrderItemCreate) defaults() {
 		v := orderitem.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.GiftMessage(); !ok {
+		v := orderitem.DefaultGiftMessage
+		_c.mutation.SetGiftMessage(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -220,6 +238,9 @@ func (_c *OrderItemCreate) check() error {
 		if err := orderitem.CurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "OrderItem.currency": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.GiftMessage(); !ok {
+		return &ValidationError{Name: "gift_message", err: errors.New(`ent: missing required field "OrderItem.gift_message"`)}
 	}
 	if len(_c.mutation.ShopIDs()) == 0 {
 		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "OrderItem.shop"`)}
@@ -289,6 +310,10 @@ func (_c *OrderItemCreate) createSpec() (*OrderItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Currency(); ok {
 		_spec.SetField(orderitem.FieldCurrency, field.TypeString, value)
 		_node.Currency = value
+	}
+	if value, ok := _c.mutation.GiftMessage(); ok {
+		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
+		_node.GiftMessage = value
 	}
 	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -532,6 +557,18 @@ func (u *OrderItemUpsert) UpdateCurrency() *OrderItemUpsert {
 	return u
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (u *OrderItemUpsert) SetGiftMessage(v string) *OrderItemUpsert {
+	u.Set(orderitem.FieldGiftMessage, v)
+	return u
+}
+
+// UpdateGiftMessage sets the "gift_message" field to the value that was provided on create.
+func (u *OrderItemUpsert) UpdateGiftMessage() *OrderItemUpsert {
+	u.SetExcluded(orderitem.FieldGiftMessage)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -756,6 +793,20 @@ func (u *OrderItemUpsertOne) SetCurrency(v string) *OrderItemUpsertOne {
 func (u *OrderItemUpsertOne) UpdateCurrency() *OrderItemUpsertOne {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateCurrency()
+	})
+}
+
+// SetGiftMessage sets the "gift_message" field.
+func (u *OrderItemUpsertOne) SetGiftMessage(v string) *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetGiftMessage(v)
+	})
+}
+
+// UpdateGiftMessage sets the "gift_message" field to the value that was provided on create.
+func (u *OrderItemUpsertOne) UpdateGiftMessage() *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateGiftMessage()
 	})
 }
 
@@ -1149,6 +1200,20 @@ func (u *OrderItemUpsertBulk) SetCurrency(v string) *OrderItemUpsertBulk {
 func (u *OrderItemUpsertBulk) UpdateCurrency() *OrderItemUpsertBulk {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateCurrency()
+	})
+}
+
+// SetGiftMessage sets the "gift_message" field.
+func (u *OrderItemUpsertBulk) SetGiftMessage(v string) *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetGiftMessage(v)
+	})
+}
+
+// UpdateGiftMessage sets the "gift_message" field to the value that was provided on create.
+func (u *OrderItemUpsertBulk) UpdateGiftMessage() *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateGiftMessage()
 	})
 }
 

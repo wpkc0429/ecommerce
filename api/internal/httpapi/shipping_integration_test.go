@@ -169,7 +169,7 @@ func shippingValidAddr() map[string]any {
 func (e *shippingEnv) checkoutOrder(t *testing.T, shopID, memberID int, domain string, price int64) int {
 	t.Helper()
 	skuID := e.newSKU(t, shopID, price, "TWD", 10)
-	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, 1); err != nil {
+	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, 1, ""); err != nil {
 		t.Fatalf("seed cart: %v", err)
 	}
 	code, created := e.memberCallJSON(t, memberID, shopID, domain, "POST", "/api/v1/shop/checkout", shippingValidAddr())

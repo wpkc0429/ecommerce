@@ -72,12 +72,19 @@ func (StorefrontClientChanged) EventName() string { return "storefront.client_ch
 // webhook's re-assertion branch re-confirms an already-succeeded payment
 // (see payment.Service.HandleWebhook's own doc comment), not just on the
 // first delivery — subscribers MUST be idempotent on (ShopID, OrderID).
+//
+// SubtotalAmount is the order's item subtotal, i.e. the loyalty award basis
+// (change order-extras, design D5) — NOT the payable total, which now includes
+// shipping. It was named TotalAmount until that change; renaming rather than
+// adding a field was deliberate (design D8): a forgotten field would have
+// silently awarded zero points, whereas a rename makes every construction site
+// fail to compile until it is revisited.
 type OrderPaymentSucceeded struct {
-	ShopID      int
-	OrderID     int
-	MemberID    int
-	TotalAmount int64
-	Currency    string
+	ShopID         int
+	OrderID        int
+	MemberID       int
+	SubtotalAmount int64
+	Currency       string
 }
 
 func (OrderPaymentSucceeded) EventName() string { return "order.payment_succeeded" }

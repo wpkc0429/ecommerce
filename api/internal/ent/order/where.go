@@ -100,6 +100,31 @@ func TotalAmount(v int64) predicate.Order {
 	return predicate.Order(sql.FieldEQ(FieldTotalAmount, v))
 }
 
+// SubtotalAmount applies equality check predicate on the "subtotal_amount" field. It's identical to SubtotalAmountEQ.
+func SubtotalAmount(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldSubtotalAmount, v))
+}
+
+// ShippingFee applies equality check predicate on the "shipping_fee" field. It's identical to ShippingFeeEQ.
+func ShippingFee(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingFee, v))
+}
+
+// ShippingMethodID applies equality check predicate on the "shipping_method_id" field. It's identical to ShippingMethodIDEQ.
+func ShippingMethodID(v int) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingMethodID, v))
+}
+
+// ShippingMethodName applies equality check predicate on the "shipping_method_name" field. It's identical to ShippingMethodNameEQ.
+func ShippingMethodName(v string) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingMethodName, v))
+}
+
+// RequestedDeliveryDate applies equality check predicate on the "requested_delivery_date" field. It's identical to RequestedDeliveryDateEQ.
+func RequestedDeliveryDate(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldRequestedDeliveryDate, v))
+}
+
 // CancelledAt applies equality check predicate on the "cancelled_at" field. It's identical to CancelledAtEQ.
 func CancelledAt(v time.Time) predicate.Order {
 	return predicate.Order(sql.FieldEQ(FieldCancelledAt, v))
@@ -448,6 +473,261 @@ func TotalAmountLT(v int64) predicate.Order {
 // TotalAmountLTE applies the LTE predicate on the "total_amount" field.
 func TotalAmountLTE(v int64) predicate.Order {
 	return predicate.Order(sql.FieldLTE(FieldTotalAmount, v))
+}
+
+// SubtotalAmountEQ applies the EQ predicate on the "subtotal_amount" field.
+func SubtotalAmountEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldSubtotalAmount, v))
+}
+
+// SubtotalAmountNEQ applies the NEQ predicate on the "subtotal_amount" field.
+func SubtotalAmountNEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldSubtotalAmount, v))
+}
+
+// SubtotalAmountIn applies the In predicate on the "subtotal_amount" field.
+func SubtotalAmountIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldSubtotalAmount, vs...))
+}
+
+// SubtotalAmountNotIn applies the NotIn predicate on the "subtotal_amount" field.
+func SubtotalAmountNotIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldSubtotalAmount, vs...))
+}
+
+// SubtotalAmountGT applies the GT predicate on the "subtotal_amount" field.
+func SubtotalAmountGT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldSubtotalAmount, v))
+}
+
+// SubtotalAmountGTE applies the GTE predicate on the "subtotal_amount" field.
+func SubtotalAmountGTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldSubtotalAmount, v))
+}
+
+// SubtotalAmountLT applies the LT predicate on the "subtotal_amount" field.
+func SubtotalAmountLT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldSubtotalAmount, v))
+}
+
+// SubtotalAmountLTE applies the LTE predicate on the "subtotal_amount" field.
+func SubtotalAmountLTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldSubtotalAmount, v))
+}
+
+// ShippingFeeEQ applies the EQ predicate on the "shipping_fee" field.
+func ShippingFeeEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingFee, v))
+}
+
+// ShippingFeeNEQ applies the NEQ predicate on the "shipping_fee" field.
+func ShippingFeeNEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldShippingFee, v))
+}
+
+// ShippingFeeIn applies the In predicate on the "shipping_fee" field.
+func ShippingFeeIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldShippingFee, vs...))
+}
+
+// ShippingFeeNotIn applies the NotIn predicate on the "shipping_fee" field.
+func ShippingFeeNotIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldShippingFee, vs...))
+}
+
+// ShippingFeeGT applies the GT predicate on the "shipping_fee" field.
+func ShippingFeeGT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldShippingFee, v))
+}
+
+// ShippingFeeGTE applies the GTE predicate on the "shipping_fee" field.
+func ShippingFeeGTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldShippingFee, v))
+}
+
+// ShippingFeeLT applies the LT predicate on the "shipping_fee" field.
+func ShippingFeeLT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldShippingFee, v))
+}
+
+// ShippingFeeLTE applies the LTE predicate on the "shipping_fee" field.
+func ShippingFeeLTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldShippingFee, v))
+}
+
+// ShippingMethodIDEQ applies the EQ predicate on the "shipping_method_id" field.
+func ShippingMethodIDEQ(v int) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDNEQ applies the NEQ predicate on the "shipping_method_id" field.
+func ShippingMethodIDNEQ(v int) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDIn applies the In predicate on the "shipping_method_id" field.
+func ShippingMethodIDIn(vs ...int) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldShippingMethodID, vs...))
+}
+
+// ShippingMethodIDNotIn applies the NotIn predicate on the "shipping_method_id" field.
+func ShippingMethodIDNotIn(vs ...int) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldShippingMethodID, vs...))
+}
+
+// ShippingMethodIDGT applies the GT predicate on the "shipping_method_id" field.
+func ShippingMethodIDGT(v int) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDGTE applies the GTE predicate on the "shipping_method_id" field.
+func ShippingMethodIDGTE(v int) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDLT applies the LT predicate on the "shipping_method_id" field.
+func ShippingMethodIDLT(v int) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDLTE applies the LTE predicate on the "shipping_method_id" field.
+func ShippingMethodIDLTE(v int) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldShippingMethodID, v))
+}
+
+// ShippingMethodIDIsNil applies the IsNil predicate on the "shipping_method_id" field.
+func ShippingMethodIDIsNil() predicate.Order {
+	return predicate.Order(sql.FieldIsNull(FieldShippingMethodID))
+}
+
+// ShippingMethodIDNotNil applies the NotNil predicate on the "shipping_method_id" field.
+func ShippingMethodIDNotNil() predicate.Order {
+	return predicate.Order(sql.FieldNotNull(FieldShippingMethodID))
+}
+
+// ShippingMethodNameEQ applies the EQ predicate on the "shipping_method_name" field.
+func ShippingMethodNameEQ(v string) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameNEQ applies the NEQ predicate on the "shipping_method_name" field.
+func ShippingMethodNameNEQ(v string) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameIn applies the In predicate on the "shipping_method_name" field.
+func ShippingMethodNameIn(vs ...string) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldShippingMethodName, vs...))
+}
+
+// ShippingMethodNameNotIn applies the NotIn predicate on the "shipping_method_name" field.
+func ShippingMethodNameNotIn(vs ...string) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldShippingMethodName, vs...))
+}
+
+// ShippingMethodNameGT applies the GT predicate on the "shipping_method_name" field.
+func ShippingMethodNameGT(v string) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameGTE applies the GTE predicate on the "shipping_method_name" field.
+func ShippingMethodNameGTE(v string) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameLT applies the LT predicate on the "shipping_method_name" field.
+func ShippingMethodNameLT(v string) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameLTE applies the LTE predicate on the "shipping_method_name" field.
+func ShippingMethodNameLTE(v string) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameContains applies the Contains predicate on the "shipping_method_name" field.
+func ShippingMethodNameContains(v string) predicate.Order {
+	return predicate.Order(sql.FieldContains(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameHasPrefix applies the HasPrefix predicate on the "shipping_method_name" field.
+func ShippingMethodNameHasPrefix(v string) predicate.Order {
+	return predicate.Order(sql.FieldHasPrefix(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameHasSuffix applies the HasSuffix predicate on the "shipping_method_name" field.
+func ShippingMethodNameHasSuffix(v string) predicate.Order {
+	return predicate.Order(sql.FieldHasSuffix(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameIsNil applies the IsNil predicate on the "shipping_method_name" field.
+func ShippingMethodNameIsNil() predicate.Order {
+	return predicate.Order(sql.FieldIsNull(FieldShippingMethodName))
+}
+
+// ShippingMethodNameNotNil applies the NotNil predicate on the "shipping_method_name" field.
+func ShippingMethodNameNotNil() predicate.Order {
+	return predicate.Order(sql.FieldNotNull(FieldShippingMethodName))
+}
+
+// ShippingMethodNameEqualFold applies the EqualFold predicate on the "shipping_method_name" field.
+func ShippingMethodNameEqualFold(v string) predicate.Order {
+	return predicate.Order(sql.FieldEqualFold(FieldShippingMethodName, v))
+}
+
+// ShippingMethodNameContainsFold applies the ContainsFold predicate on the "shipping_method_name" field.
+func ShippingMethodNameContainsFold(v string) predicate.Order {
+	return predicate.Order(sql.FieldContainsFold(FieldShippingMethodName, v))
+}
+
+// RequestedDeliveryDateEQ applies the EQ predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateEQ(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateNEQ applies the NEQ predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateNEQ(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateIn applies the In predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateIn(vs ...time.Time) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldRequestedDeliveryDate, vs...))
+}
+
+// RequestedDeliveryDateNotIn applies the NotIn predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateNotIn(vs ...time.Time) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldRequestedDeliveryDate, vs...))
+}
+
+// RequestedDeliveryDateGT applies the GT predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateGT(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateGTE applies the GTE predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateGTE(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateLT applies the LT predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateLT(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateLTE applies the LTE predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateLTE(v time.Time) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldRequestedDeliveryDate, v))
+}
+
+// RequestedDeliveryDateIsNil applies the IsNil predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateIsNil() predicate.Order {
+	return predicate.Order(sql.FieldIsNull(FieldRequestedDeliveryDate))
+}
+
+// RequestedDeliveryDateNotNil applies the NotNil predicate on the "requested_delivery_date" field.
+func RequestedDeliveryDateNotNil() predicate.Order {
+	return predicate.Order(sql.FieldNotNull(FieldRequestedDeliveryDate))
 }
 
 // CancelledAtEQ applies the EQ predicate on the "cancelled_at" field.

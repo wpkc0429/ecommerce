@@ -51,6 +51,7 @@ func (f *paymentFixtures) newOrder(t *testing.T, memberID int, totalAmount int64
 		SetPaymentStatus(order.PaymentStatusUnpaid).
 		SetFulfillmentStatus(0).
 		SetCurrency("TWD").
+		SetSubtotalAmount(totalAmount).
 		SetTotalAmount(totalAmount).
 		SetShippingAddress(json.RawMessage(`{}`)).
 		SaveX(ctx)
@@ -356,7 +357,7 @@ func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
 	if ev.ShopID != f.shopID || ev.OrderID != ord.ID || ev.MemberID != memberID {
 		t.Fatalf("expected event to carry the order's identity, got %+v", ev)
 	}
-	if ev.TotalAmount != 1290 || ev.Currency != "TWD" {
+	if ev.SubtotalAmount != 1290 || ev.Currency != "TWD" {
 		t.Fatalf("expected event to carry the order's amount/currency, got %+v", ev)
 	}
 }

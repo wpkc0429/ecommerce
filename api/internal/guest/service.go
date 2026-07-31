@@ -78,11 +78,19 @@ type Service struct {
 }
 
 // CheckoutInput is one guest checkout request: who to reach, what to buy, where
-// to send it.
+// and when to send it.
+//
+// The three optional extras added by change order-extras (per-item
+// gift_message, shipping_method_id, requested_delivery_date) are carried
+// through untouched — this package validates none of them. That is the point:
+// their rules live in cart.Service and order.Service, so a guest gets exactly
+// the same acceptance and exactly the same 422 pointers a member gets.
 type CheckoutInput struct {
-	Email           string                `json:"email"`
-	Items           []cart.ItemInput      `json:"items"`
-	ShippingAddress order.ShippingAddress `json:"shipping_address"`
+	Email                 string                `json:"email"`
+	Items                 []cart.ItemInput      `json:"items"`
+	ShippingAddress       order.ShippingAddress `json:"shipping_address"`
+	ShippingMethodID      *int                  `json:"shipping_method_id"`
+	RequestedDeliveryDate *string               `json:"requested_delivery_date"`
 }
 
 // Checkout places an order for an unauthenticated visitor.
@@ -120,7 +128,11 @@ func (s *Service) Checkout(ctx context.Context, shopID int, in CheckoutInput) (*
 	if _, err := s.Cart.ReplaceItems(ctx, shopID, m.ID, in.Items); err != nil {
 		return nil, err
 	}
-	return s.Orders.Checkout(ctx, shopID, m.ID, in.ShippingAddress)
+	return s.Orders.Checkout(ctx, shopID, m.ID, order.CheckoutInput{
+		ShippingAddress:       in.ShippingAddress,
+		ShippingMethodID:      in.ShippingMethodID,
+		RequestedDeliveryDate: in.RequestedDeliveryDate,
+	})
 }
 
 // resolveIdentity returns the shop's customer identity for email, creating a

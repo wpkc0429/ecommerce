@@ -120,6 +120,27 @@ func (CartItem) Fields() []ent.Field {
 		// D1). Never float, never numeric.
 		field.Int64("price_amount"),
 		field.String("currency").MaxLen(3).SchemaType(map[string]string{dialect.Postgres: "varchar(3)"}).NotEmpty(),
+		// gift_message (change order-extras, design D1/D2): a free-text note
+		// that travels with THIS line, not with the order — a florist's
+		// handwritten card. NOT NULL DEFAULT '' rather than nullable: NULL and
+		// '' would mean the same thing ("no message"), and keeping two spellings
+		// of one fact forces a ternary at every read (same reasoning as
+		// guest-checkout design D8's always-serialized optional address keys).
+		//
+		// It is part of a cart line's identity: AddItem/ReplaceItems accumulate
+		// on (cart_id, sku_id, gift_message), so "same bouquet, two different
+		// cards" stays two lines instead of silently collapsing into quantity 2
+		// with one message lost. Deliberately NOT covered by a unique index —
+		// see design D1 for why that trade is not worth a 500-char user-supplied
+		// btree key.
+		// No ent MaxLen validator here on purpose: it counts bytes, whereas
+		// Postgres varchar(n) counts characters. A byte limit would reject 500
+		// Chinese characters that the column accepts happily, so the two would
+		// disagree about the same value. The character-counted check lives in
+		// cart.Service (cart.MaxGiftMessageLen) and matches varchar(500)
+		// exactly.
+		field.String("gift_message").
+			SchemaType(map[string]string{dialect.Postgres: "varchar(500)"}).Default(""),
 	}
 }
 

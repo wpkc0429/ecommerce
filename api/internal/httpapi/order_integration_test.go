@@ -145,7 +145,7 @@ func (e *orderEnv) newSKU(t *testing.T, shopID int, price int64, currency string
 // reimplemented in the test).
 func (e *orderEnv) addToCart(t *testing.T, shopID, memberID, skuID int, qty int32) {
 	t.Helper()
-	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, qty); err != nil {
+	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, qty, ""); err != nil {
 		t.Fatalf("seed cart: %v", err)
 	}
 }

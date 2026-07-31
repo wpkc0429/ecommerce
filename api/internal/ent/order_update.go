@@ -166,6 +166,115 @@ func (_u *OrderUpdate) AddTotalAmount(v int64) *OrderUpdate {
 	return _u
 }
 
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (_u *OrderUpdate) SetSubtotalAmount(v int64) *OrderUpdate {
+	_u.mutation.ResetSubtotalAmount()
+	_u.mutation.SetSubtotalAmount(v)
+	return _u
+}
+
+// SetNillableSubtotalAmount sets the "subtotal_amount" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableSubtotalAmount(v *int64) *OrderUpdate {
+	if v != nil {
+		_u.SetSubtotalAmount(*v)
+	}
+	return _u
+}
+
+// AddSubtotalAmount adds value to the "subtotal_amount" field.
+func (_u *OrderUpdate) AddSubtotalAmount(v int64) *OrderUpdate {
+	_u.mutation.AddSubtotalAmount(v)
+	return _u
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (_u *OrderUpdate) SetShippingFee(v int64) *OrderUpdate {
+	_u.mutation.ResetShippingFee()
+	_u.mutation.SetShippingFee(v)
+	return _u
+}
+
+// SetNillableShippingFee sets the "shipping_fee" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableShippingFee(v *int64) *OrderUpdate {
+	if v != nil {
+		_u.SetShippingFee(*v)
+	}
+	return _u
+}
+
+// AddShippingFee adds value to the "shipping_fee" field.
+func (_u *OrderUpdate) AddShippingFee(v int64) *OrderUpdate {
+	_u.mutation.AddShippingFee(v)
+	return _u
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (_u *OrderUpdate) SetShippingMethodID(v int) *OrderUpdate {
+	_u.mutation.ResetShippingMethodID()
+	_u.mutation.SetShippingMethodID(v)
+	return _u
+}
+
+// SetNillableShippingMethodID sets the "shipping_method_id" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableShippingMethodID(v *int) *OrderUpdate {
+	if v != nil {
+		_u.SetShippingMethodID(*v)
+	}
+	return _u
+}
+
+// AddShippingMethodID adds value to the "shipping_method_id" field.
+func (_u *OrderUpdate) AddShippingMethodID(v int) *OrderUpdate {
+	_u.mutation.AddShippingMethodID(v)
+	return _u
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (_u *OrderUpdate) ClearShippingMethodID() *OrderUpdate {
+	_u.mutation.ClearShippingMethodID()
+	return _u
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (_u *OrderUpdate) SetShippingMethodName(v string) *OrderUpdate {
+	_u.mutation.SetShippingMethodName(v)
+	return _u
+}
+
+// SetNillableShippingMethodName sets the "shipping_method_name" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableShippingMethodName(v *string) *OrderUpdate {
+	if v != nil {
+		_u.SetShippingMethodName(*v)
+	}
+	return _u
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (_u *OrderUpdate) ClearShippingMethodName() *OrderUpdate {
+	_u.mutation.ClearShippingMethodName()
+	return _u
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (_u *OrderUpdate) SetRequestedDeliveryDate(v time.Time) *OrderUpdate {
+	_u.mutation.SetRequestedDeliveryDate(v)
+	return _u
+}
+
+// SetNillableRequestedDeliveryDate sets the "requested_delivery_date" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableRequestedDeliveryDate(v *time.Time) *OrderUpdate {
+	if v != nil {
+		_u.SetRequestedDeliveryDate(*v)
+	}
+	return _u
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (_u *OrderUpdate) ClearRequestedDeliveryDate() *OrderUpdate {
+	_u.mutation.ClearRequestedDeliveryDate()
+	return _u
+}
+
 // SetShippingAddress sets the "shipping_address" field.
 func (_u *OrderUpdate) SetShippingAddress(v json.RawMessage) *OrderUpdate {
 	_u.mutation.SetShippingAddress(v)
@@ -304,6 +413,11 @@ func (_u *OrderUpdate) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Order.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ShippingMethodName(); ok {
+		if err := order.ShippingMethodNameValidator(v); err != nil {
+			return &ValidationError{Name: "shipping_method_name", err: fmt.Errorf(`ent: validator failed for field "Order.shipping_method_name": %w`, err)}
+		}
+	}
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "Order.shop"`)
 	}
@@ -360,6 +474,39 @@ func (_u *OrderUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedTotalAmount(); ok {
 		_spec.AddField(order.FieldTotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.SubtotalAmount(); ok {
+		_spec.SetField(order.FieldSubtotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSubtotalAmount(); ok {
+		_spec.AddField(order.FieldSubtotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ShippingFee(); ok {
+		_spec.SetField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedShippingFee(); ok {
+		_spec.AddField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ShippingMethodID(); ok {
+		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedShippingMethodID(); ok {
+		_spec.AddField(order.FieldShippingMethodID, field.TypeInt, value)
+	}
+	if _u.mutation.ShippingMethodIDCleared() {
+		_spec.ClearField(order.FieldShippingMethodID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ShippingMethodName(); ok {
+		_spec.SetField(order.FieldShippingMethodName, field.TypeString, value)
+	}
+	if _u.mutation.ShippingMethodNameCleared() {
+		_spec.ClearField(order.FieldShippingMethodName, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequestedDeliveryDate(); ok {
+		_spec.SetField(order.FieldRequestedDeliveryDate, field.TypeTime, value)
+	}
+	if _u.mutation.RequestedDeliveryDateCleared() {
+		_spec.ClearField(order.FieldRequestedDeliveryDate, field.TypeTime)
 	}
 	if value, ok := _u.mutation.ShippingAddress(); ok {
 		_spec.SetField(order.FieldShippingAddress, field.TypeJSON, value)
@@ -632,6 +779,115 @@ func (_u *OrderUpdateOne) AddTotalAmount(v int64) *OrderUpdateOne {
 	return _u
 }
 
+// SetSubtotalAmount sets the "subtotal_amount" field.
+func (_u *OrderUpdateOne) SetSubtotalAmount(v int64) *OrderUpdateOne {
+	_u.mutation.ResetSubtotalAmount()
+	_u.mutation.SetSubtotalAmount(v)
+	return _u
+}
+
+// SetNillableSubtotalAmount sets the "subtotal_amount" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableSubtotalAmount(v *int64) *OrderUpdateOne {
+	if v != nil {
+		_u.SetSubtotalAmount(*v)
+	}
+	return _u
+}
+
+// AddSubtotalAmount adds value to the "subtotal_amount" field.
+func (_u *OrderUpdateOne) AddSubtotalAmount(v int64) *OrderUpdateOne {
+	_u.mutation.AddSubtotalAmount(v)
+	return _u
+}
+
+// SetShippingFee sets the "shipping_fee" field.
+func (_u *OrderUpdateOne) SetShippingFee(v int64) *OrderUpdateOne {
+	_u.mutation.ResetShippingFee()
+	_u.mutation.SetShippingFee(v)
+	return _u
+}
+
+// SetNillableShippingFee sets the "shipping_fee" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableShippingFee(v *int64) *OrderUpdateOne {
+	if v != nil {
+		_u.SetShippingFee(*v)
+	}
+	return _u
+}
+
+// AddShippingFee adds value to the "shipping_fee" field.
+func (_u *OrderUpdateOne) AddShippingFee(v int64) *OrderUpdateOne {
+	_u.mutation.AddShippingFee(v)
+	return _u
+}
+
+// SetShippingMethodID sets the "shipping_method_id" field.
+func (_u *OrderUpdateOne) SetShippingMethodID(v int) *OrderUpdateOne {
+	_u.mutation.ResetShippingMethodID()
+	_u.mutation.SetShippingMethodID(v)
+	return _u
+}
+
+// SetNillableShippingMethodID sets the "shipping_method_id" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableShippingMethodID(v *int) *OrderUpdateOne {
+	if v != nil {
+		_u.SetShippingMethodID(*v)
+	}
+	return _u
+}
+
+// AddShippingMethodID adds value to the "shipping_method_id" field.
+func (_u *OrderUpdateOne) AddShippingMethodID(v int) *OrderUpdateOne {
+	_u.mutation.AddShippingMethodID(v)
+	return _u
+}
+
+// ClearShippingMethodID clears the value of the "shipping_method_id" field.
+func (_u *OrderUpdateOne) ClearShippingMethodID() *OrderUpdateOne {
+	_u.mutation.ClearShippingMethodID()
+	return _u
+}
+
+// SetShippingMethodName sets the "shipping_method_name" field.
+func (_u *OrderUpdateOne) SetShippingMethodName(v string) *OrderUpdateOne {
+	_u.mutation.SetShippingMethodName(v)
+	return _u
+}
+
+// SetNillableShippingMethodName sets the "shipping_method_name" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableShippingMethodName(v *string) *OrderUpdateOne {
+	if v != nil {
+		_u.SetShippingMethodName(*v)
+	}
+	return _u
+}
+
+// ClearShippingMethodName clears the value of the "shipping_method_name" field.
+func (_u *OrderUpdateOne) ClearShippingMethodName() *OrderUpdateOne {
+	_u.mutation.ClearShippingMethodName()
+	return _u
+}
+
+// SetRequestedDeliveryDate sets the "requested_delivery_date" field.
+func (_u *OrderUpdateOne) SetRequestedDeliveryDate(v time.Time) *OrderUpdateOne {
+	_u.mutation.SetRequestedDeliveryDate(v)
+	return _u
+}
+
+// SetNillableRequestedDeliveryDate sets the "requested_delivery_date" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableRequestedDeliveryDate(v *time.Time) *OrderUpdateOne {
+	if v != nil {
+		_u.SetRequestedDeliveryDate(*v)
+	}
+	return _u
+}
+
+// ClearRequestedDeliveryDate clears the value of the "requested_delivery_date" field.
+func (_u *OrderUpdateOne) ClearRequestedDeliveryDate() *OrderUpdateOne {
+	_u.mutation.ClearRequestedDeliveryDate()
+	return _u
+}
+
 // SetShippingAddress sets the "shipping_address" field.
 func (_u *OrderUpdateOne) SetShippingAddress(v json.RawMessage) *OrderUpdateOne {
 	_u.mutation.SetShippingAddress(v)
@@ -783,6 +1039,11 @@ func (_u *OrderUpdateOne) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Order.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ShippingMethodName(); ok {
+		if err := order.ShippingMethodNameValidator(v); err != nil {
+			return &ValidationError{Name: "shipping_method_name", err: fmt.Errorf(`ent: validator failed for field "Order.shipping_method_name": %w`, err)}
+		}
+	}
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "Order.shop"`)
 	}
@@ -856,6 +1117,39 @@ func (_u *OrderUpdateOne) sqlSave(ctx context.Context) (_node *Order, err error)
 	}
 	if value, ok := _u.mutation.AddedTotalAmount(); ok {
 		_spec.AddField(order.FieldTotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.SubtotalAmount(); ok {
+		_spec.SetField(order.FieldSubtotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedSubtotalAmount(); ok {
+		_spec.AddField(order.FieldSubtotalAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ShippingFee(); ok {
+		_spec.SetField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedShippingFee(); ok {
+		_spec.AddField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.ShippingMethodID(); ok {
+		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedShippingMethodID(); ok {
+		_spec.AddField(order.FieldShippingMethodID, field.TypeInt, value)
+	}
+	if _u.mutation.ShippingMethodIDCleared() {
+		_spec.ClearField(order.FieldShippingMethodID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ShippingMethodName(); ok {
+		_spec.SetField(order.FieldShippingMethodName, field.TypeString, value)
+	}
+	if _u.mutation.ShippingMethodNameCleared() {
+		_spec.ClearField(order.FieldShippingMethodName, field.TypeString)
+	}
+	if value, ok := _u.mutation.RequestedDeliveryDate(); ok {
+		_spec.SetField(order.FieldRequestedDeliveryDate, field.TypeTime, value)
+	}
+	if _u.mutation.RequestedDeliveryDateCleared() {
+		_spec.ClearField(order.FieldRequestedDeliveryDate, field.TypeTime)
 	}
 	if value, ok := _u.mutation.ShippingAddress(); ok {
 		_spec.SetField(order.FieldShippingAddress, field.TypeJSON, value)

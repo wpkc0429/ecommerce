@@ -334,11 +334,13 @@ func TestGuestCheckoutWithExistingPasswordMemberIsIsomorphic(t *testing.T) {
 
 	// The member already has an order of their own.
 	priorSKU := e.newSKU(t, e.shopA, 500, "TWD", 5)
-	if _, err := e.cartSvc.AddItem(ctx, e.shopA, e.memberA1, priorSKU, 1); err != nil {
+	if _, err := e.cartSvc.AddItem(ctx, e.shopA, e.memberA1, priorSKU, 1, ""); err != nil {
 		t.Fatal(err)
 	}
-	priorOrder, err := e.orderSvc.Checkout(ctx, e.shopA, e.memberA1, order.ShippingAddress{
-		RecipientName: "王小明", Phone: "0900000000", Line1: "既有訂單地址",
+	priorOrder, err := e.orderSvc.Checkout(ctx, e.shopA, e.memberA1, order.CheckoutInput{
+		ShippingAddress: order.ShippingAddress{
+			RecipientName: "王小明", Phone: "0900000000", Line1: "既有訂單地址",
+		},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -473,7 +475,7 @@ func TestGuestCheckoutInvalidItemLeavesCartUnchanged(t *testing.T) {
 	// something to damage if ReplaceItems were not atomic.
 	e.checkoutAsGuest(t, e.shopADomain, "atomic@t.dev", goodSKU, 1)
 	m := e.identity(t, e.shopA, "atomic@t.dev")
-	if _, err := e.cartSvc.AddItem(ctx, e.shopA, m.ID, goodSKU, 3); err != nil {
+	if _, err := e.cartSvc.AddItem(ctx, e.shopA, m.ID, goodSKU, 3, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -505,7 +507,7 @@ func TestGuestCheckoutReplacesExistingCartContents(t *testing.T) {
 
 	// A claimed identity shopping on another device.
 	m := e.client.Member.Create().SetShopID(e.shopA).SetEmail("replaces@t.dev").SetStatus(1).SaveX(ctx)
-	if _, err := e.cartSvc.AddItem(ctx, e.shopA, m.ID, oldSKU, 2); err != nil {
+	if _, err := e.cartSvc.AddItem(ctx, e.shopA, m.ID, oldSKU, 2, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -747,7 +749,7 @@ func TestGuestAndMemberCheckoutShareOneStockGuard(t *testing.T) {
 		memberIDs[i] = e.client.Member.Create().
 			SetShopID(e.shopA).SetEmail(fmt.Sprintf("mixed-member-%d@t.dev", i)).SetStatus(1).
 			SaveX(ctx).ID
-		if _, err := e.cartSvc.AddItem(ctx, e.shopA, memberIDs[i], skuID, 1); err != nil {
+		if _, err := e.cartSvc.AddItem(ctx, e.shopA, memberIDs[i], skuID, 1, ""); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1026,7 +1028,7 @@ func TestSingleLineShippingAddressAcceptedOnBothCheckoutPaths(t *testing.T) {
 
 	// Member path: the same relaxation applies (design D8 rejects a
 	// guest-only rule for the same column).
-	if _, err := e.cartSvc.AddItem(ctx, e.shopA, e.memberA1, memberSKU, 1); err != nil {
+	if _, err := e.cartSvc.AddItem(ctx, e.shopA, e.memberA1, memberSKU, 1, ""); err != nil {
 		t.Fatal(err)
 	}
 	code, body := e.memberTokenCall(t, e.memberA1, e.shopA, e.shopADomain, "POST", "/api/v1/shop/checkout",

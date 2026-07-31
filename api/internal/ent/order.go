@@ -38,6 +38,16 @@ type Order struct {
 	Currency string `json:"currency,omitempty"`
 	// TotalAmount holds the value of the "total_amount" field.
 	TotalAmount int64 `json:"total_amount,omitempty"`
+	// SubtotalAmount holds the value of the "subtotal_amount" field.
+	SubtotalAmount int64 `json:"subtotal_amount,omitempty"`
+	// ShippingFee holds the value of the "shipping_fee" field.
+	ShippingFee int64 `json:"shipping_fee,omitempty"`
+	// ShippingMethodID holds the value of the "shipping_method_id" field.
+	ShippingMethodID *int `json:"shipping_method_id,omitempty"`
+	// ShippingMethodName holds the value of the "shipping_method_name" field.
+	ShippingMethodName *string `json:"shipping_method_name,omitempty"`
+	// RequestedDeliveryDate holds the value of the "requested_delivery_date" field.
+	RequestedDeliveryDate *time.Time `json:"requested_delivery_date,omitempty"`
 	// ShippingAddress holds the value of the "shipping_address" field.
 	ShippingAddress json.RawMessage `json:"shipping_address,omitempty"`
 	// CancelledAt holds the value of the "cancelled_at" field.
@@ -99,11 +109,11 @@ func (*Order) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case order.FieldShippingAddress:
 			values[i] = new([]byte)
-		case order.FieldID, order.FieldShopID, order.FieldMemberID, order.FieldStatus, order.FieldPaymentStatus, order.FieldFulfillmentStatus, order.FieldTotalAmount:
+		case order.FieldID, order.FieldShopID, order.FieldMemberID, order.FieldStatus, order.FieldPaymentStatus, order.FieldFulfillmentStatus, order.FieldTotalAmount, order.FieldSubtotalAmount, order.FieldShippingFee, order.FieldShippingMethodID:
 			values[i] = new(sql.NullInt64)
-		case order.FieldCurrency:
+		case order.FieldCurrency, order.FieldShippingMethodName:
 			values[i] = new(sql.NullString)
-		case order.FieldCreatedAt, order.FieldUpdatedAt, order.FieldCancelledAt:
+		case order.FieldCreatedAt, order.FieldUpdatedAt, order.FieldRequestedDeliveryDate, order.FieldCancelledAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -179,6 +189,39 @@ func (_m *Order) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field total_amount", values[i])
 			} else if value.Valid {
 				_m.TotalAmount = value.Int64
+			}
+		case order.FieldSubtotalAmount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field subtotal_amount", values[i])
+			} else if value.Valid {
+				_m.SubtotalAmount = value.Int64
+			}
+		case order.FieldShippingFee:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field shipping_fee", values[i])
+			} else if value.Valid {
+				_m.ShippingFee = value.Int64
+			}
+		case order.FieldShippingMethodID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field shipping_method_id", values[i])
+			} else if value.Valid {
+				_m.ShippingMethodID = new(int)
+				*_m.ShippingMethodID = int(value.Int64)
+			}
+		case order.FieldShippingMethodName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field shipping_method_name", values[i])
+			} else if value.Valid {
+				_m.ShippingMethodName = new(string)
+				*_m.ShippingMethodName = value.String
+			}
+		case order.FieldRequestedDeliveryDate:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_delivery_date", values[i])
+			} else if value.Valid {
+				_m.RequestedDeliveryDate = new(time.Time)
+				*_m.RequestedDeliveryDate = value.Time
 			}
 		case order.FieldShippingAddress:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -272,6 +315,27 @@ func (_m *Order) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("total_amount=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TotalAmount))
+	builder.WriteString(", ")
+	builder.WriteString("subtotal_amount=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SubtotalAmount))
+	builder.WriteString(", ")
+	builder.WriteString("shipping_fee=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShippingFee))
+	builder.WriteString(", ")
+	if v := _m.ShippingMethodID; v != nil {
+		builder.WriteString("shipping_method_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ShippingMethodName; v != nil {
+		builder.WriteString("shipping_method_name=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.RequestedDeliveryDate; v != nil {
+		builder.WriteString("requested_delivery_date=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("shipping_address=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ShippingAddress))

@@ -60,13 +60,14 @@ func (f *pointsFixtures) newOrder(t *testing.T, memberID int, totalAmount int64)
 		SetPaymentStatus(order.PaymentStatusUnpaid).
 		SetFulfillmentStatus(order.FulfillmentStatusUnfulfilled).
 		SetCurrency("TWD").
+		SetSubtotalAmount(totalAmount).
 		SetTotalAmount(totalAmount).
 		SetShippingAddress(json.RawMessage(`{}`)).
 		SaveX(ctx)
 }
 
 func paidEvent(shopID, orderID, memberID int, totalAmount int64) events.OrderPaymentSucceeded {
-	return events.OrderPaymentSucceeded{ShopID: shopID, OrderID: orderID, MemberID: memberID, TotalAmount: totalAmount, Currency: "TWD"}
+	return events.OrderPaymentSucceeded{ShopID: shopID, OrderID: orderID, MemberID: memberID, SubtotalAmount: totalAmount, Currency: "TWD"}
 }
 
 func returnedEvent(shopID, orderID, memberID int) events.OrderReturned {

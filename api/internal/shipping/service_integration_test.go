@@ -62,6 +62,7 @@ func (f *shippingFixtures) newOrder(t *testing.T, memberID int) *ent.Order {
 		SetPaymentStatus(order.PaymentStatusUnpaid).
 		SetFulfillmentStatus(order.FulfillmentStatusUnfulfilled).
 		SetCurrency("TWD").
+		SetSubtotalAmount(1000).
 		SetTotalAmount(1000).
 		SetShippingAddress(json.RawMessage(`{}`)).
 		SaveX(ctx)

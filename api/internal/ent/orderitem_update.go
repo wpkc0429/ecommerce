@@ -203,6 +203,20 @@ func (_u *OrderItemUpdate) SetNillableCurrency(v *string) *OrderItemUpdate {
 	return _u
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (_u *OrderItemUpdate) SetGiftMessage(v string) *OrderItemUpdate {
+	_u.mutation.SetGiftMessage(v)
+	return _u
+}
+
+// SetNillableGiftMessage sets the "gift_message" field if the given value is not nil.
+func (_u *OrderItemUpdate) SetNillableGiftMessage(v *string) *OrderItemUpdate {
+	if v != nil {
+		_u.SetGiftMessage(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *OrderItemUpdate) SetShop(v *Shop) *OrderItemUpdate {
 	return _u.SetShopID(v.ID)
@@ -351,6 +365,9 @@ func (_u *OrderItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(orderitem.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GiftMessage(); ok {
+		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -604,6 +621,20 @@ func (_u *OrderItemUpdateOne) SetNillableCurrency(v *string) *OrderItemUpdateOne
 	return _u
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (_u *OrderItemUpdateOne) SetGiftMessage(v string) *OrderItemUpdateOne {
+	_u.mutation.SetGiftMessage(v)
+	return _u
+}
+
+// SetNillableGiftMessage sets the "gift_message" field if the given value is not nil.
+func (_u *OrderItemUpdateOne) SetNillableGiftMessage(v *string) *OrderItemUpdateOne {
+	if v != nil {
+		_u.SetGiftMessage(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *OrderItemUpdateOne) SetShop(v *Shop) *OrderItemUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -782,6 +813,9 @@ func (_u *OrderItemUpdateOne) sqlSave(ctx context.Context) (_node *OrderItem, er
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(orderitem.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GiftMessage(); ok {
+		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

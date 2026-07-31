@@ -142,6 +142,20 @@ func (_u *CartItemUpdate) SetNillableCurrency(v *string) *CartItemUpdate {
 	return _u
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (_u *CartItemUpdate) SetGiftMessage(v string) *CartItemUpdate {
+	_u.mutation.SetGiftMessage(v)
+	return _u
+}
+
+// SetNillableGiftMessage sets the "gift_message" field if the given value is not nil.
+func (_u *CartItemUpdate) SetNillableGiftMessage(v *string) *CartItemUpdate {
+	if v != nil {
+		_u.SetGiftMessage(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *CartItemUpdate) SetShop(v *Shop) *CartItemUpdate {
 	return _u.SetShopID(v.ID)
@@ -267,6 +281,9 @@ func (_u *CartItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(cartitem.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GiftMessage(); ok {
+		_spec.SetField(cartitem.FieldGiftMessage, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -487,6 +504,20 @@ func (_u *CartItemUpdateOne) SetNillableCurrency(v *string) *CartItemUpdateOne {
 	return _u
 }
 
+// SetGiftMessage sets the "gift_message" field.
+func (_u *CartItemUpdateOne) SetGiftMessage(v string) *CartItemUpdateOne {
+	_u.mutation.SetGiftMessage(v)
+	return _u
+}
+
+// SetNillableGiftMessage sets the "gift_message" field if the given value is not nil.
+func (_u *CartItemUpdateOne) SetNillableGiftMessage(v *string) *CartItemUpdateOne {
+	if v != nil {
+		_u.SetGiftMessage(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *CartItemUpdateOne) SetShop(v *Shop) *CartItemUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -642,6 +673,9 @@ func (_u *CartItemUpdateOne) sqlSave(ctx context.Context) (_node *CartItem, err 
 	}
 	if value, ok := _u.mutation.Currency(); ok {
 		_spec.SetField(cartitem.FieldCurrency, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GiftMessage(); ok {
+		_spec.SetField(cartitem.FieldGiftMessage, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

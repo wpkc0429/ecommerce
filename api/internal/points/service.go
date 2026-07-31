@@ -263,11 +263,20 @@ func (s *Service) Handle(ctx context.Context, e events.Event) {
 }
 
 // HandleOrderPaid idempotently awards points for a paid order (design
-// D3/D4): points = TotalAmount / pointsPerMinorUnit (floor). A cheap
+// D3/D4): points = SubtotalAmount / pointsPerMinorUnit (floor). A cheap
 // existence pre-check short-circuits the common repeated-delivery case;
 // the (order_id, kind) unique index is the actual arbiter — a constraint
 // violation on insert means another delivery already won and this call is a
 // safe no-op.
+//
+// The basis is the order's item subtotal, never its payable total (change
+// order-extras, design D5). Shipping is mostly money the merchant passes
+// straight to a courier, and awarding on it would pay a customer 2 points more
+// for the same bouquet purely for choosing same-day delivery — a loyalty rule
+// that subsidizes the least efficient logistics choice. It is also the only
+// basis under which every point already issued before that change stays
+// correct: the backfill made subtotal_amount equal the old total_amount for
+// every pre-existing order.
 func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSucceeded) error {
 	already, err := s.Client.PointTransaction.Query().
 		Where(entpointtransaction.OrderIDEQ(ev.OrderID), entpointtransaction.KindEQ(KindOrderAward)).
@@ -286,7 +295,7 @@ func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSuc
 		return fmt.Errorf("points: query member for award: %w", err)
 	}
 
-	awarded := int32(ev.TotalAmount / pointsPerMinorUnit)
+	awarded := int32(ev.SubtotalAmount / pointsPerMinorUnit)
 
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {

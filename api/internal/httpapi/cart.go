@@ -55,7 +55,11 @@ func cartItemJSON(it cart.CartItemView) map[string]any {
 	return map[string]any{
 		"id": it.ID, "sku_id": it.SKUID, "sku_code": it.SKUCode,
 		"quantity": it.Quantity, "price_amount": it.PriceAmount, "currency": it.Currency,
-		"line_total": it.LineTotal, "purchasable": it.Purchasable, "unavailable_reason": it.UnavailableReason,
+		"line_total": it.LineTotal,
+		// change order-extras: always a string, never null — "no message" is
+		// the empty string (design D1).
+		"gift_message": it.GiftMessage,
+		"purchasable":  it.Purchasable, "unavailable_reason": it.UnavailableReason,
 	}
 }
 
@@ -119,11 +123,15 @@ func (h *CartHandler) addItem(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		SKUID    int   `json:"sku_id"`
 		Quantity int32 `json:"quantity"`
+		// change order-extras: optional; absent means no message. Part of the
+		// accumulation key, so the same SKU with a different message becomes a
+		// separate line rather than more quantity on the existing one.
+		GiftMessage string `json:"gift_message"`
 	}
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	view, err := h.Service.AddItem(r.Context(), shopID, memberID, in.SKUID, in.Quantity)
+	view, err := h.Service.AddItem(r.Context(), shopID, memberID, in.SKUID, in.Quantity, in.GiftMessage)
 	if err != nil {
 		writeCartError(w, h.Log, err)
 		return
@@ -145,6 +153,11 @@ func (h *CartHandler) updateItem(w http.ResponseWriter, r *http.Request) {
 		httpx.NotFound(w)
 		return
 	}
+	// Deliberately quantity only: this route does NOT accept gift_message
+	// (change order-extras, design D2). Editing a line's message would change
+	// its (sku, message) identity and so could produce two lines that are
+	// byte-for-byte identical — a state AddItem's accumulation can never reach
+	// and nothing would repair. Remove + re-add already covers the need.
 	var in struct {
 		Quantity int32 `json:"quantity"`
 	}

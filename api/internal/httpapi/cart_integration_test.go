@@ -515,7 +515,7 @@ func TestReplaceItemsSwapsContentsAtomically(t *testing.T) {
 	_, oldSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, true)
 	_, newSKU := e.newSKU(t, e.shopA, 900, "TWD", 10, true, true)
 
-	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, oldSKU, 3); err != nil {
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, oldSKU, 3, ""); err != nil {
 		t.Fatal(err)
 	}
 	view, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, []cart.ItemInput{{SKUID: newSKU, Quantity: 2}})
@@ -559,7 +559,7 @@ func TestReplaceItemsRejectsAndLeavesCartUntouched(t *testing.T) {
 	_, thinSKU := e.newSKU(t, e.shopA, 500, "TWD", 1, true, true)
 	_, usdSKU := e.newSKU(t, e.shopA, 500, "USD", 10, true, true)
 
-	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, keptSKU, 4); err != nil {
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, keptSKU, 4, ""); err != nil {
 		t.Fatal(err)
 	}
 
@@ -604,7 +604,7 @@ func TestReplaceItemsRelocksCurrency(t *testing.T) {
 	_, twdSKU := e.newSKU(t, e.shopA, 500, "TWD", 10, true, true)
 	_, usdSKU := e.newSKU(t, e.shopA, 500, "USD", 10, true, true)
 
-	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, twdSKU, 1); err != nil {
+	if _, err := svc.AddItem(ctx, e.shopA, e.memberA1, twdSKU, 1, ""); err != nil {
 		t.Fatal(err)
 	}
 	view, err := svc.ReplaceItems(ctx, e.shopA, e.memberA1, []cart.ItemInput{{SKUID: usdSKU, Quantity: 1}})

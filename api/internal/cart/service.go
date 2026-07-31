@@ -14,6 +14,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"unicode/utf8"
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcart "ksdevworks/ecommerce/api/internal/ent/cart"
@@ -54,6 +55,26 @@ const (
 	StatusConverted int16 = 1 // checked out into an order — set by order-management, never by this package
 	StatusAbandoned int16 = 2 // reserved for a future no-activity detector; unused by this change
 )
+
+// MaxGiftMessageLen bounds cart_items.gift_message (change order-extras,
+// design D2), counted in runes rather than bytes: a byte limit would silently
+// give a Chinese-writing customer a third of the allowance an English-writing
+// one gets, which is an implementation detail leaking out as a product rule.
+//
+// A limit is required at all — this is free text an *unauthenticated* guest can
+// write (guest checkout) — but it has to fit the purpose: a handwritten card
+// holds a hundred-odd characters, so 500 is generous for the real use and far
+// below anything worth abusing.
+const MaxGiftMessageLen = 500
+
+// validateGiftMessage rejects an over-long message rather than truncating it.
+// Truncation would silently deliver something the customer did not write.
+func validateGiftMessage(pointer, msg string) error {
+	if utf8.RuneCountInString(msg) > MaxGiftMessageLen {
+		return validationErr(pointer, fmt.Sprintf("gift_message must be at most %d characters", MaxGiftMessageLen))
+	}
+	return nil
+}
 
 // Unavailable reasons for CartItemView.UnavailableReason (design D6/D7).
 // Empty string means the item is purchasable.
@@ -97,6 +118,7 @@ type CartItemView struct {
 	PriceAmount       int64  // snapshot (design D2)
 	Currency          string // snapshot
 	LineTotal         int64  // PriceAmount * int64(Quantity)
+	GiftMessage       string // "" when none (change order-extras, design D1)
 	Purchasable       bool
 	UnavailableReason string
 }
@@ -156,6 +178,7 @@ func buildItemView(it *ent.CartItem) CartItemView {
 		PriceAmount: it.PriceAmount,
 		Currency:    it.Currency,
 		LineTotal:   it.PriceAmount * int64(it.Quantity),
+		GiftMessage: it.GiftMessage,
 	}
 	sku := it.Edges.Sku
 	switch {
@@ -178,14 +201,23 @@ func buildItemView(it *ent.CartItem) CartItemView {
 }
 
 // AddItem finds-or-creates the member's active cart and either creates a new
-// line item or accumulates onto an existing one for the same SKU (design
-// D5). Validates the SKU belongs to the shop, is active, its product is
-// published, its currency matches the cart's locked currency (design D4),
-// and the resulting quantity does not exceed current stock — any failure is
-// a ValidationError (422), never a 500 (spec Add item validation).
-func (s *Service) AddItem(ctx context.Context, shopID, memberID, skuID int, quantity int32) (*CartView, error) {
+// line item or accumulates onto an existing one for the same SKU *and the same
+// gift message* (design D5; change order-extras, design D1). Validates the SKU
+// belongs to the shop, is active, its product is published, its currency
+// matches the cart's locked currency (design D4), and the resulting quantity
+// does not exceed current stock — any failure is a ValidationError (422), never
+// a 500 (spec Add item validation).
+//
+// giftMessage participates in the accumulation key because "the same bouquet
+// with two different cards" is two lines, not quantity 2 with one message
+// thrown away. Stock, however, belongs to the SKU alone — so the stock check
+// sums every line of this SKU regardless of message.
+func (s *Service) AddItem(ctx context.Context, shopID, memberID, skuID int, quantity int32, giftMessage string) (*CartView, error) {
 	if quantity <= 0 {
 		return nil, validationErr("/quantity", "quantity must be greater than zero")
+	}
+	if err := validateGiftMessage("/gift_message", giftMessage); err != nil {
+		return nil, err
 	}
 
 	sku, err := s.Client.ProductSKU.Query().
@@ -235,35 +267,46 @@ func (s *Service) AddItem(ctx context.Context, shopID, memberID, skuID int, quan
 		}
 	}
 
-	existing, err := tx.CartItem.Query().
+	// Every line holding this SKU, whatever its gift message: the one to merge
+	// into (same message) and the ones that only matter for the stock ceiling.
+	// Ordered by id so the merge target is deterministic even if a duplicate
+	// ever slipped in — ent's Only() would turn that into a 500 instead.
+	siblings, err := tx.CartItem.Query().
 		Where(entcartitem.CartIDEQ(c.ID), entcartitem.SkuIDEQ(skuID)).
-		Only(ctx)
-	switch {
-	case ent.IsNotFound(err):
-		if int32(sku.StockQty) < quantity {
-			_ = tx.Rollback()
-			return nil, validationErr("/quantity", "quantity exceeds available stock")
+		Order(entcartitem.ByID()).
+		All(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, fmt.Errorf("cart: query existing items: %w", err)
+	}
+	var existing *ent.CartItem
+	var heldQty int32
+	for _, it := range siblings {
+		heldQty += it.Quantity
+		if existing == nil && it.GiftMessage == giftMessage {
+			existing = it
 		}
+	}
+
+	// Stock belongs to the SKU, not to a message: the ceiling applies to the
+	// total this cart would hold across all of its lines.
+	if sku.StockQty < heldQty+quantity {
+		_ = tx.Rollback()
+		return nil, validationErr("/quantity", "quantity exceeds available stock")
+	}
+
+	if existing == nil {
 		if _, err := tx.CartItem.Create().
 			SetShopID(shopID).SetCartID(c.ID).SetSkuID(skuID).
 			SetQuantity(quantity).SetPriceAmount(sku.PriceAmount).SetCurrency(sku.Currency).
+			SetGiftMessage(giftMessage).
 			Save(ctx); err != nil {
 			_ = tx.Rollback()
 			return nil, fmt.Errorf("cart: create item: %w", err)
 		}
-	case err != nil:
+	} else if _, err := existing.Update().SetQuantity(existing.Quantity + quantity).Save(ctx); err != nil {
 		_ = tx.Rollback()
-		return nil, fmt.Errorf("cart: query existing item: %w", err)
-	default:
-		newQty := existing.Quantity + quantity
-		if sku.StockQty < newQty {
-			_ = tx.Rollback()
-			return nil, validationErr("/quantity", "quantity exceeds available stock")
-		}
-		if _, err := existing.Update().SetQuantity(newQty).Save(ctx); err != nil {
-			_ = tx.Rollback()
-			return nil, fmt.Errorf("cart: accumulate item quantity: %w", err)
-		}
+		return nil, fmt.Errorf("cart: accumulate item quantity: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -276,6 +319,17 @@ func (s *Service) AddItem(ctx context.Context, shopID, memberID, skuID int, quan
 type ItemInput struct {
 	SKUID    int   `json:"sku_id"`
 	Quantity int32 `json:"quantity"`
+	// GiftMessage travels with this line (change order-extras, design D1).
+	// Two lines of the same SKU with different messages stay two lines.
+	GiftMessage string `json:"gift_message"`
+}
+
+// lineKey is ReplaceItems' collapse key: the same SKU with the same message is
+// one line whose quantities accumulate; the same SKU with different messages is
+// two lines (change order-extras, design D1).
+type lineKey struct {
+	skuID       int
+	giftMessage string
 }
 
 // ReplaceItems atomically replaces the member's active cart contents with
@@ -295,9 +349,11 @@ type ItemInput struct {
 //
 // Validation mirrors AddItem exactly (SKU belongs to the shop, is active, its
 // product is published, currency matches the cart's locked currency, quantity
-// > 0 and within current stock); repeated sku_ids accumulate, same as calling
-// AddItem twice. The stock check here is advisory, exactly as in AddItem — the
-// authoritative one is checkout's atomic conditional decrement.
+// > 0 and within current stock, gift message within its length limit); repeated
+// (sku_id, gift_message) pairs accumulate, same as calling AddItem twice. The
+// stock check here is advisory, exactly as in AddItem — the authoritative one is
+// checkout's atomic conditional decrement — and is applied per SKU across every
+// message (change order-extras, design D1).
 //
 // No HTTP endpoint exposes this: guest checkout is its only caller, and a
 // member-facing batch route would be a public contract with no consumer.
@@ -306,25 +362,39 @@ func (s *Service) ReplaceItems(ctx context.Context, shopID, memberID int, lines 
 		return nil, validationErr("/items", "at least one item is required")
 	}
 
-	// Collapse duplicate SKUs first so each SKU is validated once against the
+	// Collapse duplicates first so each line is validated once against the
 	// total quantity actually being requested (mirrors AddItem's accumulate).
+	// The key includes the gift message; the stock tally deliberately does not.
+	keyOrder := make([]lineKey, 0, len(lines))
+	wanted := make(map[lineKey]int32, len(lines))
 	skuOrder := make([]int, 0, len(lines))
-	wanted := make(map[int]int32, len(lines))
+	skuWanted := make(map[int]int32, len(lines))
+	firstLineOf := make(map[int]int, len(lines)) // sku_id → index of its first line, for error pointers
 	for i, l := range lines {
 		if l.Quantity <= 0 {
 			return nil, validationErr(fmt.Sprintf("/items/%d/quantity", i), "quantity must be greater than zero")
 		}
-		if _, seen := wanted[l.SKUID]; !seen {
-			skuOrder = append(skuOrder, l.SKUID)
+		if err := validateGiftMessage(fmt.Sprintf("/items/%d/gift_message", i), l.GiftMessage); err != nil {
+			return nil, err
 		}
-		wanted[l.SKUID] += l.Quantity
+		k := lineKey{skuID: l.SKUID, giftMessage: l.GiftMessage}
+		if _, seen := wanted[k]; !seen {
+			keyOrder = append(keyOrder, k)
+		}
+		wanted[k] += l.Quantity
+		if _, seen := skuWanted[l.SKUID]; !seen {
+			skuOrder = append(skuOrder, l.SKUID)
+			firstLineOf[l.SKUID] = i
+		}
+		skuWanted[l.SKUID] += l.Quantity
 	}
 
 	// Resolve and validate every SKU before touching the cart: nothing is
 	// written until the whole request is known to be satisfiable.
 	skus := make(map[int]*ent.ProductSKU, len(skuOrder))
 	var currency string
-	for i, skuID := range skuOrder {
+	for _, skuID := range skuOrder {
+		i := firstLineOf[skuID]
 		sku, err := s.Client.ProductSKU.Query().
 			Where(entproductsku.IDEQ(skuID), entproductsku.ShopIDEQ(shopID)).
 			WithProduct().
@@ -339,7 +409,7 @@ func (s *Service) ReplaceItems(ctx context.Context, shopID, memberID int, lines 
 			return nil, validationErr(pointer, "sku is not active")
 		case sku.Edges.Product == nil || sku.Edges.Product.Status != 1:
 			return nil, validationErr(pointer, "product is not published")
-		case sku.StockQty < wanted[skuID]:
+		case sku.StockQty < skuWanted[skuID]:
 			return nil, validationErr(fmt.Sprintf("/items/%d/quantity", i), "quantity exceeds available stock")
 		}
 		// One cart, one currency (design D4). The first line sets it; a
@@ -391,11 +461,12 @@ func (s *Service) ReplaceItems(ctx context.Context, shopID, memberID int, lines 
 		}
 	}
 
-	for _, skuID := range skuOrder {
-		sku := skus[skuID]
+	for _, k := range keyOrder {
+		sku := skus[k.skuID]
 		if _, err := tx.CartItem.Create().
-			SetShopID(shopID).SetCartID(c.ID).SetSkuID(skuID).
-			SetQuantity(wanted[skuID]).SetPriceAmount(sku.PriceAmount).SetCurrency(sku.Currency).
+			SetShopID(shopID).SetCartID(c.ID).SetSkuID(k.skuID).
+			SetQuantity(wanted[k]).SetPriceAmount(sku.PriceAmount).SetCurrency(sku.Currency).
+			SetGiftMessage(k.giftMessage).
 			Save(ctx); err != nil {
 			_ = tx.Rollback()
 			return nil, fmt.Errorf("cart: create item: %w", err)
@@ -444,8 +515,25 @@ func (s *Service) UpdateItemQuantity(ctx context.Context, shopID, memberID, item
 		sku, err := s.Client.ProductSKU.Query().
 			Where(entproductsku.IDEQ(*item.SkuID), entproductsku.ShopIDEQ(shopID)).
 			Only(ctx)
-		if err == nil && sku.StockQty < quantity {
-			return nil, validationErr("/quantity", "quantity exceeds available stock")
+		if err == nil {
+			// Same ceiling rule as AddItem (change order-extras, design D1):
+			// stock belongs to the SKU, so sibling lines of the same SKU
+			// carrying other gift messages count toward it.
+			siblings, err := s.Client.CartItem.Query().
+				Where(entcartitem.CartIDEQ(item.CartID), entcartitem.SkuIDEQ(*item.SkuID)).
+				All(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("cart: query sibling items: %w", err)
+			}
+			held := quantity
+			for _, sib := range siblings {
+				if sib.ID != item.ID {
+					held += sib.Quantity
+				}
+			}
+			if sku.StockQty < held {
+				return nil, validationErr("/quantity", "quantity exceeds available stock")
+			}
 		}
 	}
 	if _, err := item.Update().SetQuantity(quantity).Save(ctx); err != nil {
