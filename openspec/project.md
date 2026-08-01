@@ -28,13 +28,14 @@
 - RBAC 三層判定（覆蓋→角色聯集→拒絕）＋ Redis snapshot 快取（`authz:user:{id}:shop:{sid}`，寫入時失效）
 - 快取失效集中於 `internal/events` 領域事件（發佈於交易成功後）；渲染快取版本化 key + 整租戶 bump
 - 主題＝資料（JSON Schema + sections 組合）＋前端元件庫（`web/themes/registry.ts`）；hydration 補 default、剔除未定義鍵與未知區塊
+- **主題模式店面的電商前台：採混合式（選項 C），但尚未實作**（2026-08-01 決定，無 change、無程式碼）。電商路由（商品列表／詳情／購物車／結帳）由主題提供**獨立的前端路由**、直接呼叫電商 API；行銷頁維持 CMS section 管線，並可嵌入「精選商品」這類電商 section。理由與三個不同構之處：①路由——CMS 是 slug→單筆 `pages` 列，商品詳情是一條路由服務 N 個商品；②快取——渲染快取是 `cache:shop:{id}:v{ver}:page:{slug}`／TTL 24h／發佈頁面才 bump 版本，商品價格與庫存變動不會使其失效，**商品頁若進此快取會顯示最長 24 小時前的庫存**；③狀態——購物車與結帳是互動狀態，塞不進宣告式 section。實作前 MUST 先決定「商品資料是否進渲染快取」，否則會做出顯示過期庫存的店面。**目前零消費者**（ONDO 是自帶前端、不碰 `/web`，無任何走主題模式的電商商家），故刻意延後至 ONDO 上線後、以其實戰驗證過的流程為藍本移植
 
 ### Testing Strategy
 
 - 單元測試無外部依賴（`make test`）；整合測試以 `INTEGRATION=1` gate、共用 test DB 串行執行（`make test-int`）
 - specs 的 WHEN/THEN 場景即驗收：RBAC 判定矩陣、token 隔離矩陣、hydration/section 補全、多租戶解析與隔離皆有對應測試
 - E2E 兩支共用 `e2e/lib.mjs`（單一失敗計數器）：`happy-path.mjs` 為總入口（瀏覽器 CMS 流程 ＋ 電商鏈），`commerce-path.mjs` 為無瀏覽器、可重複執行的電商子集
-- **`internal/app/wire.go` 的領域事件訂閱只由 e2e 覆蓋**（change commerce-demo-seed design D1）：每支 integration test 都自建 dispatcher，故刪掉 `wire.go` 的訂閱不會讓任何 Go 測試轉紅（已實測）。改動事件鏈或 wire 後 MUST 跑 `commerce-path.mjs`
+- **`internal/app/wire.go` 的接線完整性由 CI 內的三道測試守著**（change contract-router-completeness，capability `wiring-integrity`）：`internal/app/wiring_integration_test.go` 跑真正的 `app.wire`，⑤遞迴 nil 稽核 ⑥生產 router 與契約 router 逐條比對 ⑦事件訂閱集合相等比對。此前每支 integration test 都自建 dispatcher，刪掉 `wire.go` 的訂閱不會讓任何 Go 測試轉紅（commerce-demo-seed design D1 已實測，該洞現已關閉）。分工：CI 答「有沒有接」，e2e 答「接上之後行為對不對」——改動事件鏈或 wire 後仍 MUST 跑 `commerce-path.mjs`
 - **API 契約由四道測試守著**（change openapi-contract）：`api/openapi/openapi.yaml` 與實作的一致性不靠自律。①路由覆蓋（`chi.Walk` 對真實 router 雙向比對，文件有而 Walk 沒有的必須通過**實際發請求的可達性探測**——`chi.Walk` 對 `/shops/{shopID}` 這種「子 router 與方法處理器同樣板」有已知盲點）②金額欄位必須 `$ref` 單一的 `MinorUnitAmount` ③真實回應以契約 schema 驗證（`santhosh-tekuri/jsonschema/v6`，取樣原則：ONDO 路徑 100% ＋ 每個共用 schema 至少一次 ＋ 401/404/422 各一次）④v1 表面鎖。①②④免基礎設施故 `make test` 即涵蓋，③在 `make test-int`；**四道全部靠既有的 `go test ./...` 進 CI，`ci.yml` 未因此改動**
 - demo seed 是可測的契約而非佈景（spec `demo-seed`）：`internal/seed` 的整合測試守著佈建完整性、冪等性、以及「等級門檻必須能被 seed 目錄的單筆訂單跨過」這條內部一致性不變式
 
