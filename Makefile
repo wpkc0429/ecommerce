@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen seed seed-demo web-dev admin-dev openapi openapi-mock openapi-ui
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo web-dev admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -52,6 +52,9 @@ migrate-down: ## Roll back the most recent migration
 
 migrate-gen: ## Generate a versioned migration from ent schema (make migrate-gen name=add_x)
 	cd api && go run ./cmd/migrategen -name $(name)
+
+ecpay-sim: ## Local stand-in for 綠界's cashier (:8090); point ECPAY_CHECKOUT_URL at it
+	cd api && go run ./cmd/ecpay-sim
 
 seed: ## Seed permissions catalog, platform roles, super admin, starter theme
 	cd api && go run ./cmd/seed

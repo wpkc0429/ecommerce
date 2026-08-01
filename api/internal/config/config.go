@@ -52,12 +52,73 @@ type Config struct {
 	// would get their own config + validation when that change lands.
 	PaymentMockWebhookSecret string
 
+	// PaymentDefaultProvider names the provider used when a checkout request
+	// does not ask for one (change ecpay-payment-provider, design D13).
+	//
+	// It defaults to "mock" so that **adding the ECPay provider changes nothing
+	// for any existing caller**: DefaultProvider decides the `provider`,
+	// `provider_reference` and `redirect_form` a v1 response carries, and
+	// switching it would alter two live endpoints' output without anyone having
+	// asked. A real deployment sets PAYMENT_DEFAULT_PROVIDER=ecpay; tests and
+	// e2e pass {"provider":"ecpay"} explicitly.
+	PaymentDefaultProvider string
+
+	// ECPay carries the 綠界 全方位金流 credentials and endpoints.
+	ECPay ECPayConfig
+
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
 
 	// RateLimit carries the auth-endpoint sliding-window thresholds (design
 	// auth-rate-limiting D2/D4).
 	RateLimit RateLimitConfig
+}
+
+// ECPayConfig carries one 綠界 merchant account's credentials and endpoints
+// (change ecpay-payment-provider).
+//
+// **Every field has a default, and none of them is required in production** —
+// the same treatment PaymentMockWebhookSecret gets, for the same reason: the
+// default provider is not ecpay, so an unconfigured deployment never reaches
+// this code. Making it a boot-time hard failure would only stop people who just
+// want to run the thing locally; a real deployment that forgets to swap the
+// credentials discovers it the first time no money arrives.
+type ECPayConfig struct {
+	// MerchantID/HashKey/HashIV default to 綠界's **published AIO test store**
+	// (3002607). These are printed in the public documentation and are not
+	// secrets.
+	//
+	// Note for whoever changes them: the widely-circulated 2000132 /
+	// 5294y06JbISpM5x9 / v77hoKGq4kWxNNIS is an OLD set, and the
+	// 2000132 / ejCk326UnaZWKisg / q9jcZX8Ib9LM8wYk that search engines love
+	// belongs to the **B2C 電子發票** API, not to AIO. Using either produces a
+	// checksum that never matches — a symptom indistinguishable from a bug in
+	// the algorithm.
+	MerchantID string
+	HashKey    string
+	HashIV     string
+
+	// CheckoutURL is where the customer's browser POSTs the cashier form.
+	//
+	// **This single value is the entire difference between simulated and live
+	// operation** (design D1). It defaults to the local simulator
+	// (api/cmd/ecpay-sim, `make ecpay-sim`) so the full flow runs with no ECPay
+	// account and no outbound network. Point it at
+	// https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5 (or the
+	// production host) and not one byte of the form or its checksum changes.
+	CheckoutURL string
+	// ReturnURL is the absolute, publicly reachable URL 綠界 POSTs the payment
+	// result to. 綠界 only supports ports 80 and 443 and does not accept
+	// internationalized domain names — a self-hosted dev environment needs a
+	// tunnel or reverse proxy, which this change deliberately does not solve.
+	ReturnURL string
+	// ClientBackURL is where 綠界's page sends the browser afterwards. Optional.
+	ClientBackURL string
+	// ChoosePayment defaults to Credit. 綠界's own guidance is to name a specific
+	// method rather than ALL, because they keep adding methods and a new one can
+	// break the notification flow. Non-instant methods (ATM/CVS/BARCODE) also
+	// require the PaymentInfoURL notification this change does not implement.
+	ChoosePayment string
 }
 
 // RateLimitConfig carries the sliding-window thresholds for the
@@ -111,6 +172,17 @@ func Load() (*Config, error) {
 		JWTIssuer:       getenv("JWT_ISSUER", "ecommerce-api"),
 
 		PaymentMockWebhookSecret: getenv("PAYMENT_MOCK_WEBHOOK_SECRET", "dev-only-mock-payment-webhook-secret"),
+		PaymentDefaultProvider:   getenv("PAYMENT_DEFAULT_PROVIDER", "mock"),
+
+		ECPay: ECPayConfig{
+			MerchantID:    getenv("ECPAY_MERCHANT_ID", "3002607"),
+			HashKey:       getenv("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
+			HashIV:        getenv("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
+			CheckoutURL:   getenv("ECPAY_CHECKOUT_URL", "http://localhost:8090/Cashier/AioCheckOut/V5"),
+			ReturnURL:     getenv("ECPAY_RETURN_URL", "http://localhost:8080/api/v1/webhooks/payments/ecpay"),
+			ClientBackURL: getenv("ECPAY_CLIENT_BACK_URL", ""),
+			ChoosePayment: getenv("ECPAY_CHOOSE_PAYMENT", "Credit"),
+		},
 	}
 
 	origins := getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3001,http://localhost:3000")

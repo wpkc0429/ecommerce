@@ -31,9 +31,18 @@ const (
 
 // statusForOutcome maps a provider's webhook Outcome onto the payments.status
 // value Service.HandleWebhook's CAS targets.
+//
+// OutcomePending maps to StatusPending, i.e. the value the row already holds
+// (change ecpay-payment-provider, design D6). HandleWebhook reads that as "there
+// is no transition to make" and leaves the row claimable by a later terminal
+// delivery — which is the entire point of the third Outcome.
 func statusForOutcome(o Outcome) int16 {
-	if o == OutcomeSucceeded {
+	switch o {
+	case OutcomeSucceeded:
 		return StatusSucceeded
+	case OutcomePending:
+		return StatusPending
+	default:
+		return StatusFailed
 	}
-	return StatusFailed
 }

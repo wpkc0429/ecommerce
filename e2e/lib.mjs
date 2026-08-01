@@ -4,7 +4,7 @@
 // failure counter. happy-path.mjs runs the browser CMS flow and then the
 // commerce path; if each script owned its own counter and its own exit, the
 // first script's failures would be swallowed by the second one's exit(0).
-import { createHmac } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -126,6 +126,123 @@ export async function deliverWebhook(providerReference, status = "succeeded") {
     );
   }
   return res;
+}
+
+// ── 綠界 ECPay (change ecpay-payment-provider) ──────────────────────────
+
+/**
+ * ECPay's HashKey/HashIV, resolved the same way the mock webhook secret is:
+ * process env → repo .env → the built-in default config.Load() uses.
+ */
+function ecpayKeys() {
+  const pick = (key, fallback) =>
+    process.env[key] || dotEnvValue(key) || fallback;
+  return {
+    hashKey: pick("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
+    hashIV: pick("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
+    merchantID: pick("ECPAY_MERCHANT_ID", "3002607"),
+  };
+}
+
+/**
+ * .NET-compatible URL encoding, per 綠界's URLEncode 轉換表 (/2904/).
+ *
+ * Written as an explicit byte loop rather than encodeURIComponent + fixups on
+ * purpose: this file is the SECOND implementation of the algorithm (the first
+ * is api/internal/payment/ecpay), and its whole value is being independent. If
+ * both sides shared the same shortcuts they would agree on the same mistake.
+ *
+ * Passthrough is alphanumerics plus `-_.!*()`; space becomes `+`; everything
+ * else — including `~`, which is the one character .NET encodes but neither Go
+ * nor JS does by default — becomes lowercase %XX over the UTF-8 bytes.
+ */
+function ecpayEncode(s) {
+  const passthrough = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.!*()";
+  const bytes = new TextEncoder().encode(s);
+  let out = "";
+  for (const b of bytes) {
+    const ch = String.fromCharCode(b);
+    if (ch === " ") out += "+";
+    else if (b < 128 && passthrough.includes(ch)) out += ch;
+    else out += "%" + b.toString(16).padStart(2, "0");
+  }
+  return out;
+}
+
+/**
+ * 綠界's CheckMacValue: case-insensitive key sort, HashKey/HashIV wrapping,
+ * .NET URL encoding, lowercase, SHA256, uppercase.
+ */
+export function ecpayCheckMac(fields) {
+  const { hashKey, hashIV } = ecpayKeys();
+  const names = Object.keys(fields)
+    .filter((k) => k !== "CheckMacValue")
+    .sort((a, b) => {
+      const la = a.toLowerCase();
+      const lb = b.toLowerCase();
+      return la < lb ? -1 : la > lb ? 1 : a < b ? -1 : a > b ? 1 : 0;
+    });
+  const raw =
+    `HashKey=${hashKey}` +
+    names.map((n) => `&${n}=${fields[n]}`).join("") +
+    `&HashIV=${hashIV}`;
+  return createHash("sha256").update(ecpayEncode(raw).toLowerCase()).digest("hex").toUpperCase();
+}
+
+/**
+ * Delivers a 綠界-shaped payment result notification and returns the response.
+ *
+ * `outcome` is one of:
+ *   "success"  RtnCode=1, SimulatePaid=0 — the money really moved
+ *   "simulate" RtnCode=1, SimulatePaid=1 — 綠界's 模擬付款 button; NO money moved
+ *   "fail"     a real failure code
+ *
+ * Like deliverWebhook, this signs its own request rather than driving the
+ * cashier simulator, so the ECPay chain still needs nothing but the API.
+ */
+export async function deliverECPayCallback(merchantTradeNo, amount, outcome = "success") {
+  const { merchantID } = ecpayKeys();
+  // 綠界 sends Taipei local time in this exact format, with no offset marker —
+  // so the fixture has to be Taipei time too, or paid_at would be off by the
+  // very 8 hours the parser is there to apply.
+  const stamp = new Date(Date.now() + 8 * 3600 * 1000)
+    .toISOString().slice(0, 19).replace("T", " ").replace(/-/g, "/");
+  const codes = {
+    success: { RtnCode: "1", RtnMsg: "交易成功", SimulatePaid: "0" },
+    simulate: { RtnCode: "1", RtnMsg: "交易成功", SimulatePaid: "1" },
+    fail: { RtnCode: "10100252", RtnMsg: "額度不足", SimulatePaid: "0" },
+  }[outcome];
+  const fields = {
+    MerchantID: merchantID,
+    MerchantTradeNo: merchantTradeNo,
+    StoreID: "",
+    // 綠界 issues ONE TradeNo per transaction and repeats it on every delivery
+    // for that transaction (which is why the API records the first one it sees
+    // and never overwrites it). Deriving it from the MerchantTradeNo reproduces
+    // that; a fresh random value per call would be a fiction that happens to
+    // make a lookup-by-TradeNo assertion fail for the wrong reason.
+    TradeNo: `E${createHash("sha256").update(merchantTradeNo).digest("hex").slice(0, 15).toUpperCase()}`,
+    TradeAmt: String(amount),
+    PaymentDate: stamp,
+    PaymentType: "Credit_CreditCard",
+    PaymentTypeChargeFee: "10",
+    TradeDate: stamp,
+    ...codes,
+  };
+  fields.CheckMacValue = ecpayCheckMac(fields);
+  const body = new URLSearchParams(fields).toString();
+  const res = await req("POST", "/api/v1/webhooks/payments/ecpay", {
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  if (res.status === 401 || (res.text ?? "").includes("CheckMacValue Error")) {
+    fail(
+      `綠界 callback rejected the checksum. The API server and this E2E resolved different ` +
+        `ECPAY_HASH_KEY/ECPAY_HASH_IV values. Set them identically for both, or leave both unset ` +
+        `to use the published test-store defaults.`,
+    );
+  }
+  return { ...res, tradeNo: fields.TradeNo };
 }
 
 // ── misc ────────────────────────────────────────────────────────────────

@@ -49,6 +49,31 @@ func (Payment) Fields() []ent.Field {
 		// echoed back by the webhook. The sole idempotent webhook lookup
 		// key (with provider) — see the unique index below.
 		field.String("provider_reference").MaxLen(191).SchemaType(map[string]string{dialect.Postgres: "varchar(191)"}).NotEmpty(),
+		// provider_transaction_id (change ecpay-payment-provider, design D4):
+		// the provider's OWN identifier, learned only when its webhook arrives.
+		//
+		// 真實金流商的流程裡有**兩個**號碼，而哪一個當查找鍵不是選擇題：
+		// provider_reference 必須在 InitiatePayment 建列的那一刻就存在，而綠界的
+		// TradeNo 那時候還不存在——所以 provider_reference 只能是我們自己產生的
+		// MerchantTradeNo。TradeNo 卻是商家在綠界後台、對帳單、客服對話裡最常
+		// 拿到的那一個，而且**綠界的退款 API 兩個號碼都是必填**。
+		//
+		// NULL（而不是空字串）表示「這家 provider 沒有第二個識別碼」或「還沒收到」
+		// ——mock 與本欄位出現前的每一列都是 NULL，如實。
+		//
+		// 刻意**沒有**唯一索引：它不是查找鍵，而且綠界對同一筆交易的重送會帶
+		// 同一個 TradeNo，加了唯一索引反而會讓合法的重送炸掉。
+		field.String("provider_transaction_id").MaxLen(64).
+			SchemaType(map[string]string{dialect.Postgres: "varchar(64)"}).Optional().Nillable(),
+		// paid_at (change ecpay-payment-provider, design D12): when the PROVIDER
+		// says the money moved — 綠界通知裡的 PaymentDate，也就是出現在對帳單上
+		// 的那個時間。
+		//
+		// 刻意不用 updated_at 代替：updated_at 的定義是「最後一次寫入這一列」，
+		// 今天它碰巧接近付款時間，但任何未來的寫入都會蓋掉它，而那一天不會有人
+		// 記得它曾經被當成付款時間用。用一個定義不同、只是暫時碰巧相等的欄位去
+		// 回答對帳問題，是那種寫錯不會噴錯的錯誤。
+		field.Time("paid_at").Optional().Nillable(),
 		// Money: integer minor units, BIGINT/int64 (product-catalog design
 		// D1 convention). Always equals the order's total_amount at the time
 		// this attempt was created — this change supports full-amount

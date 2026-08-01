@@ -4,14 +4,30 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"strconv"
+	"strings"
 
 	entsql "entgo.io/ent/dialect/sql"
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpayment "ksdevworks/ecommerce/api/internal/ent/payment"
+	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 )
+
+// ErrAmountMismatch is returned by HandleWebhook when a provider reports an
+// amount that disagrees with the one we recorded (change
+// ecpay-payment-provider, design D7).
+//
+// It is deliberately an error rather than a silent branch: the HTTP layer maps
+// it to the provider's "please retry" acknowledgement, so 綠界 retries a bounded
+// number of times and then records a delivery failure in ITS back office. The
+// value of that is not tamper-proofing (the signature already did that) — it is
+// turning "the two systems disagree about how much money this is" from a state
+// nobody would ever notice into a bell that rings on both sides.
+var ErrAmountMismatch = errors.New("payment: provider reported an amount that differs from the recorded one")
 
 // Service implements payment operations. Like order.Service/cart.Service/
 // catalog.Service, every method takes explicit shopID/memberID/orderID
@@ -29,10 +45,15 @@ import (
 // (change member-tiers-and-points design D1): this package still never
 // imports points — it only publishes a generic domain event and knows
 // nothing about who (if anyone) is subscribed.
+//
+// Log is optional (nil-safe) and used for exactly one thing: the "paid, but the
+// order was already cancelled" warning in HandleWebhook — a situation only a
+// human can resolve (change ecpay-payment-provider, design D9).
 type Service struct {
 	Client     *ent.Client
 	Orders     *order.Service
 	Dispatcher *events.Dispatcher
+	Log        *slog.Logger
 
 	// Providers is the provider registry (design D1), keyed by
 	// Provider.Name(). DefaultProvider is used when a caller does not
@@ -78,6 +99,10 @@ func (s *Service) InitiatePayment(ctx context.Context, shopID, memberID, orderID
 	res, err := prov.InitiatePayment(ctx, InitiateRequest{
 		ShopID: shopID, OrderID: orderID,
 		Amount: ord.TotalAmount, Currency: ord.Currency,
+		// change ecpay-payment-provider: a real cashier shows the customer what
+		// they are paying for (綠界's ItemName is a required field). These are the
+		// order's own frozen line snapshots, never a live SKU re-query.
+		Items: initiateItems(ord),
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("payment: initiate with provider %s: %w", providerName, err)
@@ -95,6 +120,23 @@ func (s *Service) InitiatePayment(ctx context.Context, shopID, memberID, orderID
 	return row, res, nil
 }
 
+// initiateItems maps the order's own line snapshot onto the provider-neutral
+// item shape. GetOrder eager-loads items; an order without them simply yields
+// nothing, and Items is optional for every provider.
+func initiateItems(ord *ent.Order) []InitiateItem {
+	items := ord.Edges.Items
+	if len(items) == 0 {
+		return nil
+	}
+	out := make([]InitiateItem, 0, len(items))
+	for _, it := range items {
+		out = append(out, InitiateItem{
+			Name: it.ProductTitle, Quantity: it.Quantity, UnitAmount: it.PriceAmount,
+		})
+	}
+	return out
+}
+
 // HandleWebhook applies an already-signature-verified webhook result
 // (design D6/D7): idempotent lookup by (provider, provider_reference),
 // a CAS conditional UPDATE (pending -> target) that is the primary
@@ -110,6 +152,14 @@ func (s *Service) InitiatePayment(ctx context.Context, shopID, memberID, orderID
 // verification has already authenticated the caller by this point, so this
 // is not treated as a security event, just an unrecognized/premature
 // reference.
+//
+// ── change ecpay-payment-provider adds three behaviours ────────────────
+//
+//	D6  OutcomePending performs NO transition, so the row stays claimable by a
+//	    later terminal delivery.
+//	D7  A reported amount that disagrees with the stored one aborts everything.
+//	D9  A CANCELLED order records the money but is never advanced to paid, and
+//	    publishes no loyalty event.
 func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *WebhookResult) (*ent.Payment, error) {
 	p, err := s.Client.Payment.Query().
 		Where(entpayment.ProviderEQ(providerName), entpayment.ProviderReferenceEQ(res.ProviderReference)).
@@ -121,7 +171,28 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 		return nil, fmt.Errorf("payment: query payment: %w", err)
 	}
 
+	// design D7: before any state moves, the two systems must agree on how much
+	// money this is. A provider that does not report an amount sends 0.
+	if res.Amount != 0 && res.Amount != p.Amount {
+		return nil, fmt.Errorf("%w: provider says %d, payment %d records %d",
+			ErrAmountMismatch, res.Amount, p.ID, p.Amount)
+	}
+
+	// design D4/D12: the provider's own identifier and payment timestamp are
+	// recorded on EVERY delivery that carries them, including non-terminal ones
+	// — 綠界's first notification for a transaction may well be a pending one,
+	// and its TradeNo is exactly what the merchant reconciles with.
+	if p, err = s.recordProviderFacts(ctx, p, res); err != nil {
+		return nil, err
+	}
+
 	target := statusForOutcome(res.Outcome)
+
+	// design D6: a non-terminal delivery is acknowledged and nothing else. The
+	// row must stay pending — that is the entire reason Outcome has a third value.
+	if target == StatusPending {
+		return p, nil
+	}
 
 	// CAS: only a row still pending can be claimed by this call. Affected
 	// == 1 means this call is the one that won the pending -> target
@@ -154,7 +225,43 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 	// not just the first (member-tiers-and-points design D4) — subscribers
 	// must be idempotent.
 	if target == StatusSucceeded && p.Status == StatusSucceeded {
-		ord, err := s.Orders.UpdatePaymentStatus(ctx, p.ShopID, p.OrderID, OrderPaymentStatusPaid)
+		ord, err := s.Orders.GetOrderAdmin(ctx, p.ShopID, p.OrderID)
+		if err != nil {
+			if errors.Is(err, order.ErrNotFound) {
+				return nil, ErrNotFound
+			}
+			return nil, fmt.Errorf("payment: query order for confirmation: %w", err)
+		}
+
+		// ── change ecpay-payment-provider, design D9 ────────────────────
+		//
+		// The customer was still on the provider's cashier page when the order
+		// got cancelled, and paid anyway. **Measured before this branch existed:**
+		// the order came out status=cancelled AND payment_status=paid, with the
+		// stock already restored and OrderPaymentSucceeded published — so the
+		// customer earned loyalty points for an order that will never ship, and
+		// nothing anywhere errored.
+		//
+		// The payment row still becomes succeeded above: the money really moved,
+		// and recording it as anything else would be lying in the financial trail
+		// to make a status table look tidy — the exact opposite of what manual
+		// reconciliation needs. What must not happen is the ORDER advancing.
+		//
+		// Refunding this is a manual process (design Non-Goals/D15). The system's
+		// obligation ends at "the merchant can always find it", which is what
+		// GET /admin/shops/{shopID}/payments exists for.
+		if ord.Status == order.StatusCancelled {
+			if s.Log != nil {
+				s.Log.Warn("payment succeeded for a CANCELLED order — needs a manual refund",
+					"shop_id", p.ShopID, "order_id", p.OrderID, "payment_id", p.ID,
+					"provider", p.Provider, "provider_reference", p.ProviderReference,
+					"provider_transaction_id", derefString(p.ProviderTransactionID),
+					"amount", p.Amount, "currency", p.Currency)
+			}
+			return p, nil
+		}
+
+		ord, err = s.Orders.UpdatePaymentStatus(ctx, p.ShopID, p.OrderID, OrderPaymentStatusPaid)
 		if err != nil {
 			return nil, fmt.Errorf("payment: mark order paid: %w", err)
 		}
@@ -179,6 +286,41 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 	return p, nil
 }
 
+// recordProviderFacts persists the provider's own transaction identifier and
+// payment timestamp (change ecpay-payment-provider, design D4/D12).
+//
+// Both are written **only when currently unset**: 綠界 redelivers, and the first
+// delivery that carried a value is the authoritative one. A later delivery
+// carrying nothing must not erase it, and one carrying the same thing has
+// nothing to add.
+func (s *Service) recordProviderFacts(ctx context.Context, p *ent.Payment, res *WebhookResult) (*ent.Payment, error) {
+	upd := s.Client.Payment.UpdateOneID(p.ID)
+	changed := false
+	if res.ProviderTransactionID != "" && derefString(p.ProviderTransactionID) == "" {
+		upd = upd.SetProviderTransactionID(res.ProviderTransactionID)
+		changed = true
+	}
+	if res.PaidAt != nil && p.PaidAt == nil {
+		upd = upd.SetPaidAt(*res.PaidAt)
+		changed = true
+	}
+	if !changed {
+		return p, nil
+	}
+	out, err := upd.Save(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("payment: record provider transaction facts: %w", err)
+	}
+	return out, nil
+}
+
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // ListForOrderAdmin returns every payment attempt for orderID within
 // shopID, newest first (merchant back-office requirement). Verifies the
 // order itself is visible in shopID first (order.Service.GetOrderAdmin) so
@@ -199,4 +341,93 @@ func (s *Service) ListForOrderAdmin(ctx context.Context, shopID, orderID int) ([
 		return nil, fmt.Errorf("payment: list payments: %w", err)
 	}
 	return rows, nil
+}
+
+// ── manual reconciliation (change ecpay-payment-provider, design D10) ──
+
+// AdminListParams filters the shop-wide payment ledger.
+type AdminListParams struct {
+	Page     int
+	PageSize int
+	// Q is matched EXACTLY (after trimming) against provider_reference and
+	// provider_transaction_id, and additionally against the order id when it
+	// parses as a positive integer.
+	//
+	// **Exact, not a substring match — deliberately unlike the order list's Q**
+	// (change admin-commerce-operations design D3, which ILIKEs recipient
+	// name/phone). The two answer different questions: that one looks for a
+	// *person* and needs fuzziness; this one is "paste the number from 綠界's
+	// back office". A substring search here would add no capability, could not
+	// use an index, and would make `1` return half the table.
+	Q string
+}
+
+// PaymentPage is a page of payments plus pagination metadata (mirrors
+// order.OrderPage).
+type PaymentPage struct {
+	Payments []*ent.Payment
+	Total    int
+	Page     int
+	PageSize int
+}
+
+// ListAdmin answers "I have this transaction from the provider's back office —
+// which order is it, and does the amount match?".
+//
+// That is the direction the pre-existing endpoint could not go: ListForOrderAdmin
+// requires you to already know the order id, while manual reconciliation starts
+// from the provider's own number. Everything else it needs (both identifiers,
+// amount, currency, timestamps) was already on the row — the gap was never the
+// data, only the lookup (design D8).
+//
+// A foreign shop's identifier simply matches nothing: the shop_id predicate is
+// unconditional, so this cannot reach across the tenant boundary even if a
+// caller guesses a valid reference. An empty list is the honest answer for a
+// list endpoint, and it leaks less than "it exists but is not yours".
+func (s *Service) ListAdmin(ctx context.Context, shopID int, params AdminListParams) (*PaymentPage, error) {
+	page, pageSize := normalizePage(params.Page, params.PageSize)
+
+	q := s.Client.Payment.Query().Where(entpayment.ShopIDEQ(shopID))
+	if kw := strings.TrimSpace(params.Q); kw != "" {
+		preds := []predicate.Payment{
+			entpayment.ProviderReferenceEQ(kw),
+			entpayment.ProviderTransactionIDEQ(kw),
+		}
+		// "他說訂單編號是 1234" is the same question from the other side, and the
+		// merchant should not have to know which box to type it into (the same
+		// reasoning as the order list's keyword).
+		if id, err := strconv.Atoi(kw); err == nil && id > 0 {
+			preds = append(preds, entpayment.OrderIDEQ(id))
+		}
+		q = q.Where(entpayment.Or(preds...))
+	}
+
+	total, err := q.Clone().Count(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("payment: count payments: %w", err)
+	}
+	// Explicit order, never the database's choice (change commerce-demo-seed
+	// design D8).
+	rows, err := q.Order(entpayment.ByID(entsql.OrderDesc())).
+		Limit(pageSize).Offset((page - 1) * pageSize).
+		All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("payment: list payments: %w", err)
+	}
+	return &PaymentPage{Payments: rows, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// normalizePage mirrors order.normalizePage's bounds so the two paginated
+// back-office lists behave identically.
+func normalizePage(page, pageSize int) (int, int) {
+	if page < 1 {
+		page = 1
+	}
+	switch {
+	case pageSize <= 0:
+		pageSize = 20
+	case pageSize > 100:
+		pageSize = 100
+	}
+	return page, pageSize
 }

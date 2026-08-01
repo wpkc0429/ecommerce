@@ -20,6 +20,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
+	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -114,10 +115,22 @@ func newPaymentEnv(t *testing.T) *paymentEnv {
 	e.cartSvc = &cart.Service{Client: client}
 	e.orderSvc = &order.Service{Client: client}
 	mock := payment.NewMockProvider(e.webhookSecret)
+	// change ecpay-payment-provider: the ECPay provider is registered alongside
+	// the mock, exactly as wire.go does it. DefaultProvider stays "mock" so every
+	// pre-existing test in this file keeps exercising the path it was written
+	// for; the ECPay tests (ecpay_integration_test.go) ask for it by name.
+	ecpayProv := ecpay.New(ecpay.Config{
+		MerchantID: ecpayTestMerchantID, HashKey: ecpayTestHashKey, HashIV: ecpayTestHashIV,
+		CheckoutURL: "http://localhost:8090/Cashier/AioCheckOut/V5",
+		ReturnURL:   "http://localhost:8080/api/v1/webhooks/payments/ecpay",
+	}, nil)
 	e.paymentSvc = &payment.Service{
-		Client:          client,
-		Orders:          e.orderSvc,
-		Providers:       map[string]payment.Provider{mock.Name(): mock},
+		Client: client,
+		Orders: e.orderSvc,
+		Log:    log,
+		Providers: map[string]payment.Provider{
+			mock.Name(): mock, ecpayProv.Name(): ecpayProv,
+		},
 		DefaultProvider: mock.Name(),
 	}
 

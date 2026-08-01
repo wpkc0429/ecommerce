@@ -19,6 +19,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/member"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
+	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 	"ksdevworks/ecommerce/api/internal/points"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
@@ -173,13 +174,35 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// map, nothing else changes. Member/admin routes reuse orderService as
 	// the sole controlled entry point for advancing orders.payment_status
 	// (design D6/D7); the webhook route needs no auth middleware of its own.
+	//
+	// change ecpay-payment-provider: the registry now has two entries, and that
+	// really was all the wiring the abstraction needed — the interface itself
+	// grew three capabilities (RedirectForm/WebhookAck/OutcomePending, see the
+	// package doc), but httpapi's control flow and the webhook route did not
+	// change shape. DefaultProvider stays "mock" unless configuration says
+	// otherwise (design D13), so this line changes nothing for existing callers.
 	mockProvider := payment.NewMockProvider(cfg.PaymentMockWebhookSecret)
+	ecpayProvider := ecpay.New(ecpay.Config{
+		MerchantID:    cfg.ECPay.MerchantID,
+		HashKey:       cfg.ECPay.HashKey,
+		HashIV:        cfg.ECPay.HashIV,
+		CheckoutURL:   cfg.ECPay.CheckoutURL,
+		ReturnURL:     cfg.ECPay.ReturnURL,
+		ClientBackURL: cfg.ECPay.ClientBackURL,
+		ChoosePayment: cfg.ECPay.ChoosePayment,
+	}, nil)
 	paymentService := &payment.Service{
-		Client:          client,
-		Orders:          orderService,
-		Dispatcher:      dispatcher,
-		Providers:       map[string]payment.Provider{mockProvider.Name(): mockProvider},
-		DefaultProvider: mockProvider.Name(),
+		Client:     client,
+		Orders:     orderService,
+		Dispatcher: dispatcher,
+		// The only consumer is the "paid, but the order was already cancelled"
+		// warning (design D9) — a state only a human can resolve.
+		Log: a.log,
+		Providers: map[string]payment.Provider{
+			mockProvider.Name():  mockProvider,
+			ecpayProvider.Name(): ecpayProvider,
+		},
+		DefaultProvider: cfg.PaymentDefaultProvider,
 	}
 	deps.Payments = &httpapi.PaymentHandler{Client: client, Service: paymentService, Authz: authz, Log: a.log}
 

@@ -936,17 +936,38 @@ components:
     Payment:
       type: object
       additionalProperties: false
-      required: [id, order_id, provider, provider_reference, amount, currency, status, created_at, updated_at]
+      required: [id, order_id, provider, provider_reference, provider_transaction_id, paid_at, amount, currency, status, created_at, updated_at]
       properties:
         id: { type: integer }
         order_id: { type: integer }
         provider:
           type: string
           description: 服務商代號，也是 webhook 路徑上的 `{provider}` 片段。
-          examples: ["mock"]
+          examples: ["mock", "ecpay"]
         provider_reference:
           type: string
-          description: 服務商端的交易識別碼；webhook 以 (`provider`, `provider_reference`) 做冪等查找。
+          description: |
+            **我們產生**的交易識別碼，發起付款時就決定並送給服務商；webhook 以
+            (`provider`, `provider_reference`) 做冪等查找。綠界流程中這是
+            `MerchantTradeNo`（綠界後台顯示為「商店訂單編號」）。
+        provider_transaction_id:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: |
+            **服務商產生**的交易識別碼，只有在它的回呼送達後才會有值；服務商沒有
+            第二個識別碼時恆為 `null`（例如 `mock`）。綠界流程中這是 `TradeNo`
+            （綠界後台顯示為「綠界交易單號」）。
+
+            人工對帳時商家手上拿到的可能是這兩個號碼中的任何一個，
+            `GET /api/v1/admin/shops/{shopID}/payments` 的 `q` 兩個都接受。
+          examples: ["2412311225437371"]
+        paid_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+          description: |
+            **服務商所宣告的付款時間**（綠界的 `PaymentDate`，也就是出現在對帳單上
+            的那個時間）。服務商不回報時為 `null`。
+
+            這與 `updated_at` 不同且**不可互相替代**：`updated_at` 的定義是
+            「這一列最後一次被寫入」，任何未來的寫入都會蓋掉它。
         amount:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
           description: 請款金額，**等於訂單的 `total_amount`（含運費）**。本階段只支援全額付款。
@@ -958,16 +979,61 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    PaymentRedirectForm:
+      type: object
+      additionalProperties: false
+      required: [method, action, fields]
+      description: |
+        以**表單 POST** 把顧客送到服務商的收銀台。真實金流商（綠界的
+        `AioCheckOut`）是把一組欄位 POST 過去，一個 URL 字串裝不下它。
+
+        本 API 交付的是**欄位集，不是一段 HTML**：消費端不一定是瀏覽器
+        （SSR、自帶靜態站、原生 APP 都在服務範圍內），而且 HTML 逸出應該發生在
+        消費端自己的框架裡，不該由一個 JSON API 產生標記送進顧客的瀏覽器。
+
+        照著做：建一個 `<form method>` 指向 `action` 的表單，`fields` 的每一組
+        key/value 各放一個 hidden input，然後送出。
+      properties:
+        method:
+          type: string
+          enum: [POST]
+        action:
+          type: string
+          description: 表單要送到的絕對網址。
+          examples: ["https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5"]
+        fields:
+          type: object
+          additionalProperties: { type: string }
+          description: |
+            表單欄位，名稱→值。**由服務商定義，本 API 不對它的內容做承諾**——
+            綠界會隨方案增減欄位，逐一寫進契約等於把綠界的 API 版本鎖進我們的 v1。
+
+            **金額欄位的單位在這裡宣告一次**：綠界的 `TotalAmount` 等於訂單的
+            `total_amount`，同為最小貨幣單位的整數，**沒有任何換算**（TWD 的最小
+            單位就是元）。此處無法以 `MinorUnitAmount` 表達（表單值型別上都是
+            字串），守著它的是 Go 端的單元測試。
+          examples:
+            - MerchantID: "3002607"
+              MerchantTradeNo: "O1234TMZQ8K3PA"
+              TotalAmount: "3400"
+              CheckMacValue: "6C51C9E6888DE861FD62FB1DD17029FC742634498FD813DC43D4243B5685B840"
+
     PaymentInitiateResult:
       type: object
       additionalProperties: false
-      required: [id, order_id, provider, provider_reference, amount, currency, status, created_at, updated_at, redirect_url]
+      required: [id, order_id, provider, provider_reference, provider_transaction_id, paid_at, amount, currency, status, created_at, updated_at, redirect_url, redirect_form]
       description: 發起付款的回應：一筆 `Payment` 加上要把顧客導去的位置。
       properties:
         id: { type: integer }
         order_id: { type: integer }
         provider: { type: string }
         provider_reference: { type: string }
+        provider_transaction_id:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: 發起付款當下必為 `null`——它由服務商在回呼時才產生。
+        paid_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+          description: 發起付款當下必為 `null`。
         amount:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
           description: 請款金額，等於訂單的 `total_amount`。
@@ -981,6 +1047,31 @@ components:
             把顧客導向這個位置完成付款。付款結果**不會**經由這個轉導回來——
             權威是服務商送到 `/api/v1/webhooks/payments/{provider}` 的回呼。
             前端在轉導回來後應重新查詢訂單的 `payment_status`。
+
+            **需要表單 POST 的服務商（如綠界）在這裡回空字串**——
+            請先看 `redirect_form`。
+        redirect_form:
+          oneOf:
+            - $ref: '#/components/schemas/PaymentRedirectForm'
+            - type: 'null'
+          description: |
+            **消費端 MUST 先檢查這個欄位。** 它不是 `null` 時，`redirect_url`
+            沒有意義，必須改用表單 POST。以 GET 導向 `action`（不帶欄位）
+            會落在服務商的錯誤頁。
+
+    PaymentPage:
+      type: object
+      additionalProperties: false
+      required: [payments, page, page_size, total]
+      properties:
+        payments:
+          type: array
+          items: { $ref: '#/components/schemas/Payment' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total:
+          type: integer
+          description: 符合條件的**總筆數**（不是金額）。
 
     # ── 物流 ──────────────────────────────────────────────────
     Shipment:
@@ -2236,8 +2327,20 @@ paths:
         簽章驗證必須跑在**原始位元組**上（body 上限 64 KiB）。
 
         **冪等**：同一筆回呼重送多次結果相同。認不出 `provider_reference` 時
-        回 **200 `{"status":"ignored"}`** 而不是 404——簽章已經證明呼叫者身分，
-        回錯誤只會招來無止境的重試，也會洩漏我們認不認得這筆交易。
+        **受理**而不是回 404——簽章已經證明呼叫者身分，回錯誤只會招來無止境的
+        重試，也會洩漏我們認不認得這筆交易。
+
+        **回應形狀由服務商決定，不是由本 API 決定**（change
+        ecpay-payment-provider）。這條端點的呼叫者是服務商的伺服器，它的協定
+        是它自己的：綠界要求收到**純文字 `1|OK`**，收不到就每隔 5~15 分鐘重送、
+        當天最多 4 次。因此同一條路徑會依 `{provider}` 回傳不同的 content type：
+
+        | provider | 已受理 | 驗簽失敗 | 我方處理失敗 |
+        |---|---|---|---|
+        | `mock` | `200 application/json {"status":"ok"\|"ignored"}` | `401` 錯誤信封 | `500` 錯誤信封 |
+        | `ecpay` | `200 text/plain 1\|OK` | `200 text/plain 0\|CheckMacValue Error` | `500 text/plain 0\|Internal Error` |
+
+        `ecpay` 只有「我方處理失敗」是非 2xx，因為那是唯一重送幫得上忙的情況。
       security: [{ providerSignature: [] }]
       parameters:
         - name: provider
@@ -2257,7 +2360,10 @@ paths:
               description: 形狀由各服務商決定。
       responses:
         "200":
-          description: 已受理。`ok` 表示狀態已更新；`ignored` 表示認不出這筆交易。
+          description: |
+            已受理。JSON 形式（`mock` 等沒有自訂協定的服務商）：`ok` 表示狀態已
+            更新，`ignored` 表示認不出這筆交易。純文字形式（`ecpay`）：`1|OK` 表示
+            已受理，`0|…` 表示未受理。
           content:
             application/json:
               schema:
@@ -2266,6 +2372,11 @@ paths:
                 required: [status]
                 properties:
                   status: { type: string, enum: [ok, ignored] }
+            text/plain:
+              schema:
+                type: string
+                description: 服務商自訂的確認字串。
+                examples: ["1|OK", "0|CheckMacValue Error"]
         "400": { $ref: '#/components/responses/BadRequest' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "404": { $ref: '#/components/responses/NotFound' }
@@ -4141,6 +4252,54 @@ paths:
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
         "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shops/{shopID}/payments:
+    get:
+      tags: [admin-commerce]
+      operationId: listShopPayments
+      summary: 以金流商的識別碼反查付款與訂單（人工對帳）
+      description: |
+        需要商家層 `payment.view`。
+
+        **這條端點的存在理由是方向。** `…/orders/{orderID}/payments` 要求你
+        **先知道訂單編號**，而人工對帳的起點恰好相反：商家手上是金流商後台的
+        一筆交易。
+
+        `q` 對兩個識別碼做**精確比對**（前後空白會被去除）：
+        `provider_reference`（我們產生的，綠界的 `MerchantTradeNo`）與
+        `provider_transaction_id`（金流商產生的，綠界的 `TradeNo`）；`q` 是正整數
+        時另外比對訂單編號。**刻意不是子字串搜尋**——對帳的動作是把號碼貼過來，
+        模糊比對在這裡不增加能力，卻會讓 `1` 撈回半個資料表。
+
+        不帶 `q` 時回傳該商家的付款流水帳，依 `id` 遞減。屬於其他商家的識別碼
+        回傳空清單。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: q
+          in: query
+          required: false
+          description: 金流商識別碼（任一個）或訂單編號，精確比對。
+          schema: { type: string }
+          examples:
+            ecpayTradeNo: { value: "2412311225437371" }
+            merchantTradeNo: { value: "O1234TMZQ8K3PA" }
+        - name: page
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: page_size
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: 付款紀錄分頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
 
   /api/v1/admin/shops/{shopID}/orders/{orderID}/payments:
     get:

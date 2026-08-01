@@ -451,6 +451,8 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "provider", Type: field.TypeString, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
 		{Name: "provider_reference", Type: field.TypeString, Size: 191, SchemaType: map[string]string{"postgres": "varchar(191)"}},
+		{Name: "provider_transaction_id", Type: field.TypeString, Nullable: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "paid_at", Type: field.TypeTime, Nullable: true},
 		{Name: "amount", Type: field.TypeInt64},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
 		{Name: "status", Type: field.TypeInt16, Default: 0},
@@ -465,13 +467,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "payments_shops_shop",
-				Columns:    []*schema.Column{PaymentsColumns[8]},
+				Columns:    []*schema.Column{PaymentsColumns[10]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "payments_orders_order",
-				Columns:    []*schema.Column{PaymentsColumns[9]},
+				Columns:    []*schema.Column{PaymentsColumns[11]},
 				RefColumns: []*schema.Column{OrdersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -485,7 +487,7 @@ var (
 			{
 				Name:    "payment_shop_id_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{PaymentsColumns[8], PaymentsColumns[9]},
+				Columns: []*schema.Column{PaymentsColumns[10], PaymentsColumns[11]},
 			},
 		},
 	}

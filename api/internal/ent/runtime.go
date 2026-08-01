@@ -578,8 +578,12 @@ func init() {
 			return nil
 		}
 	}()
+	// paymentDescProviderTransactionID is the schema descriptor for provider_transaction_id field.
+	paymentDescProviderTransactionID := paymentFields[4].Descriptor()
+	// payment.ProviderTransactionIDValidator is a validator for the "provider_transaction_id" field. It is called by the builders before save.
+	payment.ProviderTransactionIDValidator = paymentDescProviderTransactionID.Validators[0].(func(string) error)
 	// paymentDescCurrency is the schema descriptor for currency field.
-	paymentDescCurrency := paymentFields[5].Descriptor()
+	paymentDescCurrency := paymentFields[7].Descriptor()
 	// payment.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	payment.CurrencyValidator = func() func(string) error {
 		validators := paymentDescCurrency.Validators
@@ -597,7 +601,7 @@ func init() {
 		}
 	}()
 	// paymentDescStatus is the schema descriptor for status field.
-	paymentDescStatus := paymentFields[6].Descriptor()
+	paymentDescStatus := paymentFields[8].Descriptor()
 	// payment.DefaultStatus holds the default value on creation for the status field.
 	payment.DefaultStatus = paymentDescStatus.Default.(int16)
 	permissionFields := schema.Permission{}.Fields()

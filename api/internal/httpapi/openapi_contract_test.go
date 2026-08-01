@@ -371,7 +371,19 @@ var moneyExemptions = map[string]string{
 	"/components/schemas/ShopPage/properties/total":             "pagination count",
 	"/components/schemas/PointTransactionPage/properties/total": "pagination count",
 	"/components/schemas/MemberPage/properties/total":           "pagination count",
+	"/components/schemas/PaymentPage/properties/total":          "pagination count",
 }
+
+// **A money field this check is known NOT to see** (change
+// ecpay-payment-provider, design D17), recorded here so nobody mistakes green
+// for covered: PaymentRedirectForm.fields is declared as
+// `additionalProperties: {type: string}`, so walkProperties never reaches
+// 綠界's TotalAmount inside it. Enumerating 綠界's dozen form fields as contract
+// properties would lock THEIR API version into OUR v1 — the next field they add
+// would turn `additionalProperties: false` red. The mechanical guard moved
+// rather than disappeared: internal/payment/ecpay's
+// TestInitiateAmountIsSentVerbatim asserts the exact string that goes on the
+// wire.
 
 // refsMinorUnit accepts either a bare $ref to MinorUnitAmount or a single-element
 // allOf wrapper (the OpenAPI-idiomatic way to attach a per-field description to
@@ -685,4 +697,31 @@ func TestOpenAPIV1SurfaceLock(t *testing.T) {
 		return
 	}
 	t.Logf("表面鎖：%d 項承諾全部仍在（文件目前共 %d 項，新增不受限）", locked, len(current))
+}
+
+// TestSimulatorIsNotMountedOnTheAPI encodes change ecpay-payment-provider's
+// design D11 as an assertion rather than as a convention.
+//
+// The 綠界 cashier stand-in is a separate binary (api/cmd/ecpay-sim) for three
+// reasons, and the first is the one this test protects: **a route here gets
+// locked into v1-surface.txt**, where the only rule is "nothing is ever
+// deleted" — and the simulator is a thing whose entire purpose is to be deleted
+// the day the real integration lands. Putting a planned deletion inside a
+// no-deletions mechanism teaches the next person to ignore the mechanism.
+//
+// (The other two: a config-conditional mount would make production's route
+// table differ from the one these checks walk, and a same-process handler would
+// skip the serialization, the absolute cross-host URL and the "ReturnURL must be
+// reachable from outside" constraint that are the parts which actually break.)
+func TestSimulatorIsNotMountedOnTheAPI(t *testing.T) {
+	for _, route := range testutil.RouteTable(t, contractRouter(t)) {
+		lower := strings.ToLower(route)
+		for _, marker := range []string{"cashier", "aiocheckout", "ecpay-sim", "simulator"} {
+			if strings.Contains(lower, marker) {
+				t.Errorf("%q looks like the payment-provider simulator. It belongs in "+
+					"api/cmd/ecpay-sim, not on the API: mounting it makes it a v1 promise "+
+					"(v1-surface.txt) for something meant to be deleted (design D11).", route)
+			}
+		}
+	}
 }

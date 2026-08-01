@@ -23,7 +23,8 @@
 // Run with CMS:   cd e2e && node happy-path.mjs
 import { pathToFileURL } from "node:url";
 import {
-  API, brief, check, deliverWebhook, fail, failureCount, isoDate, req, runID, section, tierFor, tierName,
+  API, brief, check, deliverECPayCallback, deliverWebhook, ecpayCheckMac, fail, failureCount, isoDate, req,
+  runID, section, tierFor, tierName,
 } from "./lib.mjs";
 
 // The back-office half of this path signs in as the shop's own merchant owner,
@@ -50,11 +51,13 @@ const BOUQUET_SLUG = "anniversary-bouquet";
 const BOUQUET_SKU = "BQ-ANNI-M";
 
 // Permanent stock consumed by one run: 1 (guest, returned) + 2 (member,
-// returned) + 1 (the tier-discount order of section ⑧, returned) + 0 (cancelled
-// orders restore stock). Returns do NOT restore stock — only cancellation does —
-// so a seeded database supports a bounded number of runs before it needs
-// re-seeding (design D7). BQ-ANNI-M is seeded with 36, i.e. 9 runs.
-const STOCK_PER_RUN = 4;
+// returned) + 1 (the tier-discount order of section ⑧, returned) + 1 (the ECPay
+// order of section ⑫, returned) + 0 (cancelled orders restore stock, which
+// covers section ⑩ and section ⑫'s cancelled-then-paid order). Returns do NOT
+// restore stock — only cancellation does — so a seeded database supports a
+// bounded number of runs before it needs re-seeding (design D7). BQ-ANNI-M is
+// seeded with 36, i.e. 7 runs.
+const STOCK_PER_RUN = 5;
 
 class Abort extends Error {}
 
@@ -633,7 +636,153 @@ async function commercePath() {
     reused.json?.error?.code === "idempotency_key_reused", brief(reused));
   check("a refused reuse touches no stock",
     (await skuStock(BOUQUET_SKU)) === stockAfterFirstIdem, String(stockAfterFirstIdem));
+
+  // ── ⑫ 綠界 ECPay：表單導向、1|OK、模擬付款不付錢、反查對帳 ──
+  //
+  // Driven entirely through the API: the callbacks are signed by this script's
+  // own CheckMacValue implementation (lib.mjs), which is a SECOND, independent
+  // implementation of 綠界's algorithm and is verified against the same
+  // published vector the Go unit test uses. `make ecpay-sim` exists for humans;
+  // this chain needs nothing but the API.
+  //
+  // It uses the MEMBER path on purpose: guest checkout is rate limited (20 per
+  // 10 minutes per IP), and this script is meant to be re-runnable.
+  section("⑫ 綠界 ECPay: form redirect, 1|OK, simulated payment, reconciliation lookup");
+
+  const ecPointsBefore = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  await req("DELETE", "/api/v1/shop/cart/items", { token: member, pk: PK });
+  await req("POST", "/api/v1/shop/cart/items", { token: member, pk: PK, body: { sku_id: sku.id, quantity: 1 } });
+  const ecCheckout = await req("POST", "/api/v1/shop/checkout", {
+    token: member, pk: PK,
+    body: {
+      shipping_method_id: paidMethod.id,
+      recipient_name: "E2E 綠界", phone: "0955666777", line1: "台北市信義區松高路 11 號",
+    },
+  });
+  need(ecCheckout.status === 201, `ecpay member checkout failed: ${brief(ecCheckout)}`);
+  const ecOrder = ecCheckout.json;
+
+  const ecPay = await req("POST", `/api/v1/shop/orders/${ecOrder.id}/payments`, {
+    token: member, pk: PK, body: { provider: "ecpay" },
+  });
+  need(ecPay.status === 201, `ecpay payment initiation failed: ${brief(ecPay)}`);
+
+  // design D2: 綠界's cashier is a form POST, so a single redirect URL cannot
+  // carry it. The API hands back the field set; redirect_url survives as a v1
+  // key with no meaning for this provider.
+  const ecForm = ecPay.json.redirect_form;
+  check("ECPay returns a redirect FORM, not a URL",
+    ecForm !== null && ecForm?.method === "POST" && typeof ecForm?.action === "string",
+    JSON.stringify([ecPay.json.redirect_url, ecForm?.method, ecForm?.action]));
+  check("redirect_url is empty for a form-POST provider",
+    ecPay.json.redirect_url === "", JSON.stringify(ecPay.json.redirect_url));
+  check("every field 綠界 requires is present",
+    ["MerchantID", "MerchantTradeNo", "MerchantTradeDate", "PaymentType", "TotalAmount",
+      "TradeDesc", "ItemName", "ReturnURL", "ChoosePayment", "EncryptType", "CheckMacValue"]
+      .every((k) => (ecForm?.fields?.[k] ?? "") !== ""),
+    JSON.stringify(Object.keys(ecForm?.fields ?? {})));
+  // The one place the OpenAPI money check cannot reach (design D17): form values
+  // are strings, so the contract declares no per-field schema for them.
+  check("TotalAmount is the payable total with NO scaling",
+    ecForm?.fields?.TotalAmount === String(ecOrder.total_amount),
+    `${ecForm?.fields?.TotalAmount} vs ${ecOrder.total_amount}`);
+  check("the CheckMacValue we generated is the one an independent implementation computes",
+    ecForm?.fields?.CheckMacValue === ecpayCheckMac(ecForm.fields),
+    `${ecForm?.fields?.CheckMacValue} vs ${ecpayCheckMac(ecForm?.fields ?? {})}`);
+
+  // design D6: 綠界's back-office 模擬付款 button sends RtnCode=1 / RtnMsg=交易成功
+  // and settles nothing. Reading only RtnCode marks the order paid, awards
+  // points and queues it for shipping, with nothing in the bank.
+  const ecSim = await deliverECPayCallback(ecPay.json.provider_reference, ecOrder.total_amount, "simulate");
+  check("a simulated-payment notification is still acknowledged with exactly 1|OK",
+    ecSim.status === 200 && (ecSim.text ?? "").trim() === "1|OK", brief(ecSim));
+  const ecAfterSim = await req("GET", `/api/v1/shop/orders/${ecOrder.id}`, { token: member, pk: PK });
+  check("SimulatePaid=1 does NOT mark the order paid (綠界 settles no money for it)",
+    ecAfterSim.json?.payment_status === 0, String(ecAfterSim.json?.payment_status));
+  const ecPointsAfterSim = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  check("...and awards no points",
+    ecPointsAfterSim.points === ecPointsBefore.points,
+    `${ecPointsBefore.points} → ${ecPointsAfterSim.points}`);
+
+  // And the row is still claimable — that is the whole reason Outcome has a
+  // third value: mapping the above to "failed" would make this delivery lose
+  // the CAS, and the order would never become paid.
+  const ecReal = await deliverECPayCallback(ecPay.json.provider_reference, ecOrder.total_amount, "success");
+  check("the real notification is acknowledged with exactly 1|OK (no JSON envelope)",
+    ecReal.status === 200 && (ecReal.text ?? "").trim() === "1|OK", brief(ecReal));
+  const ecAfterPay = await req("GET", `/api/v1/shop/orders/${ecOrder.id}`, { token: member, pk: PK });
+  check("the real notification marks the order paid",
+    ecAfterPay.json?.payment_status === 1, String(ecAfterPay.json?.payment_status));
+
+  // design D4/D10/D12: manual reconciliation starts from 綠界's own number.
+  const lookup = await req("GET", shopPath(`/payments?q=${encodeURIComponent(ecReal.tradeNo)}`), { token: admin });
+  check("the merchant can find the order from 綠界's OWN transaction number",
+    lookup.status === 200 && lookup.json?.payments?.length === 1 &&
+      lookup.json.payments[0].order_id === ecOrder.id,
+    brief(lookup));
+  const paidRow = lookup.json?.payments?.[0] ?? {};
+  check("the reconciliation row carries 付款單號、金額、時間",
+    paidRow.provider_reference === ecPay.json.provider_reference &&
+      paidRow.provider_transaction_id === ecReal.tradeNo &&
+      paidRow.amount === ecOrder.total_amount &&
+      typeof paidRow.paid_at === "string",
+    JSON.stringify([paidRow.provider_reference, paidRow.provider_transaction_id, paidRow.amount, paidRow.paid_at]));
+
+  // Ship + return it so this section leaves the member's balance where it found
+  // it, the same discipline sections ③/⑧ follow.
+  const ecShip = await req("POST", shopPath(`/orders/${ecOrder.id}/shipments`), {
+    token: admin, body: { carrier: paidMethod.carrier, tracking_number: `E2E-${runID}-EC` },
+  });
+  need(ecShip.status === 201, `create shipment (ecpay order) failed: ${brief(ecShip)}`);
+  await req("PUT", shopPath(`/orders/${ecOrder.id}/shipments/${ecShip.json.id}`), {
+    token: admin, body: { status: "returned" },
+  });
+  const ecPointsRestored = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  check("returning the ECPay order claws back exactly what it awarded",
+    ecPointsRestored.points === ecPointsBefore.points,
+    `${ecPointsBefore.points} → ${ecPointsRestored.points}`);
+
+  // design D9: the customer pays after the order was cancelled. The money is
+  // recorded truthfully; the order is NOT advanced and earns no points. Before
+  // this change the same sequence produced an order that was cancelled AND paid,
+  // with its stock already back on the shelf and points awarded for it.
+  await req("DELETE", "/api/v1/shop/cart/items", { token: member, pk: PK });
+  await req("POST", "/api/v1/shop/cart/items", { token: member, pk: PK, body: { sku_id: sku.id, quantity: 1 } });
+  const orphanCheckout = await req("POST", "/api/v1/shop/checkout", {
+    token: member, pk: PK,
+    body: { recipient_name: "E2E 取消", phone: "0955000111", line1: "台北市信義區松高路 12 號" },
+  });
+  need(orphanCheckout.status === 201, `orphan checkout failed: ${brief(orphanCheckout)}`);
+  const orphanOrder = orphanCheckout.json;
+  const orphanPay = await req("POST", `/api/v1/shop/orders/${orphanOrder.id}/payments`, {
+    token: member, pk: PK, body: { provider: "ecpay" },
+  });
+  need(orphanPay.status === 201, `orphan payment initiation failed: ${brief(orphanPay)}`);
+  const orphanStockBefore = await skuStock(BOUQUET_SKU);
+  const orphanCancel = await req("POST", `/api/v1/shop/orders/${orphanOrder.id}/cancel`, { token: member, pk: PK });
+  need(orphanCancel.status === 200, `orphan cancel failed: ${brief(orphanCancel)}`);
+  check("cancelling returns the stock the pending payment was holding",
+    (await skuStock(BOUQUET_SKU)) === orphanStockBefore + 1, String(orphanStockBefore));
+
+  const orphanHook = await deliverECPayCallback(orphanPay.json.provider_reference, orphanOrder.total_amount, "success");
+  check("a payment that lands after cancellation is still acknowledged with 1|OK",
+    orphanHook.status === 200 && (orphanHook.text ?? "").trim() === "1|OK", brief(orphanHook));
+  const orphanAfter = await req("GET", `/api/v1/shop/orders/${orphanOrder.id}`, { token: member, pk: PK });
+  check("a CANCELLED order is never advanced to paid",
+    orphanAfter.json?.status === 1 && orphanAfter.json?.payment_status === 0,
+    JSON.stringify([orphanAfter.json?.status, orphanAfter.json?.payment_status]));
+  const orphanPoints = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  check("...and earns no points (it will never ship)",
+    orphanPoints.points === ecPointsBefore.points, `${ecPointsBefore.points} → ${orphanPoints.points}`);
+  const orphanLookup = await req("GET",
+    shopPath(`/payments?q=${encodeURIComponent(orphanPay.json.provider_reference)}`), { token: admin });
+  check("but the merchant can always find the money that needs a manual refund",
+    orphanLookup.json?.payments?.length === 1 &&
+      orphanLookup.json.payments[0].status === 1 &&
+      orphanLookup.json.payments[0].order_id === orphanOrder.id,
+    brief(orphanLookup));
 }
+
 
 // Entry-point detection: when run directly this script owns the exit code;
 // when imported by happy-path.mjs it only contributes to the shared failure

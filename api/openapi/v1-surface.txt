@@ -190,6 +190,14 @@ GET /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token
 GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token path pageID
 GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token path shopID
+GET /api/v1/admin/shops/{shopID}/payments
+GET /api/v1/admin/shops/{shopID}/payments path shopID
+GET /api/v1/admin/shops/{shopID}/payments query page
+GET /api/v1/admin/shops/{shopID}/payments query page optional
+GET /api/v1/admin/shops/{shopID}/payments query page_size
+GET /api/v1/admin/shops/{shopID}/payments query page_size optional
+GET /api/v1/admin/shops/{shopID}/payments query q
+GET /api/v1/admin/shops/{shopID}/payments query q optional
 GET /api/v1/admin/shops/{shopID}/products
 GET /api/v1/admin/shops/{shopID}/products path shopID
 GET /api/v1/admin/shops/{shopID}/products query category_id
@@ -524,8 +532,10 @@ Payment.created_at
 Payment.currency
 Payment.id
 Payment.order_id
+Payment.paid_at
 Payment.provider
 Payment.provider_reference
+Payment.provider_transaction_id
 Payment.status
 Payment.updated_at
 PaymentInitiateResult.amount
@@ -533,11 +543,21 @@ PaymentInitiateResult.created_at
 PaymentInitiateResult.currency
 PaymentInitiateResult.id
 PaymentInitiateResult.order_id
+PaymentInitiateResult.paid_at
 PaymentInitiateResult.provider
 PaymentInitiateResult.provider_reference
+PaymentInitiateResult.provider_transaction_id
+PaymentInitiateResult.redirect_form
 PaymentInitiateResult.redirect_url
 PaymentInitiateResult.status
 PaymentInitiateResult.updated_at
+PaymentPage.page
+PaymentPage.page_size
+PaymentPage.payments
+PaymentPage.total
+PaymentRedirectForm.action
+PaymentRedirectForm.fields
+PaymentRedirectForm.method
 Permission.description
 Permission.id
 Permission.name

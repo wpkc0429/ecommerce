@@ -93,6 +93,46 @@ func (_u *PaymentUpdate) SetNillableProviderReference(v *string) *PaymentUpdate 
 	return _u
 }
 
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (_u *PaymentUpdate) SetProviderTransactionID(v string) *PaymentUpdate {
+	_u.mutation.SetProviderTransactionID(v)
+	return _u
+}
+
+// SetNillableProviderTransactionID sets the "provider_transaction_id" field if the given value is not nil.
+func (_u *PaymentUpdate) SetNillableProviderTransactionID(v *string) *PaymentUpdate {
+	if v != nil {
+		_u.SetProviderTransactionID(*v)
+	}
+	return _u
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (_u *PaymentUpdate) ClearProviderTransactionID() *PaymentUpdate {
+	_u.mutation.ClearProviderTransactionID()
+	return _u
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (_u *PaymentUpdate) SetPaidAt(v time.Time) *PaymentUpdate {
+	_u.mutation.SetPaidAt(v)
+	return _u
+}
+
+// SetNillablePaidAt sets the "paid_at" field if the given value is not nil.
+func (_u *PaymentUpdate) SetNillablePaidAt(v *time.Time) *PaymentUpdate {
+	if v != nil {
+		_u.SetPaidAt(*v)
+	}
+	return _u
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (_u *PaymentUpdate) ClearPaidAt() *PaymentUpdate {
+	_u.mutation.ClearPaidAt()
+	return _u
+}
+
 // SetAmount sets the "amount" field.
 func (_u *PaymentUpdate) SetAmount(v int64) *PaymentUpdate {
 	_u.mutation.ResetAmount()
@@ -224,6 +264,11 @@ func (_u *PaymentUpdate) check() error {
 			return &ValidationError{Name: "provider_reference", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_reference": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProviderTransactionID(); ok {
+		if err := payment.ProviderTransactionIDValidator(v); err != nil {
+			return &ValidationError{Name: "provider_transaction_id", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_transaction_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Currency(); ok {
 		if err := payment.CurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Payment.currency": %w`, err)}
@@ -264,6 +309,18 @@ func (_u *PaymentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ProviderReference(); ok {
 		_spec.SetField(payment.FieldProviderReference, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ProviderTransactionID(); ok {
+		_spec.SetField(payment.FieldProviderTransactionID, field.TypeString, value)
+	}
+	if _u.mutation.ProviderTransactionIDCleared() {
+		_spec.ClearField(payment.FieldProviderTransactionID, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaidAt(); ok {
+		_spec.SetField(payment.FieldPaidAt, field.TypeTime, value)
+	}
+	if _u.mutation.PaidAtCleared() {
+		_spec.ClearField(payment.FieldPaidAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Amount(); ok {
 		_spec.SetField(payment.FieldAmount, field.TypeInt64, value)
@@ -422,6 +479,46 @@ func (_u *PaymentUpdateOne) SetNillableProviderReference(v *string) *PaymentUpda
 	return _u
 }
 
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (_u *PaymentUpdateOne) SetProviderTransactionID(v string) *PaymentUpdateOne {
+	_u.mutation.SetProviderTransactionID(v)
+	return _u
+}
+
+// SetNillableProviderTransactionID sets the "provider_transaction_id" field if the given value is not nil.
+func (_u *PaymentUpdateOne) SetNillableProviderTransactionID(v *string) *PaymentUpdateOne {
+	if v != nil {
+		_u.SetProviderTransactionID(*v)
+	}
+	return _u
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (_u *PaymentUpdateOne) ClearProviderTransactionID() *PaymentUpdateOne {
+	_u.mutation.ClearProviderTransactionID()
+	return _u
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (_u *PaymentUpdateOne) SetPaidAt(v time.Time) *PaymentUpdateOne {
+	_u.mutation.SetPaidAt(v)
+	return _u
+}
+
+// SetNillablePaidAt sets the "paid_at" field if the given value is not nil.
+func (_u *PaymentUpdateOne) SetNillablePaidAt(v *time.Time) *PaymentUpdateOne {
+	if v != nil {
+		_u.SetPaidAt(*v)
+	}
+	return _u
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (_u *PaymentUpdateOne) ClearPaidAt() *PaymentUpdateOne {
+	_u.mutation.ClearPaidAt()
+	return _u
+}
+
 // SetAmount sets the "amount" field.
 func (_u *PaymentUpdateOne) SetAmount(v int64) *PaymentUpdateOne {
 	_u.mutation.ResetAmount()
@@ -566,6 +663,11 @@ func (_u *PaymentUpdateOne) check() error {
 			return &ValidationError{Name: "provider_reference", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_reference": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProviderTransactionID(); ok {
+		if err := payment.ProviderTransactionIDValidator(v); err != nil {
+			return &ValidationError{Name: "provider_transaction_id", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_transaction_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Currency(); ok {
 		if err := payment.CurrencyValidator(v); err != nil {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Payment.currency": %w`, err)}
@@ -623,6 +725,18 @@ func (_u *PaymentUpdateOne) sqlSave(ctx context.Context) (_node *Payment, err er
 	}
 	if value, ok := _u.mutation.ProviderReference(); ok {
 		_spec.SetField(payment.FieldProviderReference, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ProviderTransactionID(); ok {
+		_spec.SetField(payment.FieldProviderTransactionID, field.TypeString, value)
+	}
+	if _u.mutation.ProviderTransactionIDCleared() {
+		_spec.ClearField(payment.FieldProviderTransactionID, field.TypeString)
+	}
+	if value, ok := _u.mutation.PaidAt(); ok {
+		_spec.SetField(payment.FieldPaidAt, field.TypeTime, value)
+	}
+	if _u.mutation.PaidAtCleared() {
+		_spec.ClearField(payment.FieldPaidAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Amount(); ok {
 		_spec.SetField(payment.FieldAmount, field.TypeInt64, value)

@@ -31,6 +31,10 @@ type Payment struct {
 	Provider string `json:"provider,omitempty"`
 	// ProviderReference holds the value of the "provider_reference" field.
 	ProviderReference string `json:"provider_reference,omitempty"`
+	// ProviderTransactionID holds the value of the "provider_transaction_id" field.
+	ProviderTransactionID *string `json:"provider_transaction_id,omitempty"`
+	// PaidAt holds the value of the "paid_at" field.
+	PaidAt *time.Time `json:"paid_at,omitempty"`
 	// Amount holds the value of the "amount" field.
 	Amount int64 `json:"amount,omitempty"`
 	// Currency holds the value of the "currency" field.
@@ -83,9 +87,9 @@ func (*Payment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case payment.FieldID, payment.FieldShopID, payment.FieldOrderID, payment.FieldAmount, payment.FieldStatus:
 			values[i] = new(sql.NullInt64)
-		case payment.FieldProvider, payment.FieldProviderReference, payment.FieldCurrency:
+		case payment.FieldProvider, payment.FieldProviderReference, payment.FieldProviderTransactionID, payment.FieldCurrency:
 			values[i] = new(sql.NullString)
-		case payment.FieldCreatedAt, payment.FieldUpdatedAt:
+		case payment.FieldCreatedAt, payment.FieldUpdatedAt, payment.FieldPaidAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -143,6 +147,20 @@ func (_m *Payment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field provider_reference", values[i])
 			} else if value.Valid {
 				_m.ProviderReference = value.String
+			}
+		case payment.FieldProviderTransactionID:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field provider_transaction_id", values[i])
+			} else if value.Valid {
+				_m.ProviderTransactionID = new(string)
+				*_m.ProviderTransactionID = value.String
+			}
+		case payment.FieldPaidAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field paid_at", values[i])
+			} else if value.Valid {
+				_m.PaidAt = new(time.Time)
+				*_m.PaidAt = value.Time
 			}
 		case payment.FieldAmount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -225,6 +243,16 @@ func (_m *Payment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("provider_reference=")
 	builder.WriteString(_m.ProviderReference)
+	builder.WriteString(", ")
+	if v := _m.ProviderTransactionID; v != nil {
+		builder.WriteString("provider_transaction_id=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.PaidAt; v != nil {
+		builder.WriteString("paid_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("amount=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Amount))

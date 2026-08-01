@@ -26,6 +26,10 @@ const (
 	FieldProvider = "provider"
 	// FieldProviderReference holds the string denoting the provider_reference field in the database.
 	FieldProviderReference = "provider_reference"
+	// FieldProviderTransactionID holds the string denoting the provider_transaction_id field in the database.
+	FieldProviderTransactionID = "provider_transaction_id"
+	// FieldPaidAt holds the string denoting the paid_at field in the database.
+	FieldPaidAt = "paid_at"
 	// FieldAmount holds the string denoting the amount field in the database.
 	FieldAmount = "amount"
 	// FieldCurrency holds the string denoting the currency field in the database.
@@ -63,6 +67,8 @@ var Columns = []string{
 	FieldOrderID,
 	FieldProvider,
 	FieldProviderReference,
+	FieldProviderTransactionID,
+	FieldPaidAt,
 	FieldAmount,
 	FieldCurrency,
 	FieldStatus,
@@ -89,6 +95,8 @@ var (
 	ProviderValidator func(string) error
 	// ProviderReferenceValidator is a validator for the "provider_reference" field. It is called by the builders before save.
 	ProviderReferenceValidator func(string) error
+	// ProviderTransactionIDValidator is a validator for the "provider_transaction_id" field. It is called by the builders before save.
+	ProviderTransactionIDValidator func(string) error
 	// CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	CurrencyValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -131,6 +139,16 @@ func ByProvider(opts ...sql.OrderTermOption) OrderOption {
 // ByProviderReference orders the results by the provider_reference field.
 func ByProviderReference(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProviderReference, opts...).ToFunc()
+}
+
+// ByProviderTransactionID orders the results by the provider_transaction_id field.
+func ByProviderTransactionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProviderTransactionID, opts...).ToFunc()
+}
+
+// ByPaidAt orders the results by the paid_at field.
+func ByPaidAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPaidAt, opts...).ToFunc()
 }
 
 // ByAmount orders the results by the amount field.

@@ -10564,26 +10564,28 @@ func (m *PageMutation) ResetEdge(name string) error {
 // PaymentMutation represents an operation that mutates the Payment nodes in the graph.
 type PaymentMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	provider           *string
-	provider_reference *string
-	amount             *int64
-	addamount          *int64
-	currency           *string
-	status             *int16
-	addstatus          *int16
-	clearedFields      map[string]struct{}
-	shop               *int
-	clearedshop        bool
-	_order             *int
-	cleared_order      bool
-	done               bool
-	oldValue           func(context.Context) (*Payment, error)
-	predicates         []predicate.Payment
+	op                      Op
+	typ                     string
+	id                      *int
+	created_at              *time.Time
+	updated_at              *time.Time
+	provider                *string
+	provider_reference      *string
+	provider_transaction_id *string
+	paid_at                 *time.Time
+	amount                  *int64
+	addamount               *int64
+	currency                *string
+	status                  *int16
+	addstatus               *int16
+	clearedFields           map[string]struct{}
+	shop                    *int
+	clearedshop             bool
+	_order                  *int
+	cleared_order           bool
+	done                    bool
+	oldValue                func(context.Context) (*Payment, error)
+	predicates              []predicate.Payment
 }
 
 var _ ent.Mutation = (*PaymentMutation)(nil)
@@ -10900,6 +10902,104 @@ func (m *PaymentMutation) ResetProviderReference() {
 	m.provider_reference = nil
 }
 
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (m *PaymentMutation) SetProviderTransactionID(s string) {
+	m.provider_transaction_id = &s
+}
+
+// ProviderTransactionID returns the value of the "provider_transaction_id" field in the mutation.
+func (m *PaymentMutation) ProviderTransactionID() (r string, exists bool) {
+	v := m.provider_transaction_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProviderTransactionID returns the old "provider_transaction_id" field's value of the Payment entity.
+// If the Payment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMutation) OldProviderTransactionID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProviderTransactionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProviderTransactionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProviderTransactionID: %w", err)
+	}
+	return oldValue.ProviderTransactionID, nil
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (m *PaymentMutation) ClearProviderTransactionID() {
+	m.provider_transaction_id = nil
+	m.clearedFields[payment.FieldProviderTransactionID] = struct{}{}
+}
+
+// ProviderTransactionIDCleared returns if the "provider_transaction_id" field was cleared in this mutation.
+func (m *PaymentMutation) ProviderTransactionIDCleared() bool {
+	_, ok := m.clearedFields[payment.FieldProviderTransactionID]
+	return ok
+}
+
+// ResetProviderTransactionID resets all changes to the "provider_transaction_id" field.
+func (m *PaymentMutation) ResetProviderTransactionID() {
+	m.provider_transaction_id = nil
+	delete(m.clearedFields, payment.FieldProviderTransactionID)
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (m *PaymentMutation) SetPaidAt(t time.Time) {
+	m.paid_at = &t
+}
+
+// PaidAt returns the value of the "paid_at" field in the mutation.
+func (m *PaymentMutation) PaidAt() (r time.Time, exists bool) {
+	v := m.paid_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaidAt returns the old "paid_at" field's value of the Payment entity.
+// If the Payment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PaymentMutation) OldPaidAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaidAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaidAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaidAt: %w", err)
+	}
+	return oldValue.PaidAt, nil
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (m *PaymentMutation) ClearPaidAt() {
+	m.paid_at = nil
+	m.clearedFields[payment.FieldPaidAt] = struct{}{}
+}
+
+// PaidAtCleared returns if the "paid_at" field was cleared in this mutation.
+func (m *PaymentMutation) PaidAtCleared() bool {
+	_, ok := m.clearedFields[payment.FieldPaidAt]
+	return ok
+}
+
+// ResetPaidAt resets all changes to the "paid_at" field.
+func (m *PaymentMutation) ResetPaidAt() {
+	m.paid_at = nil
+	delete(m.clearedFields, payment.FieldPaidAt)
+}
+
 // SetAmount sets the "amount" field.
 func (m *PaymentMutation) SetAmount(i int64) {
 	m.amount = &i
@@ -11136,7 +11236,7 @@ func (m *PaymentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PaymentMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 11)
 	if m.created_at != nil {
 		fields = append(fields, payment.FieldCreatedAt)
 	}
@@ -11154,6 +11254,12 @@ func (m *PaymentMutation) Fields() []string {
 	}
 	if m.provider_reference != nil {
 		fields = append(fields, payment.FieldProviderReference)
+	}
+	if m.provider_transaction_id != nil {
+		fields = append(fields, payment.FieldProviderTransactionID)
+	}
+	if m.paid_at != nil {
+		fields = append(fields, payment.FieldPaidAt)
 	}
 	if m.amount != nil {
 		fields = append(fields, payment.FieldAmount)
@@ -11184,6 +11290,10 @@ func (m *PaymentMutation) Field(name string) (ent.Value, bool) {
 		return m.Provider()
 	case payment.FieldProviderReference:
 		return m.ProviderReference()
+	case payment.FieldProviderTransactionID:
+		return m.ProviderTransactionID()
+	case payment.FieldPaidAt:
+		return m.PaidAt()
 	case payment.FieldAmount:
 		return m.Amount()
 	case payment.FieldCurrency:
@@ -11211,6 +11321,10 @@ func (m *PaymentMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldProvider(ctx)
 	case payment.FieldProviderReference:
 		return m.OldProviderReference(ctx)
+	case payment.FieldProviderTransactionID:
+		return m.OldProviderTransactionID(ctx)
+	case payment.FieldPaidAt:
+		return m.OldPaidAt(ctx)
 	case payment.FieldAmount:
 		return m.OldAmount(ctx)
 	case payment.FieldCurrency:
@@ -11267,6 +11381,20 @@ func (m *PaymentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProviderReference(v)
+		return nil
+	case payment.FieldProviderTransactionID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProviderTransactionID(v)
+		return nil
+	case payment.FieldPaidAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaidAt(v)
 		return nil
 	case payment.FieldAmount:
 		v, ok := value.(int64)
@@ -11345,7 +11473,14 @@ func (m *PaymentMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *PaymentMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(payment.FieldProviderTransactionID) {
+		fields = append(fields, payment.FieldProviderTransactionID)
+	}
+	if m.FieldCleared(payment.FieldPaidAt) {
+		fields = append(fields, payment.FieldPaidAt)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -11358,6 +11493,14 @@ func (m *PaymentMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *PaymentMutation) ClearField(name string) error {
+	switch name {
+	case payment.FieldProviderTransactionID:
+		m.ClearProviderTransactionID()
+		return nil
+	case payment.FieldPaidAt:
+		m.ClearPaidAt()
+		return nil
+	}
 	return fmt.Errorf("unknown Payment nullable field %s", name)
 }
 
@@ -11382,6 +11525,12 @@ func (m *PaymentMutation) ResetField(name string) error {
 		return nil
 	case payment.FieldProviderReference:
 		m.ResetProviderReference()
+		return nil
+	case payment.FieldProviderTransactionID:
+		m.ResetProviderTransactionID()
+		return nil
+	case payment.FieldPaidAt:
+		m.ResetPaidAt()
 		return nil
 	case payment.FieldAmount:
 		m.ResetAmount()

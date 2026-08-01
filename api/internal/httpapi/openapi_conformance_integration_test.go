@@ -36,6 +36,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +53,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
+	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 	"ksdevworks/ecommerce/api/internal/points"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/tenant"
@@ -67,7 +69,7 @@ var requiredSchemas = []string{
 	"MemberPoints", "MemberTier",
 	"MinorUnitAmount",
 	"Order", "OrderItem", "OrderPage", "ShippingAddress",
-	"PaymentInitiateResult",
+	"PaymentInitiateResult", "PaymentRedirectForm",
 	"PointTransaction", "PointTransactionPage",
 	"Product", "ProductPage", "ProductSKU",
 	"PublicShippingMethod",
@@ -300,9 +302,19 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	cartSvc := &cart.Service{Client: client}
 	orderSvc := &order.Service{Client: client}
 	mock := payment.NewMockProvider(e.webhookSecret)
+	// change ecpay-payment-provider: ONDO's real provider, registered exactly as
+	// wire.go does. Sampling rule 1 (ONDO's path is covered 100%) is why the
+	// form-POST response shape is asserted against the contract below.
+	ecpayProv := ecpay.New(ecpay.Config{
+		MerchantID: "3002607", HashKey: "pwFHCqoQZGmho4w6", HashIV: "EkRm7iFT261dpevs",
+		CheckoutURL: "http://localhost:8090/Cashier/AioCheckOut/V5",
+		ReturnURL:   "http://localhost:8080/api/v1/webhooks/payments/ecpay",
+	}, nil)
 	paymentSvc := &payment.Service{
-		Client: client, Orders: orderSvc, Dispatcher: dispatcher,
-		Providers:       map[string]payment.Provider{mock.Name(): mock},
+		Client: client, Orders: orderSvc, Dispatcher: dispatcher, Log: log,
+		Providers: map[string]payment.Provider{
+			mock.Name(): mock, ecpayProv.Name(): ecpayProv,
+		},
 		DefaultProvider: mock.Name(),
 	}
 	e.shippingSvc = &shipping.Service{Client: client, Orders: orderSvc, Dispatcher: dispatcher}
@@ -459,6 +471,37 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	code, body = e.do(t, http.MethodGet, "/api/v1/shop/guest/order", guestResult.Token, nil)
 	requireStatus(t, code, http.StatusOK, body)
 	v.assertResponse(t, "/api/v1/shop/guest/order", http.MethodGet, http.StatusOK, body)
+
+	// ── ONDO 路徑 ⑥a：以綠界發起付款（表單導向的回應形狀）─────────────
+	//
+	// 這一條先跑，理由是它必須跑在訂單被標記已付款之前（已付款的訂單不可再發起
+	// 付款）。同一張訂單允許多筆付款嘗試，這是 payment-integration 明訂的。
+	code, body = e.do(t, http.MethodPost, "/api/v1/shop/guest/order/payments", guestResult.Token,
+		map[string]string{"provider": "ecpay"})
+	requireStatus(t, code, http.StatusCreated, body)
+	v.assertResponse(t, "/api/v1/shop/guest/order/payments", http.MethodPost, http.StatusCreated, body)
+
+	var ecpayInitiated struct {
+		RedirectURL  string `json:"redirect_url"`
+		RedirectForm *struct {
+			Method string            `json:"method"`
+			Action string            `json:"action"`
+			Fields map[string]string `json:"fields"`
+		} `json:"redirect_form"`
+	}
+	decodeInto(t, body, &ecpayInitiated)
+	if ecpayInitiated.RedirectForm == nil {
+		t.Fatal("綠界需要表單 POST，redirect_form 不得為 null")
+	}
+	if ecpayInitiated.RedirectURL != "" {
+		t.Errorf("表單導向的 provider 其 redirect_url 必須為空字串，得到 %q", ecpayInitiated.RedirectURL)
+	}
+	// 金額欄位的單位在契約裡無法以 MinorUnitAmount 表達（表單值都是字串），
+	// 所以這一行是它在契約層唯一的守衛。
+	if got := ecpayInitiated.RedirectForm.Fields["TotalAmount"]; got != strconv.FormatInt(guestResult.Order.TotalAmount, 10) {
+		t.Errorf("TotalAmount = %q，必須逐位元組等於訂單應付總額 %d（無任何換算）",
+			got, guestResult.Order.TotalAmount)
+	}
 
 	// ── ONDO 路徑 ⑥：發起付款 ─────────────────────────────────────────
 	code, body = e.do(t, http.MethodPost, "/api/v1/shop/guest/order/payments", guestResult.Token, nil)

@@ -94,6 +94,14 @@ func (p *MockProvider) VerifyWebhook(_ context.Context, req WebhookRequest) (*We
 	return &WebhookResult{ProviderReference: body.ProviderReference, Outcome: outcome}, nil
 }
 
+// WebhookAck returns the zero WebhookResponse for every acknowledgement
+// (change ecpay-payment-provider, design D3): the mock provider's "caller" is
+// our own test suite, which has no protocol requirements of its own, so the HTTP
+// layer answers in the API's own JSON envelope exactly as it did before this
+// method existed. **This provider's webhook responses are byte-for-byte
+// unchanged**, which is the property the zero-value default was introduced for.
+func (p *MockProvider) WebhookAck(Ack) WebhookResponse { return WebhookResponse{} }
+
 // mockHMAC computes the raw HMAC-SHA256 digest of body under secret.
 func mockHMAC(secret string, body []byte) []byte {
 	mac := hmac.New(sha256.New, []byte(secret))

@@ -76,6 +76,34 @@ func (_c *PaymentCreate) SetProviderReference(v string) *PaymentCreate {
 	return _c
 }
 
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (_c *PaymentCreate) SetProviderTransactionID(v string) *PaymentCreate {
+	_c.mutation.SetProviderTransactionID(v)
+	return _c
+}
+
+// SetNillableProviderTransactionID sets the "provider_transaction_id" field if the given value is not nil.
+func (_c *PaymentCreate) SetNillableProviderTransactionID(v *string) *PaymentCreate {
+	if v != nil {
+		_c.SetProviderTransactionID(*v)
+	}
+	return _c
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (_c *PaymentCreate) SetPaidAt(v time.Time) *PaymentCreate {
+	_c.mutation.SetPaidAt(v)
+	return _c
+}
+
+// SetNillablePaidAt sets the "paid_at" field if the given value is not nil.
+func (_c *PaymentCreate) SetNillablePaidAt(v *time.Time) *PaymentCreate {
+	if v != nil {
+		_c.SetPaidAt(*v)
+	}
+	return _c
+}
+
 // SetAmount sets the "amount" field.
 func (_c *PaymentCreate) SetAmount(v int64) *PaymentCreate {
 	_c.mutation.SetAmount(v)
@@ -191,6 +219,11 @@ func (_c *PaymentCreate) check() error {
 			return &ValidationError{Name: "provider_reference", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_reference": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProviderTransactionID(); ok {
+		if err := payment.ProviderTransactionIDValidator(v); err != nil {
+			return &ValidationError{Name: "provider_transaction_id", err: fmt.Errorf(`ent: validator failed for field "Payment.provider_transaction_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Amount(); !ok {
 		return &ValidationError{Name: "amount", err: errors.New(`ent: missing required field "Payment.amount"`)}
 	}
@@ -253,6 +286,14 @@ func (_c *PaymentCreate) createSpec() (*Payment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ProviderReference(); ok {
 		_spec.SetField(payment.FieldProviderReference, field.TypeString, value)
 		_node.ProviderReference = value
+	}
+	if value, ok := _c.mutation.ProviderTransactionID(); ok {
+		_spec.SetField(payment.FieldProviderTransactionID, field.TypeString, value)
+		_node.ProviderTransactionID = &value
+	}
+	if value, ok := _c.mutation.PaidAt(); ok {
+		_spec.SetField(payment.FieldPaidAt, field.TypeTime, value)
+		_node.PaidAt = &value
 	}
 	if value, ok := _c.mutation.Amount(); ok {
 		_spec.SetField(payment.FieldAmount, field.TypeInt64, value)
@@ -409,6 +450,42 @@ func (u *PaymentUpsert) SetProviderReference(v string) *PaymentUpsert {
 // UpdateProviderReference sets the "provider_reference" field to the value that was provided on create.
 func (u *PaymentUpsert) UpdateProviderReference() *PaymentUpsert {
 	u.SetExcluded(payment.FieldProviderReference)
+	return u
+}
+
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (u *PaymentUpsert) SetProviderTransactionID(v string) *PaymentUpsert {
+	u.Set(payment.FieldProviderTransactionID, v)
+	return u
+}
+
+// UpdateProviderTransactionID sets the "provider_transaction_id" field to the value that was provided on create.
+func (u *PaymentUpsert) UpdateProviderTransactionID() *PaymentUpsert {
+	u.SetExcluded(payment.FieldProviderTransactionID)
+	return u
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (u *PaymentUpsert) ClearProviderTransactionID() *PaymentUpsert {
+	u.SetNull(payment.FieldProviderTransactionID)
+	return u
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentUpsert) SetPaidAt(v time.Time) *PaymentUpsert {
+	u.Set(payment.FieldPaidAt, v)
+	return u
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentUpsert) UpdatePaidAt() *PaymentUpsert {
+	u.SetExcluded(payment.FieldPaidAt)
+	return u
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentUpsert) ClearPaidAt() *PaymentUpsert {
+	u.SetNull(payment.FieldPaidAt)
 	return u
 }
 
@@ -572,6 +649,48 @@ func (u *PaymentUpsertOne) SetProviderReference(v string) *PaymentUpsertOne {
 func (u *PaymentUpsertOne) UpdateProviderReference() *PaymentUpsertOne {
 	return u.Update(func(s *PaymentUpsert) {
 		s.UpdateProviderReference()
+	})
+}
+
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (u *PaymentUpsertOne) SetProviderTransactionID(v string) *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.SetProviderTransactionID(v)
+	})
+}
+
+// UpdateProviderTransactionID sets the "provider_transaction_id" field to the value that was provided on create.
+func (u *PaymentUpsertOne) UpdateProviderTransactionID() *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.UpdateProviderTransactionID()
+	})
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (u *PaymentUpsertOne) ClearProviderTransactionID() *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.ClearProviderTransactionID()
+	})
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentUpsertOne) SetPaidAt(v time.Time) *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.SetPaidAt(v)
+	})
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentUpsertOne) UpdatePaidAt() *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.UpdatePaidAt()
+	})
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentUpsertOne) ClearPaidAt() *PaymentUpsertOne {
+	return u.Update(func(s *PaymentUpsert) {
+		s.ClearPaidAt()
 	})
 }
 
@@ -909,6 +1028,48 @@ func (u *PaymentUpsertBulk) SetProviderReference(v string) *PaymentUpsertBulk {
 func (u *PaymentUpsertBulk) UpdateProviderReference() *PaymentUpsertBulk {
 	return u.Update(func(s *PaymentUpsert) {
 		s.UpdateProviderReference()
+	})
+}
+
+// SetProviderTransactionID sets the "provider_transaction_id" field.
+func (u *PaymentUpsertBulk) SetProviderTransactionID(v string) *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.SetProviderTransactionID(v)
+	})
+}
+
+// UpdateProviderTransactionID sets the "provider_transaction_id" field to the value that was provided on create.
+func (u *PaymentUpsertBulk) UpdateProviderTransactionID() *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.UpdateProviderTransactionID()
+	})
+}
+
+// ClearProviderTransactionID clears the value of the "provider_transaction_id" field.
+func (u *PaymentUpsertBulk) ClearProviderTransactionID() *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.ClearProviderTransactionID()
+	})
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (u *PaymentUpsertBulk) SetPaidAt(v time.Time) *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.SetPaidAt(v)
+	})
+}
+
+// UpdatePaidAt sets the "paid_at" field to the value that was provided on create.
+func (u *PaymentUpsertBulk) UpdatePaidAt() *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.UpdatePaidAt()
+	})
+}
+
+// ClearPaidAt clears the value of the "paid_at" field.
+func (u *PaymentUpsertBulk) ClearPaidAt() *PaymentUpsertBulk {
+	return u.Update(func(s *PaymentUpsert) {
+		s.ClearPaidAt()
 	})
 }
 

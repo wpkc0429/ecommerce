@@ -328,16 +328,57 @@ async function submitOrder(key, payload) {
 ```js
 const pay = await fetch(`${API}/api/v1/shop/guest/order/payments`, {
   method: "POST",
-  headers: { ...headers, "Authorization": `Bearer ${orderAccessToken}` },
+  headers: { ...headers, "Content-Type": "application/json", "Authorization": `Bearer ${orderAccessToken}` },
+  body: JSON.stringify({ provider: "ecpay" }),   // 省略則使用平台預設
 });
-const { redirect_url, amount } = await pay.json();   // 201
-window.location.href = redirect_url;
+const { redirect_url, redirect_form, amount } = await pay.json();   // 201
 ```
 
 - **路徑裡沒有訂單 id**——權杖已經指名了那一筆訂單。傳 id 也沒有用（沒有這個參數）。
 - `amount` 等於訂單的 `total_amount`（**已扣折扣、已含運費**）。金額由伺服器決定，請求無法指定。
 - **付款結果不會經由這個轉導回來。** 權威是金流服務商送到平台的伺服器回呼。
   顧客轉導回你的網站後，請**重新查一次訂單**看 `payment_status`。
+
+### 送顧客過去有兩種形式，**先看 `redirect_form`**
+
+金流服務商有兩種收單方式，回應同時帶了兩個鍵，只有一個有意義：
+
+```js
+if (redirect_form) {
+  submitForm(redirect_form);        // 表單 POST（綠界 ECPay 走這條）
+} else {
+  window.location.href = redirect_url;   // 單純轉導
+}
+```
+
+**順序不能顛倒。** 需要表單 POST 的服務商其 `redirect_url` 是**空字串**——先讀它會得到
+`window.location.href = ""`，也就是重新整理當前頁面，顧客永遠到不了收銀台。
+
+### `submitForm` 的完整實作（可直接複製）
+
+```js
+function submitForm({ method, action, fields }) {
+  const form = document.createElement("form");
+  form.method = method;          // "POST"
+  form.action = action;          // 金流服務商的收銀台網址
+  for (const [name, value] of Object.entries(fields)) {
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = name;
+    input.value = value;
+    form.appendChild(input);
+  }
+  document.body.appendChild(form);
+  form.submit();
+}
+```
+
+- **`fields` 原樣送出，一個都不能少、一個都不能改。** 裡面有一個檢查碼欄位涵蓋其餘所有欄位；
+  少送、多送或改動任何一個值，服務商都會拒絕這筆交易。**不要自己重排、過濾或轉型。**
+- **API 刻意不回傳一段現成的 HTML。** 你的框架已經處理好逸出，而且自帶前端不一定是網頁
+  （原生 APP 拿欄位集可以直接丟給系統瀏覽器或 WebView）。
+- **不要用 iframe。** 綠界明列 iframe 會導致交易失敗；iOS 上 FB／LINE 的 in-app 瀏覽器同樣不支援。
+- 若你的站有 CSP，記得 `form-action` 要允許收銀台的網域。
 
 ---
 
