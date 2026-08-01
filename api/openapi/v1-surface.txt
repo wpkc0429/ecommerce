@@ -8,9 +8,23 @@
 # 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉：
 # 後續的破壞性變更 MUST 改走新端點或 /api/v2，MUST NOT 再引用「尚無外部消費者」。
 #
-# 行的兩種形式：
-#   METHOD /path            一條公開路由
-#   SchemaName.property     一個具名 component schema 的屬性
+# 行的五種形式：
+#   METHOD /path                                一條公開路由
+#   SchemaName.property                         一個具名 component schema 的屬性
+#   METHOD /path <in> <name>                    該端點接受此請求參數（<in> ＝ header|query|path）
+#   METHOD /path <in> <name> optional           且此參數可以省略
+#   METHOD /path response <code> <Header-Name>  該端點承諾在此狀態碼回應此標頭
+#
+# 選填參數刻意產生**兩行**：「接受它」與「可以不帶它」是兩個獨立的承諾。把選填改成
+# 必填會讓 optional 那一行消失（＝破壞，轉紅）；把必填改成選填只是新增一行（＝放寬，
+# 放行）。方向性因此由事實本身表達，檢查規則維持「每一行都必須還在」這一句話。
+#
+# 參數與標頭以**端點**為單位。刪掉某條端點的 `- $ref: PublishableKey` 而保留元件定義，
+# 仍然是破壞——本檔會有對應的行消失。
+#
+# 本鎖**不**記錄參數的型別／pattern／長度／值域／敘述／範例：改敘述、補範例、放寬
+# 值域都不該轉紅（假警報是防腐機制最快的死法）。代價是「把約束改嚴」本鎖沉默，
+# 那一段的防線是 code review，見 openapi_contract_test.go 的檔頭。
 AllowedOrigin.created_at
 AllowedOrigin.id
 AllowedOrigin.origin
@@ -45,67 +59,206 @@ CategoryNode.parent_id
 CategoryNode.position
 CategoryNode.slug
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID}
+DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path originID
+DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID}
+DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
+DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
+DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/pages/{pageID}
+DELETE /api/v1/admin/shops/{shopID}/pages/{pageID} path pageID
+DELETE /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/products/{productID}
+DELETE /api/v1/admin/shops/{shopID}/products/{productID} path productID
+DELETE /api/v1/admin/shops/{shopID}/products/{productID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID}
+DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID} path keyID
+DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+DELETE /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
+DELETE /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID}
+DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path roleID
+DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path shopID
+DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path userID
 DELETE /api/v1/admin/sites/{siteID}
+DELETE /api/v1/admin/sites/{siteID} path siteID
 DELETE /api/v1/admin/sites/{siteID}/shops/{shopID}
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
 DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID}
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
 DELETE /api/v1/admin/users/{userID}/roles/{roleID}
+DELETE /api/v1/admin/users/{userID}/roles/{roleID} path roleID
+DELETE /api/v1/admin/users/{userID}/roles/{roleID} path userID
 DELETE /api/v1/shop/cart/items
+DELETE /api/v1/shop/cart/items header X-Publishable-Key
+DELETE /api/v1/shop/cart/items header X-Publishable-Key optional
 DELETE /api/v1/shop/cart/items/{itemID}
+DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
+DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
+DELETE /api/v1/shop/cart/items/{itemID} path itemID
 Error.error
 GET /api/v1/admin/me
 GET /api/v1/admin/permissions
 GET /api/v1/admin/roles
 GET /api/v1/admin/shops
+GET /api/v1/admin/shops query page
+GET /api/v1/admin/shops query page optional
+GET /api/v1/admin/shops query page_size
+GET /api/v1/admin/shops query page_size optional
 GET /api/v1/admin/shops/{shopID}
+GET /api/v1/admin/shops/{shopID} path shopID
 GET /api/v1/admin/shops/{shopID}/allowed-origins
+GET /api/v1/admin/shops/{shopID}/allowed-origins path shopID
 GET /api/v1/admin/shops/{shopID}/categories
+GET /api/v1/admin/shops/{shopID}/categories path shopID
+GET /api/v1/admin/shops/{shopID}/categories query flat
+GET /api/v1/admin/shops/{shopID}/categories query flat optional
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID}
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 GET /api/v1/admin/shops/{shopID}/content
+GET /api/v1/admin/shops/{shopID}/content path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers
+GET /api/v1/admin/shops/{shopID}/member-tiers path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
+GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points path memberID
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points path shopID
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions path memberID
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions path shopID
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query page
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query page optional
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query page_size
+GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query page_size optional
 GET /api/v1/admin/shops/{shopID}/orders
+GET /api/v1/admin/shops/{shopID}/orders path shopID
+GET /api/v1/admin/shops/{shopID}/orders query page
+GET /api/v1/admin/shops/{shopID}/orders query page optional
+GET /api/v1/admin/shops/{shopID}/orders query page_size
+GET /api/v1/admin/shops/{shopID}/orders query page_size optional
+GET /api/v1/admin/shops/{shopID}/orders query status
+GET /api/v1/admin/shops/{shopID}/orders query status optional
 GET /api/v1/admin/shops/{shopID}/orders/{orderID}
+GET /api/v1/admin/shops/{shopID}/orders/{orderID} path orderID
+GET /api/v1/admin/shops/{shopID}/orders/{orderID} path shopID
 GET /api/v1/admin/shops/{shopID}/orders/{orderID}/payments
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/payments path orderID
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/payments path shopID
 GET /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments path orderID
+GET /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments path shopID
 GET /api/v1/admin/shops/{shopID}/page-types
+GET /api/v1/admin/shops/{shopID}/page-types path shopID
 GET /api/v1/admin/shops/{shopID}/pages
+GET /api/v1/admin/shops/{shopID}/pages path shopID
 GET /api/v1/admin/shops/{shopID}/pages/{pageID}
+GET /api/v1/admin/shops/{shopID}/pages/{pageID} path pageID
+GET /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token
+GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token path pageID
+GET /api/v1/admin/shops/{shopID}/pages/{pageID}/preview-token path shopID
 GET /api/v1/admin/shops/{shopID}/products
+GET /api/v1/admin/shops/{shopID}/products path shopID
+GET /api/v1/admin/shops/{shopID}/products query category_id
+GET /api/v1/admin/shops/{shopID}/products query category_id optional
+GET /api/v1/admin/shops/{shopID}/products query page
+GET /api/v1/admin/shops/{shopID}/products query page optional
+GET /api/v1/admin/shops/{shopID}/products query page_size
+GET /api/v1/admin/shops/{shopID}/products query page_size optional
+GET /api/v1/admin/shops/{shopID}/products query status
+GET /api/v1/admin/shops/{shopID}/products query status optional
 GET /api/v1/admin/shops/{shopID}/products/{productID}
+GET /api/v1/admin/shops/{shopID}/products/{productID} path productID
+GET /api/v1/admin/shops/{shopID}/products/{productID} path shopID
 GET /api/v1/admin/shops/{shopID}/publishable-keys
+GET /api/v1/admin/shops/{shopID}/publishable-keys path shopID
 GET /api/v1/admin/shops/{shopID}/roles
+GET /api/v1/admin/shops/{shopID}/roles path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods
+GET /api/v1/admin/shops/{shopID}/shipping-methods path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
+GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
 GET /api/v1/admin/shops/{shopID}/theme/precheck
+GET /api/v1/admin/shops/{shopID}/theme/precheck path shopID
+GET /api/v1/admin/shops/{shopID}/theme/precheck query theme_id
 GET /api/v1/admin/shops/{shopID}/themes
+GET /api/v1/admin/shops/{shopID}/themes path shopID
 GET /api/v1/admin/shops/{shopID}/users
+GET /api/v1/admin/shops/{shopID}/users path shopID
 GET /api/v1/admin/sites
 GET /api/v1/admin/themes
 GET /api/v1/admin/themes/{themeID}
+GET /api/v1/admin/themes/{themeID} path themeID
 GET /api/v1/render/page
+GET /api/v1/render/page header X-Publishable-Key
+GET /api/v1/render/page header X-Publishable-Key optional
+GET /api/v1/render/page header X-Site-Domain
+GET /api/v1/render/page header X-Site-Domain optional
+GET /api/v1/render/page query path
+GET /api/v1/render/page query path optional
+GET /api/v1/render/page response 200 X-Cache
 GET /api/v1/render/preview
+GET /api/v1/render/preview query token
 GET /api/v1/shop/cart
+GET /api/v1/shop/cart header X-Publishable-Key
+GET /api/v1/shop/cart header X-Publishable-Key optional
 GET /api/v1/shop/guest/order
+GET /api/v1/shop/guest/order header X-Publishable-Key
+GET /api/v1/shop/guest/order header X-Publishable-Key optional
 GET /api/v1/shop/guest/order/shipment
+GET /api/v1/shop/guest/order/shipment header X-Publishable-Key
+GET /api/v1/shop/guest/order/shipment header X-Publishable-Key optional
 GET /api/v1/shop/me
+GET /api/v1/shop/me header X-Publishable-Key
+GET /api/v1/shop/me header X-Publishable-Key optional
 GET /api/v1/shop/orders
+GET /api/v1/shop/orders header X-Publishable-Key
+GET /api/v1/shop/orders header X-Publishable-Key optional
+GET /api/v1/shop/orders query page
+GET /api/v1/shop/orders query page optional
+GET /api/v1/shop/orders query page_size
+GET /api/v1/shop/orders query page_size optional
 GET /api/v1/shop/orders/{orderID}
+GET /api/v1/shop/orders/{orderID} header X-Publishable-Key
+GET /api/v1/shop/orders/{orderID} header X-Publishable-Key optional
+GET /api/v1/shop/orders/{orderID} path orderID
 GET /api/v1/shop/orders/{orderID}/shipment
+GET /api/v1/shop/orders/{orderID}/shipment header X-Publishable-Key
+GET /api/v1/shop/orders/{orderID}/shipment header X-Publishable-Key optional
+GET /api/v1/shop/orders/{orderID}/shipment path orderID
 GET /api/v1/shop/points
+GET /api/v1/shop/points header X-Publishable-Key
+GET /api/v1/shop/points header X-Publishable-Key optional
 GET /api/v1/shop/points/transactions
+GET /api/v1/shop/points/transactions header X-Publishable-Key
+GET /api/v1/shop/points/transactions header X-Publishable-Key optional
+GET /api/v1/shop/points/transactions query page
+GET /api/v1/shop/points/transactions query page optional
+GET /api/v1/shop/points/transactions query page_size
+GET /api/v1/shop/points/transactions query page_size optional
 GET /api/v1/shop/products
+GET /api/v1/shop/products header X-Publishable-Key
+GET /api/v1/shop/products header X-Publishable-Key optional
+GET /api/v1/shop/products query page
+GET /api/v1/shop/products query page optional
+GET /api/v1/shop/products query page_size
+GET /api/v1/shop/products query page_size optional
 GET /api/v1/shop/products/{slug}
+GET /api/v1/shop/products/{slug} header X-Publishable-Key
+GET /api/v1/shop/products/{slug} header X-Publishable-Key optional
+GET /api/v1/shop/products/{slug} path slug
 GET /api/v1/shop/shipping-methods
+GET /api/v1/shop/shipping-methods header X-Publishable-Key
+GET /api/v1/shop/shipping-methods header X-Publishable-Key optional
 GET /healthz
 GuestCheckoutItem.gift_message
 GuestCheckoutItem.quantity
@@ -174,54 +327,136 @@ OrderPage.page
 OrderPage.page_size
 OrderPage.total
 POST /api/v1/admin/auth/login
+POST /api/v1/admin/auth/login response 429 Retry-After
 POST /api/v1/admin/auth/logout
 POST /api/v1/admin/auth/refresh
+POST /api/v1/admin/auth/refresh response 429 Retry-After
 POST /api/v1/admin/permissions
 POST /api/v1/admin/roles
 POST /api/v1/admin/shops
 POST /api/v1/admin/shops/{shopID}/allowed-origins
+POST /api/v1/admin/shops/{shopID}/allowed-origins path shopID
 POST /api/v1/admin/shops/{shopID}/categories
+POST /api/v1/admin/shops/{shopID}/categories path shopID
 POST /api/v1/admin/shops/{shopID}/member-tiers
+POST /api/v1/admin/shops/{shopID}/member-tiers path shopID
 POST /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust
+POST /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust path memberID
+POST /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust path shopID
 POST /api/v1/admin/shops/{shopID}/orders/{orderID}/cancel
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/cancel path orderID
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/cancel path shopID
 POST /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments path orderID
+POST /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments path shopID
 POST /api/v1/admin/shops/{shopID}/pages
+POST /api/v1/admin/shops/{shopID}/pages path shopID
 POST /api/v1/admin/shops/{shopID}/pages/{pageID}/publish
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/publish path pageID
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/publish path shopID
 POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish path pageID
+POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish path shopID
 POST /api/v1/admin/shops/{shopID}/products
+POST /api/v1/admin/shops/{shopID}/products path shopID
 POST /api/v1/admin/shops/{shopID}/publishable-keys
+POST /api/v1/admin/shops/{shopID}/publishable-keys path shopID
 POST /api/v1/admin/shops/{shopID}/shipping-methods
+POST /api/v1/admin/shops/{shopID}/shipping-methods path shopID
 POST /api/v1/admin/shops/{shopID}/theme
+POST /api/v1/admin/shops/{shopID}/theme path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles
+POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path shopID
+POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path userID
 POST /api/v1/admin/sites
 POST /api/v1/admin/sites/{siteID}/shops
+POST /api/v1/admin/sites/{siteID}/shops path siteID
 POST /api/v1/admin/themes
 POST /api/v1/admin/themes/{themeID}/pages
+POST /api/v1/admin/themes/{themeID}/pages path themeID
 POST /api/v1/admin/users/{userID}/roles
+POST /api/v1/admin/users/{userID}/roles path userID
 POST /api/v1/shop/auth/login
+POST /api/v1/shop/auth/login header X-Publishable-Key
+POST /api/v1/shop/auth/login header X-Publishable-Key optional
+POST /api/v1/shop/auth/login response 429 Retry-After
 POST /api/v1/shop/auth/logout
+POST /api/v1/shop/auth/logout header X-Publishable-Key
+POST /api/v1/shop/auth/logout header X-Publishable-Key optional
 POST /api/v1/shop/auth/refresh
+POST /api/v1/shop/auth/refresh header X-Publishable-Key
+POST /api/v1/shop/auth/refresh header X-Publishable-Key optional
+POST /api/v1/shop/auth/refresh response 429 Retry-After
 POST /api/v1/shop/auth/register
+POST /api/v1/shop/auth/register header X-Publishable-Key
+POST /api/v1/shop/auth/register header X-Publishable-Key optional
+POST /api/v1/shop/auth/register response 429 Retry-After
 POST /api/v1/shop/cart/items
+POST /api/v1/shop/cart/items header X-Publishable-Key
+POST /api/v1/shop/cart/items header X-Publishable-Key optional
 POST /api/v1/shop/checkout
+POST /api/v1/shop/checkout header Idempotency-Key
+POST /api/v1/shop/checkout header Idempotency-Key optional
+POST /api/v1/shop/checkout header X-Publishable-Key
+POST /api/v1/shop/checkout header X-Publishable-Key optional
+POST /api/v1/shop/checkout response 201 Idempotency-Replayed
 POST /api/v1/shop/guest/checkout
+POST /api/v1/shop/guest/checkout header Idempotency-Key
+POST /api/v1/shop/guest/checkout header Idempotency-Key optional
+POST /api/v1/shop/guest/checkout header X-Publishable-Key
+POST /api/v1/shop/guest/checkout header X-Publishable-Key optional
+POST /api/v1/shop/guest/checkout response 201 Idempotency-Replayed
+POST /api/v1/shop/guest/checkout response 429 Retry-After
 POST /api/v1/shop/guest/order/payments
+POST /api/v1/shop/guest/order/payments header X-Publishable-Key
+POST /api/v1/shop/guest/order/payments header X-Publishable-Key optional
 POST /api/v1/shop/orders/{orderID}/cancel
+POST /api/v1/shop/orders/{orderID}/cancel header X-Publishable-Key
+POST /api/v1/shop/orders/{orderID}/cancel header X-Publishable-Key optional
+POST /api/v1/shop/orders/{orderID}/cancel path orderID
 POST /api/v1/shop/orders/{orderID}/payments
+POST /api/v1/shop/orders/{orderID}/payments header X-Publishable-Key
+POST /api/v1/shop/orders/{orderID}/payments header X-Publishable-Key optional
+POST /api/v1/shop/orders/{orderID}/payments path orderID
 POST /api/v1/webhooks/payments/{provider}
+POST /api/v1/webhooks/payments/{provider} path provider
 PUT /api/v1/admin/roles/{roleID}/permissions
+PUT /api/v1/admin/roles/{roleID}/permissions path roleID
 PUT /api/v1/admin/shops/{shopID}
+PUT /api/v1/admin/shops/{shopID} path shopID
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 PUT /api/v1/admin/shops/{shopID}/content
+PUT /api/v1/admin/shops/{shopID}/content path shopID
 PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
+PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
+PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID
 PUT /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID}
+PUT /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID} path orderID
+PUT /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID} path shipmentID
+PUT /api/v1/admin/shops/{shopID}/orders/{orderID}/shipments/{shipmentID} path shopID
 PUT /api/v1/admin/shops/{shopID}/pages/{pageID}
+PUT /api/v1/admin/shops/{shopID}/pages/{pageID} path pageID
+PUT /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 PUT /api/v1/admin/shops/{shopID}/products/{productID}
+PUT /api/v1/admin/shops/{shopID}/products/{productID} path productID
+PUT /api/v1/admin/shops/{shopID}/products/{productID} path shopID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
+PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
+PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
 PUT /api/v1/admin/sites/{siteID}/shops/{shopID}
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
 PUT /api/v1/admin/themes/{themeID}
+PUT /api/v1/admin/themes/{themeID} path themeID
 PUT /api/v1/admin/themes/{themeID}/pages/{themePageID}
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
 PUT /api/v1/shop/cart/items/{itemID}
+PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
+PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
+PUT /api/v1/shop/cart/items/{itemID} path itemID
 Page.content_json
 Page.id
 Page.incompatible

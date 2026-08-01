@@ -9,11 +9,31 @@ package httpapi
 //
 //	檢查 1  TestOpenAPICoversEveryRoute       chi.Walk 的真實路由表 vs 文件的 paths
 //	檢查 2  TestOpenAPIMoneyFieldsDeclareUnit 金額欄位必須 $ref MinorUnitAmount
-//	檢查 4  TestOpenAPIV1SurfaceLock          v1 已承諾的路由與公開回應鍵不得消失
+//	檢查 4  TestOpenAPIV1SurfaceLock          v1 已承諾的表面不得消失
 //
 // 重新產生表面鎖檔（**刪行代表破壞 v1，請確認你真的要這麼做**）：
 //
 //	cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface
+//
+// ── 檢查 4 的涵蓋範圍與其邊界（change api-contract-parameter-lock）─────────
+//
+// 鎖檔收錄五種行：路由、具名 schema 的屬性、端點接受的請求參數、該參數可否省略、
+// 端點承諾的回應標頭。參數與標頭一律**以端點為單位**記錄而非以 components 元件為
+// 單位——消費端依賴的是「這條端點接受 X-Publishable-Key」，把某條端點的
+// `- $ref: PublishableKey` 刪掉而保留元件定義是一次真實的破壞，元件層級的鎖會沉默。
+//
+// **required 的方向性住在產生器，不住在檢查器。** 選填參數產生兩行（「接受」＋
+// 「可省略」），必填參數只產生一行。於是 false→true（收緊）讓 optional 那一行消失
+// 而轉紅，true→false（放寬）只是新增一行而放行——檢查器那句唯一的規則（「鎖檔的
+// 每一行今天仍存在於契約中」）一個字都不必改。這句話短到可以在 code review 時原地
+// 驗證，那正是鎖檔可信的原因。
+//
+// **明寫的邊界：本鎖不記錄參數的型別、pattern、長度、值域、敘述與範例。** 因此把
+// Idempotency-Key 的 maxLength 從 255 改成 32（收緊 ＝ 破壞）本鎖**沉默**。這是取捨
+// 不是疏漏：約束的破壞方向是「收緊」，而收緊在鎖檔裡表現為新增，要擋住它得讓檢查器
+// 變成 JSON Schema 相容性判定器；同時放寬 pattern、補 example、修一句敘述全部會轉紅
+// ——**假警報是防腐機制最快的死法**。可機械化又不誤報的部分本鎖百分之百擋住，其餘
+// 不宣稱擋得住。
 //
 // ── chi.Walk 的已知盲點（design D3a）─────────────────────────────────────
 //
@@ -66,9 +86,23 @@ const (
 # 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉：
 # 後續的破壞性變更 MUST 改走新端點或 /api/v2，MUST NOT 再引用「尚無外部消費者」。
 #
-# 行的兩種形式：
-#   METHOD /path            一條公開路由
-#   SchemaName.property     一個具名 component schema 的屬性
+# 行的五種形式：
+#   METHOD /path                                一條公開路由
+#   SchemaName.property                         一個具名 component schema 的屬性
+#   METHOD /path <in> <name>                    該端點接受此請求參數（<in> ＝ header|query|path）
+#   METHOD /path <in> <name> optional           且此參數可以省略
+#   METHOD /path response <code> <Header-Name>  該端點承諾在此狀態碼回應此標頭
+#
+# 選填參數刻意產生**兩行**：「接受它」與「可以不帶它」是兩個獨立的承諾。把選填改成
+# 必填會讓 optional 那一行消失（＝破壞，轉紅）；把必填改成選填只是新增一行（＝放寬，
+# 放行）。方向性因此由事實本身表達，檢查規則維持「每一行都必須還在」這一句話。
+#
+# 參數與標頭以**端點**為單位。刪掉某條端點的 ` + "`- $ref: PublishableKey`" + ` 而保留元件定義，
+# 仍然是破壞——本檔會有對應的行消失。
+#
+# 本鎖**不**記錄參數的型別／pattern／長度／值域／敘述／範例：改敘述、補範例、放寬
+# 值域都不該轉紅（假警報是防腐機制最快的死法）。代價是「把約束改嚴」本鎖沉默，
+# 那一段的防線是 code review，見 openapi_contract_test.go 的檔頭。
 `
 )
 
@@ -325,6 +359,48 @@ func escapePointer(s string) string {
 	return strings.NewReplacer("~", "~0", "/", "~1").Replace(s)
 }
 
+func unescapePointer(s string) string {
+	return strings.NewReplacer("~1", "/", "~0", "~").Replace(s)
+}
+
+// derefLocal follows a local `$ref` (`#/components/...`) and returns the object
+// it points at; objects without a `$ref` are returned as-is.
+//
+// **An unresolvable $ref is a hard failure, never a silent skip** (design D7).
+// Skipping would be safe while *checking* — the missing facts make locked lines
+// go missing, which turns the test red. It is not safe while *generating*: the
+// person running -openapi.update-surface would see deletions in the diff with no
+// way to tell a typo'd $ref from a deliberate removal, and would commit a
+// silently incomplete lock as the new baseline.
+func derefLocal(t *testing.T, doc map[string]any, node any) map[string]any {
+	t.Helper()
+	obj, ok := node.(map[string]any)
+	if !ok {
+		t.Fatalf("openapi.yaml: expected an object, got %T", node)
+	}
+	ref, isRef := obj["$ref"].(string)
+	if !isRef {
+		return obj
+	}
+	if !strings.HasPrefix(ref, "#/") {
+		t.Fatalf("openapi.yaml: only local $ref is supported, got %q", ref)
+	}
+	var cur any = doc
+	for _, seg := range strings.Split(strings.TrimPrefix(ref, "#/"), "/") {
+		seg = unescapePointer(seg)
+		m, isObj := cur.(map[string]any)
+		if !isObj {
+			t.Fatalf("openapi.yaml: $ref %q does not resolve (%q is not inside an object)", ref, seg)
+		}
+		next, found := m[seg]
+		if !found {
+			t.Fatalf("openapi.yaml: $ref %q does not resolve (no %q)", ref, seg)
+		}
+		cur = next
+	}
+	return derefLocal(t, doc, cur)
+}
+
 func TestOpenAPIMoneyFieldsDeclareUnit(t *testing.T) {
 	doc := loadOpenAPI(t)
 
@@ -368,7 +444,76 @@ func TestOpenAPIMoneyFieldsDeclareUnit(t *testing.T) {
 
 // ── 檢查 4：v1 表面鎖 ──────────────────────────────────────────────────
 
+// parameterFacts renders one route's request parameters as lock lines.
+//
+// OpenAPI lets an operation override a path-item parameter that has the same
+// (name, in), so the lists are merged in order with the operation winning.
+//
+// Each parameter yields ONE fact — "this endpoint accepts it here" — and, when
+// it is optional, a SECOND independent fact — "you may omit it". That split is
+// the whole of the required-direction handling: turning optional into required
+// deletes the second line (breaking → red), while turning required into optional
+// merely adds one (widening → green), and the checker never learns what
+// `optional` means (design D3).
+func parameterFacts(t *testing.T, doc map[string]any, route string, lists ...[]any) []string {
+	t.Helper()
+	merged := map[string]map[string]any{}
+	var order []string
+	for _, list := range lists {
+		for _, raw := range list {
+			p := derefLocal(t, doc, raw)
+			name, _ := p["name"].(string)
+			in, _ := p["in"].(string)
+			if name == "" || in == "" {
+				t.Fatalf("%s: a parameter has no name/in — the lock cannot address it", route)
+			}
+			key := in + " " + name
+			if _, dup := merged[key]; !dup {
+				order = append(order, key)
+			}
+			merged[key] = p
+		}
+	}
+	out := make([]string, 0, len(order)*2)
+	for _, key := range order {
+		out = append(out, route+" "+key)
+		if required, _ := merged[key]["required"].(bool); !required {
+			out = append(out, route+" "+key+" optional")
+		}
+	}
+	return out
+}
+
+// responseHeaderFacts renders the headers a route promises to send.
+//
+// The response objects are dereferenced because `Retry-After` lives on the
+// shared components/responses/TooManyRequests — reading only inline responses
+// would see 3 of the 9 headers and silently under-lock the other 6.
+func responseHeaderFacts(t *testing.T, doc map[string]any, route string, op map[string]any) []string {
+	t.Helper()
+	responses, ok := op["responses"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	var out []string
+	for code, raw := range responses {
+		headers, ok := derefLocal(t, doc, raw)["headers"].(map[string]any)
+		if !ok {
+			continue
+		}
+		for name := range headers {
+			out = append(out, route+" response "+code+" "+name)
+		}
+	}
+	return out
+}
+
 // currentSurface renders the contract's v1 promises as sorted lines.
+//
+// Sorting is a single flat sort.Strings over all five line forms. That is not
+// laziness: a space (0x20) sorts before '/' (0x2F), so a route's parameter and
+// header lines land directly beneath the route line and above its sub-paths —
+// one endpoint's complete promise clusters into one readable block for free.
 func currentSurface(t *testing.T, doc map[string]any) []string {
 	t.Helper()
 	seen := map[string]bool{}
@@ -390,6 +535,37 @@ func currentSurface(t *testing.T, doc map[string]any) []string {
 			seen[name+"."+prop] = true
 		}
 	}
+
+	// Request parameters and response headers, per operation (change
+	// api-contract-parameter-lock). Everything above this point is untouched:
+	// extending the lock must not weaken what it already held.
+	paths, _ := doc["paths"].(map[string]any)
+	for p, raw := range paths {
+		item, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		shared, _ := item["parameters"].([]any)
+		for key, rawOp := range item {
+			method, isMethod := httpMethods[key]
+			if !isMethod {
+				continue
+			}
+			op, ok := rawOp.(map[string]any)
+			if !ok {
+				t.Fatalf("paths%s.%s is not an object", p, key)
+			}
+			own, _ := op["parameters"].([]any)
+			route := method + " " + p
+			for _, line := range parameterFacts(t, doc, route, shared, own) {
+				seen[line] = true
+			}
+			for _, line := range responseHeaderFacts(t, doc, route, op) {
+				seen[line] = true
+			}
+		}
+	}
+
 	out := make([]string, 0, len(seen))
 	for line := range seen {
 		out = append(out, line)
@@ -442,6 +618,7 @@ func TestOpenAPIV1SurfaceLock(t *testing.T) {
 		t.Errorf("%d 個 v1 已承諾的項目從契約中消失了——這是破壞性變更。\n"+
 			"若確實要移除，必須同時從 %s 手動刪掉對應的行（該刪除會出現在 code review 的 diff 中）：\n  %s",
 			len(missing), surfaceRelPath, strings.Join(missing, "\n  "))
+		return
 	}
 	t.Logf("表面鎖：%d 項承諾全部仍在（文件目前共 %d 項，新增不受限）", locked, len(current))
 }
