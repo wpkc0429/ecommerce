@@ -373,8 +373,16 @@ func init() {
 	orderDescShippingFee := orderFields[8].Descriptor()
 	// order.DefaultShippingFee holds the default value on creation for the shipping_fee field.
 	order.DefaultShippingFee = orderDescShippingFee.Default.(int64)
+	// orderDescDiscountAmount is the schema descriptor for discount_amount field.
+	orderDescDiscountAmount := orderFields[9].Descriptor()
+	// order.DefaultDiscountAmount holds the default value on creation for the discount_amount field.
+	order.DefaultDiscountAmount = orderDescDiscountAmount.Default.(int64)
+	// orderDescMemberTierName is the schema descriptor for member_tier_name field.
+	orderDescMemberTierName := orderFields[11].Descriptor()
+	// order.MemberTierNameValidator is a validator for the "member_tier_name" field. It is called by the builders before save.
+	order.MemberTierNameValidator = orderDescMemberTierName.Validators[0].(func(string) error)
 	// orderDescShippingMethodName is the schema descriptor for shipping_method_name field.
-	orderDescShippingMethodName := orderFields[10].Descriptor()
+	orderDescShippingMethodName := orderFields[13].Descriptor()
 	// order.ShippingMethodNameValidator is a validator for the "shipping_method_name" field. It is called by the builders before save.
 	order.ShippingMethodNameValidator = orderDescShippingMethodName.Validators[0].(func(string) error)
 	orderitemMixin := schema.OrderItem{}.Mixin()

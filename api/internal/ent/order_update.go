@@ -208,6 +208,74 @@ func (_u *OrderUpdate) AddShippingFee(v int64) *OrderUpdate {
 	return _u
 }
 
+// SetDiscountAmount sets the "discount_amount" field.
+func (_u *OrderUpdate) SetDiscountAmount(v int64) *OrderUpdate {
+	_u.mutation.ResetDiscountAmount()
+	_u.mutation.SetDiscountAmount(v)
+	return _u
+}
+
+// SetNillableDiscountAmount sets the "discount_amount" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableDiscountAmount(v *int64) *OrderUpdate {
+	if v != nil {
+		_u.SetDiscountAmount(*v)
+	}
+	return _u
+}
+
+// AddDiscountAmount adds value to the "discount_amount" field.
+func (_u *OrderUpdate) AddDiscountAmount(v int64) *OrderUpdate {
+	_u.mutation.AddDiscountAmount(v)
+	return _u
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (_u *OrderUpdate) SetDiscountPercent(v int16) *OrderUpdate {
+	_u.mutation.ResetDiscountPercent()
+	_u.mutation.SetDiscountPercent(v)
+	return _u
+}
+
+// SetNillableDiscountPercent sets the "discount_percent" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableDiscountPercent(v *int16) *OrderUpdate {
+	if v != nil {
+		_u.SetDiscountPercent(*v)
+	}
+	return _u
+}
+
+// AddDiscountPercent adds value to the "discount_percent" field.
+func (_u *OrderUpdate) AddDiscountPercent(v int16) *OrderUpdate {
+	_u.mutation.AddDiscountPercent(v)
+	return _u
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (_u *OrderUpdate) ClearDiscountPercent() *OrderUpdate {
+	_u.mutation.ClearDiscountPercent()
+	return _u
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (_u *OrderUpdate) SetMemberTierName(v string) *OrderUpdate {
+	_u.mutation.SetMemberTierName(v)
+	return _u
+}
+
+// SetNillableMemberTierName sets the "member_tier_name" field if the given value is not nil.
+func (_u *OrderUpdate) SetNillableMemberTierName(v *string) *OrderUpdate {
+	if v != nil {
+		_u.SetMemberTierName(*v)
+	}
+	return _u
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (_u *OrderUpdate) ClearMemberTierName() *OrderUpdate {
+	_u.mutation.ClearMemberTierName()
+	return _u
+}
+
 // SetShippingMethodID sets the "shipping_method_id" field.
 func (_u *OrderUpdate) SetShippingMethodID(v int) *OrderUpdate {
 	_u.mutation.ResetShippingMethodID()
@@ -413,6 +481,11 @@ func (_u *OrderUpdate) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Order.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MemberTierName(); ok {
+		if err := order.MemberTierNameValidator(v); err != nil {
+			return &ValidationError{Name: "member_tier_name", err: fmt.Errorf(`ent: validator failed for field "Order.member_tier_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ShippingMethodName(); ok {
 		if err := order.ShippingMethodNameValidator(v); err != nil {
 			return &ValidationError{Name: "shipping_method_name", err: fmt.Errorf(`ent: validator failed for field "Order.shipping_method_name": %w`, err)}
@@ -486,6 +559,27 @@ func (_u *OrderUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedShippingFee(); ok {
 		_spec.AddField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DiscountAmount(); ok {
+		_spec.SetField(order.FieldDiscountAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDiscountAmount(); ok {
+		_spec.AddField(order.FieldDiscountAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DiscountPercent(); ok {
+		_spec.SetField(order.FieldDiscountPercent, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedDiscountPercent(); ok {
+		_spec.AddField(order.FieldDiscountPercent, field.TypeInt16, value)
+	}
+	if _u.mutation.DiscountPercentCleared() {
+		_spec.ClearField(order.FieldDiscountPercent, field.TypeInt16)
+	}
+	if value, ok := _u.mutation.MemberTierName(); ok {
+		_spec.SetField(order.FieldMemberTierName, field.TypeString, value)
+	}
+	if _u.mutation.MemberTierNameCleared() {
+		_spec.ClearField(order.FieldMemberTierName, field.TypeString)
 	}
 	if value, ok := _u.mutation.ShippingMethodID(); ok {
 		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)
@@ -821,6 +915,74 @@ func (_u *OrderUpdateOne) AddShippingFee(v int64) *OrderUpdateOne {
 	return _u
 }
 
+// SetDiscountAmount sets the "discount_amount" field.
+func (_u *OrderUpdateOne) SetDiscountAmount(v int64) *OrderUpdateOne {
+	_u.mutation.ResetDiscountAmount()
+	_u.mutation.SetDiscountAmount(v)
+	return _u
+}
+
+// SetNillableDiscountAmount sets the "discount_amount" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableDiscountAmount(v *int64) *OrderUpdateOne {
+	if v != nil {
+		_u.SetDiscountAmount(*v)
+	}
+	return _u
+}
+
+// AddDiscountAmount adds value to the "discount_amount" field.
+func (_u *OrderUpdateOne) AddDiscountAmount(v int64) *OrderUpdateOne {
+	_u.mutation.AddDiscountAmount(v)
+	return _u
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (_u *OrderUpdateOne) SetDiscountPercent(v int16) *OrderUpdateOne {
+	_u.mutation.ResetDiscountPercent()
+	_u.mutation.SetDiscountPercent(v)
+	return _u
+}
+
+// SetNillableDiscountPercent sets the "discount_percent" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableDiscountPercent(v *int16) *OrderUpdateOne {
+	if v != nil {
+		_u.SetDiscountPercent(*v)
+	}
+	return _u
+}
+
+// AddDiscountPercent adds value to the "discount_percent" field.
+func (_u *OrderUpdateOne) AddDiscountPercent(v int16) *OrderUpdateOne {
+	_u.mutation.AddDiscountPercent(v)
+	return _u
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (_u *OrderUpdateOne) ClearDiscountPercent() *OrderUpdateOne {
+	_u.mutation.ClearDiscountPercent()
+	return _u
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (_u *OrderUpdateOne) SetMemberTierName(v string) *OrderUpdateOne {
+	_u.mutation.SetMemberTierName(v)
+	return _u
+}
+
+// SetNillableMemberTierName sets the "member_tier_name" field if the given value is not nil.
+func (_u *OrderUpdateOne) SetNillableMemberTierName(v *string) *OrderUpdateOne {
+	if v != nil {
+		_u.SetMemberTierName(*v)
+	}
+	return _u
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (_u *OrderUpdateOne) ClearMemberTierName() *OrderUpdateOne {
+	_u.mutation.ClearMemberTierName()
+	return _u
+}
+
 // SetShippingMethodID sets the "shipping_method_id" field.
 func (_u *OrderUpdateOne) SetShippingMethodID(v int) *OrderUpdateOne {
 	_u.mutation.ResetShippingMethodID()
@@ -1039,6 +1201,11 @@ func (_u *OrderUpdateOne) check() error {
 			return &ValidationError{Name: "currency", err: fmt.Errorf(`ent: validator failed for field "Order.currency": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.MemberTierName(); ok {
+		if err := order.MemberTierNameValidator(v); err != nil {
+			return &ValidationError{Name: "member_tier_name", err: fmt.Errorf(`ent: validator failed for field "Order.member_tier_name": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ShippingMethodName(); ok {
 		if err := order.ShippingMethodNameValidator(v); err != nil {
 			return &ValidationError{Name: "shipping_method_name", err: fmt.Errorf(`ent: validator failed for field "Order.shipping_method_name": %w`, err)}
@@ -1129,6 +1296,27 @@ func (_u *OrderUpdateOne) sqlSave(ctx context.Context) (_node *Order, err error)
 	}
 	if value, ok := _u.mutation.AddedShippingFee(); ok {
 		_spec.AddField(order.FieldShippingFee, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DiscountAmount(); ok {
+		_spec.SetField(order.FieldDiscountAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.AddedDiscountAmount(); ok {
+		_spec.AddField(order.FieldDiscountAmount, field.TypeInt64, value)
+	}
+	if value, ok := _u.mutation.DiscountPercent(); ok {
+		_spec.SetField(order.FieldDiscountPercent, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedDiscountPercent(); ok {
+		_spec.AddField(order.FieldDiscountPercent, field.TypeInt16, value)
+	}
+	if _u.mutation.DiscountPercentCleared() {
+		_spec.ClearField(order.FieldDiscountPercent, field.TypeInt16)
+	}
+	if value, ok := _u.mutation.MemberTierName(); ok {
+		_spec.SetField(order.FieldMemberTierName, field.TypeString, value)
+	}
+	if _u.mutation.MemberTierNameCleared() {
+		_spec.ClearField(order.FieldMemberTierName, field.TypeString)
 	}
 	if value, ok := _u.mutation.ShippingMethodID(); ok {
 		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)

@@ -418,10 +418,13 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 
 	var guestResult struct {
 		Order struct {
-			ID             int   `json:"id"`
-			TotalAmount    int64 `json:"total_amount"`
-			SubtotalAmount int64 `json:"subtotal_amount"`
-			ShippingFee    int64 `json:"shipping_fee"`
+			ID              int     `json:"id"`
+			TotalAmount     int64   `json:"total_amount"`
+			SubtotalAmount  int64   `json:"subtotal_amount"`
+			DiscountAmount  int64   `json:"discount_amount"`
+			ShippingFee     int64   `json:"shipping_fee"`
+			DiscountPercent *int16  `json:"discount_percent"`
+			MemberTierName  *string `json:"member_tier_name"`
 		} `json:"order"`
 		Token string `json:"order_access_token"`
 	}
@@ -435,9 +438,18 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	if got, want := guestResult.Order.ShippingFee, int64(200); got != want {
 		t.Errorf("shipping_fee = %d, want %d", got, want)
 	}
-	if guestResult.Order.TotalAmount != guestResult.Order.SubtotalAmount+guestResult.Order.ShippingFee {
-		t.Errorf("total_amount %d != subtotal %d + fee %d — 契約宣告這是恆等式",
-			guestResult.Order.TotalAmount, guestResult.Order.SubtotalAmount, guestResult.Order.ShippingFee)
+	// A brand-new guest email holds no tier, so the discount trio is the
+	// "nothing applied" shape (change tier-discount-application).
+	if guestResult.Order.DiscountAmount != 0 ||
+		guestResult.Order.DiscountPercent != nil || guestResult.Order.MemberTierName != nil {
+		t.Errorf("a tierless guest must get the null discount snapshot, got %d/%v/%v",
+			guestResult.Order.DiscountAmount, guestResult.Order.DiscountPercent, guestResult.Order.MemberTierName)
+	}
+	if guestResult.Order.TotalAmount !=
+		guestResult.Order.SubtotalAmount-guestResult.Order.DiscountAmount+guestResult.Order.ShippingFee {
+		t.Errorf("total_amount %d != subtotal %d − discount %d + fee %d — 契約宣告這是恆等式",
+			guestResult.Order.TotalAmount, guestResult.Order.SubtotalAmount,
+			guestResult.Order.DiscountAmount, guestResult.Order.ShippingFee)
 	}
 	if guestResult.Token == "" {
 		t.Fatal("guest checkout returned no order_access_token")

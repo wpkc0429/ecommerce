@@ -66,8 +66,10 @@ func (f *pointsFixtures) newOrder(t *testing.T, memberID int, totalAmount int64)
 		SaveX(ctx)
 }
 
-func paidEvent(shopID, orderID, memberID int, totalAmount int64) events.OrderPaymentSucceeded {
-	return events.OrderPaymentSucceeded{ShopID: shopID, OrderID: orderID, MemberID: memberID, SubtotalAmount: totalAmount, Currency: "TWD"}
+// paidEvent builds the award event exactly as payment.Service does: the basis is
+// what the customer paid for goods (change tier-discount-application, design D7).
+func paidEvent(shopID, orderID, memberID int, basisAmount int64) events.OrderPaymentSucceeded {
+	return events.OrderPaymentSucceeded{ShopID: shopID, OrderID: orderID, MemberID: memberID, AwardBasisAmount: basisAmount, Currency: "TWD"}
 }
 
 func returnedEvent(shopID, orderID, memberID int) events.OrderReturned {

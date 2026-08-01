@@ -36,6 +36,12 @@ const (
 	FieldSubtotalAmount = "subtotal_amount"
 	// FieldShippingFee holds the string denoting the shipping_fee field in the database.
 	FieldShippingFee = "shipping_fee"
+	// FieldDiscountAmount holds the string denoting the discount_amount field in the database.
+	FieldDiscountAmount = "discount_amount"
+	// FieldDiscountPercent holds the string denoting the discount_percent field in the database.
+	FieldDiscountPercent = "discount_percent"
+	// FieldMemberTierName holds the string denoting the member_tier_name field in the database.
+	FieldMemberTierName = "member_tier_name"
 	// FieldShippingMethodID holds the string denoting the shipping_method_id field in the database.
 	FieldShippingMethodID = "shipping_method_id"
 	// FieldShippingMethodName holds the string denoting the shipping_method_name field in the database.
@@ -91,6 +97,9 @@ var Columns = []string{
 	FieldTotalAmount,
 	FieldSubtotalAmount,
 	FieldShippingFee,
+	FieldDiscountAmount,
+	FieldDiscountPercent,
+	FieldMemberTierName,
 	FieldShippingMethodID,
 	FieldShippingMethodName,
 	FieldRequestedDeliveryDate,
@@ -125,6 +134,10 @@ var (
 	CurrencyValidator func(string) error
 	// DefaultShippingFee holds the default value on creation for the "shipping_fee" field.
 	DefaultShippingFee int64
+	// DefaultDiscountAmount holds the default value on creation for the "discount_amount" field.
+	DefaultDiscountAmount int64
+	// MemberTierNameValidator is a validator for the "member_tier_name" field. It is called by the builders before save.
+	MemberTierNameValidator func(string) error
 	// ShippingMethodNameValidator is a validator for the "shipping_method_name" field. It is called by the builders before save.
 	ShippingMethodNameValidator func(string) error
 )
@@ -190,6 +203,21 @@ func BySubtotalAmount(opts ...sql.OrderTermOption) OrderOption {
 // ByShippingFee orders the results by the shipping_fee field.
 func ByShippingFee(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShippingFee, opts...).ToFunc()
+}
+
+// ByDiscountAmount orders the results by the discount_amount field.
+func ByDiscountAmount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDiscountAmount, opts...).ToFunc()
+}
+
+// ByDiscountPercent orders the results by the discount_percent field.
+func ByDiscountPercent(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDiscountPercent, opts...).ToFunc()
+}
+
+// ByMemberTierName orders the results by the member_tier_name field.
+func ByMemberTierName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMemberTierName, opts...).ToFunc()
 }
 
 // ByShippingMethodID orders the results by the shipping_method_id field.

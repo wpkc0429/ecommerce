@@ -50,10 +50,11 @@ const BOUQUET_SLUG = "anniversary-bouquet";
 const BOUQUET_SKU = "BQ-ANNI-M";
 
 // Permanent stock consumed by one run: 1 (guest, returned) + 2 (member,
-// returned) + 0 (cancelled orders restore stock). Returns do NOT restore stock
-// — only cancellation does — so a seeded database supports a bounded number of
-// runs before it needs re-seeding (design D7).
-const STOCK_PER_RUN = 3;
+// returned) + 1 (the tier-discount order of section ⑧, returned) + 0 (cancelled
+// orders restore stock). Returns do NOT restore stock — only cancellation does —
+// so a seeded database supports a bounded number of runs before it needs
+// re-seeding (design D7). BQ-ANNI-M is seeded with 36, i.e. 9 runs.
+const STOCK_PER_RUN = 4;
 
 class Abort extends Error {}
 
@@ -199,9 +200,14 @@ async function commercePath() {
   const gOrder = guest.json.order;
   const gToken = guest.json.order_access_token;
   check("guest checkout creates an order without any credential", true, `order ${gOrder.id}`);
-  check("order amounts compose as subtotal + shipping_fee = total",
-    gOrder.subtotal_amount + gOrder.shipping_fee === gOrder.total_amount,
-    `${gOrder.subtotal_amount} + ${gOrder.shipping_fee} = ${gOrder.total_amount}`);
+  check("order amounts compose as subtotal − discount + shipping_fee = total",
+    gOrder.subtotal_amount - gOrder.discount_amount + gOrder.shipping_fee === gOrder.total_amount,
+    `${gOrder.subtotal_amount} - ${gOrder.discount_amount} + ${gOrder.shipping_fee} = ${gOrder.total_amount}`);
+  // A brand-new email has never earned a point, so it holds no tier at all —
+  // the "nothing applied" shape (change tier-discount-application).
+  check("a brand-new guest holds no tier, so nothing is discounted",
+    gOrder.discount_amount === 0 && gOrder.discount_percent === null && gOrder.member_tier_name === null,
+    JSON.stringify([gOrder.discount_amount, gOrder.discount_percent, gOrder.member_tier_name]));
   check("the selected method's flat rate became the order's shipping fee",
     gOrder.shipping_fee === paidMethod.flat_rate, `${gOrder.shipping_fee} vs ${paidMethod.flat_rate}`);
   check("the shipping method name is snapshotted onto the order",
@@ -339,6 +345,12 @@ async function commercePath() {
   check("a zero-rate shipping method leaves the payable total equal to the subtotal",
     mOrder.shipping_fee === 0 && mOrder.total_amount === mOrder.subtotal_amount,
     `${mOrder.subtotal_amount} + ${mOrder.shipping_fee} = ${mOrder.total_amount}`);
+  // Deterministic across runs: a run is points-neutral (section ⑨ claws back
+  // what ⑦ awarded), so the demo customer always enters this section on the
+  // 0-point tier, whose seeded discount_percent is NULL.
+  check("the member enters this order on a tier that grants no discount",
+    mOrder.discount_amount === 0,
+    `${tierName(pointsBefore.level)} → discount ${mOrder.discount_amount}`);
 
   const mPay = await req("POST", `/api/v1/shop/orders/${mOrder.id}/payments`, { token: member, pk: PK, body: {} });
   need(mPay.status === 201, `member payment initiation failed: ${brief(mPay)}`);
@@ -370,8 +382,99 @@ async function commercePath() {
     mLedgerReplay.total === ledgerBefore.total + 1,
     `${ledgerBefore.total} → ${mLedgerReplay.total}`);
 
-  // ── ⑧ 會員路徑：出貨 → 退貨 → 降級 ──
-  section("⑧ Member path: ship → return → clawback and tier downgrade");
+  // ── ⑧ 等級折扣：真的扣錢、快照不動、點數以折後為基準 ──
+  //
+  // Placed here on purpose: sections ⑥/⑦ just promoted the member with a real
+  // purchase, so this runs against a tier the customer actually earned rather
+  // than one the test planted. The order is paid (to reach the points basis) and
+  // then returned, which claws the award back and leaves section ⑨'s balance
+  // arithmetic exactly as it was — at the cost of 1 permanently consumed unit of
+  // stock (returns do not restock), which is why STOCK_PER_RUN is 4.
+  section("⑧ Member tier discount: applied, snapshotted, and reflected in points");
+  const tierNow = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  const pct = tierNow.level?.discount_percent ?? 0;
+  need(pct > 0,
+    `the member's tier (${tierName(tierNow.level)}) has no discount_percent — ` +
+      "the seeded ladder must give the 30-point tier one, run `make seed-demo`");
+  check("the member's earned tier carries a discount rate the storefront can read",
+    true, `${tierName(tierNow.level)} @ ${pct}%`);
+
+  await req("DELETE", "/api/v1/shop/cart/items", { token: member, pk: PK });
+  await req("POST", "/api/v1/shop/cart/items", { token: member, pk: PK, body: { sku_id: sku.id, quantity: 1 } });
+  const dRes = await req("POST", "/api/v1/shop/checkout", {
+    token: member, pk: PK,
+    body: {
+      recipient_name: "E2E 折扣", phone: "0922333444", line1: "台北市大安區永康街 12 號",
+      shipping_method_id: paidMethod.id,
+    },
+  });
+  need(dRes.status === 201, `discounted member checkout failed: ${brief(dRes)}`);
+  const dOrder = dRes.json;
+  // floor(subtotal × pct / 100) — the same integer rule the server uses, spelled
+  // out here rather than read back from the response, so the test would notice a
+  // server that rounded instead of truncated.
+  const expectedDiscount = Math.floor((dOrder.subtotal_amount * pct) / 100);
+  check("the tier discount is actually applied to the order",
+    dOrder.discount_amount === expectedDiscount && dOrder.discount_amount > 0,
+    `${dOrder.discount_amount} vs expected ${expectedDiscount}`);
+  check("the rate and the tier that granted it are snapshotted onto the order",
+    dOrder.discount_percent === pct && dOrder.member_tier_name === tierNow.level?.name,
+    JSON.stringify([dOrder.discount_percent, dOrder.member_tier_name]));
+  check("the discount comes off the goods only — the shipping fee is untouched",
+    dOrder.shipping_fee === paidMethod.flat_rate,
+    `${dOrder.shipping_fee} vs ${paidMethod.flat_rate}`);
+  check("amounts compose as subtotal − discount + shipping_fee = total",
+    dOrder.subtotal_amount - dOrder.discount_amount + dOrder.shipping_fee === dOrder.total_amount,
+    `${dOrder.subtotal_amount} - ${dOrder.discount_amount} + ${dOrder.shipping_fee} = ${dOrder.total_amount}`);
+
+  // The snapshot: re-price the tier under the order's feet and read it back.
+  const bumped = Math.min(100, pct + 20);
+  const tierRow = tiers.find((t) => t.name === tierNow.level?.name);
+  const repriced = await req("PUT", shopPath(`/member-tiers/${tierRow.id}`), {
+    token: admin, body: { discount_percent: bumped },
+  });
+  check("merchant re-prices the tier", repriced.status === 200, brief(repriced));
+  const dReread = await req("GET", `/api/v1/shop/orders/${dOrder.id}`, { token: member, pk: PK });
+  check("re-pricing the tier does NOT change the existing order",
+    dReread.json?.discount_amount === dOrder.discount_amount &&
+      dReread.json?.discount_percent === pct &&
+      dReread.json?.total_amount === dOrder.total_amount,
+    JSON.stringify([dReread.json?.discount_amount, dReread.json?.discount_percent, dReread.json?.total_amount]));
+  // Restore it: the seeded ladder is shared with every other section and run.
+  await req("PUT", shopPath(`/member-tiers/${tierRow.id}`), { token: admin, body: { discount_percent: pct } });
+
+  const dPay = await req("POST", `/api/v1/shop/orders/${dOrder.id}/payments`, { token: member, pk: PK, body: {} });
+  need(dPay.status === 201, `discounted order payment failed: ${brief(dPay)}`);
+  check("the payment provider is charged the DISCOUNTED total",
+    dPay.json.amount === dOrder.total_amount && dPay.json.amount < dOrder.subtotal_amount + dOrder.shipping_fee,
+    `charged ${dPay.json.amount}, list price would be ${dOrder.subtotal_amount + dOrder.shipping_fee}`);
+  const dHook = await deliverWebhook(dPay.json.provider_reference);
+  check("signed provider webhook accepted (discounted order)", dHook.status === 200, brief(dHook));
+
+  const dAward = Math.floor((dOrder.subtotal_amount - dOrder.discount_amount) / 100);
+  const listPriceAward = Math.floor(dOrder.subtotal_amount / 100);
+  const dPoints = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  check("points are awarded on the DISCOUNTED subtotal, not the list price",
+    dPoints.points === mPointsReplay.points + dAward,
+    `${mPointsReplay.points} + ${dAward} vs ${dPoints.points} (list-price basis would add ${listPriceAward})`);
+  check("the discount genuinely changes the answer (so the check above is meaningful)",
+    dAward !== listPriceAward, `${dAward} vs ${listPriceAward}`);
+
+  // Ship + return it so this section is points-neutral for section ⑨.
+  const dShip = await req("POST", shopPath(`/orders/${dOrder.id}/shipments`), {
+    token: admin, body: { carrier: paidMethod.carrier, tracking_number: `E2E-${runID}-D` },
+  });
+  need(dShip.status === 201, `create shipment (discounted order) failed: ${brief(dShip)}`);
+  await req("PUT", shopPath(`/orders/${dOrder.id}/shipments/${dShip.json.id}`), {
+    token: admin, body: { status: "returned" },
+  });
+  const dAfterReturn = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json;
+  check("returning the discounted order claws back exactly what it awarded",
+    dAfterReturn.points === mPointsReplay.points,
+    `${dPoints.points} → ${dAfterReturn.points}, want ${mPointsReplay.points}`);
+
+  // ── ⑨ 會員路徑：出貨 → 退貨 → 降級 ──
+  section("⑨ Member path: ship → return → clawback and tier downgrade");
   const mShip = await req("POST", shopPath(`/orders/${mOrder.id}/shipments`), {
     token: admin, body: { carrier: freeMethod.carrier, tracking_number: `E2E-${runID}-M` },
   });
@@ -402,8 +505,8 @@ async function commercePath() {
       forThisOrder.some((t) => t.kind === 1 && t.points_delta === -mAward),
     JSON.stringify(forThisOrder));
 
-  // ── ⑨ 取消訂單歸還庫存 ──
-  section("⑨ Cancelling an order restores stock");
+  // ── ⑩ 取消訂單歸還庫存 ──
+  section("⑩ Cancelling an order restores stock");
   const stockBeforeCancel = await skuStock(BOUQUET_SKU);
   await req("DELETE", "/api/v1/shop/cart/items", { token: member, pk: PK });
   await req("POST", "/api/v1/shop/cart/items", { token: member, pk: PK, body: { sku_id: sku.id, quantity: 1 } });
@@ -423,7 +526,7 @@ async function commercePath() {
   check("cancellation restores the stock it held",
     (await skuStock(BOUQUET_SKU)) === stockBeforeCancel, String(stockBeforeCancel));
 
-  // ── ⑩ 冪等鍵：重送不會建立第二筆訂單 ──
+  // ── ⑪ 冪等鍵：重送不會建立第二筆訂單 ──
   //
   // This section exists for one reason that no Go test can cover: every
   // integration test builds its own router, so nothing in `go test ./...`
@@ -432,7 +535,7 @@ async function commercePath() {
   // ignores Idempotency-Key — the exact failure mode change commerce-demo-seed
   // measured for the event subscriptions. This is the only assertion standing
   // between that mistake and duplicate orders in production.
-  section("⑩ Idempotency-Key: a re-sent checkout replays instead of duplicating");
+  section("⑪ Idempotency-Key: a re-sent checkout replays instead of duplicating");
   const idemKey = `e2e-idem-${runID}`;
   const idemBody = {
     email: `e2e-idem-${runID}@example.com`,

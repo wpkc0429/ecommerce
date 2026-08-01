@@ -42,6 +42,12 @@ type Order struct {
 	SubtotalAmount int64 `json:"subtotal_amount,omitempty"`
 	// ShippingFee holds the value of the "shipping_fee" field.
 	ShippingFee int64 `json:"shipping_fee,omitempty"`
+	// DiscountAmount holds the value of the "discount_amount" field.
+	DiscountAmount int64 `json:"discount_amount,omitempty"`
+	// DiscountPercent holds the value of the "discount_percent" field.
+	DiscountPercent *int16 `json:"discount_percent,omitempty"`
+	// MemberTierName holds the value of the "member_tier_name" field.
+	MemberTierName *string `json:"member_tier_name,omitempty"`
 	// ShippingMethodID holds the value of the "shipping_method_id" field.
 	ShippingMethodID *int `json:"shipping_method_id,omitempty"`
 	// ShippingMethodName holds the value of the "shipping_method_name" field.
@@ -109,9 +115,9 @@ func (*Order) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case order.FieldShippingAddress:
 			values[i] = new([]byte)
-		case order.FieldID, order.FieldShopID, order.FieldMemberID, order.FieldStatus, order.FieldPaymentStatus, order.FieldFulfillmentStatus, order.FieldTotalAmount, order.FieldSubtotalAmount, order.FieldShippingFee, order.FieldShippingMethodID:
+		case order.FieldID, order.FieldShopID, order.FieldMemberID, order.FieldStatus, order.FieldPaymentStatus, order.FieldFulfillmentStatus, order.FieldTotalAmount, order.FieldSubtotalAmount, order.FieldShippingFee, order.FieldDiscountAmount, order.FieldDiscountPercent, order.FieldShippingMethodID:
 			values[i] = new(sql.NullInt64)
-		case order.FieldCurrency, order.FieldShippingMethodName:
+		case order.FieldCurrency, order.FieldMemberTierName, order.FieldShippingMethodName:
 			values[i] = new(sql.NullString)
 		case order.FieldCreatedAt, order.FieldUpdatedAt, order.FieldRequestedDeliveryDate, order.FieldCancelledAt:
 			values[i] = new(sql.NullTime)
@@ -201,6 +207,26 @@ func (_m *Order) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field shipping_fee", values[i])
 			} else if value.Valid {
 				_m.ShippingFee = value.Int64
+			}
+		case order.FieldDiscountAmount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field discount_amount", values[i])
+			} else if value.Valid {
+				_m.DiscountAmount = value.Int64
+			}
+		case order.FieldDiscountPercent:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field discount_percent", values[i])
+			} else if value.Valid {
+				_m.DiscountPercent = new(int16)
+				*_m.DiscountPercent = int16(value.Int64)
+			}
+		case order.FieldMemberTierName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field member_tier_name", values[i])
+			} else if value.Valid {
+				_m.MemberTierName = new(string)
+				*_m.MemberTierName = value.String
 			}
 		case order.FieldShippingMethodID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -321,6 +347,19 @@ func (_m *Order) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("shipping_fee=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ShippingFee))
+	builder.WriteString(", ")
+	builder.WriteString("discount_amount=")
+	builder.WriteString(fmt.Sprintf("%v", _m.DiscountAmount))
+	builder.WriteString(", ")
+	if v := _m.DiscountPercent; v != nil {
+		builder.WriteString("discount_percent=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MemberTierName; v != nil {
+		builder.WriteString("member_tier_name=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.ShippingMethodID; v != nil {
 		builder.WriteString("shipping_method_id=")

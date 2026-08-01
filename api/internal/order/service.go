@@ -28,6 +28,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcart "ksdevworks/ecommerce/api/internal/ent/cart"
 	entidem "ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	entmember "ksdevworks/ecommerce/api/internal/ent/member"
 	entorder "ksdevworks/ecommerce/api/internal/ent/order"
 	entorderitem "ksdevworks/ecommerce/api/internal/ent/orderitem"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
@@ -246,6 +247,83 @@ func (s *Service) resolveShippingMethod(ctx context.Context, shopID int, methodI
 	return sm, nil
 }
 
+// tierDiscount is the member tier snapshot taken at checkout (change
+// tier-discount-application, design D3/D8). The zero value means "held no tier",
+// which is the ordinary case for a first-time buyer and produces byte-identical
+// behavior to every checkout that predates this change.
+type tierDiscount struct {
+	TierName *string
+	Percent  *int16
+}
+
+// amount computes the money actually taken off the item subtotal.
+//
+// Integer arithmetic, truncating (design D4). Three properties are load-bearing
+// and each is easy to destroy by "tidying up":
+//
+//   - **Truncation, never rounding.** floor is what points already use
+//     (floor(basis/100)); a second rounding direction would mean every future
+//     reader of a money path has to look up which one applies here. Truncation is
+//     also what Go's integer division does natively, so there is no `+ 50` for
+//     someone to delete later — and a deleted `+ 50` shows up only as an
+//     off-by-one on non-divisible subtotals, which nothing would catch.
+//   - **Multiply before dividing.** subtotal/100*percent drops everything below
+//     100 first: 3333 at 10% would yield 330 instead of 333.
+//   - **The customer never gets more than the merchant advertised.** With
+//     truncation the effective rate is always ≤ discount_percent, the difference
+//     strictly less than one minor unit.
+//
+// Overflow bound, stated rather than guarded: subtotal × 100 exceeds int64 only
+// past ~9.2e16, and the subtotal accumulator itself would have overflowed long
+// before that. That limit predates this change.
+func (d tierDiscount) amount(subtotal int64) int64 {
+	if d.Percent == nil || *d.Percent <= 0 || subtotal <= 0 {
+		return 0
+	}
+	return subtotal * int64(*d.Percent) / 100
+}
+
+// resolveTierDiscount reads the customer's current tier and the rate to apply
+// (change tier-discount-application, design D8).
+//
+// It reads members.level_id rather than re-deriving the tier from the points
+// balance: level_id is maintained by points.Service inside the same transaction
+// as every ledger write (member-tiers-and-points design D6/D7), so it *is* the
+// answer to "which tier is this customer in". Recomputing here would add a second
+// judge of the same question, and two judges eventually disagree.
+//
+// A tier whose own discount_percent is NULL snapshots as 0, so the order can
+// still tell "belonged to a tier that grants nothing" from "belonged to no tier"
+// (design D3).
+//
+// Runs *outside* the checkout transaction, alongside resolveShippingMethod. A
+// merchant re-pricing a tier in that window is the same benign race the shipping
+// fee already has: the customer gets the rate in force when they pressed submit.
+//
+// shop_id is carried explicitly rather than left to the tenant interceptor —
+// guest checkout runs inside tenant context and member checkout does too, but
+// correctness here must not depend on ambient state (member-identity-per-shop
+// design D4).
+func (s *Service) resolveTierDiscount(ctx context.Context, shopID, memberID int) (tierDiscount, error) {
+	m, err := s.Client.Member.Query().
+		Where(entmember.IDEQ(memberID), entmember.ShopIDEQ(shopID)).
+		WithMemberTier().
+		Only(ctx)
+	if err != nil {
+		return tierDiscount{}, fmt.Errorf("order: query member tier: %w", err)
+	}
+	tier := m.Edges.MemberTier
+	if tier == nil {
+		return tierDiscount{}, nil
+	}
+	percent := int16(0)
+	if tier.DiscountPercent != nil {
+		percent = *tier.DiscountPercent
+	}
+	name := tier.Name
+	return tierDiscount{TierName: &name, Percent: &percent}, nil
+}
+
 // ── checkout ────────────────────────────────────────────────────────────
 
 // Checkout converts the member's active cart into an order (design D3), all
@@ -277,10 +355,14 @@ func (s *Service) resolveShippingMethod(ctx context.Context, shopID int, methodI
 // method rather than to its callers, and did so strictly *around* the
 // transaction: both are parsed and validated before it opens (a bad shipping
 // method must not consume the cart or touch stock), and the resulting fee only
-// enters the arithmetic that composes the order row. The conditional stock
-// decrement and its affected-rows check below are unchanged, character for
+// enters the arithmetic that composes the order row. Change
+// tier-discount-application added the member tier discount the same way — the
+// tier is resolved before the transaction opens, and the one multiplication
+// happens after the stock loop, where the subtotal first exists. The conditional
+// stock decrement and its affected-rows check below are unchanged, character for
 // character — they remain the single implementation every order-placing entry
-// point shares.
+// point shares, and that includes the discount: no entry point may resolve a rate
+// of its own, and no request body may name one.
 func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in CheckoutInput) (*ent.Order, error) {
 	if err := in.ShippingAddress.Validate(); err != nil {
 		return nil, err
@@ -296,6 +378,10 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 	var shippingFee int64
 	if shippingMethod != nil {
 		shippingFee = shippingMethod.FlatRate
+	}
+	discount, err := s.resolveTierDiscount(ctx, shopID, memberID)
+	if err != nil {
+		return nil, err
 	}
 
 	c, err := s.Client.Cart.Query().
@@ -366,9 +452,15 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 		return nil, fmt.Errorf("order: marshal shipping address: %w", err)
 	}
 
-	// change order-extras, design D6/D7: total_amount is the payable total.
-	// The DB's orders_total_amount_composition_check enforces this same
-	// equation, so no other path can create an order where it does not hold.
+	// change order-extras design D6/D7, amended by change
+	// tier-discount-application design D5: total_amount is the payable total, now
+	// net of the member tier discount. The DB's
+	// orders_total_amount_composition_check enforces this same equation, so no
+	// other path can create an order where it does not hold.
+	//
+	// The multiplication lives here — after the stock loop that produced the
+	// subtotal, before the row is written — so the loop above stays untouched.
+	discountAmount := discount.amount(subtotal)
 	create := tx.Order.Create().
 		SetShopID(shopID).SetMemberID(memberID).
 		SetStatus(StatusCreated).
@@ -376,9 +468,14 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 		SetFulfillmentStatus(FulfillmentStatusUnfulfilled).
 		SetCurrency(c.Currency).
 		SetSubtotalAmount(subtotal).
+		SetDiscountAmount(discountAmount).
 		SetShippingFee(shippingFee).
-		SetTotalAmount(subtotal + shippingFee).
+		SetTotalAmount(subtotal - discountAmount + shippingFee).
 		SetShippingAddress(addrJSON)
+	if discount.Percent != nil {
+		// Both or neither — orders_tier_snapshot_check makes that a database fact.
+		create.SetDiscountPercent(*discount.Percent).SetMemberTierName(*discount.TierName)
+	}
 	if shippingMethod != nil {
 		create.SetShippingMethodID(shippingMethod.ID).SetShippingMethodName(shippingMethod.Name)
 	}

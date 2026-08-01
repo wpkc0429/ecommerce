@@ -284,7 +284,8 @@
           <button id="new-member-tier-btn" class="primary">新增等級</button>
         </div>
         <p class="hint">
-          等級由點數餘額決定：門檻最高且不超過餘額的那一級。折扣百分比目前只儲存，尚未參與任何計價。
+          等級由點數餘額決定：門檻最高且不超過餘額的那一級。折扣百分比會在結帳時自動套用於<strong>商品金額</strong>（運費不折），
+          存檔後立即對<strong>新訂單</strong>生效，<strong>不影響既有訂單</strong>。點數則以折扣後的實付商品金額核發。
         </p>
         <p id="member-tiers-error" class="error" hidden></p>
         <table class="table">
@@ -297,7 +298,7 @@
             <h3 id="member-tier-dialog-title">新增會員等級</h3>
             <label>名稱 <input type="text" id="member-tier-name" required /></label>
             <label>點數門檻（點，不是金額） <input type="number" id="member-tier-min-points" step="1" min="0" value="0" required /></label>
-            <label>折扣百分比（%） <input type="number" id="member-tier-discount" step="1" min="0" max="100" value="0" /></label>
+            <label>折扣百分比（%，結帳時套用於商品金額，運費不折） <input type="number" id="member-tier-discount" step="1" min="0" max="100" value="0" /></label>
             <p id="member-tier-error" class="error" hidden></p>
             <div class="dialog-actions">
               <button type="button" id="member-tier-cancel">取消</button>

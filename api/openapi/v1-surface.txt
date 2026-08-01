@@ -311,10 +311,13 @@ MemberTier.updated_at
 Order.cancelled_at
 Order.created_at
 Order.currency
+Order.discount_amount
+Order.discount_percent
 Order.fulfillment_status
 Order.id
 Order.items
 Order.member_id
+Order.member_tier_name
 Order.payment_status
 Order.requested_delivery_date
 Order.shipping_address

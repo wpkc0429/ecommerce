@@ -4,9 +4,10 @@
 //
 //  1. **篩選一律送給伺服器**（design D3）。列表是分頁的，在前端過濾只看得到當頁，
 //     會對「符合條件但在第 3 頁」的訂單回報不存在——那是一束沒送到的花。
-//  2. **金額三件組要以組合式呈現**（design D10）。change order-extras 把
-//     total_amount 的語意從「品項小計」改成「應付總額」，這個畫面是唯一能讓商家
-//     察覺這件事的地方，所以是「小計 ＋ 運費 ＝ 應付總額」，不是三個並列的數字。
+//  2. **金額要以組合式呈現**（design D10）。change order-extras 把 total_amount
+//     的語意從「品項小計」改成「應付總額」，change tier-discount-application 又在
+//     中間插入了折抵，這個畫面是唯一能讓商家察覺這兩件事的地方，所以是
+//     「小計 －折扣 ＋ 運費 ＝ 應付總額」，不是四個並列的數字。
 //  3. **出貨是整筆訂單、至多一筆**（design D1/D9）。shipments 沒有品項欄位，
 //     order_id 上有唯一索引。所以這裡沒有品項勾選、沒有數量、沒有「已出貨 3 件
 //     待出貨 2 件」——那個概念在系統裡沒有對應的事實。
@@ -15,7 +16,7 @@
 //     出現，因為伺服器的 CAS 只在 shipped 成立，一顆保證 409 的按鈕比沒有更糟。
 import { api } from "../lib/api.js";
 import { $, el, clear, rows, renderPager } from "../lib/dom.js";
-import { formatMoney } from "../lib/money.js";
+import { formatMoney, formatPercent } from "../lib/money.js";
 import { can, whenCan } from "../lib/rbac.js";
 
 const PAGE_SIZE = 20;
@@ -137,11 +138,21 @@ export function createOrdersView(ctx) {
     const addr = o.shipping_address || {};
     const host = clear($("#order-summary"));
 
-    // 金額三件組：組合式，不是三個並列的數字（design D10）。
+    // 金額組合式，不是並列的數字（design D10）。折抵列**只在真的折了錢時出現**
+    // （change tier-discount-application, design D13）：每一筆訂單都掛一個「− NT$0」
+    // 會教會商家忽略那一列，而它恰恰是最需要被看見的一列。
+    // 折抵是金額走 formatMoney、折扣率是百分比走 formatPercent——`10` 同時可以是
+    // 10% 與 NT$10，兩者看起來都合理，所以絕不互換。
+    const discounted = Number(o.discount_amount) > 0;
     host.append(el("div", { class: "amount-composition", id: "order-amounts" },
       el("span", { class: "amount-part" },
         el("span", { class: "amount-label" }, "品項小計"),
         el("span", { class: "money", id: "order-subtotal" }, formatMoney(o.subtotal_amount, o.currency))),
+      discounted ? el("span", { class: "amount-op" }, "－") : "",
+      discounted ? el("span", { class: "amount-part" },
+        el("span", { class: "amount-label" },
+          `等級折扣（${o.member_tier_name ?? "—"} ${formatPercent(o.discount_percent ?? 0)}）`),
+        el("span", { class: "money", id: "order-discount" }, formatMoney(o.discount_amount, o.currency))) : "",
       el("span", { class: "amount-op" }, "＋"),
       el("span", { class: "amount-part" },
         el("span", { class: "amount-label" }, `運費${o.shipping_method_name ? `（${o.shipping_method_name}）` : ""}`),

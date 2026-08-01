@@ -159,12 +159,19 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 			return nil, fmt.Errorf("payment: mark order paid: %w", err)
 		}
 		if s.Dispatcher != nil {
-			// SubtotalAmount, not TotalAmount: points are awarded on goods, not
-			// on the courier's fee (change order-extras, design D5). The amount
-			// charged above is still ord.TotalAmount.
+			// The loyalty award basis, and the single place it is defined
+			// (change tier-discount-application, design D7): what the customer
+			// actually paid for goods. Not TotalAmount — that includes the
+			// courier's fee, and points reward the purchase, not the logistics
+			// (change order-extras, design D5). Not SubtotalAmount alone — a tier
+			// discount and the points it earns are two forms of one loyalty
+			// budget, so awarding on the list price would multiply the merchant's
+			// cost behind a knob showing them a single number. The amount charged
+			// is still ord.TotalAmount.
 			s.Dispatcher.Publish(ctx, events.OrderPaymentSucceeded{
 				ShopID: ord.ShopID, OrderID: ord.ID, MemberID: ord.MemberID,
-				SubtotalAmount: ord.SubtotalAmount, Currency: ord.Currency,
+				AwardBasisAmount: ord.SubtotalAmount - ord.DiscountAmount,
+				Currency:         ord.Currency,
 			})
 		}
 	}

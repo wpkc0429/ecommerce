@@ -722,6 +722,9 @@ components:
         - currency
         - total_amount
         - subtotal_amount
+        - discount_amount
+        - discount_percent
+        - member_tier_name
         - shipping_fee
         - shipping_method_id
         - shipping_method_name
@@ -734,8 +737,12 @@ components:
       description: |
         訂單。三個獨立的狀態軸（`status` / `payment_status` / `fulfillment_status`）互不取代。
 
-        **金額由資料庫約束保證恆等**：`total_amount = subtotal_amount + shipping_fee`。
-        呼叫端**不要自己加**——顯示與請款都用 `total_amount`。
+        **金額由資料庫約束保證恆等**：
+        `total_amount = subtotal_amount − discount_amount + shipping_fee`。
+        呼叫端**不要自己算**——顯示與請款都用 `total_amount`。
+
+        `discount_amount` 是**會員等級折扣**的折抵金額（見 `MemberTier.discount_percent`）。
+        顧客結帳當下不屬於任何等級時它是 `0`，`discount_percent` 與 `member_tier_name` 為 `null`。
       properties:
         id: { type: integer }
         shop_id: { type: integer }
@@ -765,8 +772,31 @@ components:
         subtotal_amount:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
           description: |
-            品項小計 ＝ Σ(`items[].line_total`)。
-            **點數以此為基準核發，運費不計點。**
+            品項小計 ＝ Σ(`items[].line_total`)，**折扣前**。折扣不會改變這個值。
+        discount_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: |
+            會員等級折扣的折抵金額，未套用折扣時為 `0`。**永不重算**：商家日後調整或刪除
+            該等級、顧客升降級，都不會改變已成立訂單的這個值。
+
+            計算方式（整數，**無條件捨去**）：`subtotal_amount × discount_percent / 100`。
+            **只吃品項小計，運費不打折。**
+
+            **點數以 `subtotal_amount − discount_amount`（實付商品金額）為基準核發，運費不計點。**
+          examples: [340]
+        discount_percent:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: |
+            結帳當下**實際套用**的折扣率快照。`null` 表示顧客當時不屬於任何等級；
+            屬於一個沒有設定折扣的等級時為 `0`（兩者刻意可分辨）。
+            **這是百分比不是金額。**
+          examples: [10]
+        member_tier_name:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: |
+            折扣所依據的會員等級名稱快照，**不因日後改名或刪除而變動**。
+            與 `discount_percent` 同時為 `null` 或同時非 `null`。
+          examples: ["金卡會員"]
         shipping_fee:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
           description: 結帳當下所選運送方式 `flat_rate` 的快照；未選運送方式時為 `0`。**永不重算**。
@@ -1027,7 +1057,14 @@ components:
           description: 達到此點數即進入本等級。**這是點數不是金額。**
         discount_percent:
           oneOf: [{ type: integer }, { type: 'null' }]
-          description: 保留欄位，本階段**沒有任何邏輯讀它**來計算折扣。
+          description: |
+            0–100 的折扣百分比。屬於本等級的顧客結帳時，系統會**自動套用**它：
+            折抵金額 ＝ `subtotal_amount × discount_percent / 100`，整數運算、**無條件捨去**，
+            **只吃品項小計，運費不打折**。`null` 或 `0` 皆表示不折扣。
+
+            變更**立即**對其後建立的訂單生效，且**不影響任何既有訂單**——訂單上的
+            `discount_percent` / `discount_amount` 是結帳當下的快照。**這是百分比不是金額。**
+          examples: [10]
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -1754,6 +1791,10 @@ paths:
 
         運送方式與配送日的驗證發生在**交易之前**：驗證失敗時庫存與購物車狀態完全不受影響。
 
+        顧客所屬會員等級的折扣**由伺服器決定並自動套用**（見 `MemberTier.discount_percent`），
+        請求主體無法指定折扣。結帳前要預估折抵金額，請讀 `GET /api/v1/shop/points` 的
+        `level.discount_percent` 並套用同一條整數公式。
+
         帶 `Idempotency-Key` 時，同一把 key 的重送會**回放**原本那筆訂單（201 ＋
         `Idempotency-Replayed: true`），不會建立第二筆。這解決的不是雙擊——購物車的
         「已轉換」保護早就擋住雙擊了，但它回的 409 **不告訴你訂單是哪一筆**，於是回應
@@ -1933,8 +1974,13 @@ paths:
       operationId: getMyPoints
       summary: 自己的點數與等級
       description: |
-        點數在訂單**付款成功**後由事件核發，基準是訂單的 **`subtotal_amount`（商品金額），
-        運費不計點**。文案請寫「商品金額每 100 元 1 點（運費不計）」。
+        點數在訂單**付款成功**後由事件核發，基準是 **`subtotal_amount − discount_amount`
+        （實付商品金額），運費不計點、等級折抵也不計點**。
+        文案請寫「實付商品金額每 100 元 1 點（運費不計）」。
+
+        回應的 `level` 含該等級的 `discount_percent`，**這是會員前台在結帳前預估折抵金額的
+        唯一資料來源**（平台刻意不另設預估端點）。預估請用與伺服器相同的整數公式：
+        `floor(小計 × discount_percent / 100)`。
       security: [{ memberJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
@@ -1976,7 +2022,12 @@ paths:
 
         流程：驗證輸入 → 在本商家找出或建立該 email 的**無密碼身分** →
         以送來的品項原子取代該身分的購物車 → 走**與會員完全相同**的結帳實作。
-        因此扣庫存的並發保護、金額組成、點數核發在兩條路徑上逐字相同。
+        因此扣庫存的並發保護、金額組成、會員等級折扣與點數核發在兩條路徑上逐字相同。
+
+        **回頭客會拿到折扣。** 該 email 的身分若已因先前的付款訂單累積點數而升上一個帶折扣的
+        會員等級，這筆訂單就會套用它——這是自帶前端（無登入 UI）唯一能兌現等級折扣的路徑。
+        全新的 email 沒有等級，`discount_amount` 為 `0`。**訪客沒有結帳前的折扣預估**，
+        也刻意不提供以 email 查詢等級的端點。
 
         回應帶一枚**訂單存取權杖**，用它查這一筆訂單、發起付款、查出貨。
         它不是 session——邊界見 Security Schemes 的 `orderAccessToken`。

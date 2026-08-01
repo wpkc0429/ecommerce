@@ -6493,6 +6493,11 @@ type OrderMutation struct {
 	addsubtotal_amount      *int64
 	shipping_fee            *int64
 	addshipping_fee         *int64
+	discount_amount         *int64
+	adddiscount_amount      *int64
+	discount_percent        *int16
+	adddiscount_percent     *int16
+	member_tier_name        *string
 	shipping_method_id      *int
 	addshipping_method_id   *int
 	shipping_method_name    *string
@@ -7127,6 +7132,181 @@ func (m *OrderMutation) ResetShippingFee() {
 	m.addshipping_fee = nil
 }
 
+// SetDiscountAmount sets the "discount_amount" field.
+func (m *OrderMutation) SetDiscountAmount(i int64) {
+	m.discount_amount = &i
+	m.adddiscount_amount = nil
+}
+
+// DiscountAmount returns the value of the "discount_amount" field in the mutation.
+func (m *OrderMutation) DiscountAmount() (r int64, exists bool) {
+	v := m.discount_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiscountAmount returns the old "discount_amount" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldDiscountAmount(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiscountAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiscountAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiscountAmount: %w", err)
+	}
+	return oldValue.DiscountAmount, nil
+}
+
+// AddDiscountAmount adds i to the "discount_amount" field.
+func (m *OrderMutation) AddDiscountAmount(i int64) {
+	if m.adddiscount_amount != nil {
+		*m.adddiscount_amount += i
+	} else {
+		m.adddiscount_amount = &i
+	}
+}
+
+// AddedDiscountAmount returns the value that was added to the "discount_amount" field in this mutation.
+func (m *OrderMutation) AddedDiscountAmount() (r int64, exists bool) {
+	v := m.adddiscount_amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDiscountAmount resets all changes to the "discount_amount" field.
+func (m *OrderMutation) ResetDiscountAmount() {
+	m.discount_amount = nil
+	m.adddiscount_amount = nil
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (m *OrderMutation) SetDiscountPercent(i int16) {
+	m.discount_percent = &i
+	m.adddiscount_percent = nil
+}
+
+// DiscountPercent returns the value of the "discount_percent" field in the mutation.
+func (m *OrderMutation) DiscountPercent() (r int16, exists bool) {
+	v := m.discount_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiscountPercent returns the old "discount_percent" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldDiscountPercent(ctx context.Context) (v *int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiscountPercent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiscountPercent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiscountPercent: %w", err)
+	}
+	return oldValue.DiscountPercent, nil
+}
+
+// AddDiscountPercent adds i to the "discount_percent" field.
+func (m *OrderMutation) AddDiscountPercent(i int16) {
+	if m.adddiscount_percent != nil {
+		*m.adddiscount_percent += i
+	} else {
+		m.adddiscount_percent = &i
+	}
+}
+
+// AddedDiscountPercent returns the value that was added to the "discount_percent" field in this mutation.
+func (m *OrderMutation) AddedDiscountPercent() (r int16, exists bool) {
+	v := m.adddiscount_percent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (m *OrderMutation) ClearDiscountPercent() {
+	m.discount_percent = nil
+	m.adddiscount_percent = nil
+	m.clearedFields[order.FieldDiscountPercent] = struct{}{}
+}
+
+// DiscountPercentCleared returns if the "discount_percent" field was cleared in this mutation.
+func (m *OrderMutation) DiscountPercentCleared() bool {
+	_, ok := m.clearedFields[order.FieldDiscountPercent]
+	return ok
+}
+
+// ResetDiscountPercent resets all changes to the "discount_percent" field.
+func (m *OrderMutation) ResetDiscountPercent() {
+	m.discount_percent = nil
+	m.adddiscount_percent = nil
+	delete(m.clearedFields, order.FieldDiscountPercent)
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (m *OrderMutation) SetMemberTierName(s string) {
+	m.member_tier_name = &s
+}
+
+// MemberTierName returns the value of the "member_tier_name" field in the mutation.
+func (m *OrderMutation) MemberTierName() (r string, exists bool) {
+	v := m.member_tier_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMemberTierName returns the old "member_tier_name" field's value of the Order entity.
+// If the Order object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderMutation) OldMemberTierName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMemberTierName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMemberTierName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMemberTierName: %w", err)
+	}
+	return oldValue.MemberTierName, nil
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (m *OrderMutation) ClearMemberTierName() {
+	m.member_tier_name = nil
+	m.clearedFields[order.FieldMemberTierName] = struct{}{}
+}
+
+// MemberTierNameCleared returns if the "member_tier_name" field was cleared in this mutation.
+func (m *OrderMutation) MemberTierNameCleared() bool {
+	_, ok := m.clearedFields[order.FieldMemberTierName]
+	return ok
+}
+
+// ResetMemberTierName resets all changes to the "member_tier_name" field.
+func (m *OrderMutation) ResetMemberTierName() {
+	m.member_tier_name = nil
+	delete(m.clearedFields, order.FieldMemberTierName)
+}
+
 // SetShippingMethodID sets the "shipping_method_id" field.
 func (m *OrderMutation) SetShippingMethodID(i int) {
 	m.shipping_method_id = &i
@@ -7537,7 +7717,7 @@ func (m *OrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OrderMutation) Fields() []string {
-	fields := make([]string, 0, 16)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, order.FieldCreatedAt)
 	}
@@ -7570,6 +7750,15 @@ func (m *OrderMutation) Fields() []string {
 	}
 	if m.shipping_fee != nil {
 		fields = append(fields, order.FieldShippingFee)
+	}
+	if m.discount_amount != nil {
+		fields = append(fields, order.FieldDiscountAmount)
+	}
+	if m.discount_percent != nil {
+		fields = append(fields, order.FieldDiscountPercent)
+	}
+	if m.member_tier_name != nil {
+		fields = append(fields, order.FieldMemberTierName)
 	}
 	if m.shipping_method_id != nil {
 		fields = append(fields, order.FieldShippingMethodID)
@@ -7616,6 +7805,12 @@ func (m *OrderMutation) Field(name string) (ent.Value, bool) {
 		return m.SubtotalAmount()
 	case order.FieldShippingFee:
 		return m.ShippingFee()
+	case order.FieldDiscountAmount:
+		return m.DiscountAmount()
+	case order.FieldDiscountPercent:
+		return m.DiscountPercent()
+	case order.FieldMemberTierName:
+		return m.MemberTierName()
 	case order.FieldShippingMethodID:
 		return m.ShippingMethodID()
 	case order.FieldShippingMethodName:
@@ -7657,6 +7852,12 @@ func (m *OrderMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldSubtotalAmount(ctx)
 	case order.FieldShippingFee:
 		return m.OldShippingFee(ctx)
+	case order.FieldDiscountAmount:
+		return m.OldDiscountAmount(ctx)
+	case order.FieldDiscountPercent:
+		return m.OldDiscountPercent(ctx)
+	case order.FieldMemberTierName:
+		return m.OldMemberTierName(ctx)
 	case order.FieldShippingMethodID:
 		return m.OldShippingMethodID(ctx)
 	case order.FieldShippingMethodName:
@@ -7753,6 +7954,27 @@ func (m *OrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetShippingFee(v)
 		return nil
+	case order.FieldDiscountAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiscountAmount(v)
+		return nil
+	case order.FieldDiscountPercent:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiscountPercent(v)
+		return nil
+	case order.FieldMemberTierName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMemberTierName(v)
+		return nil
 	case order.FieldShippingMethodID:
 		v, ok := value.(int)
 		if !ok {
@@ -7814,6 +8036,12 @@ func (m *OrderMutation) AddedFields() []string {
 	if m.addshipping_fee != nil {
 		fields = append(fields, order.FieldShippingFee)
 	}
+	if m.adddiscount_amount != nil {
+		fields = append(fields, order.FieldDiscountAmount)
+	}
+	if m.adddiscount_percent != nil {
+		fields = append(fields, order.FieldDiscountPercent)
+	}
 	if m.addshipping_method_id != nil {
 		fields = append(fields, order.FieldShippingMethodID)
 	}
@@ -7837,6 +8065,10 @@ func (m *OrderMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSubtotalAmount()
 	case order.FieldShippingFee:
 		return m.AddedShippingFee()
+	case order.FieldDiscountAmount:
+		return m.AddedDiscountAmount()
+	case order.FieldDiscountPercent:
+		return m.AddedDiscountPercent()
 	case order.FieldShippingMethodID:
 		return m.AddedShippingMethodID()
 	}
@@ -7890,6 +8122,20 @@ func (m *OrderMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddShippingFee(v)
 		return nil
+	case order.FieldDiscountAmount:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDiscountAmount(v)
+		return nil
+	case order.FieldDiscountPercent:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDiscountPercent(v)
+		return nil
 	case order.FieldShippingMethodID:
 		v, ok := value.(int)
 		if !ok {
@@ -7905,6 +8151,12 @@ func (m *OrderMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *OrderMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(order.FieldDiscountPercent) {
+		fields = append(fields, order.FieldDiscountPercent)
+	}
+	if m.FieldCleared(order.FieldMemberTierName) {
+		fields = append(fields, order.FieldMemberTierName)
+	}
 	if m.FieldCleared(order.FieldShippingMethodID) {
 		fields = append(fields, order.FieldShippingMethodID)
 	}
@@ -7931,6 +8183,12 @@ func (m *OrderMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *OrderMutation) ClearField(name string) error {
 	switch name {
+	case order.FieldDiscountPercent:
+		m.ClearDiscountPercent()
+		return nil
+	case order.FieldMemberTierName:
+		m.ClearMemberTierName()
+		return nil
 	case order.FieldShippingMethodID:
 		m.ClearShippingMethodID()
 		return nil
@@ -7983,6 +8241,15 @@ func (m *OrderMutation) ResetField(name string) error {
 		return nil
 	case order.FieldShippingFee:
 		m.ResetShippingFee()
+		return nil
+	case order.FieldDiscountAmount:
+		m.ResetDiscountAmount()
+		return nil
+	case order.FieldDiscountPercent:
+		m.ResetDiscountPercent()
+		return nil
+	case order.FieldMemberTierName:
+		m.ResetMemberTierName()
 		return nil
 	case order.FieldShippingMethodID:
 		m.ResetShippingMethodID()

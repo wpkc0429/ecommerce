@@ -313,6 +313,9 @@ var (
 		{Name: "total_amount", Type: field.TypeInt64},
 		{Name: "subtotal_amount", Type: field.TypeInt64},
 		{Name: "shipping_fee", Type: field.TypeInt64, Default: 0},
+		{Name: "discount_amount", Type: field.TypeInt64, Default: 0},
+		{Name: "discount_percent", Type: field.TypeInt16, Nullable: true},
+		{Name: "member_tier_name", Type: field.TypeString, Nullable: true, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
 		{Name: "shipping_method_id", Type: field.TypeInt, Nullable: true},
 		{Name: "shipping_method_name", Type: field.TypeString, Nullable: true, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
 		{Name: "requested_delivery_date", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "date"}},
@@ -329,13 +332,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "orders_shops_shop",
-				Columns:    []*schema.Column{OrdersColumns[15]},
+				Columns:    []*schema.Column{OrdersColumns[18]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "orders_members_member",
-				Columns:    []*schema.Column{OrdersColumns[16]},
+				Columns:    []*schema.Column{OrdersColumns[19]},
 				RefColumns: []*schema.Column{MembersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -344,12 +347,12 @@ var (
 			{
 				Name:    "order_shop_id_member_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrdersColumns[15], OrdersColumns[16]},
+				Columns: []*schema.Column{OrdersColumns[18], OrdersColumns[19]},
 			},
 			{
 				Name:    "order_shop_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{OrdersColumns[15], OrdersColumns[3]},
+				Columns: []*schema.Column{OrdersColumns[18], OrdersColumns[3]},
 			},
 		},
 	}
@@ -1254,13 +1257,17 @@ func init() {
 	OrdersTable.ForeignKeys[1].RefTable = MembersTable
 	OrdersTable.Annotation = &entsql.Annotation{}
 	OrdersTable.Annotation.Checks = map[string]string{
+		"orders_discount_amount_bound_check":    "discount_amount <= subtotal_amount",
+		"orders_discount_amount_check":          "discount_amount >= 0",
+		"orders_discount_percent_check":         "discount_percent IS NULL OR (discount_percent >= 0 AND discount_percent <= 100)",
 		"orders_fulfillment_status_check":       "fulfillment_status >= 0",
 		"orders_payment_status_check":           "payment_status >= 0",
 		"orders_shipping_fee_check":             "shipping_fee >= 0",
 		"orders_status_check":                   "status IN (0, 1)",
 		"orders_subtotal_amount_check":          "subtotal_amount >= 0",
+		"orders_tier_snapshot_check":            "(member_tier_name IS NULL) = (discount_percent IS NULL)",
 		"orders_total_amount_check":             "total_amount >= 0",
-		"orders_total_amount_composition_check": "total_amount = subtotal_amount + shipping_fee",
+		"orders_total_amount_composition_check": "total_amount = subtotal_amount - discount_amount + shipping_fee",
 	}
 	OrderItemsTable.ForeignKeys[0].RefTable = OrdersTable
 	OrderItemsTable.ForeignKeys[1].RefTable = ShopsTable

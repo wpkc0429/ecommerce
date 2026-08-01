@@ -76,8 +76,12 @@ const (
 )
 
 // pointsPerMinorUnit is the platform-wide, hardcoded award ratio (design
-// D3): 1 point per 100 minor currency units of orders.total_amount,
-// integer division (floor). Not configurable per shop (design Non-Goals).
+// D3): 1 point per 100 minor currency units of the award basis, integer
+// division (floor). Not configurable per shop (design Non-Goals).
+//
+// The floor here and the floor in order.tierDiscount.amount are deliberately the
+// same direction: this system has exactly one rounding rule (change
+// tier-discount-application, design D4).
 const pointsPerMinorUnit = 100
 
 // Service implements member-tiers-and-points operations, scoped by explicit
@@ -263,20 +267,31 @@ func (s *Service) Handle(ctx context.Context, e events.Event) {
 }
 
 // HandleOrderPaid idempotently awards points for a paid order (design
-// D3/D4): points = SubtotalAmount / pointsPerMinorUnit (floor). A cheap
+// D3/D4): points = AwardBasisAmount / pointsPerMinorUnit (floor). A cheap
 // existence pre-check short-circuits the common repeated-delivery case;
 // the (order_id, kind) unique index is the actual arbiter — a constraint
 // violation on insert means another delivery already won and this call is a
 // safe no-op.
 //
-// The basis is the order's item subtotal, never its payable total (change
-// order-extras, design D5). Shipping is mostly money the merchant passes
-// straight to a courier, and awarding on it would pay a customer 2 points more
-// for the same bouquet purely for choosing same-day delivery — a loyalty rule
-// that subsidizes the least efficient logistics choice. It is also the only
-// basis under which every point already issued before that change stays
-// correct: the backfill made subtotal_amount equal the old total_amount for
-// every pre-existing order.
+// The basis is what the customer actually paid for goods — the item subtotal
+// less any member tier discount — and this package deliberately does not
+// re-derive it (change tier-discount-application, design D7); the publisher
+// computes it once.
+//
+// Two things are excluded and each has its own reason:
+//
+//   - Shipping (change order-extras, design D5) is mostly money the merchant
+//     passes straight to a courier. Awarding on it would pay a customer 2 points
+//     more for the same bouquet purely for choosing same-day delivery — a loyalty
+//     rule that subsidizes the least efficient logistics choice.
+//   - The tier discount (change tier-discount-application, design D6) is the
+//     *other* form of the same loyalty reward. Awarding on the list price would
+//     compound the two behind a knob that shows the merchant one number, and
+//     would hand points to a 100%-discounted order the merchant earned nothing on.
+//
+// Both exclusions are retroactively free: every order that predates them has
+// shipping_fee = 0 and discount_amount = 0, so re-running today's rule over any
+// historical order reproduces exactly the number that was issued at the time.
 func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSucceeded) error {
 	already, err := s.Client.PointTransaction.Query().
 		Where(entpointtransaction.OrderIDEQ(ev.OrderID), entpointtransaction.KindEQ(KindOrderAward)).
@@ -295,7 +310,7 @@ func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSuc
 		return fmt.Errorf("points: query member for award: %w", err)
 	}
 
-	awarded := int32(ev.SubtotalAmount / pointsPerMinorUnit)
+	awarded := int32(ev.AwardBasisAmount / pointsPerMinorUnit)
 
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
@@ -333,6 +348,10 @@ func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSuc
 // points (e.g. shipped unpaid), the clawback amount is 0 — a zero-delta row
 // is still recorded so the (order_id, kind) unique index keeps guarding
 // against reprocessing.
+//
+// The amount comes from the order's own award row, never from a recomputation.
+// That is what makes a discounted order's return give back exactly what it gave
+// out, even if the merchant has since edited or deleted the tier that priced it.
 func (s *Service) HandleOrderReturned(ctx context.Context, ev events.OrderReturned) error {
 	already, err := s.Client.PointTransaction.Query().
 		Where(entpointtransaction.OrderIDEQ(ev.OrderID), entpointtransaction.KindEQ(KindOrderClawback)).

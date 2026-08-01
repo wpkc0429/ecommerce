@@ -110,6 +110,21 @@ func ShippingFee(v int64) predicate.Order {
 	return predicate.Order(sql.FieldEQ(FieldShippingFee, v))
 }
 
+// DiscountAmount applies equality check predicate on the "discount_amount" field. It's identical to DiscountAmountEQ.
+func DiscountAmount(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldDiscountAmount, v))
+}
+
+// DiscountPercent applies equality check predicate on the "discount_percent" field. It's identical to DiscountPercentEQ.
+func DiscountPercent(v int16) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldDiscountPercent, v))
+}
+
+// MemberTierName applies equality check predicate on the "member_tier_name" field. It's identical to MemberTierNameEQ.
+func MemberTierName(v string) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldMemberTierName, v))
+}
+
 // ShippingMethodID applies equality check predicate on the "shipping_method_id" field. It's identical to ShippingMethodIDEQ.
 func ShippingMethodID(v int) predicate.Order {
 	return predicate.Order(sql.FieldEQ(FieldShippingMethodID, v))
@@ -553,6 +568,171 @@ func ShippingFeeLT(v int64) predicate.Order {
 // ShippingFeeLTE applies the LTE predicate on the "shipping_fee" field.
 func ShippingFeeLTE(v int64) predicate.Order {
 	return predicate.Order(sql.FieldLTE(FieldShippingFee, v))
+}
+
+// DiscountAmountEQ applies the EQ predicate on the "discount_amount" field.
+func DiscountAmountEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldDiscountAmount, v))
+}
+
+// DiscountAmountNEQ applies the NEQ predicate on the "discount_amount" field.
+func DiscountAmountNEQ(v int64) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldDiscountAmount, v))
+}
+
+// DiscountAmountIn applies the In predicate on the "discount_amount" field.
+func DiscountAmountIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldDiscountAmount, vs...))
+}
+
+// DiscountAmountNotIn applies the NotIn predicate on the "discount_amount" field.
+func DiscountAmountNotIn(vs ...int64) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldDiscountAmount, vs...))
+}
+
+// DiscountAmountGT applies the GT predicate on the "discount_amount" field.
+func DiscountAmountGT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldDiscountAmount, v))
+}
+
+// DiscountAmountGTE applies the GTE predicate on the "discount_amount" field.
+func DiscountAmountGTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldDiscountAmount, v))
+}
+
+// DiscountAmountLT applies the LT predicate on the "discount_amount" field.
+func DiscountAmountLT(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldDiscountAmount, v))
+}
+
+// DiscountAmountLTE applies the LTE predicate on the "discount_amount" field.
+func DiscountAmountLTE(v int64) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldDiscountAmount, v))
+}
+
+// DiscountPercentEQ applies the EQ predicate on the "discount_percent" field.
+func DiscountPercentEQ(v int16) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldDiscountPercent, v))
+}
+
+// DiscountPercentNEQ applies the NEQ predicate on the "discount_percent" field.
+func DiscountPercentNEQ(v int16) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldDiscountPercent, v))
+}
+
+// DiscountPercentIn applies the In predicate on the "discount_percent" field.
+func DiscountPercentIn(vs ...int16) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldDiscountPercent, vs...))
+}
+
+// DiscountPercentNotIn applies the NotIn predicate on the "discount_percent" field.
+func DiscountPercentNotIn(vs ...int16) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldDiscountPercent, vs...))
+}
+
+// DiscountPercentGT applies the GT predicate on the "discount_percent" field.
+func DiscountPercentGT(v int16) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldDiscountPercent, v))
+}
+
+// DiscountPercentGTE applies the GTE predicate on the "discount_percent" field.
+func DiscountPercentGTE(v int16) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldDiscountPercent, v))
+}
+
+// DiscountPercentLT applies the LT predicate on the "discount_percent" field.
+func DiscountPercentLT(v int16) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldDiscountPercent, v))
+}
+
+// DiscountPercentLTE applies the LTE predicate on the "discount_percent" field.
+func DiscountPercentLTE(v int16) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldDiscountPercent, v))
+}
+
+// DiscountPercentIsNil applies the IsNil predicate on the "discount_percent" field.
+func DiscountPercentIsNil() predicate.Order {
+	return predicate.Order(sql.FieldIsNull(FieldDiscountPercent))
+}
+
+// DiscountPercentNotNil applies the NotNil predicate on the "discount_percent" field.
+func DiscountPercentNotNil() predicate.Order {
+	return predicate.Order(sql.FieldNotNull(FieldDiscountPercent))
+}
+
+// MemberTierNameEQ applies the EQ predicate on the "member_tier_name" field.
+func MemberTierNameEQ(v string) predicate.Order {
+	return predicate.Order(sql.FieldEQ(FieldMemberTierName, v))
+}
+
+// MemberTierNameNEQ applies the NEQ predicate on the "member_tier_name" field.
+func MemberTierNameNEQ(v string) predicate.Order {
+	return predicate.Order(sql.FieldNEQ(FieldMemberTierName, v))
+}
+
+// MemberTierNameIn applies the In predicate on the "member_tier_name" field.
+func MemberTierNameIn(vs ...string) predicate.Order {
+	return predicate.Order(sql.FieldIn(FieldMemberTierName, vs...))
+}
+
+// MemberTierNameNotIn applies the NotIn predicate on the "member_tier_name" field.
+func MemberTierNameNotIn(vs ...string) predicate.Order {
+	return predicate.Order(sql.FieldNotIn(FieldMemberTierName, vs...))
+}
+
+// MemberTierNameGT applies the GT predicate on the "member_tier_name" field.
+func MemberTierNameGT(v string) predicate.Order {
+	return predicate.Order(sql.FieldGT(FieldMemberTierName, v))
+}
+
+// MemberTierNameGTE applies the GTE predicate on the "member_tier_name" field.
+func MemberTierNameGTE(v string) predicate.Order {
+	return predicate.Order(sql.FieldGTE(FieldMemberTierName, v))
+}
+
+// MemberTierNameLT applies the LT predicate on the "member_tier_name" field.
+func MemberTierNameLT(v string) predicate.Order {
+	return predicate.Order(sql.FieldLT(FieldMemberTierName, v))
+}
+
+// MemberTierNameLTE applies the LTE predicate on the "member_tier_name" field.
+func MemberTierNameLTE(v string) predicate.Order {
+	return predicate.Order(sql.FieldLTE(FieldMemberTierName, v))
+}
+
+// MemberTierNameContains applies the Contains predicate on the "member_tier_name" field.
+func MemberTierNameContains(v string) predicate.Order {
+	return predicate.Order(sql.FieldContains(FieldMemberTierName, v))
+}
+
+// MemberTierNameHasPrefix applies the HasPrefix predicate on the "member_tier_name" field.
+func MemberTierNameHasPrefix(v string) predicate.Order {
+	return predicate.Order(sql.FieldHasPrefix(FieldMemberTierName, v))
+}
+
+// MemberTierNameHasSuffix applies the HasSuffix predicate on the "member_tier_name" field.
+func MemberTierNameHasSuffix(v string) predicate.Order {
+	return predicate.Order(sql.FieldHasSuffix(FieldMemberTierName, v))
+}
+
+// MemberTierNameIsNil applies the IsNil predicate on the "member_tier_name" field.
+func MemberTierNameIsNil() predicate.Order {
+	return predicate.Order(sql.FieldIsNull(FieldMemberTierName))
+}
+
+// MemberTierNameNotNil applies the NotNil predicate on the "member_tier_name" field.
+func MemberTierNameNotNil() predicate.Order {
+	return predicate.Order(sql.FieldNotNull(FieldMemberTierName))
+}
+
+// MemberTierNameEqualFold applies the EqualFold predicate on the "member_tier_name" field.
+func MemberTierNameEqualFold(v string) predicate.Order {
+	return predicate.Order(sql.FieldEqualFold(FieldMemberTierName, v))
+}
+
+// MemberTierNameContainsFold applies the ContainsFold predicate on the "member_tier_name" field.
+func MemberTierNameContainsFold(v string) predicate.Order {
+	return predicate.Order(sql.FieldContainsFold(FieldMemberTierName, v))
 }
 
 // ShippingMethodIDEQ applies the EQ predicate on the "shipping_method_id" field.

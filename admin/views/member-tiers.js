@@ -2,11 +2,14 @@
 //
 // **這個畫面上沒有任何金額。** min_points 是「點」、discount_percent 是「%」，
 // 兩者都不得經過 formatMoney（design D10）——點數與金額之間有一個真實換算
-// （核發是 floor(subtotal_amount / 100)），所以把 34 點畫成 NT$34 會完全合理地
+// （核發是 floor(實付商品金額 / 100)），所以把 34 點畫成 NT$34 會完全合理地
 // 錯下去，而且不會有任何東西噴錯。
 //
-// discount_percent 本階段只儲存、不參與任何計價（spec member-tiers-and-points），
-// 畫面必須說出這件事，否則商家會以為設了就會打折。
+// discount_percent **會在結帳時真的套用**（change tier-discount-application）：
+// 折抵金額 = floor(品項小計 × discount_percent / 100)，只吃商品金額、運費不折，
+// 且訂單上是快照——事後改這裡不會動到既有訂單。畫面必須說出這件事。
+// 在此之前它只儲存不計價，而後台照樣把它擺出來讓商家設定，於是商家以為自己在
+// 給折扣、顧客卻付原價——這正是那個 change 要修的東西，別把說明改回去。
 import { api, ApiError } from "../lib/api.js";
 import { $, el, rows } from "../lib/dom.js";
 import { formatPoints, formatPercent } from "../lib/money.js";
@@ -75,7 +78,8 @@ export function createMemberTiersView(ctx) {
   }
 
   async function remove(tier) {
-    if (!confirm(`確定刪除等級「${tier.name}」？目前屬於此等級的會員會在下次點數異動時重新歸級。`)) return;
+    if (!confirm(`確定刪除等級「${tier.name}」？目前屬於此等級的會員會在下次點數異動時重新歸級，` +
+      `之後的訂單不再享有此折扣。已成立的訂單金額不受影響。`)) return;
     const err = $("#member-tiers-error");
     err.hidden = true;
     try {

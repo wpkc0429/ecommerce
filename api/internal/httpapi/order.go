@@ -102,10 +102,18 @@ func orderJSON(o *ent.Order) map[string]any {
 		"id": o.ID, "shop_id": o.ShopID, "member_id": o.MemberID,
 		"status": o.Status, "payment_status": o.PaymentStatus, "fulfillment_status": o.FulfillmentStatus,
 		"currency": o.Currency,
-		// change order-extras, design D6: total_amount is the PAYABLE total —
-		// subtotal_amount + shipping_fee — and is what payment charges. It used
-		// to be the item subtotal alone; subtotal_amount now carries that.
+		// change order-extras design D6, amended by change
+		// tier-discount-application design D5: total_amount is the PAYABLE total —
+		// subtotal_amount − discount_amount + shipping_fee — and is what payment
+		// charges. Its meaning has not changed since order-extras; only the
+		// arithmetic that composes it has, so it may now be *less* than
+		// subtotal + fee as well as more.
 		"total_amount": o.TotalAmount, "subtotal_amount": o.SubtotalAmount, "shipping_fee": o.ShippingFee,
+		// The member tier discount snapshot: what was taken off, at what rate, by
+		// which tier. discount_percent/member_tier_name are null together when the
+		// customer held no tier at checkout; a tier granting nothing snapshots as 0.
+		"discount_amount": o.DiscountAmount, "discount_percent": o.DiscountPercent,
+		"member_tier_name":   o.MemberTierName,
 		"shipping_method_id": o.ShippingMethodID, "shipping_method_name": o.ShippingMethodName,
 		"requested_delivery_date": deliveryDateJSON(o.RequestedDeliveryDate),
 		"shipping_address":        o.ShippingAddress, "cancelled_at": o.CancelledAt,

@@ -140,6 +140,48 @@ func (_c *OrderCreate) SetNillableShippingFee(v *int64) *OrderCreate {
 	return _c
 }
 
+// SetDiscountAmount sets the "discount_amount" field.
+func (_c *OrderCreate) SetDiscountAmount(v int64) *OrderCreate {
+	_c.mutation.SetDiscountAmount(v)
+	return _c
+}
+
+// SetNillableDiscountAmount sets the "discount_amount" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableDiscountAmount(v *int64) *OrderCreate {
+	if v != nil {
+		_c.SetDiscountAmount(*v)
+	}
+	return _c
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (_c *OrderCreate) SetDiscountPercent(v int16) *OrderCreate {
+	_c.mutation.SetDiscountPercent(v)
+	return _c
+}
+
+// SetNillableDiscountPercent sets the "discount_percent" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableDiscountPercent(v *int16) *OrderCreate {
+	if v != nil {
+		_c.SetDiscountPercent(*v)
+	}
+	return _c
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (_c *OrderCreate) SetMemberTierName(v string) *OrderCreate {
+	_c.mutation.SetMemberTierName(v)
+	return _c
+}
+
+// SetNillableMemberTierName sets the "member_tier_name" field if the given value is not nil.
+func (_c *OrderCreate) SetNillableMemberTierName(v *string) *OrderCreate {
+	if v != nil {
+		_c.SetMemberTierName(*v)
+	}
+	return _c
+}
+
 // SetShippingMethodID sets the "shipping_method_id" field.
 func (_c *OrderCreate) SetShippingMethodID(v int) *OrderCreate {
 	_c.mutation.SetShippingMethodID(v)
@@ -286,6 +328,10 @@ func (_c *OrderCreate) defaults() {
 		v := order.DefaultShippingFee
 		_c.mutation.SetShippingFee(v)
 	}
+	if _, ok := _c.mutation.DiscountAmount(); !ok {
+		v := order.DefaultDiscountAmount
+		_c.mutation.SetDiscountAmount(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -327,6 +373,14 @@ func (_c *OrderCreate) check() error {
 	}
 	if _, ok := _c.mutation.ShippingFee(); !ok {
 		return &ValidationError{Name: "shipping_fee", err: errors.New(`ent: missing required field "Order.shipping_fee"`)}
+	}
+	if _, ok := _c.mutation.DiscountAmount(); !ok {
+		return &ValidationError{Name: "discount_amount", err: errors.New(`ent: missing required field "Order.discount_amount"`)}
+	}
+	if v, ok := _c.mutation.MemberTierName(); ok {
+		if err := order.MemberTierNameValidator(v); err != nil {
+			return &ValidationError{Name: "member_tier_name", err: fmt.Errorf(`ent: validator failed for field "Order.member_tier_name": %w`, err)}
+		}
 	}
 	if v, ok := _c.mutation.ShippingMethodName(); ok {
 		if err := order.ShippingMethodNameValidator(v); err != nil {
@@ -404,6 +458,18 @@ func (_c *OrderCreate) createSpec() (*Order, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ShippingFee(); ok {
 		_spec.SetField(order.FieldShippingFee, field.TypeInt64, value)
 		_node.ShippingFee = value
+	}
+	if value, ok := _c.mutation.DiscountAmount(); ok {
+		_spec.SetField(order.FieldDiscountAmount, field.TypeInt64, value)
+		_node.DiscountAmount = value
+	}
+	if value, ok := _c.mutation.DiscountPercent(); ok {
+		_spec.SetField(order.FieldDiscountPercent, field.TypeInt16, value)
+		_node.DiscountPercent = &value
+	}
+	if value, ok := _c.mutation.MemberTierName(); ok {
+		_spec.SetField(order.FieldMemberTierName, field.TypeString, value)
+		_node.MemberTierName = &value
 	}
 	if value, ok := _c.mutation.ShippingMethodID(); ok {
 		_spec.SetField(order.FieldShippingMethodID, field.TypeInt, value)
@@ -680,6 +746,66 @@ func (u *OrderUpsert) UpdateShippingFee() *OrderUpsert {
 // AddShippingFee adds v to the "shipping_fee" field.
 func (u *OrderUpsert) AddShippingFee(v int64) *OrderUpsert {
 	u.Add(order.FieldShippingFee, v)
+	return u
+}
+
+// SetDiscountAmount sets the "discount_amount" field.
+func (u *OrderUpsert) SetDiscountAmount(v int64) *OrderUpsert {
+	u.Set(order.FieldDiscountAmount, v)
+	return u
+}
+
+// UpdateDiscountAmount sets the "discount_amount" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateDiscountAmount() *OrderUpsert {
+	u.SetExcluded(order.FieldDiscountAmount)
+	return u
+}
+
+// AddDiscountAmount adds v to the "discount_amount" field.
+func (u *OrderUpsert) AddDiscountAmount(v int64) *OrderUpsert {
+	u.Add(order.FieldDiscountAmount, v)
+	return u
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (u *OrderUpsert) SetDiscountPercent(v int16) *OrderUpsert {
+	u.Set(order.FieldDiscountPercent, v)
+	return u
+}
+
+// UpdateDiscountPercent sets the "discount_percent" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateDiscountPercent() *OrderUpsert {
+	u.SetExcluded(order.FieldDiscountPercent)
+	return u
+}
+
+// AddDiscountPercent adds v to the "discount_percent" field.
+func (u *OrderUpsert) AddDiscountPercent(v int16) *OrderUpsert {
+	u.Add(order.FieldDiscountPercent, v)
+	return u
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (u *OrderUpsert) ClearDiscountPercent() *OrderUpsert {
+	u.SetNull(order.FieldDiscountPercent)
+	return u
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (u *OrderUpsert) SetMemberTierName(v string) *OrderUpsert {
+	u.Set(order.FieldMemberTierName, v)
+	return u
+}
+
+// UpdateMemberTierName sets the "member_tier_name" field to the value that was provided on create.
+func (u *OrderUpsert) UpdateMemberTierName() *OrderUpsert {
+	u.SetExcluded(order.FieldMemberTierName)
+	return u
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (u *OrderUpsert) ClearMemberTierName() *OrderUpsert {
+	u.SetNull(order.FieldMemberTierName)
 	return u
 }
 
@@ -997,6 +1123,76 @@ func (u *OrderUpsertOne) AddShippingFee(v int64) *OrderUpsertOne {
 func (u *OrderUpsertOne) UpdateShippingFee() *OrderUpsertOne {
 	return u.Update(func(s *OrderUpsert) {
 		s.UpdateShippingFee()
+	})
+}
+
+// SetDiscountAmount sets the "discount_amount" field.
+func (u *OrderUpsertOne) SetDiscountAmount(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetDiscountAmount(v)
+	})
+}
+
+// AddDiscountAmount adds v to the "discount_amount" field.
+func (u *OrderUpsertOne) AddDiscountAmount(v int64) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddDiscountAmount(v)
+	})
+}
+
+// UpdateDiscountAmount sets the "discount_amount" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateDiscountAmount() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateDiscountAmount()
+	})
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (u *OrderUpsertOne) SetDiscountPercent(v int16) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetDiscountPercent(v)
+	})
+}
+
+// AddDiscountPercent adds v to the "discount_percent" field.
+func (u *OrderUpsertOne) AddDiscountPercent(v int16) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddDiscountPercent(v)
+	})
+}
+
+// UpdateDiscountPercent sets the "discount_percent" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateDiscountPercent() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateDiscountPercent()
+	})
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (u *OrderUpsertOne) ClearDiscountPercent() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearDiscountPercent()
+	})
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (u *OrderUpsertOne) SetMemberTierName(v string) *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetMemberTierName(v)
+	})
+}
+
+// UpdateMemberTierName sets the "member_tier_name" field to the value that was provided on create.
+func (u *OrderUpsertOne) UpdateMemberTierName() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateMemberTierName()
+	})
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (u *OrderUpsertOne) ClearMemberTierName() *OrderUpsertOne {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearMemberTierName()
 	})
 }
 
@@ -1495,6 +1691,76 @@ func (u *OrderUpsertBulk) AddShippingFee(v int64) *OrderUpsertBulk {
 func (u *OrderUpsertBulk) UpdateShippingFee() *OrderUpsertBulk {
 	return u.Update(func(s *OrderUpsert) {
 		s.UpdateShippingFee()
+	})
+}
+
+// SetDiscountAmount sets the "discount_amount" field.
+func (u *OrderUpsertBulk) SetDiscountAmount(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetDiscountAmount(v)
+	})
+}
+
+// AddDiscountAmount adds v to the "discount_amount" field.
+func (u *OrderUpsertBulk) AddDiscountAmount(v int64) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddDiscountAmount(v)
+	})
+}
+
+// UpdateDiscountAmount sets the "discount_amount" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateDiscountAmount() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateDiscountAmount()
+	})
+}
+
+// SetDiscountPercent sets the "discount_percent" field.
+func (u *OrderUpsertBulk) SetDiscountPercent(v int16) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetDiscountPercent(v)
+	})
+}
+
+// AddDiscountPercent adds v to the "discount_percent" field.
+func (u *OrderUpsertBulk) AddDiscountPercent(v int16) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.AddDiscountPercent(v)
+	})
+}
+
+// UpdateDiscountPercent sets the "discount_percent" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateDiscountPercent() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateDiscountPercent()
+	})
+}
+
+// ClearDiscountPercent clears the value of the "discount_percent" field.
+func (u *OrderUpsertBulk) ClearDiscountPercent() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearDiscountPercent()
+	})
+}
+
+// SetMemberTierName sets the "member_tier_name" field.
+func (u *OrderUpsertBulk) SetMemberTierName(v string) *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.SetMemberTierName(v)
+	})
+}
+
+// UpdateMemberTierName sets the "member_tier_name" field to the value that was provided on create.
+func (u *OrderUpsertBulk) UpdateMemberTierName() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.UpdateMemberTierName()
+	})
+}
+
+// ClearMemberTierName clears the value of the "member_tier_name" field.
+func (u *OrderUpsertBulk) ClearMemberTierName() *OrderUpsertBulk {
+	return u.Update(func(s *OrderUpsert) {
+		s.ClearMemberTierName()
 	})
 }
 

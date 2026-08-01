@@ -357,7 +357,7 @@ func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
 	if ev.ShopID != f.shopID || ev.OrderID != ord.ID || ev.MemberID != memberID {
 		t.Fatalf("expected event to carry the order's identity, got %+v", ev)
 	}
-	if ev.SubtotalAmount != 1290 || ev.Currency != "TWD" {
+	if ev.AwardBasisAmount != 1290 || ev.Currency != "TWD" {
 		t.Fatalf("expected event to carry the order's amount/currency, got %+v", ev)
 	}
 }

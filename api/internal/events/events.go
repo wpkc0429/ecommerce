@@ -73,18 +73,28 @@ func (StorefrontClientChanged) EventName() string { return "storefront.client_ch
 // (see payment.Service.HandleWebhook's own doc comment), not just on the
 // first delivery — subscribers MUST be idempotent on (ShopID, OrderID).
 //
-// SubtotalAmount is the order's item subtotal, i.e. the loyalty award basis
-// (change order-extras, design D5) — NOT the payable total, which now includes
-// shipping. It was named TotalAmount until that change; renaming rather than
-// adding a field was deliberate (design D8): a forgotten field would have
-// silently awarded zero points, whereas a rename makes every construction site
-// fail to compile until it is revisited.
+// AwardBasisAmount is the money the customer actually paid for goods:
+// orders.subtotal_amount − orders.discount_amount. It is NOT the payable total
+// (which includes shipping) and NOT the list-price subtotal (which ignores the
+// member tier discount).
+//
+// The name states the role rather than the arithmetic on purpose (change
+// tier-discount-application, design D7): the basis is defined in exactly one
+// place — the publisher, right next to the order row it reads — and points.Service
+// never re-derives it. A name describing the arithmetic would start lying the
+// first time something else is netted off.
+//
+// This field has now been renamed twice (TotalAmount → SubtotalAmount →
+// AwardBasisAmount) and both times for the same reason (order-extras design D8):
+// adding a field beside it instead would let any construction site that forgets
+// the new one keep compiling and silently award the wrong number, while a rename
+// stops the build until every site has been revisited.
 type OrderPaymentSucceeded struct {
-	ShopID         int
-	OrderID        int
-	MemberID       int
-	SubtotalAmount int64
-	Currency       string
+	ShopID           int
+	OrderID          int
+	MemberID         int
+	AwardBasisAmount int64
+	Currency         string
 }
 
 func (OrderPaymentSucceeded) EventName() string { return "order.payment_succeeded" }

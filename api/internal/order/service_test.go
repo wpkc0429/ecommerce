@@ -167,3 +167,68 @@ func TestParseRequestedDeliveryDateRejects(t *testing.T) {
 		})
 	}
 }
+
+// TestTierDiscountAmount pins the one rounding rule this system has (change
+// tier-discount-application, design D4).
+//
+// The non-divisible cases are the whole point: 3400 @ 10% divides exactly and
+// would pass under any rounding mode, so it proves nothing on its own. 3333 and
+// 3339 separate truncation from round-half-up, and 5 @ 10% separates it from
+// ceiling.
+func TestTierDiscountAmount(t *testing.T) {
+	pct := func(v int16) *int16 { return &v }
+	name := "金卡會員"
+
+	cases := []struct {
+		label    string
+		discount tierDiscount
+		subtotal int64
+		want     int64
+	}{
+		{"no tier at all", tierDiscount{}, 3400, 0},
+		{"tier granting nothing", tierDiscount{TierName: &name, Percent: pct(0)}, 3400, 0},
+		{"divides exactly", tierDiscount{TierName: &name, Percent: pct(10)}, 3400, 340},
+		// 333.3 → 333. Truncation and round-half-up agree here; kept as the
+		// baseline the next case is compared against.
+		{"does not divide, remainder below half", tierDiscount{TierName: &name, Percent: pct(10)}, 3333, 333},
+		// 333.9 → 333, NOT 334. This is the assertion that fails the moment
+		// someone "tidies" the arithmetic into rounding.
+		{"does not divide, remainder above half", tierDiscount{TierName: &name, Percent: pct(10)}, 3339, 333},
+		// 190.05 → 190: a rate that is not a multiple of 10, on a real price.
+		{"awkward rate on a real price", tierDiscount{TierName: &name, Percent: pct(5)}, 3801, 190},
+		// 0.5 → 0. Ceiling would hand out 1 minor unit here.
+		{"discount below one minor unit", tierDiscount{TierName: &name, Percent: pct(10)}, 5, 0},
+		{"full discount", tierDiscount{TierName: &name, Percent: pct(100)}, 3400, 3400},
+		{"zero subtotal", tierDiscount{TierName: &name, Percent: pct(10)}, 0, 0},
+	}
+	for _, c := range cases {
+		if got := c.discount.amount(c.subtotal); got != c.want {
+			t.Errorf("%s: amount(%d) = %d, want %d", c.label, c.subtotal, got, c.want)
+		}
+	}
+}
+
+// TestTierDiscountNeverExceedsSubtotalOrTheAdvertisedRate sweeps every rate the
+// CHECK constraint allows against a subtotal chosen to be divisible by nothing
+// convenient, and asserts the two properties the DB constraint and the merchant's
+// expectation each depend on.
+func TestTierDiscountNeverExceedsSubtotalOrTheAdvertisedRate(t *testing.T) {
+	const subtotal int64 = 3797 // prime-ish: forces a remainder at most rates
+	for p := int16(0); p <= 100; p++ {
+		percent := p
+		d := tierDiscount{Percent: &percent}
+		got := d.amount(subtotal)
+		if got < 0 || got > subtotal {
+			t.Fatalf("percent %d: amount %d outside [0, %d] — violates orders_discount_amount_bound_check", p, got, subtotal)
+		}
+		// The effective rate must never exceed what the merchant configured:
+		// got/subtotal <= p/100, i.e. got*100 <= subtotal*p.
+		if got*100 > subtotal*int64(p) {
+			t.Fatalf("percent %d: amount %d exceeds the advertised rate on subtotal %d", p, got, subtotal)
+		}
+		// ...and must never be more than one minor unit short of it.
+		if (got+1)*100 <= subtotal*int64(p) {
+			t.Fatalf("percent %d: amount %d is more than one minor unit short on subtotal %d", p, got, subtotal)
+		}
+	}
+}

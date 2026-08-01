@@ -362,6 +362,11 @@ try {
   check("subtotal shown unscaled", subtotal === "NT$3,400", subtotal);
   check("shipping fee shown unscaled", shippingFee === "NT$150", shippingFee);
   check("payable total is subtotal + shipping fee", total === "NT$3,550", `${subtotal} + ${shippingFee} = ${total}`);
+  // change tier-discount-application (design D13): a brand-new email holds no
+  // tier, and a "− NT$0" row on every order would teach merchants to ignore the
+  // one row that matters. The positive case is asserted in ⑱.5 below.
+  check("an undiscounted order shows no discount row at all",
+    (await page.locator("#order-discount").count()) === 0);
   const summaryText = (await page.textContent("#order-summary")) ?? "";
   check("recipient shown on the detail", summaryText.includes(`E2E 收件人 ${runID}`), summaryText.slice(0, 200));
   check("requested delivery date shown on the detail", summaryText.includes(isoDate(1)), summaryText.slice(0, 200));
@@ -405,6 +410,11 @@ try {
   await page.waitForSelector("#tab-points:not([hidden])", { timeout: 8000 });
   await page.waitForFunction(() =>
     document.querySelector("#points-balance").textContent.trim() !== "—", null, { timeout: 8000 });
+  // The view fires loadBalance() and loadLedger() in parallel (Promise.all), so a
+  // populated balance does not imply a populated ledger — wait for the second one
+  // too, or this section is a coin flip. (Observed failing once before this wait
+  // existed; it has nothing to do with what is being asserted.)
+  await page.waitForSelector("#points-tbody tr", { timeout: 8000 });
   const balance = (await page.textContent("#points-balance")).trim();
   // 核發基準是品項小計，不是應付總額（change order-extras design D5）：
   // floor(3400 / 100) = 34；若誤用 total 會是 floor(3550 / 100) = 35。
@@ -415,6 +425,41 @@ try {
     ledgerText.includes("訂單核發") && ledgerText.includes(`訂單 #${opsOrder.id}`), ledgerText.slice(0, 200));
   check("ledger delta is a point count, not currency",
     ledgerText.includes("+34 點") && !ledgerText.includes("NT$34"), ledgerText.slice(0, 200));
+
+  console.log("⑱.5 同一位顧客的第二筆訂單自動帶等級折扣（後台看得見）");
+  // No setup: ⑯ paid 3,400 → 34 points → past the seeded 銀卡會員 threshold (30),
+  // which carries 5%. So the *same guest email* placing a second order is
+  // enough — and it doubles as the proof that a returning guest gets the
+  // discount without ever logging in (design D9), which is the only way ONDO's
+  // customers can get one at all.
+  const repeat = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK,
+    body: {
+      email: guestEmail,
+      items: [{ sku_id: skuID, quantity: 1 }],
+      shipping_address: { recipient_name: `E2E 收件人 ${runID}`, phone: "0955123456", line1: "台北市大安區信義路四段 1 號" },
+      shipping_method_id: methodID,
+    },
+  });
+  check("the returning guest's second order is placed", repeat.status === 201, brief(repeat));
+  const repeatOrder = repeat.json?.order ?? {};
+  // 3400 − floor(3400 × 5 / 100) + 150 = 3400 − 170 + 150 = 3380.
+  check("the returning guest's tier discount is applied without any login",
+    repeatOrder.discount_amount === 170 && repeatOrder.discount_percent === 5 &&
+      repeatOrder.total_amount === 3380,
+    JSON.stringify([repeatOrder.discount_amount, repeatOrder.discount_percent, repeatOrder.total_amount]));
+
+  await page.goto(`http://localhost:3001/#/orders/${repeatOrder.id}`);
+  await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector("#order-discount", { timeout: 8000 });
+  const dDiscount = (await page.textContent("#order-discount")).trim();
+  const dTotal = (await page.textContent("#order-total")).trim();
+  const amountsText = (await page.textContent("#order-amounts")) ?? "";
+  check("the discount is shown unscaled (170 → NT$170)", dDiscount === "NT$170", dDiscount);
+  check("the payable total reflects the discount", dTotal === "NT$3,380", `${dDiscount} → ${dTotal}`);
+  check("the tier that granted it is named, with its rate as a percentage not money",
+    amountsText.includes("銀卡會員") && amountsText.includes("5%") && !amountsText.includes("NT$5"),
+    amountsText.replace(/\s+/g, " ").slice(0, 200));
 
   console.log("⑲ 產生 publishable key");
   await page.click('.tab[data-tab="storefront-clients"]');
@@ -457,6 +502,13 @@ try {
   await tierRow.waitFor({ timeout: 8000 });
   const tierText = (await tierRow.textContent()) ?? "";
   check("member tier created through the admin UI", tierText.includes(tierName), tierText);
+  // change tier-discount-application (design D13): the screen used to say the
+  // discount was stored but not applied. It is applied now, and a back office
+  // still claiming otherwise is the bug that change exists to fix.
+  const tierHelp = (await page.textContent("#tab-member-tiers")) ?? "";
+  check("the tier screen no longer claims the discount is inert",
+    !tierHelp.includes("尚未參與") && !tierHelp.includes("只儲存") && tierHelp.includes("結帳時"),
+    tierHelp.replace(/\s+/g, " ").slice(0, 160));
   check("min_points rendered as points, never as money",
     tierText.includes("999,000 點") && !tierText.includes("NT$"), tierText);
   await tierRow.locator("button", { hasText: "編輯" }).click();

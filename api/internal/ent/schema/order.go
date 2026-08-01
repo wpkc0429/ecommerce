@@ -61,26 +61,50 @@ func (Order) Fields() []ent.Field {
 		// Money: integer minor units, BIGINT/int64 (product-catalog design
 		// D1). Never float, never recomputed after creation.
 		//
-		// Three amounts, fixed relative to each other by a DB CHECK (change
-		// order-extras, design D6/D7):
+		// Four amounts, fixed relative to each other by a DB CHECK (change
+		// order-extras design D6/D7, extended by change tier-discount-application
+		// design D5):
 		//
-		//	subtotal_amount = Σ(order_items.price_amount × quantity)
+		//	subtotal_amount = Σ(order_items.price_amount × quantity)   ← pre-discount, always
+		//	discount_amount = the member tier discount actually applied, or 0
 		//	shipping_fee    = the selected shipping method's flat_rate, or 0
-		//	total_amount    = subtotal_amount + shipping_fee   ← what is charged
+		//	total_amount    = subtotal_amount − discount_amount + shipping_fee  ← what is charged
 		//
 		// total_amount changed meaning in change order-extras: it used to be the
 		// item subtotal alone, which meant payment.InitiatePayment charged less
 		// than the storefront displayed. No stored value moved (the backfill set
 		// subtotal_amount = total_amount, shipping_fee = 0, under which every
 		// pre-existing row was already correct); what changed is that a future
-		// order may have total_amount > Σ(items).
+		// order may have total_amount > Σ(items). tier-discount-application did
+		// NOT change its meaning again — only the arithmetic that composes it, so
+		// an order may now also be *less* than subtotal + fee.
 		//
-		// Loyalty points are awarded on subtotal_amount, NOT total_amount
-		// (design D5): shipping is a pass-through cost, and awarding on it would
-		// pay a customer more for choosing the more expensive courier.
+		// Loyalty points are awarded on subtotal_amount − discount_amount
+		// (tier-discount-application design D6): shipping is a pass-through cost,
+		// and a discount and its points are two forms of the same loyalty budget —
+		// awarding on the pre-discount amount multiplies the merchant's cost behind
+		// a knob that shows them only one number.
 		field.Int64("total_amount"),
 		field.Int64("subtotal_amount"),
 		field.Int64("shipping_fee").Default(0),
+		// discount_amount / discount_percent / member_tier_name are ONE snapshot,
+		// taken at checkout and never recomputed (design D3/D8). Storing only the
+		// rate — let alone only the tier — would leave a number nobody can
+		// reproduce afterwards: discount_percent is a setting the merchant edits at
+		// will, and a member_tiers row can be deleted outright. Same discipline as
+		// order_items.price_amount and orders.shipping_fee/shipping_method_name.
+		field.Int64("discount_amount").Default(0),
+		// The rate ACTUALLY applied. NULL means "held no tier at checkout"; a tier
+		// whose own discount_percent is NULL snapshots as 0 here, so "belonged to a
+		// tier with no discount" stays distinguishable from "belonged to no tier".
+		field.Int16("discount_percent").Optional().Nillable(),
+		// Denormalized text snapshot, surviving a later rename or deletion of the
+		// tier. The tier *id* is deliberately not snapshotted (design D3): what the
+		// customer agreed to is a name and a rate, and unlike shipping methods
+		// nothing ever selects a tier by id — order-extras design D4's own
+		// criterion, applied to a case where the round trip does not exist.
+		field.String("member_tier_name").MaxLen(100).
+			SchemaType(map[string]string{dialect.Postgres: "varchar(100)"}).Optional().Nillable(),
 		// Informational only (change order-extras, design D4) — no edge, no FK,
 		// exactly like OrderItem.product_id/sku_id. A real FK would change an
 		// existing endpoint's behavior: DELETE /shipping-methods/{id} would
@@ -149,10 +173,22 @@ func (Order) Annotations() []schema.Annotation {
 				"orders_total_amount_check":       "total_amount >= 0",
 				"orders_subtotal_amount_check":    "subtotal_amount >= 0",
 				"orders_shipping_fee_check":       "shipping_fee >= 0",
-				// change order-extras, design D7: the composition of the three
+				"orders_discount_amount_check":    "discount_amount >= 0",
+				// change tier-discount-application, design D5: a discount can never
+				// make the goods portion negative. Without this the failure would
+				// surface as orders_total_amount_check ("the total is negative"),
+				// which names a symptom rather than the line that was crossed.
+				"orders_discount_amount_bound_check": "discount_amount <= subtotal_amount",
+				"orders_discount_percent_check":      "discount_percent IS NULL OR (discount_percent >= 0 AND discount_percent <= 100)",
+				// A half-written tier snapshot ("a name but no rate") is a row
+				// nobody can explain, and can only come from a mistake. Same
+				// discipline as checkout_idempotency_keys' completed⇔has-order.
+				"orders_tier_snapshot_check": "(member_tier_name IS NULL) = (discount_percent IS NULL)",
+				// change order-extras, design D7 (amended by change
+				// tier-discount-application, design D5): the composition of the four
 				// amounts is a database fact, not a line of Go arithmetic that
 				// the next order-creating path could forget to reproduce.
-				"orders_total_amount_composition_check": "total_amount = subtotal_amount + shipping_fee",
+				"orders_total_amount_composition_check": "total_amount = subtotal_amount - discount_amount + shipping_fee",
 			},
 		},
 	}
