@@ -1298,6 +1298,23 @@ components:
           description: 權限節點名稱。
           items: { type: string }
 
+    ShopPermissions:
+      type: object
+      additionalProperties: false
+      required: [shop_id, user_id, permissions]
+      description: |
+        呼叫者**自己**在某商家的有效權限節點（change admin-commerce-catalog）。
+        後台前端據此決定哪些分頁與按鈕該出現——它是體驗層，**不是安全邊界**：
+        伺服器端的 `RequireShopPermission` 永遠是唯一權威。
+      properties:
+        shop_id: { type: integer }
+        user_id: { type: integer }
+        permissions:
+          type: array
+          description: 三層判定後為允許的權限節點名稱，依名稱排序。無任何權限時為空陣列。
+          items: { type: string }
+          examples: [["category.view", "product.edit", "product.view"]]
+
     ShopUser:
       type: object
       additionalProperties: false
@@ -3433,6 +3450,31 @@ paths:
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
   # ═══════════════════════ 商家層：RBAC ═══════════════════════
+  /api/v1/admin/shops/{shopID}/me:
+    get:
+      tags: [admin-rbac]
+      operationId: getMeInShop
+      summary: 取得呼叫者在此商家的有效權限
+      description: |
+        **不需要任何權限節點**，只需要已認證且通過跨店存取守衛——「我在這家店能做什麼」
+        必須是每個進得了這家店的人都答得出來的自我資訊（change admin-commerce-catalog
+        design D5）。以任一既有節點（例如 `shop.view`）當守衛，會讓只被授予 `product.view`
+        的自訂角色拿到 403 而看到空白後台。
+
+        回傳的是**三層判定後**的結果（個人覆蓋優先於角色聯集），不是角色權限的原始聯集；
+        節點清單由權限目錄推導，新增權限節點時自動涵蓋。回應只含呼叫者自己的權限。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 呼叫者於此商家的有效權限節點。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopPermissions' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
   /api/v1/admin/shops/{shopID}/roles:
     get:
       tags: [admin-rbac]
@@ -3694,7 +3736,12 @@ paths:
       tags: [admin-catalog]
       operationId: listProductsAdmin
       summary: 列出商品（含草稿）
-      description: 需要商家層 `product.view`。
+      description: |
+        需要商家層 `product.view`。
+
+        `q` 為選填關鍵字，對 `title`、`slug` 與該商品任一 SKU 的 `sku_code` 做
+        **大小寫不敏感的子字串比對**，範圍是該商家的整個目錄（不是當頁）。
+        不帶 `q` 時行為與此參數引入前完全相同。
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -3707,6 +3754,14 @@ paths:
           in: query
           required: false
           schema: { type: integer, enum: [0, 1] }
+        - name: q
+          in: query
+          required: false
+          description: 關鍵字（比對 `title` / `slug` / `sku_code`）。
+          schema: { type: string }
+          examples:
+            keyword:
+              value: 康乃馨
       responses:
         "200":
           description: 商品的一頁。

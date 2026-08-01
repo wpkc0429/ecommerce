@@ -701,6 +701,10 @@ type ProductListParams struct {
 	PageSize   int
 	CategoryID *int
 	Status     *int16
+	// Q is an optional keyword (change admin-commerce-catalog, design D6).
+	// Empty/absent means "no keyword filter" and the query is byte-for-byte
+	// what it was before this field existed.
+	Q string
 }
 
 // ProductPage is a page of products plus pagination metadata.
@@ -733,6 +737,20 @@ func (s *Service) ListProducts(ctx context.Context, shopID int, params ProductLi
 	}
 	if params.Status != nil {
 		q = q.Where(entproduct.StatusEQ(*params.Status))
+	}
+	// Keyword search (design D6). Title, slug and sku_code are the three
+	// identifiers a merchant actually has for a product; the search must run
+	// over the whole catalog rather than the current page, because a search
+	// box that only filters the loaded page reports "not found" for products
+	// that exist two pages away and the merchant then creates a duplicate.
+	// ILIKE '%…%' does not use an index — fine at one shop's catalog size,
+	// see design D6 for the path when it stops being fine.
+	if kw := strings.TrimSpace(params.Q); kw != "" {
+		q = q.Where(entproduct.Or(
+			entproduct.TitleContainsFold(kw),
+			entproduct.SlugContainsFold(kw),
+			entproduct.HasSkusWith(entproductsku.SkuCodeContainsFold(kw)),
+		))
 	}
 	total, err := q.Clone().Count(ctx)
 	if err != nil {

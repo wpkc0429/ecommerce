@@ -172,6 +172,70 @@ func TestProductListPaginationAndFilters(t *testing.T) {
 	}
 }
 
+// Scenario: 依關鍵字搜尋（title / slug / sku_code）、與其他篩選並用、未帶時
+// 行為不變 (spec Product listing pagination and filters, change
+// admin-commerce-catalog design D6).
+//
+// The keyword runs over the whole catalog, not the loaded page — a search box
+// that only filters the current page tells a merchant a product does not exist
+// when it merely lives two pages away, and the merchant then creates a
+// duplicate.
+func TestProductListKeywordSearch(t *testing.T) {
+	e := newCatalogEnv(t)
+
+	e.callJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, "/products"), map[string]any{
+		"title": "母親節康乃馨花束", "slug": "mothers-day-carnation",
+		"skus": []map[string]any{{"sku_code": "CARN-M", "price_amount": 3400, "stock_qty": 5}},
+	})
+	_, tulip := e.callJSON(t, e.ownerA, "POST", e.shopPath(e.shopA, "/products"), map[string]any{
+		"title": "鬱金香花束", "slug": "tulip-bouquet",
+		"skus": []map[string]any{{"sku_code": "TULIP-L", "price_amount": 4400, "stock_qty": 3}},
+	})
+	tulipID := int(tulip["id"].(float64))
+	e.callJSON(t, e.ownerA, "PUT", e.shopPath(e.shopA, fmt.Sprintf("/products/%d", tulipID)), map[string]any{"status": 1})
+
+	// Title substring.
+	code, byTitle := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=康乃馨"), nil)
+	if code != http.StatusOK || byTitle["total"].(float64) != 1 {
+		t.Fatalf("search by title: %d %+v", code, byTitle)
+	}
+
+	// Slug substring, case-insensitive.
+	_, bySlug := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=TULIP-BOU"), nil)
+	if bySlug["total"].(float64) != 1 {
+		t.Fatalf("search by slug must be case-insensitive: %+v", bySlug)
+	}
+
+	// SKU code — the merchant's other everyday identifier for a product.
+	_, bySKU := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=carn-m"), nil)
+	if bySKU["total"].(float64) != 1 {
+		t.Fatalf("search by sku_code: %+v", bySKU)
+	}
+
+	// Combined with status: 康乃馨 is still a draft, so status=1 excludes it.
+	_, combined := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=花束&status=1"), nil)
+	if combined["total"].(float64) != 1 {
+		t.Fatalf("q + status must both apply: %+v", combined)
+	}
+	got := combined["products"].([]any)[0].(map[string]any)["slug"]
+	if got != "tulip-bouquet" {
+		t.Fatalf("q + status returned the wrong product: %v", got)
+	}
+
+	// No match is an empty page, not an error.
+	_, none := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=zzz-nothing"), nil)
+	if none["total"].(float64) != 0 || len(none["products"].([]any)) != 0 {
+		t.Fatalf("no-match search: %+v", none)
+	}
+
+	// Absent (and blank) q leaves the query exactly as it was.
+	_, all := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products"), nil)
+	_, blank := e.callJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, "/products?q=%20"), nil)
+	if all["total"].(float64) != 2 || blank["total"].(float64) != 2 {
+		t.Fatalf("absent/blank q must not filter: all=%+v blank=%+v", all, blank)
+	}
+}
+
 // Scenario: editor 不可刪除商品；merchant_owner 可以 (spec Merchant-scoped
 // catalog management authorization).
 func TestProductRBACDeleteRestriction(t *testing.T) {

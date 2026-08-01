@@ -35,13 +35,12 @@
         </div>
       </header>
 
-      <nav class="tabs">
-        <button data-tab="pages" class="tab active">頁面</button>
-        <button data-tab="content" class="tab">全域內容</button>
-      </nav>
+      <!-- 導覽由 app.js 依權限產生（design D5） -->
+      <nav class="tabs" id="tabs"></nav>
+      <p id="no-access" class="error" hidden></p>
 
       <!-- 頁面清單 -->
-      <div id="tab-pages" class="tab-panel">
+      <div id="tab-pages" class="tab-panel" hidden>
         <div class="toolbar">
           <h2>頁面</h2>
           <button id="new-page-btn" class="primary">新增頁面</button>
@@ -97,6 +96,80 @@
         </div>
         <p id="content-error" class="error" hidden></p>
         <form id="content-form" class="schema-form"></form>
+      </div>
+
+      <!-- 商品分類 -->
+      <div id="tab-categories" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>商品分類</h2>
+          <button id="new-category-btn" class="primary">新增分類</button>
+        </div>
+        <p id="categories-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr><th>ID</th><th>名稱</th><th>slug</th><th>父分類</th><th>排序</th><th>動作</th></tr></thead>
+          <tbody id="categories-tbody"></tbody>
+        </table>
+
+        <dialog id="category-dialog">
+          <form id="category-form" method="dialog">
+            <h3 id="category-dialog-title">新增分類</h3>
+            <label>名稱 <input type="text" id="category-name" required /></label>
+            <label>Slug <input type="text" id="category-slug" required pattern="[a-z0-9-]+" /></label>
+            <label>父分類 <select id="category-parent"></select></label>
+            <label>排序 <input type="number" id="category-position" step="1" value="0" /></label>
+            <p id="category-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="category-cancel">取消</button>
+              <button type="submit" class="primary">儲存</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+
+      <!-- 商品清單 -->
+      <div id="tab-products" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>商品</h2>
+          <div class="filters">
+            <input type="search" id="product-q" placeholder="搜尋標題 / slug / SKU 代碼" />
+            <select id="product-category"></select>
+            <select id="product-status">
+              <option value="">全部狀態</option>
+              <option value="0">草稿</option>
+              <option value="1">已發佈</option>
+            </select>
+            <button id="product-search">搜尋</button>
+          </div>
+          <button id="new-product-btn" class="primary">新增商品</button>
+        </div>
+        <p id="products-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr>
+            <th>ID</th><th>標題</th><th>slug</th><th>分類</th><th>SKU 數</th>
+            <th>價格</th><th>庫存合計</th><th>狀態</th><th>動作</th>
+          </tr></thead>
+          <tbody id="products-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="products-prev">← 上一頁</button>
+          <span id="products-pageinfo"></span>
+          <button id="products-next">下一頁 →</button>
+        </div>
+      </div>
+
+      <!-- 商品編輯器（含巢狀 SKU） -->
+      <div id="tab-product-editor" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2 id="product-editor-title">編輯商品</h2>
+          <div class="toolbar-actions">
+            <button id="product-back">← 返回清單</button>
+            <button id="product-save" class="primary">儲存</button>
+            <button id="product-delete" class="danger">刪除</button>
+          </div>
+        </div>
+        <p id="product-editor-status" class="hint"></p>
+        <p id="product-editor-error" class="error" hidden></p>
+        <form id="product-form" class="schema-form wide"></form>
       </div>
     </section>
   </div>

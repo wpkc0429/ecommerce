@@ -111,6 +111,36 @@ legend { font-weight: 600; padding: 0 0.4rem; }
 .hint { color: #6b7280; margin-bottom: 0.5rem; }
 .error { color: #b91c1c; background: #fef2f2; border: 1px solid #fecaca; border-radius: 0.4rem; padding: 0.5rem 0.75rem; }
 
+/* 商品目錄（change admin-commerce-catalog） */
+.schema-form.wide { max-width: none; }
+.filters { display: flex; gap: 0.5rem; align-items: center; flex: 1; max-width: 40rem; }
+.filters input, .filters select { width: auto; }
+.filters input[type="search"] { flex: 1; min-width: 12rem; }
+
+.table td.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.table td.money { white-space: nowrap; }
+.table td.center { text-align: center; }
+.table td.empty { color: #6b7280; text-align: center; padding: 1.5rem; }
+
+.pager { display: flex; align-items: center; gap: 0.75rem; margin-top: 0.9rem; }
+.pager span { color: #6b7280; }
+
+.sku-table { margin-bottom: 0.75rem; }
+.sku-table th { font-size: 0.8rem; color: #374151; white-space: nowrap; }
+.sku-table td { vertical-align: top; }
+.sku-table input[type="number"] { min-width: 6rem; }
+.sku-table .sku-currency { width: 5rem; text-transform: uppercase; }
+.money-preview { display: block; color: #059669; font-size: 0.8rem; margin-top: 0.2rem; white-space: nowrap; }
+
+.kv-rows { display: flex; flex-direction: column; gap: 0.3rem; }
+.kv-row { display: flex; align-items: center; gap: 0.3rem; }
+.kv-row input { width: 6.5rem; }
+.kv-eq { color: #6b7280; }
+button.tiny { padding: 0.15rem 0.45rem; font-size: 0.8rem; }
+
+.checkbox-grid { display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem; }
+label.checkbox { flex-direction: row; align-items: center; gap: 0.35rem; }
+
 dialog { border: none; border-radius: 0.75rem; padding: 1.5rem; min-width: 24rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
 dialog::backdrop { background: rgba(0,0,0,0.35); }
 dialog form { display: flex; flex-direction: column; gap: 0.8rem; }

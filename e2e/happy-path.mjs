@@ -13,7 +13,7 @@
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { chromium } from "playwright";
 
-import { check, fail, failureCount, req } from "./lib.mjs";
+import { brief, check, fail, failureCount, req, runID } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
@@ -184,6 +184,122 @@ try {
   await req("POST", "/api/v1/admin/shops/1/theme", {
     token: adminToken, body: { theme_id: 1 },
   });
+
+  // ══ 商品目錄後台（change admin-commerce-catalog, design D10）══
+  //
+  // 建立分類 → 建立含 2 個 SKU 的商品 → 金額顯示未被縮放 → 改一個 SKU 的庫存
+  // → 另一個 SKU 仍在（守著 design D8 的全量 upsert 語意）→ 發佈 → 公開端點。
+  const catSlug = `e2e-cat-${runID}`;
+  const prodSlug = `e2e-product-${runID}`;
+  const skuA = `E2E-${runID}-A`;
+  const skuB = `E2E-${runID}-B`;
+
+  console.log("⑧ Category CRUD in the admin UI");
+  await page.goto("http://localhost:3001/");
+  await page.waitForSelector("#view-main:not([hidden])", { timeout: 8000 });
+  await page.click('.tab[data-tab="categories"]');
+  await page.waitForSelector("#tab-categories:not([hidden])");
+  await page.click("#new-category-btn");
+  await page.waitForSelector("#category-dialog[open]");
+  await page.fill("#category-name", `E2E 花束 ${runID}`);
+  await page.fill("#category-slug", catSlug);
+  await page.click("#category-form button[type=submit]");
+  await page.waitForSelector(`#categories-tbody tr:has-text("${catSlug}")`, { timeout: 8000 });
+  const newCategoryID =
+    (await page.textContent(`#categories-tbody tr:has-text("${catSlug}") td:nth-child(1)`)).trim();
+  check("category created through the admin UI", newCategoryID.length > 0, newCategoryID);
+
+  console.log("⑨ Product with two nested SKUs");
+  await page.click('.tab[data-tab="products"]');
+  await page.waitForSelector("#tab-products:not([hidden])");
+  await page.click("#new-product-btn");
+  await page.waitForSelector("#tab-product-editor:not([hidden])");
+  await page.fill("#product-title", `E2E 康乃馨花束 ${runID}`);
+  await page.fill("#product-slug", prodSlug);
+  await page.fill("#product-description", "E2E 建立的商品");
+  // 多對多分類：勾選剛建立的分類（其 id 就是分類表格第一欄）。
+  await page.check(`#product-form .category-box[value="${newCategoryID}"]`);
+
+  // 兩列 SKU。價格是最小貨幣單位整數：3400 就是 NT$3,400（design D4）。
+  await page.click("#add-sku-btn");
+  await page.click("#add-sku-btn");
+  const skuRows = page.locator("#sku-tbody tr.sku-row");
+  check("two SKU rows added by the nested repeater", (await skuRows.count()) === 2);
+
+  await skuRows.nth(0).locator(".sku-code").fill(skuA);
+  await skuRows.nth(0).locator(".sku-price").fill("3400");
+  await skuRows.nth(0).locator(".sku-stock").fill("5");
+  // 巢狀第二層：SKU 列裡面的 options key/value repeater。
+  await skuRows.nth(0).locator("button.tiny").click();
+  await skuRows.nth(0).locator(".kv-key").fill("尺寸");
+  await skuRows.nth(0).locator(".kv-value").fill("S");
+
+  await skuRows.nth(1).locator(".sku-code").fill(skuB);
+  await skuRows.nth(1).locator(".sku-price").fill("4400");
+  await skuRows.nth(1).locator(".sku-stock").fill("3");
+
+  const livePreview = await skuRows.nth(0).locator(".money-preview").textContent();
+  check("price input previews the amount unscaled (3400 → NT$3,400)",
+    livePreview?.trim() === "NT$3,400", livePreview ?? "");
+
+  await page.click("#product-save");
+  await page.waitForFunction(() =>
+    document.querySelector("#product-editor-status").textContent.includes("已儲存"));
+  check("product created with its nested SKUs", true);
+
+  console.log("⑩ 金額顯示未被縮放（本 change 唯一「寫錯不會噴錯」的地方）");
+  await page.click("#product-back");
+  await page.waitForSelector("#tab-products:not([hidden])");
+  await page.fill("#product-q", prodSlug);
+  await page.click("#product-search");
+  const prodRow = page.locator(`#products-tbody tr[data-slug="${prodSlug}"]`);
+  await prodRow.waitFor({ timeout: 8000 });
+  check("server-side keyword search finds the product", (await prodRow.count()) === 1);
+  const rowText = (await prodRow.textContent()) ?? "";
+  check("list shows NT$3,400 – NT$4,400 (integer minor units, never divided)",
+    rowText.includes("NT$3,400") && rowText.includes("NT$4,400"), rowText);
+  check("no /100 anywhere: NT$34 never appears", !rowText.includes("NT$34"), rowText);
+  check("no *100 anywhere: NT$340,000 never appears", !rowText.includes("NT$340,000"), rowText);
+  check("stock總計 shown as 8", rowText.includes("8"), rowText);
+
+  console.log("⑪ 改一個 SKU 的庫存，另一個 SKU 必須毫髮無傷（design D8）");
+  await prodRow.locator("button", { hasText: "編輯" }).click();
+  await page.waitForSelector("#tab-product-editor:not([hidden])");
+  const rowA = page.locator(`#sku-tbody tr.sku-row:has(.sku-code[value="${skuA}"])`);
+  await rowA.locator(".sku-stock").fill("7");
+  await page.click("#product-save");
+  await page.waitForFunction(() =>
+    document.querySelector("#product-editor-status").textContent.includes("已儲存"));
+  await page.click("#product-back");
+  await page.waitForSelector("#tab-products:not([hidden])");
+  await prodRow.locator("button", { hasText: "編輯" }).click();
+  await page.waitForSelector("#sku-tbody tr.sku-row");
+  const reloaded = page.locator("#sku-tbody tr.sku-row");
+  check("both SKUs survived the save (a partial payload would have deleted one)",
+    (await reloaded.count()) === 2, String(await reloaded.count()));
+  check("edited SKU has the new stock",
+    (await page.inputValue(`#sku-tbody tr.sku-row:has(.sku-code[value="${skuA}"]) .sku-stock`)) === "7");
+  check("untouched SKU kept its own stock",
+    (await page.inputValue(`#sku-tbody tr.sku-row:has(.sku-code[value="${skuB}"]) .sku-stock`)) === "3");
+  check("nested option round-tripped through jsonb",
+    (await page.inputValue(`#sku-tbody tr.sku-row:has(.sku-code[value="${skuA}"]) .kv-value`)) === "S");
+
+  console.log("⑫ 發佈 → 前台公開端點看得到");
+  await page.selectOption("#product-status-select", "1");
+  await page.click("#product-save");
+  await page.waitForFunction(() =>
+    document.querySelector("#product-editor-status").textContent.includes("已發佈"));
+  const publicList = await req("GET", "/api/v1/shop/products?page_size=100", {
+    pk: "pk_demoseedstorefrontkeynotsecret",
+  });
+  const published = (publicList.json?.products ?? []).find((p) => p.slug === prodSlug);
+  check("published product is visible on the public catalog endpoint",
+    Boolean(published), brief(publicList));
+  const publicA = (published?.skus ?? []).find((s) => s.sku_code === skuA);
+  check("public endpoint reports the edited stock", publicA?.stock_qty === 7,
+    JSON.stringify(published?.skus));
+  check("public endpoint reports the unscaled price", publicA?.price_amount === 3400,
+    JSON.stringify(publicA));
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.

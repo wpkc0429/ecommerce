@@ -123,6 +123,8 @@ GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
+GET /api/v1/admin/shops/{shopID}/me
+GET /api/v1/admin/shops/{shopID}/me path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers
 GET /api/v1/admin/shops/{shopID}/member-tiers path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
@@ -173,6 +175,8 @@ GET /api/v1/admin/shops/{shopID}/products query page
 GET /api/v1/admin/shops/{shopID}/products query page optional
 GET /api/v1/admin/shops/{shopID}/products query page_size
 GET /api/v1/admin/shops/{shopID}/products query page_size optional
+GET /api/v1/admin/shops/{shopID}/products query q
+GET /api/v1/admin/shops/{shopID}/products query q optional
 GET /api/v1/admin/shops/{shopID}/products query status
 GET /api/v1/admin/shops/{shopID}/products query status optional
 GET /api/v1/admin/shops/{shopID}/products/{productID}
@@ -586,6 +590,9 @@ ShopPage.page
 ShopPage.page_size
 ShopPage.shops
 ShopPage.total
+ShopPermissions.permissions
+ShopPermissions.shop_id
+ShopPermissions.user_id
 ShopUser.email
 ShopUser.roles
 ShopUser.status

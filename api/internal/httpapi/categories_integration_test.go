@@ -100,10 +100,13 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 
 	catalogService := &catalog.Service{Client: client}
 	e.router = httpapi.New(httpapi.Deps{
-		Cfg:        &config.Config{},
-		Log:        log,
-		AdminMW:    httpapi.NewAdminMiddleware(issuer),
-		TenantMW:   httpapi.NewTenantMiddleware(e.resolver),
+		Cfg:      &config.Config{},
+		Log:      log,
+		AdminMW:  httpapi.NewAdminMiddleware(issuer),
+		TenantMW: httpapi.NewTenantMiddleware(e.resolver),
+		// Roles carries GET /shops/{shopID}/me, which the admin SPA reads to
+		// decide which catalog buttons to render (change admin-commerce-catalog).
+		Roles:      &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: log},
 		Categories: &httpapi.CategoriesHandler{Client: client, Service: catalogService, Authz: authz, Log: log},
 		Products:   &httpapi.ProductsHandler{Client: client, Service: catalogService, Authz: authz, Log: log},
 	})

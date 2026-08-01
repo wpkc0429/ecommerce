@@ -115,6 +115,7 @@ func (h *ProductsHandler) list(w http.ResponseWriter, r *http.Request) {
 		PageSize:   paginationParam(r, "page_size"),
 		CategoryID: optionalIntQuery(r, "category_id"),
 		Status:     optionalInt16Query(r, "status"),
+		Q:          r.URL.Query().Get("q"),
 	}
 	pp, err := h.Service.ListProducts(r.Context(), shopID, params)
 	if err != nil {

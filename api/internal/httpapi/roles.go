@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -29,6 +30,9 @@ type RolesHandler struct {
 
 // MountShop registers routes under /admin/shops/{shopID} (admin-authenticated).
 func (h *RolesHandler) MountShop(r chi.Router) {
+	// Self-information: no permission node, only the cross-shop guard
+	// (change admin-commerce-catalog, design D5).
+	r.With(h.Authz.RequireShopAccess()).Get("/me", h.meInShop)
 	r.With(h.Authz.RequireShopPermission("user.view")).Get("/roles", h.listMerchantRoles)
 	r.With(h.Authz.RequireShopPermission("user.view")).Get("/users", h.listShopUsers)
 	r.With(h.Authz.RequireShopPermission("user.manage_roles")).Post("/users/{userID}/roles", h.assignShopRole)
@@ -53,6 +57,52 @@ func intParam(r *http.Request, name string) (int, bool) {
 }
 
 // ── merchant scope ────────────────────────────────────────────────
+
+// meInShop returns the caller's own effective permission nodes for the shop in
+// the URL (change admin-commerce-catalog, design D5) — the answer to "what may
+// I do here?", which the admin SPA needs before it can decide which buttons to
+// render at all.
+//
+// The node list is derived from the permissions catalog and run through
+// Snapshot.Allows, so it is the *decided* set (a user-level denial override
+// removes a node its role grants), not the raw union of role permissions.
+// Deriving it from the catalog rather than a hardcoded list means a new
+// permission node is covered here the day it is seeded.
+func (h *RolesHandler) meInShop(w http.ResponseWriter, r *http.Request) {
+	id, ok := auth.AdminFrom(r.Context())
+	if !ok {
+		httpx.Unauthorized(w)
+		return
+	}
+	shopID, ok := shopIDParam(r)
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	snap, err := h.Engine.Snapshot(r.Context(), id.UserID, shopID)
+	if err != nil {
+		h.Log.Error("load authorization snapshot", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	names, err := h.Client.Permission.Query().Order(permission.ByName()).Select(permission.FieldName).Strings(r.Context())
+	if err != nil {
+		h.Log.Error("load permission catalog", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	granted := make([]string, 0, len(names))
+	for _, name := range names {
+		if snap.Allows(name) {
+			granted = append(granted, name)
+		}
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{
+		"shop_id":     shopID,
+		"user_id":     id.UserID,
+		"permissions": granted,
+	})
+}
 
 func (h *RolesHandler) listMerchantRoles(w http.ResponseWriter, r *http.Request) {
 	roles, err := h.Client.Role.Query().

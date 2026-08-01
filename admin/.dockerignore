@@ -1,0 +1,8 @@
+# The image COPYs the whole directory into nginx's web root so that adding an
+# ES module never needs a Dockerfile edit (change admin-commerce-catalog).
+# These never belong in the web root. nginx.conf is NOT listed here — it must
+# stay in the build context because the Dockerfile COPYs it to the nginx
+# config dir; it is deleted from the web root in the same Dockerfile instead.
+Dockerfile
+.dockerignore
+package.json
