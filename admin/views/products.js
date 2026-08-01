@@ -11,7 +11,7 @@
 //  3. **狀態住在 closure**（design D2）。每一列 SKU 自己持有 read()，收集時
 //     不做任何 DOM 查詢——見 lib/dom.js 的 repeater。
 import { api } from "../lib/api.js";
-import { $, el, clear, fillSelect, repeater } from "../lib/dom.js";
+import { $, el, clear, fillSelect, repeater, rows, renderPager } from "../lib/dom.js";
 import { formatMoney, parseAmount, priceRange } from "../lib/money.js";
 import { showValidationErrors } from "../lib/schemaform.js";
 import { can, whenCan, readOnlyUnless } from "../lib/rbac.js";
@@ -82,15 +82,10 @@ export function createProductsView(ctx) {
     state.total = data.total ?? 0;
     state.page = data.page ?? 1;
 
-    const tbody = clear($("#products-tbody"));
-    if ((data.products || []).length === 0) {
-      tbody.append(el("tr", {}, el("td", { colspan: "9", class: "empty" },
-        state.total === 0 && !$("#product-q").value.trim() ? "尚未建立任何商品。" : "沒有符合條件的商品。")));
-    }
-    for (const p of data.products || []) {
+    rows($("#products-tbody"), data.products, (p) => {
       const skus = p.skus || [];
       const stock = skus.reduce((sum, s) => sum + (Number(s.stock_qty) || 0), 0);
-      tbody.append(el("tr", { "data-slug": p.slug },
+      return el("tr", { "data-slug": p.slug },
         el("td", {}, p.id),
         el("td", {}, p.title),
         el("td", { class: "mono" }, p.slug),
@@ -105,13 +100,14 @@ export function createProductsView(ctx) {
         el("td", {},
           el("button", { onclick: () => openEditor(p.id) }, can("product.edit") ? "編輯" : "檢視"),
           whenCan("product.delete", () =>
-            el("button", { class: "danger", onclick: () => remove(p) }, "刪除")))));
-    }
+            el("button", { class: "danger", onclick: () => remove(p) }, "刪除"))));
+    }, {
+      empty: state.total === 0 && !$("#product-q").value.trim()
+        ? "尚未建立任何商品。" : "沒有符合條件的商品。",
+      colspan: 9,
+    });
 
-    const pages = Math.max(1, Math.ceil(state.total / PAGE_SIZE));
-    $("#products-pageinfo").textContent = `第 ${state.page} / ${pages} 頁 ｜ 共 ${state.total} 筆`;
-    $("#products-prev").disabled = state.page <= 1;
-    $("#products-next").disabled = state.page >= pages;
+    renderPager("products", state.page, state.total, PAGE_SIZE);
   }
 
   async function remove(p) {

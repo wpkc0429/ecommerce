@@ -26,6 +26,35 @@ export function formatMoney(amount, currency = "TWD") {
   return currency === "TWD" ? `NT$${s}` : `${s} ${currency}`;
 }
 
+/**
+ * 點數（change admin-commerce-operations, design D10）。
+ *
+ * **點數不是金額，絕不能經過 formatMoney。** 這條規則存在的理由是兩者之間有一個
+ * 真實的換算：points.Service 以 floor(subtotal_amount / 100) 核發，所以一筆
+ * 3,400 的訂單會核發 34 點。把 34 丟進 formatMoney 會得到「NT$34」——數字對、
+ * 單位錯、而且看起來完全合理，沒有任何測試會噴錯。訂單詳情上這兩個數字會同時
+ * 出現，所以它們在畫面上必須長得不一樣。
+ */
+export function formatPoints(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  return `${groups.format(v)} 點`;
+}
+
+/** 帶正負號的點數異動量（流水帳用）：+34 點 / −34 點。 */
+export function formatPointsDelta(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  return `${v > 0 ? "+" : ""}${groups.format(v)} 點`;
+}
+
+/** 百分比欄位（member_tiers.discount_percent）。同樣不經過 formatMoney。 */
+export function formatPercent(n) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return "—";
+  return `${v}%`;
+}
+
 /** 讀一個整數輸入框（金額或數量）；空白/非法一律 0，永不回傳小數。 */
 export function parseAmount(input) {
   const v = parseInt(input?.value ?? "", 10);

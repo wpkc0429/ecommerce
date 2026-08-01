@@ -5,7 +5,7 @@
 // prefer to build their own tree view"）。父子關係以「父分類」欄與編輯時的
 // <select> 表達；排序是既有的 position 數字欄位。拖拉排序留給日後。
 import { api } from "../lib/api.js";
-import { $, el, clear, fillSelect } from "../lib/dom.js";
+import { $, el, fillSelect, rows } from "../lib/dom.js";
 import { can, whenCan } from "../lib/rbac.js";
 
 export function createCategoriesView(ctx) {
@@ -33,23 +33,17 @@ export function createCategoriesView(ctx) {
       err.hidden = false;
       return;
     }
-    const tbody = clear($("#categories-tbody"));
-    if (state.list.length === 0) {
-      tbody.append(el("tr", {}, el("td", { colspan: "6", class: "empty" }, "尚未建立任何分類。")));
-      return;
-    }
-    for (const c of state.list) {
-      tbody.append(el("tr", {},
-        el("td", {}, c.id),
-        el("td", {}, c.name),
-        el("td", {}, c.slug),
-        el("td", {}, c.parent_id ? nameOf(c.parent_id) : "—"),
-        el("td", {}, c.position ?? 0),
-        el("td", {},
-          whenCan("category.edit", () => el("button", { onclick: () => openDialog(c) }, "編輯")),
-          whenCan("category.delete", () =>
-            el("button", { class: "danger", onclick: () => remove(c) }, "刪除")))));
-    }
+    rows($("#categories-tbody"), state.list, (c) => el("tr", {},
+      el("td", {}, c.id),
+      el("td", {}, c.name),
+      el("td", {}, c.slug),
+      el("td", {}, c.parent_id ? nameOf(c.parent_id) : "—"),
+      el("td", {}, c.position ?? 0),
+      el("td", {},
+        whenCan("category.edit", () => el("button", { onclick: () => openDialog(c) }, "編輯")),
+        whenCan("category.delete", () =>
+          el("button", { class: "danger", onclick: () => remove(c) }, "刪除")))),
+    { empty: "尚未建立任何分類。", colspan: 6 });
   }
 
   function openDialog(category) {

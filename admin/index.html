@@ -171,6 +171,223 @@
         <p id="product-editor-error" class="error" hidden></p>
         <form id="product-form" class="schema-form wide"></form>
       </div>
+
+      <!-- 訂單清單（change admin-commerce-operations） -->
+      <div id="tab-orders" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>訂單</h2>
+          <div class="filters">
+            <input type="search" id="order-q" placeholder="搜尋收件人 / 電話 / 訂單編號" />
+            <select id="order-status">
+              <option value="">全部訂單狀態</option>
+              <option value="0">處理中</option>
+              <option value="1">已取消</option>
+            </select>
+            <select id="order-payment-status">
+              <option value="">全部付款狀態</option>
+              <option value="0">未付款</option>
+              <option value="1">已付款</option>
+            </select>
+            <select id="order-fulfillment-status">
+              <option value="">全部出貨狀態</option>
+              <option value="0">未出貨</option>
+              <option value="1">已出貨</option>
+              <option value="2">已送達</option>
+              <option value="3">已退貨</option>
+            </select>
+            <label class="inline">指定配送日 <input type="date" id="order-delivery-from" /></label>
+            <label class="inline">至 <input type="date" id="order-delivery-to" /></label>
+            <button id="order-search">搜尋</button>
+          </div>
+        </div>
+        <p id="orders-date-note" class="hint" hidden>
+          已套用指定配送日篩選：<strong>未填寫指定配送日的訂單不會出現在結果中</strong>。清空日期即可看到全部。
+        </p>
+        <p id="orders-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr>
+            <th>編號</th><th>建立時間</th><th>收件人</th><th>指定配送日</th>
+            <th>應付總額</th><th>訂單</th><th>付款</th><th>出貨</th><th>動作</th>
+          </tr></thead>
+          <tbody id="orders-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="orders-prev">← 上一頁</button>
+          <span id="orders-pageinfo"></span>
+          <button id="orders-next">下一頁 →</button>
+        </div>
+      </div>
+
+      <!-- 訂單詳情 -->
+      <div id="tab-order-detail" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2 id="order-detail-title">訂單</h2>
+          <div class="toolbar-actions">
+            <button id="order-back">← 返回清單</button>
+            <button id="order-points-btn">檢視此顧客點數</button>
+            <button id="order-cancel-btn" class="danger">取消訂單</button>
+          </div>
+        </div>
+        <p id="order-detail-error" class="error" hidden></p>
+        <div id="order-summary" class="detail-section"></div>
+
+        <h3>品項</h3>
+        <table class="table">
+          <thead><tr>
+            <th>商品</th><th>SKU</th><th>單價</th><th>數量</th><th>小計</th><th>卡片訊息</th>
+          </tr></thead>
+          <tbody id="order-items-tbody"></tbody>
+        </table>
+
+        <h3>出貨</h3>
+        <div id="order-shipment" class="detail-section"></div>
+
+        <h3>付款紀錄</h3>
+        <div id="order-payments" class="detail-section"></div>
+      </div>
+
+      <!-- 運送方式 -->
+      <div id="tab-shipping-methods" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>運送方式</h2>
+          <button id="new-shipping-method-btn" class="primary">新增運送方式</button>
+        </div>
+        <p id="shipping-methods-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr><th>ID</th><th>名稱</th><th>物流商</th><th>固定運費</th><th>狀態</th><th>動作</th></tr></thead>
+          <tbody id="shipping-methods-tbody"></tbody>
+        </table>
+
+        <dialog id="shipping-method-dialog">
+          <form id="shipping-method-form" method="dialog">
+            <h3 id="shipping-method-dialog-title">新增運送方式</h3>
+            <label>名稱 <input type="text" id="shipping-method-name" required /></label>
+            <label>物流商 <input type="text" id="shipping-method-carrier" required /></label>
+            <label>固定運費（最小貨幣單位整數）
+              <input type="number" id="shipping-method-rate" step="1" min="0" value="0" required />
+              <span class="money-preview" id="shipping-method-rate-preview"></span>
+            </label>
+            <label class="checkbox"><input type="checkbox" id="shipping-method-active" checked /> <span>啟用（顧客結帳時可選）</span></label>
+            <p id="shipping-method-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="shipping-method-cancel">取消</button>
+              <button type="submit" class="primary">儲存</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+
+      <!-- 會員等級 -->
+      <div id="tab-member-tiers" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>會員等級</h2>
+          <button id="new-member-tier-btn" class="primary">新增等級</button>
+        </div>
+        <p class="hint">
+          等級由點數餘額決定：門檻最高且不超過餘額的那一級。折扣百分比目前只儲存，尚未參與任何計價。
+        </p>
+        <p id="member-tiers-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr><th>ID</th><th>名稱</th><th>點數門檻</th><th>折扣</th><th>動作</th></tr></thead>
+          <tbody id="member-tiers-tbody"></tbody>
+        </table>
+
+        <dialog id="member-tier-dialog">
+          <form id="member-tier-form" method="dialog">
+            <h3 id="member-tier-dialog-title">新增會員等級</h3>
+            <label>名稱 <input type="text" id="member-tier-name" required /></label>
+            <label>點數門檻（點，不是金額） <input type="number" id="member-tier-min-points" step="1" min="0" value="0" required /></label>
+            <label>折扣百分比（%） <input type="number" id="member-tier-discount" step="1" min="0" max="100" value="0" /></label>
+            <p id="member-tier-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="member-tier-cancel">取消</button>
+              <button type="submit" class="primary">儲存</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+
+      <!-- 會員點數 -->
+      <div id="tab-points" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>會員點數</h2>
+          <div class="filters">
+            <label class="inline">會員編號 <input type="number" id="points-member-input" min="1" placeholder="例如 12" /></label>
+            <button id="points-member-go">查詢</button>
+          </div>
+        </div>
+        <p id="points-hint" class="hint">
+          輸入會員編號，或從訂單詳情的「檢視此顧客點數」進來。平台目前沒有顧客名冊端點，因此無法在此瀏覽全部會員。
+        </p>
+        <p id="points-error" class="error" hidden></p>
+        <div id="points-body" hidden>
+          <div class="detail-section">
+            <div class="detail-grid">
+              <div class="kv"><span class="kv-k">顧客</span><span class="kv-v" id="points-member-label">—</span></div>
+              <div class="kv"><span class="kv-k">點數餘額</span><span class="kv-v points" id="points-balance">—</span></div>
+              <div class="kv"><span class="kv-k">目前等級</span><span class="kv-v" id="points-level">—</span></div>
+            </div>
+          </div>
+
+          <div id="points-adjust-box" class="detail-section" hidden>
+            <h3>手動調整</h3>
+            <form id="points-adjust-form" class="inline-form">
+              <label class="inline">異動點數 <input type="number" id="points-adjust-delta" step="1" placeholder="+10 或 -10" /></label>
+              <label class="inline">理由 <input type="text" id="points-adjust-reason" placeholder="例如：客訴補償" /></label>
+              <button type="submit" class="primary">送出調整</button>
+            </form>
+            <p id="points-adjust-error" class="error" hidden></p>
+            <p class="hint">流水帳是唯讀的稽核軌跡：調整只會新增一列，不會改寫任何既有紀錄。</p>
+          </div>
+
+          <h3>點數流水帳</h3>
+          <table class="table">
+            <thead><tr><th>ID</th><th>異動</th><th>種類</th><th>來源 / 理由</th><th>時間</th></tr></thead>
+            <tbody id="points-tbody"></tbody>
+          </table>
+          <div class="pager">
+            <button id="points-prev">← 上一頁</button>
+            <span id="points-pageinfo"></span>
+            <button id="points-next">下一頁 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 前端接入（publishable key ＋ allowed origin） -->
+      <div id="tab-storefront-clients" class="tab-panel" hidden>
+        <div id="publishable-keys-block" hidden>
+          <div class="toolbar">
+            <h2>Publishable Key</h2>
+            <button id="new-publishable-key-btn" class="primary">產生新金鑰</button>
+          </div>
+          <p class="hint">
+            金鑰是<strong>公開識別碼，不是憑證</strong>：它只決定請求屬於哪一家商家，不參與任何授權判定，可以安全地放進前端原始碼。
+          </p>
+          <p id="publishable-keys-error" class="error" hidden></p>
+          <table class="table">
+            <thead><tr><th>ID</th><th>金鑰</th><th>標籤</th><th>建立時間</th><th>狀態</th><th>動作</th></tr></thead>
+            <tbody id="publishable-keys-tbody"></tbody>
+          </table>
+        </div>
+
+        <div id="allowed-origins-block" hidden>
+          <div class="toolbar">
+            <h2>允許的瀏覽器 Origin <span class="badge">平台層設定</span></h2>
+          </div>
+          <p class="hint">
+            origin 是全域競爭的命名空間（與綁定網域同性質），因此由平台層權限管理，商家層角色看不到這個區塊。
+          </p>
+          <form id="allowed-origin-form" class="inline-form">
+            <label class="inline">Origin <input type="url" id="allowed-origin-input" placeholder="https://shop.example.com" required /></label>
+            <button type="submit" class="primary">登記</button>
+          </form>
+          <p id="allowed-origins-error" class="error" hidden></p>
+          <table class="table">
+            <thead><tr><th>ID</th><th>Origin</th><th>建立時間</th><th>動作</th></tr></thead>
+            <tbody id="allowed-origins-tbody"></tbody>
+          </table>
+        </div>
+      </div>
     </section>
   </div>
   <script type="module" src="./app.js"></script>

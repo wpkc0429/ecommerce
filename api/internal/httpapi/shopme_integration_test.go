@@ -159,3 +159,47 @@ func TestShopMePlatformAdminCrossShop(t *testing.T) {
 		t.Fatalf("platform role permission missing: %v", perms)
 	}
 }
+
+// Scenario: 平台層節點只出現在持有平台角色者的商家層權限集合中
+// (change admin-commerce-operations, design D6; spec admin-operations-ui/
+// 前端接入設定：publishable key 為商家層，allowed origin 為平台層).
+//
+// This is the mechanical evidence behind a UI decision: the admin SPA decides
+// whether to draw the allowed-origins block from this very endpoint's answer,
+// even though shop.manage_client_origins is a PLATFORM-scoped node guarded by
+// RequirePlatformPermission. That works because a shop-context snapshot unions
+// in platform-scope role assignments (rbac.Engine.load takes
+// roleuser.ShopIDEQ(shopID) OR roleuser.ShopIDIsNil()) — so the node surfaces
+// for a platform admin and stays absent for a merchant owner, which is exactly
+// the visibility the UI needs. If that union ever changes, the origins block
+// silently disappears for platform admins; this test is what would say so.
+func TestShopMeSurfacesPlatformNodesOnlyForPlatformRoles(t *testing.T) {
+	e := newCatalogEnv(t)
+	ctx := context.Background()
+
+	// A platform-scoped node that no merchant role grants (mirrors the seeded
+	// catalog's shop.manage_client_origins).
+	nodeID := e.client.Permission.Create().SetName("shop.manage_client_origins").SaveX(ctx).ID
+	platformRole := e.client.Role.Create().SetName("super_admin_origins").SetScope("platform").SaveX(ctx)
+	e.client.RolePermission.Create().SetRoleID(platformRole.ID).SetPermissionID(nodeID).SaveX(ctx)
+
+	hash, _ := auth.HashPassword("password-123")
+	platformAdmin := e.client.User.Create().SetEmail("platform-origins@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
+	e.client.RoleUser.Create().SetUserID(platformAdmin).SetRoleID(platformRole.ID).SaveX(ctx)
+
+	code, ownerPerms := meIn(t, e, e.ownerA, e.shopA)
+	if code != http.StatusOK {
+		t.Fatalf("owner /me: %d", code)
+	}
+	if has(ownerPerms, "shop.manage_client_origins") {
+		t.Fatalf("a merchant owner must not see the platform node: %v", ownerPerms)
+	}
+
+	code, adminPerms := meIn(t, e, platformAdmin, e.shopA)
+	if code != http.StatusOK {
+		t.Fatalf("platform admin /me: %d", code)
+	}
+	if !has(adminPerms, "shop.manage_client_origins") {
+		t.Fatalf("a platform admin must see the platform node in shop context: %v", adminPerms)
+	}
+}

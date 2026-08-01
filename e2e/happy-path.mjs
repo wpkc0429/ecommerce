@@ -13,7 +13,7 @@
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { chromium } from "playwright";
 
-import { brief, check, fail, failureCount, req, runID } from "./lib.mjs";
+import { brief, check, deliverWebhook, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
 const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
@@ -300,6 +300,179 @@ try {
     JSON.stringify(published?.skus));
   check("public endpoint reports the unscaled price", publicA?.price_amount === 3400,
     JSON.stringify(publicA));
+
+  // ══ 商家營運後台（change admin-commerce-operations, design D11）══
+  //
+  // 建立運送方式 → 用「上面剛發佈的那個商品」下單 → 後台以深層連結看到訂單 →
+  // 付款 → 出貨並標記已送達 → 點數餘額與流水帳 → 產生 publishable key →
+  // 會員等級 CRUD → allowed origin 登記與移除。
+  //
+  // 刻意用自建商品而不是 seed 的花束：commerce-path 的 STOCK_PER_RUN 是對花束
+  // 庫存的預算，這一段若也吃它，就會靜默縮短「一份 seed 能跑幾次」。
+  const PK = "pk_demoseedstorefrontkeynotsecret";
+  const methodName = `E2E 專車配送 ${runID}`;
+
+  console.log("⑬ 後台建立運送方式（運費不縮放）");
+  await page.click('.tab[data-tab="shipping-methods"]');
+  await page.waitForSelector("#tab-shipping-methods:not([hidden])");
+  await page.click("#new-shipping-method-btn");
+  await page.waitForSelector("#shipping-method-dialog[open]");
+  await page.fill("#shipping-method-name", methodName);
+  await page.fill("#shipping-method-carrier", "E2E 快遞");
+  await page.fill("#shipping-method-rate", "150");
+  await page.click("#shipping-method-form button[type=submit]");
+  const methodRow = page.locator(`#shipping-methods-tbody tr[data-name="${methodName}"]`);
+  await methodRow.waitFor({ timeout: 8000 });
+  const methodID = Number((await methodRow.locator("td").first().textContent()).trim());
+  const methodText = (await methodRow.textContent()) ?? "";
+  check("shipping method created through the admin UI", Number.isFinite(methodID) && methodID > 0, String(methodID));
+  check("flat rate shown unscaled (150 → NT$150)", methodText.includes("NT$150"), methodText);
+  check("no /100: NT$1.5 never appears", !methodText.includes("NT$1.5"), methodText);
+  check("no *100: NT$15,000 never appears", !methodText.includes("NT$15,000"), methodText);
+
+  console.log("⑭ 以該運送方式在前台下單");
+  const skuID = publicA?.id;
+  const guestEmail = `e2e-ops-${runID}@example.com`;
+  const placed = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK,
+    body: {
+      email: guestEmail,
+      items: [{ sku_id: skuID, quantity: 1, gift_message: "E2E：營運後台測試卡片" }],
+      shipping_address: { recipient_name: `E2E 收件人 ${runID}`, phone: "0955123456", line1: "台北市大安區信義路四段 1 號" },
+      shipping_method_id: methodID,
+      requested_delivery_date: isoDate(1),
+    },
+  });
+  check("guest order placed with the just-created shipping method",
+    placed.status === 201, brief(placed));
+  const opsOrder = placed.json?.order ?? {};
+  const opsToken = placed.json?.order_access_token;
+
+  console.log("⑮ 後台以深層連結 #/orders/{id} 開啟詳情");
+  await page.goto(`http://localhost:3001/#/orders/${opsOrder.id}`);
+  await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector("#order-amounts");
+  check("deep link opens the order detail directly (no list navigation)",
+    (await page.textContent("#order-detail-title")).includes(String(opsOrder.id)),
+    await page.textContent("#order-detail-title"));
+  // 金額三件組：3400 + 150 = 3550，全部不縮放，且組合關係看得見。
+  const subtotal = (await page.textContent("#order-subtotal")).trim();
+  const shippingFee = (await page.textContent("#order-shipping-fee")).trim();
+  const total = (await page.textContent("#order-total")).trim();
+  check("subtotal shown unscaled", subtotal === "NT$3,400", subtotal);
+  check("shipping fee shown unscaled", shippingFee === "NT$150", shippingFee);
+  check("payable total is subtotal + shipping fee", total === "NT$3,550", `${subtotal} + ${shippingFee} = ${total}`);
+  const summaryText = (await page.textContent("#order-summary")) ?? "";
+  check("recipient shown on the detail", summaryText.includes(`E2E 收件人 ${runID}`), summaryText.slice(0, 200));
+  check("requested delivery date shown on the detail", summaryText.includes(isoDate(1)), summaryText.slice(0, 200));
+  check("shipping method name snapshotted onto the order is shown", summaryText.includes(methodName), summaryText.slice(0, 200));
+  const itemsText = (await page.textContent("#order-items-tbody")) ?? "";
+  check("gift message shown on the item row, not at order level",
+    itemsText.includes("E2E：營運後台測試卡片"), itemsText.slice(0, 200));
+
+  console.log("⑯ 付款 → 後台顯示已付款");
+  const opsPay = await req("POST", "/api/v1/shop/guest/order/payments", { token: opsToken, pk: PK, body: {} });
+  check("payment initiated for the ops order", opsPay.status === 201, brief(opsPay));
+  const opsHook = await deliverWebhook(opsPay.json?.provider_reference);
+  check("signed provider webhook accepted (ops order)", opsHook.status === 200, brief(opsHook));
+  await page.reload();
+  await page.waitForSelector("#order-amounts", { timeout: 8000 });
+  check("back office reflects the paid state",
+    ((await page.textContent("#order-summary")) ?? "").includes("已付款"),
+    (await page.textContent("#order-summary"))?.slice(0, 200) ?? "");
+
+  console.log("⑰ 後台出貨 → 標記已送達（終態）");
+  await page.waitForSelector("#create-shipment-btn", { timeout: 8000 });
+  await page.fill("#shipment-carrier", "E2E 快遞");
+  await page.fill("#shipment-tracking", `E2E-OPS-${runID}`);
+  await page.click("#create-shipment-btn");
+  await page.waitForSelector("#shipment-detail", { timeout: 8000 });
+  const shipText = (await page.textContent("#order-shipment")) ?? "";
+  check("shipment created through the admin UI", shipText.includes(`E2E-OPS-${runID}`), shipText.slice(0, 200));
+  check("order is now marked shipped", shipText.includes("已出貨"), shipText.slice(0, 200));
+  page.once("dialog", (d) => d.accept());
+  await page.click("#shipment-delivered-btn");
+  await page.waitForSelector("#shipment-terminal-note", { timeout: 8000 });
+  check("shipment advanced to delivered",
+    ((await page.textContent("#order-shipment")) ?? "").includes("已送達"),
+    (await page.textContent("#order-shipment"))?.slice(0, 200) ?? "");
+  check("a terminal shipment offers no further state buttons",
+    (await page.locator("#shipment-delivered-btn").count()) === 0 &&
+      (await page.locator("#shipment-returned-btn").count()) === 0);
+
+  console.log("⑱ 後台看到該顧客的點數餘額與流水帳");
+  await page.click("#order-points-btn");
+  await page.waitForSelector("#tab-points:not([hidden])", { timeout: 8000 });
+  await page.waitForFunction(() =>
+    document.querySelector("#points-balance").textContent.trim() !== "—", null, { timeout: 8000 });
+  const balance = (await page.textContent("#points-balance")).trim();
+  // 核發基準是品項小計，不是應付總額（change order-extras design D5）：
+  // floor(3400 / 100) = 34；若誤用 total 會是 floor(3550 / 100) = 35。
+  check("balance is floor(subtotal / 100), not floor(total / 100)", balance === "34 點", balance);
+  check("points are NOT rendered as money", !balance.includes("NT$") && !balance.includes("$"), balance);
+  const ledgerText = (await page.textContent("#points-tbody")) ?? "";
+  check("ledger shows the award row for this order",
+    ledgerText.includes("訂單核發") && ledgerText.includes(`訂單 #${opsOrder.id}`), ledgerText.slice(0, 200));
+  check("ledger delta is a point count, not currency",
+    ledgerText.includes("+34 點") && !ledgerText.includes("NT$34"), ledgerText.slice(0, 200));
+
+  console.log("⑲ 產生 publishable key");
+  await page.click('.tab[data-tab="storefront-clients"]');
+  await page.waitForSelector("#tab-storefront-clients:not([hidden])");
+  const keyLabel = `e2e-${runID}`;
+  page.once("dialog", (d) => d.accept(keyLabel));
+  await page.click("#new-publishable-key-btn");
+  const newKeyRow = page.locator(`#publishable-keys-tbody tr:has-text("${keyLabel}")`);
+  await newKeyRow.waitFor({ timeout: 8000 });
+  const keyValue = (await newKeyRow.locator("td.key-value").textContent()).trim();
+  check("publishable key generated through the admin UI", keyValue.startsWith("pk_"), keyValue);
+  check("the key is shown in full (public identifier, not a credential)",
+    keyValue.length > 10 && !keyValue.includes("…") && !keyValue.includes("*"), keyValue);
+
+  console.log("⑳ allowed origin（平台層）登記與移除");
+  const e2eOrigin = `https://e2e-${runID}.example.com`;
+  check("platform-level origins block is visible to the platform admin",
+    await page.isVisible("#allowed-origins-block"));
+  await page.fill("#allowed-origin-input", e2eOrigin);
+  await page.click("#allowed-origin-form button[type=submit]");
+  const originRow = page.locator(`#allowed-origins-tbody tr[data-origin="${e2eOrigin}"]`);
+  await originRow.waitFor({ timeout: 8000 });
+  check("allowed origin registered through the admin UI", true, e2eOrigin);
+  page.once("dialog", (d) => d.accept());
+  await originRow.locator("button").click();
+  await originRow.waitFor({ state: "detached", timeout: 8000 });
+  check("allowed origin removed again (globally unique — leaving it would 422 next run)", true);
+
+  console.log("㉑ 會員等級 CRUD（門檻極高 + 用完刪除，對點數階梯淨零影響）");
+  await page.click('.tab[data-tab="member-tiers"]');
+  await page.waitForSelector("#tab-member-tiers:not([hidden])");
+  const tierName = `E2E 等級 ${runID}`;
+  await page.click("#new-member-tier-btn");
+  await page.waitForSelector("#member-tier-dialog[open]");
+  await page.fill("#member-tier-name", tierName);
+  await page.fill("#member-tier-min-points", "999000");
+  await page.fill("#member-tier-discount", "1");
+  await page.click("#member-tier-form button[type=submit]");
+  const tierRow = page.locator(`#member-tiers-tbody tr[data-tier="${tierName}"]`);
+  await tierRow.waitFor({ timeout: 8000 });
+  const tierText = (await tierRow.textContent()) ?? "";
+  check("member tier created through the admin UI", tierText.includes(tierName), tierText);
+  check("min_points rendered as points, never as money",
+    tierText.includes("999,000 點") && !tierText.includes("NT$"), tierText);
+  await tierRow.locator("button", { hasText: "編輯" }).click();
+  await page.waitForSelector("#member-tier-dialog[open]");
+  await page.fill("#member-tier-discount", "2");
+  await page.click("#member-tier-form button[type=submit]");
+  await page.waitForFunction((name) => {
+    const row = [...document.querySelectorAll("#member-tiers-tbody tr")]
+      .find((r) => r.dataset.tier === name);
+    return row && row.textContent.includes("2%");
+  }, tierName, { timeout: 8000 });
+  check("member tier edited through the admin UI", true, "discount 1% → 2%");
+  page.once("dialog", (d) => d.accept());
+  await tierRow.locator("button", { hasText: "刪除" }).click();
+  await tierRow.waitFor({ state: "detached", timeout: 8000 });
+  check("member tier deleted (the seeded ladder is left exactly as it was)", true);
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.

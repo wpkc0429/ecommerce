@@ -765,3 +765,185 @@ func TestUpdatePaymentAndFulfillmentStatusScopingAndValidation(t *testing.T) {
 		t.Fatalf("negative fulfillment_status: want *ValidationError, got %T", err)
 	}
 }
+
+// ── change admin-commerce-operations (design D3/D4): the back-office order
+// list's optional filters. Every case below also has to leave the no-filter
+// behavior untouched, which is why the first assertion in each block is the
+// unfiltered count. ────────────────────────────────────────────────────────
+
+// checkoutAs places one order for memberA1 in shop A with a chosen recipient
+// name/phone and an optional requested delivery date (YYYY-MM-DD, "" to omit).
+func (e *orderEnv) checkoutAs(t *testing.T, name, phone, deliveryDate string) int {
+	t.Helper()
+	_, sku := e.newSKU(t, e.shopA, 1000, "TWD", 10, true, true)
+	e.addToCart(t, e.shopA, e.memberA1, sku, 1)
+	body := map[string]any{"recipient_name": name, "phone": phone, "line1": "民生東路一段1號"}
+	if deliveryDate != "" {
+		body["requested_delivery_date"] = deliveryDate
+	}
+	code, created := e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "POST", "/api/v1/shop/checkout", body)
+	if code != http.StatusCreated {
+		t.Fatalf("checkout %q: want 201, got %d (%+v)", name, code, created)
+	}
+	return int(created["id"].(float64))
+}
+
+// listIDs runs the admin order list with a raw query string and returns the
+// returned order ids in response order.
+func (e *orderEnv) listIDs(t *testing.T, userID, shopID int, query string) []int {
+	t.Helper()
+	code, page := e.adminCallJSON(t, userID, "GET", e.shopPath(shopID, "/orders"+query), nil)
+	if code != http.StatusOK {
+		t.Fatalf("list %q: want 200, got %d (%+v)", query, code, page)
+	}
+	rows, _ := page["orders"].([]any)
+	out := make([]int, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, int(r.(map[string]any)["id"].(float64)))
+	}
+	return out
+}
+
+func sameIDs(got []int, want ...int) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	seen := map[int]bool{}
+	for _, id := range got {
+		seen[id] = true
+	}
+	for _, id := range want {
+		if !seen[id] {
+			return false
+		}
+	}
+	return true
+}
+
+// Scenario: 依付款與出貨狀態篩選出待出貨清單 (spec Merchant back-office order
+// access is scoped by shop and RBAC).
+func TestOrderAdminListPaymentAndFulfillmentFilters(t *testing.T) {
+	e := newOrderEnv(t)
+	ctx := context.Background()
+	paid := e.checkoutAs(t, "已付款", "0911000001", "")
+	shipped := e.checkoutAs(t, "已出貨", "0911000002", "")
+	fresh := e.checkoutAs(t, "剛下單", "0911000003", "")
+
+	if _, err := e.orderSvc.UpdatePaymentStatus(ctx, e.shopA, paid, 1); err != nil {
+		t.Fatalf("advance payment: %v", err)
+	}
+	if _, err := e.orderSvc.UpdatePaymentStatus(ctx, e.shopA, shipped, 1); err != nil {
+		t.Fatalf("advance payment: %v", err)
+	}
+	if _, err := e.orderSvc.UpdateFulfillmentStatus(ctx, e.shopA, shipped, 1); err != nil {
+		t.Fatalf("advance fulfillment: %v", err)
+	}
+
+	if got := e.listIDs(t, e.ownerA, e.shopA, ""); !sameIDs(got, paid, shipped, fresh) {
+		t.Fatalf("unfiltered list changed: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?payment_status=1"); !sameIDs(got, paid, shipped) {
+		t.Fatalf("payment_status=1: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?fulfillment_status=0"); !sameIDs(got, paid, fresh) {
+		t.Fatalf("fulfillment_status=0: %v", got)
+	}
+	// The picking list: paid but not yet shipped.
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?payment_status=1&fulfillment_status=0"); !sameIDs(got, paid) {
+		t.Fatalf("paid+unfulfilled: %v", got)
+	}
+	// An unrecognized value matches nothing rather than erroring — the
+	// enumerations belong to payment/shipping, not to this endpoint.
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?payment_status=99"); len(got) != 0 {
+		t.Fatalf("unknown payment_status should match nothing: %v", got)
+	}
+}
+
+// Scenario: 依指定配送日區間篩選；未指定配送日的訂單不被回傳 (spec Merchant
+// back-office order access is scoped by shop and RBAC).
+func TestOrderAdminListDeliveryDateRangeFilter(t *testing.T) {
+	e := newOrderEnv(t)
+	day := func(n int) string { return time.Now().AddDate(0, 0, n).Format("2006-01-02") }
+	tomorrow := e.checkoutAs(t, "明天送", "0922000001", day(1))
+	later := e.checkoutAs(t, "後天送", "0922000002", day(3))
+	whenever := e.checkoutAs(t, "沒指定", "0922000003", "")
+
+	if got := e.listIDs(t, e.ownerA, e.shopA, ""); !sameIDs(got, tomorrow, later, whenever) {
+		t.Fatalf("unfiltered list changed: %v", got)
+	}
+	// A single day: from == to, inclusive on both ends.
+	q := fmt.Sprintf("?delivery_from=%s&delivery_to=%s", day(1), day(1))
+	if got := e.listIDs(t, e.ownerA, e.shopA, q); !sameIDs(got, tomorrow) {
+		t.Fatalf("single-day range: %v", got)
+	}
+	// One-sided bounds.
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?delivery_from="+day(2)); !sameIDs(got, later) {
+		t.Fatalf("from-only: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?delivery_to="+day(2)); !sameIDs(got, tomorrow) {
+		t.Fatalf("to-only: %v", got)
+	}
+	// The documented exclusion: NULL compares false, so an order with no
+	// requested delivery date is absent from every dated query. The UI has to
+	// say so (spec admin-operations-ui), and this is the fact it must say.
+	wide := fmt.Sprintf("?delivery_from=%s&delivery_to=%s", day(-30), day(365))
+	if got := e.listIDs(t, e.ownerA, e.shopA, wide); !sameIDs(got, tomorrow, later) {
+		t.Fatalf("wide range should still exclude the undated order: %v", got)
+	}
+	// An unparseable date is "filter absent", not an error (tolerant input).
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?delivery_from=not-a-date"); !sameIDs(got, tomorrow, later, whenever) {
+		t.Fatalf("unparseable date should be ignored: %v", got)
+	}
+}
+
+// Scenario: 關鍵字比對收件人姓名或電話；數字時亦比對訂單編號 (spec Merchant
+// back-office order access is scoped by shop and RBAC).
+func TestOrderAdminListKeywordFilter(t *testing.T) {
+	e := newOrderEnv(t)
+	wang := e.checkoutAs(t, "王小明", "0912345678", "")
+	chen := e.checkoutAs(t, "陳大文", "0987654321", "")
+	alice := e.checkoutAs(t, "Alice Wang", "0900111222", "")
+
+	if got := e.listIDs(t, e.ownerA, e.shopA, ""); !sameIDs(got, wang, chen, alice) {
+		t.Fatalf("unfiltered list changed: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?q=%E7%8E%8B"); !sameIDs(got, wang) { // 王
+		t.Fatalf("name substring: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?q=0987"); !sameIDs(got, chen) {
+		t.Fatalf("phone substring: %v", got)
+	}
+	// Case-insensitive, and it is the *name* being matched, not the id.
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?q=alice"); !sameIDs(got, alice) {
+		t.Fatalf("case-insensitive name: %v", got)
+	}
+	// "他說訂單編號是 …" — a numeric keyword also matches the order id.
+	if got := e.listIDs(t, e.ownerA, e.shopA, fmt.Sprintf("?q=%d", chen)); len(got) == 0 || !contains(got, chen) {
+		t.Fatalf("order id keyword: %v (want %d)", got, chen)
+	}
+	// A keyword that matches nothing is an empty page, not an error.
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?q=nobody-here"); len(got) != 0 {
+		t.Fatalf("no-match keyword: %v", got)
+	}
+	// A quote in the keyword is a keyword, not SQL (parameter binding).
+	if got := e.listIDs(t, e.ownerA, e.shopA, "?q=%27%20OR%201%3D1%20--"); len(got) != 0 {
+		t.Fatalf("quoted keyword must not become SQL: %v", got)
+	}
+	// Filters compose with the pre-existing status filter and stay shop-scoped.
+	q := fmt.Sprintf("?q=%%E7%%8E%%8B&status=%d", order.StatusCreated)
+	if got := e.listIDs(t, e.ownerA, e.shopA, q); !sameIDs(got, wang) {
+		t.Fatalf("keyword + status: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerB, e.shopB, "?q=%E7%8E%8B"); len(got) != 0 {
+		t.Fatalf("keyword must not cross shops: %v", got)
+	}
+}
+
+func contains(ids []int, want int) bool {
+	for _, id := range ids {
+		if id == want {
+			return true
+		}
+	}
+	return false
+}

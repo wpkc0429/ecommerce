@@ -145,3 +145,40 @@ dialog { border: none; border-radius: 0.75rem; padding: 1.5rem; min-width: 24rem
 dialog::backdrop { background: rgba(0,0,0,0.35); }
 dialog form { display: flex; flex-direction: column; gap: 0.8rem; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 0.5rem; }
+
+/* 營運後台（change admin-commerce-operations） */
+.filters { flex-wrap: wrap; max-width: none; }
+label.inline { flex-direction: row; align-items: center; gap: 0.35rem; white-space: nowrap; color: #374151; }
+.inline-form { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
+
+.detail-section { margin-bottom: 1.25rem; }
+h3 { margin: 1.25rem 0 0.6rem; font-size: 1rem; }
+
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.5rem 1.5rem; }
+.kv { display: flex; gap: 0.5rem; align-items: baseline; border-bottom: 1px solid #f3f4f6; padding: 0.35rem 0; }
+.kv-k { color: #6b7280; min-width: 6rem; }
+.kv-v { font-weight: 500; }
+.kv-v.mono, .table td.mono, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* 金額三件組：組合關係必須看得見，不是三個並列的數字（design D10） */
+.amount-composition {
+  display: flex; align-items: flex-end; gap: 0.9rem; flex-wrap: wrap;
+  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.5rem;
+  padding: 0.9rem 1.1rem; margin-bottom: 1rem;
+}
+.amount-part { display: flex; flex-direction: column; gap: 0.15rem; }
+.amount-label { color: #6b7280; font-size: 0.8rem; }
+.amount-part .money { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.amount-part.total .money { font-size: 1.35rem; font-weight: 700; color: #111827; }
+.amount-op { color: #6b7280; font-size: 1.1rem; padding-bottom: 0.15rem; }
+
+/* 點數不是金額（design D10）：不同顏色、不同單位、絕不套用貨幣格式 */
+.points, .table td.points { color: #7c3aed; font-weight: 600; white-space: nowrap; }
+.points.negative, .table td.points.negative { color: #b91c1c; }
+
+.shipment-form { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
+.shipment-form .field { flex-direction: column; gap: 0.3rem; }
+.shipment-form input { width: 14rem; }
+
+.table td.gift-message { max-width: 18rem; white-space: pre-wrap; color: #92400e; }
+.table td.key-value { user-select: all; }

@@ -110,6 +110,26 @@ async function commercePath() {
   check("seeded publishable key resolves the demo shop", Boolean(shopID), String(shopID));
   const shopPath = (p) => `/api/v1/admin/shops/${shopID}${p}`;
 
+  // change admin-commerce-operations (design D6): the admin SPA decides whether
+  // to draw the allowed-origins block straight from this endpoint's answer, even
+  // though shop.manage_client_origins is a PLATFORM-scoped node. The difference
+  // only shows up for a MERCHANT identity — the platform admin that
+  // happy-path.mjs drives in the browser holds both tiers and sees everything.
+  // So the asymmetry has to be asserted here, where the caller is the shop's own
+  // owner, or it is not asserted at all.
+  const meRes = await req("GET", shopPath("/me"), { token: admin });
+  const myPerms = meRes.json?.permissions ?? [];
+  check("merchant owner can query their own effective permissions in this shop",
+    meRes.status === 200, brief(meRes));
+  check("publishable keys are merchant-scoped, so the owner holds them",
+    myPerms.includes("publishable_key.view") && myPerms.includes("publishable_key.create"),
+    JSON.stringify(myPerms.filter((p) => p.startsWith("publishable_key"))));
+  check("allowed origins are platform-scoped, so the owner does NOT hold the node",
+    !myPerms.includes("shop.manage_client_origins"), JSON.stringify(myPerms));
+  const originsForOwner = await req("GET", shopPath("/allowed-origins"), { token: admin });
+  check("…and the server agrees: the owner is refused on the origins endpoint",
+    originsForOwner.status === 403, brief(originsForOwner));
+
   const adminMethods = await req("GET", shopPath("/shipping-methods"), { token: admin });
   const allMethods = adminMethods.json?.shipping_methods ?? [];
   const activeMethods = allMethods.filter((m) => m.is_active);

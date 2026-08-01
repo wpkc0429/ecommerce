@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - `/api` — Go headless API（唯一資料權威）：chi router、ent + versioned migrations、JWT 雙體系認證、RBAC、多租戶解析、CMS/渲染/快取
 - `/web` — Next.js (App Router) storefront SSR：以渲染 bundle API 取得資料，主題＝前端元件庫（`themes/registry.ts`）
-- `/admin` — 無建置步驟的薄殼 SPA（原生 ES modules，`lib/` + `views/`）：登入、CMS 內容編輯與發佈/預覽、商品目錄（分類／商品／巢狀 SKU）
+- `/admin` — 無建置步驟的薄殼 SPA（原生 ES modules，`lib/` + `views/`）：登入、CMS 內容編輯與發佈/預覽、商品目錄（分類／商品／巢狀 SKU）、營運（訂單／出貨／運送方式／會員等級／點數／publishable key 與 origin）
 - `/e2e` — Playwright 瀏覽器 E2E（happy path）
 - `docker-compose.yml` — PostgreSQL 16 + Redis 7（開發基礎設施）
 
@@ -36,7 +36,7 @@ make openapi-mock  # 由契約起 Prism mock server（:4010，npx，無需 DB/Re
 make openapi-ui    # 由契約起 Redocly 可瀏覽文件（:8081，npx）
 
 cd web && npm run gen:types   # 由 starter schema JSON 重新產生 TS 型別
-cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 電商鏈（需三個服務 + seed-demo 後的乾淨狀態；目前 101 項斷言）
+cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 營運後台 ＋ 電商鏈（需三個服務 + seed-demo 後的乾淨狀態；目前 138 項斷言）
 cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API；可重複執行）
 ```
 
@@ -60,6 +60,12 @@ cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API�
 - **admin 前端架構已定案**（change admin-commerce-catalog，design D1，`admin-commerce-operations` 及之後皆繼承）：**維持無建置步驟**，但不再是單檔——瀏覽器原生 `import`／`export` 讓「無建置步驟」與「多模組」可以並存（`admin/lib/*.js` 共用詞彙、`admin/views/*.js` 各視圖、`admin/app.js` 只剩 shell 與**視圖註冊表**）。新增視圖 = index.html 一個 `.tab-panel` + 註冊表一列。共用詞彙刻意維持在下限：`el()`、`repeater()`、`formatMoney()`、`can()`，**沒有虛擬 DOM／observable／模板語言／路由器**——每加一個都要能指出它替換掉了哪一段重複程式碼。推翻此決策（改用框架）的四條條件寫在 design D1，出現任一條就重開評估，不必再爭論。`admin/Dockerfile` 改為 `COPY .` ＋ `.dockerignore`，新增模組不需要改部署設定。
 - **巢狀表單一律用 `repeater()`**（design D2）：`renderRow(value, remove)` 回傳 `{ node, read }`，**`read()` 閉包在該列自己的 input 參考上**；收集時走 entries 陣列呼叫每列的 `read()`，**一次 DOM 查詢都不做**。這與 `lib/schemaform.js`（CMS）用 label 文字回頭找 DOM 的收集路徑刻意相反——後者在「N 列 × 每列 M 個同名子欄位」下會靜默配錯值。因為 `repeater` 對「列裡面有什麼」一無所知，巢狀第二層（SKU 列裡的 `options` key/value）用的是同一個函式。**商品／SKU／分類刻意不走 schema 驅動表單**（design D3）：CMS 需要它是因為頁型形狀在撰寫時未知；商品的形狀是 Go struct ＋ OpenAPI，已知且穩定，`x-editor-order` 要解的 jsonb 鍵序問題在手寫表單上根本不存在。
 - **後台金額顯示與輸入絕不縮放**（design D4）：整個 `admin/` 不存在 `/100` 或 `*100`；顯示走 `admin/lib/money.js`，輸入是整數。TWD 的最小貨幣單位是元，`3400` 就是 `NT$3,400`。刻意**不用** `Intl.NumberFormat` 的 `style:"currency"`（它會產出 `$3,400.00`，那個 `.00` 暗示相反的單位語意，下一個人就會去補除法），也**不自建** exponent 對照表（product-catalog design D1 已定案那是後端 `money` package 的事）。守著它的是 `e2e/happy-path.mjs` 第 ⑩ 節的三條斷言——這是本專案唯一「寫錯不會噴錯」的地方。
+- **admin 的營運後台與 tripwire 現況**（change admin-commerce-operations）：`admin-commerce-catalog` design D1 的**四條推翻條件已逐條查證**。**#1（跨視圖衍生狀態）未觸發，而且理由是資料模型而不是克制**——`shipping.Service.CreateShipment` 的簽名裡沒有品項也沒有數量，`shipments.order_id` 有唯一索引，`ListShipmentsAdmin` 註解寫明「0 or 1 row this phase」：**一筆訂單至多一筆出貨，粒度是整筆訂單**。所以「已出貨數／待出貨數」在系統裡沒有對應的事實，UI **不得**提供品項勾選或數量輸入（那會讓商家以為可以只出一部分）。要做部分出貨得先讓 `shipments` 長出 line items，**屆時 tripwire #1 才真正到期，該重新評估的是框架，不是在前端手工同步四個地方**。**#2（第三次重寫）觸發了**，處置是 `lib/dom.js` 的 `rows()`（8 個列表視圖）與 `renderPager()`（3 個）——它們是純函式、不需要生命週期也不需要反應性，所以答案是「加進 `lib/`」而不是框架；**刻意不是 `table()`**（表頭是 `index.html` 的靜態 `<thead>`，本來就不重複，接管整張表只會把儲存格推進 config 物件）。**#4（總行數 ~3000）未觸發但只差一點**：實測 2,940 行（JS 2,361 ＋ HTML 395 ＋ CSS 184），**下一個視圖就會越過**——下一個 admin change 開工前先重評 D1，不要先寫程式。
+- **後台路由是 40 行的 hash router**（`admin/lib/router.js`，change admin-commerce-operations design D5）：`#/<view>[/<param>]`。`showTab()` 只寫 `location.hash`，畫面切換只發生在單一的路由處理器裡（兩份真相會立刻漂移）；hash 未變時瀏覽器不發事件，所以導航函式回傳 false 時呼叫端必須自己渲染一次。**hash 而不是 History API**：後台是 nginx 服務的靜態檔，History API 的深層連結需要伺服器 rewrite。深層連結刻意**只涵蓋「這一筆」**（`#/orders/1234`、`#/points/57`），**篩選條件不入 hash**。開機時 hash 指向的視圖必須存在、有權限、且非 `transient`（編輯器類視圖的內容由開啟它的視圖預先填好，重新整理會停在空畫面），否則安靜回落到第一個有權限的視圖——過期的書籤不該長得像故障。
+- **點數不是金額，絕不能經過 `formatMoney`**（change admin-commerce-operations design D10）：`admin/lib/money.js` 另有 `formatPoints`／`formatPointsDelta`／`formatPercent`。這條規則存在的理由是兩者之間有真實換算（核發是 `floor(subtotal_amount / 100)`），所以一筆 3,400 的訂單核發 34 點，而把 34 丟進 `formatMoney` 會得到 `NT$34`——數字對、單位錯、看起來完全合理、沒有任何東西會噴錯。訂單詳情上兩者同時出現，E2E 有專門斷言（餘額必須是 `34 點`且不含 `NT$`）。訂單金額三件組必須**組合式**呈現（`小計 ＋ 運費 ＝ 應付總額`），那是唯一能讓商家察覺 `order-extras` 改了 `total_amount` 語意的地方。
+- **`shop.manage_client_origins` 的 UI 可見性來源就是 `/shops/{shopID}/me`**（change admin-commerce-operations design D6，已實測 ＋ 整合測試）：它雖是**平台層**節點，但 `rbac.Engine.load` 在商家上下文取角色時是 `shop_id = ? OR shop_id IS NULL`，**平台層角色的權限會被聯集進商家層快照**——所以平台管理員的 `/shops/1/me` 含它、商家 owner 不含，正好對上伺服器的 200／403。**不需要第二個可見性來源。** 已知不精確：伺服器的 `RequirePlatformPermission` 另外要求 `HasPlatformRole`，而 `can()` 不查那個；若有人把該節點授予 merchant scope 的角色（seed 不會），UI 會多畫一顆按下去回 403 的按鈕——體驗層不是安全層。
+- **商家訂單列表的篩選一律在伺服器端**（change admin-commerce-operations design D3／D4）：`GET /admin/shops/{shopID}/orders` 除既有 `status` 外，新增選填 `payment_status`／`fulfillment_status`／`delivery_from`／`delivery_to`／`q`（皆為 additive，不帶時查詢逐行相同）。**不得在前端過濾**——列表是分頁的，對當頁過濾會回報「今天沒有要出的貨」而其實有一筆在第 3 頁。日期區間篩的是 **`requested_delivery_date`（Postgres `date`，無時區歧義）而不是 `created_at`**（`shops` 沒有時區欄位，「某一天的訂單」在伺服器上無法無歧義定義）；**未指定配送日的訂單在帶任一日期界限時一律被排除**（NULL 比較為假），UI 必須明示這件事。`q` 對 `shipping_address->>'recipient_name'`／`->>'phone'` 做 ILIKE，數字時另比對訂單編號；實作用 `sql.P` + `Builder.Arg`（**`sql.ExprP` 的 `?` 不會被改寫成 Postgres 的 `$N`，會 500**）。
+- **平台沒有任何列出會員的端點**（change admin-commerce-operations design D7）：後台點數視圖只能以 member id 定址（訂單詳情的按鈕、深層連結 `#/points/{memberID}`、或手動輸入）。做顧客名冊需要分頁、搜尋、一份 PII 揭露決策與一個今天不存在的權限節點——留給獨立 change，別順手加一個 `GET /members`。
 - **商品 PUT 是全量語意，UI 必須永遠送完整 `skus`**（design D8）：`catalog.upsertSKUs` 會**刪除未出現在酬載中的既有 SKU**，`category_ids` 同樣全量取代。漏送一列＝靜默刪掉它的價格與庫存。因此商品編輯器只有一顆儲存鍵，不提供「只存基本資料」；任何日後新增的「快速編輯」入口動手前先讀 design D8。E2E 第 ⑪ 節專門守著它。
 - **UI 的權限來源是 `GET /api/v1/admin/shops/{shopID}/me`**（design D5）：回傳呼叫者在該商家**三層判定後**的有效權限節點。它的守衛只有「已認證 ＋ 跨店存取守衛」，**不要求任何權限節點**——以任一既有節點當守衛，只被授予 `product.view` 的自訂角色就會拿到 403 而看到空白後台。**這是體驗層不是安全層**，伺服器的 `RequireShopPermission` 永遠是唯一權威。切換商家必須重新取得。
 - **主題 schema 來源**：`api/internal/seed/schemas/starter/*.json` 同時驅動後端驗證/hydration 與 `web` 的 TS 型別（`npm run gen:types`）。

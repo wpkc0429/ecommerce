@@ -3915,7 +3915,12 @@ paths:
       tags: [admin-commerce]
       operationId: listOrdersAdmin
       summary: 列出商家訂單
-      description: 需要商家層 `order.view`。
+      description: |
+        需要商家層 `order.view`。
+
+        除 `status` 外的篩選參數皆由 change admin-commerce-operations（design D3）新增，
+        全部選填；一個都不帶時，查詢與回應與它們存在之前完全相同。它們必須在伺服器端執行——
+        列表是分頁的，在前端過濾只看得到當頁，會對「符合條件但在第 3 頁」的訂單回報不存在。
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
@@ -3925,6 +3930,39 @@ paths:
           in: query
           required: false
           schema: { type: integer, enum: [0, 1] }
+        - name: payment_status
+          in: query
+          required: false
+          description: |
+            精確比對 `payment_status`。刻意不宣告 enum：該欄位的列舉由 payment-integration
+            擁有（order-management design D5），在此複製一份只會產生兩份會漂移的真相。
+            不認得的值篩出零筆。
+          schema: { type: integer, minimum: 0 }
+        - name: fulfillment_status
+          in: query
+          required: false
+          description: 精確比對 `fulfillment_status`（列舉由 shipping-logistics 擁有，理由同上）。
+          schema: { type: integer, minimum: 0 }
+        - name: delivery_from
+          in: query
+          required: false
+          description: |
+            `requested_delivery_date` 的下界（含）。日曆日，不是瞬間——該欄位是 Postgres `date`，
+            因此這個篩選對每個時區的每個呼叫端都是同一個答案（design D4）。
+            **未指定配送日的訂單在帶任一界限時一律被排除**（NULL 比較為假）。
+          schema: { type: string, format: date }
+        - name: delivery_to
+          in: query
+          required: false
+          description: '`requested_delivery_date` 的上界（含）。語意同 `delivery_from`。'
+          schema: { type: string, format: date }
+        - name: q
+          in: query
+          required: false
+          description: |
+            關鍵字：對收件人姓名與電話做大小寫不敏感的子字串比對；可解析為正整數時另比對訂單編號。
+            不比對地址行——商家找的是人，比對 `line1` 會讓「台北」回傳半個城市的訂單。
+          schema: { type: string }
       responses:
         "200":
           description: 訂單的一頁。

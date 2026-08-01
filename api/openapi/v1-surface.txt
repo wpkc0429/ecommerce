@@ -142,10 +142,20 @@ GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query pa
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points/transactions query page_size optional
 GET /api/v1/admin/shops/{shopID}/orders
 GET /api/v1/admin/shops/{shopID}/orders path shopID
+GET /api/v1/admin/shops/{shopID}/orders query delivery_from
+GET /api/v1/admin/shops/{shopID}/orders query delivery_from optional
+GET /api/v1/admin/shops/{shopID}/orders query delivery_to
+GET /api/v1/admin/shops/{shopID}/orders query delivery_to optional
+GET /api/v1/admin/shops/{shopID}/orders query fulfillment_status
+GET /api/v1/admin/shops/{shopID}/orders query fulfillment_status optional
 GET /api/v1/admin/shops/{shopID}/orders query page
 GET /api/v1/admin/shops/{shopID}/orders query page optional
 GET /api/v1/admin/shops/{shopID}/orders query page_size
 GET /api/v1/admin/shops/{shopID}/orders query page_size optional
+GET /api/v1/admin/shops/{shopID}/orders query payment_status
+GET /api/v1/admin/shops/{shopID}/orders query payment_status optional
+GET /api/v1/admin/shops/{shopID}/orders query q
+GET /api/v1/admin/shops/{shopID}/orders query q optional
 GET /api/v1/admin/shops/{shopID}/orders query status
 GET /api/v1/admin/shops/{shopID}/orders query status optional
 GET /api/v1/admin/shops/{shopID}/orders/{orderID}

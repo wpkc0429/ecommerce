@@ -261,12 +261,41 @@ func (h *OrderHandler) cancelMine(w http.ResponseWriter, r *http.Request) {
 
 // ── merchant back office ─────────────────────────────────────────────
 
+// optionalDateQuery parses a query param as a bare calendar day (YYYY-MM-DD).
+// A missing or unparseable value yields nil — "filter absent" — following the
+// same tolerant-input rule as paginationParam/optionalIntQuery (design D3 of
+// change product-catalog).
+//
+// The layout is deliberately date-only, matching orders.requested_delivery_date's
+// Postgres `date` type: accepting a timestamp here would invite a timezone
+// offset into a comparison that has none (change admin-commerce-operations,
+// design D4).
+func optionalDateQuery(r *http.Request, name string) *time.Time {
+	raw := r.URL.Query().Get(name)
+	if raw == "" {
+		return nil
+	}
+	d, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		return nil
+	}
+	return &d
+}
+
 func (h *OrderHandler) listAdmin(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
 	params := order.AdminListParams{
 		Page:     paginationParam(r, "page"),
 		PageSize: paginationParam(r, "page_size"),
 		Status:   optionalInt16Query(r, "status"),
+		// change admin-commerce-operations (design D3): every filter below is
+		// optional, and a request carrying none of them behaves exactly as it
+		// did before they existed.
+		PaymentStatus:     optionalInt16Query(r, "payment_status"),
+		FulfillmentStatus: optionalInt16Query(r, "fulfillment_status"),
+		DeliveryFrom:      optionalDateQuery(r, "delivery_from"),
+		DeliveryTo:        optionalDateQuery(r, "delivery_to"),
+		Q:                 r.URL.Query().Get("q"),
 	}
 	op, err := h.Service.ListOrdersAdmin(r.Context(), shopID, params)
 	if err != nil {

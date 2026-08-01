@@ -18,6 +18,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
@@ -494,10 +496,37 @@ type ListParams struct {
 
 // AdminListParams are pagination + filter inputs for the merchant back
 // office order list.
+//
+// Every field below Status was added by change admin-commerce-operations
+// (design D3) and every one of them is optional: with all of them at their
+// zero value ListOrdersAdmin runs the exact query it ran before they existed.
+// They are not conveniences — the list is paginated, so a filter applied in the
+// browser can only ever see the current page and would answer "no orders ship
+// today" while one sits on page 3. That is a bouquet that never left the shop.
 type AdminListParams struct {
 	Page     int
 	PageSize int
 	Status   *int16
+	// PaymentStatus/FulfillmentStatus are matched exactly. Deliberately not
+	// range-validated here: the DB CHECK on both columns is only ">= 0" and the
+	// enumerations belong to payment/shipping respectively (order-management
+	// design D5). An unrecognized value simply matches nothing, which is the
+	// honest answer.
+	PaymentStatus     *int16
+	FulfillmentStatus *int16
+	// DeliveryFrom/DeliveryTo bound requested_delivery_date, a Postgres `date`
+	// — a calendar day with no instant and no offset, so this filter means the
+	// same thing to every caller in every timezone (design D4). Orders with no
+	// requested delivery date are excluded whenever either bound is set: NULL
+	// compares false, and "what ships on the 5th" genuinely does not include
+	// "whenever".
+	DeliveryFrom *time.Time
+	DeliveryTo   *time.Time
+	// Q matches the recipient's name or phone (case-insensitive substring), and
+	// additionally the order id when Q parses as a positive integer. It does NOT
+	// match address lines: a merchant is looking for a person, and matching
+	// line1 would turn "台北" into half the city's orders.
+	Q string
 }
 
 // OrderPage is a page of orders plus pagination metadata (mirrors
@@ -545,14 +574,75 @@ func (s *Service) GetOrderAdmin(ctx context.Context, shopID, orderID int) (*ent.
 }
 
 // ListOrdersAdmin lists every order within shopID, newest first, optionally
-// filtered by order status.
+// filtered by order status and — since change admin-commerce-operations
+// (design D3) — by payment/fulfillment status, requested delivery date range
+// and a recipient/order-id keyword.
+//
+// Every filter is conditional: with an all-zero AdminListParams beyond
+// Page/PageSize this builds byte for byte the query it built before those
+// fields existed.
 func (s *Service) ListOrdersAdmin(ctx context.Context, shopID int, params AdminListParams) (*OrderPage, error) {
 	page, pageSize := normalizePage(params.Page, params.PageSize)
 	q := s.Client.Order.Query().Where(entorder.ShopIDEQ(shopID))
 	if params.Status != nil {
 		q = q.Where(entorder.StatusEQ(*params.Status))
 	}
+	if params.PaymentStatus != nil {
+		q = q.Where(entorder.PaymentStatusEQ(*params.PaymentStatus))
+	}
+	if params.FulfillmentStatus != nil {
+		q = q.Where(entorder.FulfillmentStatusEQ(*params.FulfillmentStatus))
+	}
+	if params.DeliveryFrom != nil {
+		q = q.Where(entorder.RequestedDeliveryDateGTE(*params.DeliveryFrom))
+	}
+	if params.DeliveryTo != nil {
+		q = q.Where(entorder.RequestedDeliveryDateLTE(*params.DeliveryTo))
+	}
+	if kw := strings.TrimSpace(params.Q); kw != "" {
+		q = q.Where(recipientOrIDMatches(kw))
+	}
 	return paginate(ctx, q, page, pageSize)
+}
+
+// addressFieldMatches matches one string key inside the shipping_address jsonb
+// against a case-insensitive LIKE pattern.
+//
+// ent has no typed predicate for jsonb key extraction, so this drops to a raw
+// selector — but the value goes through Builder.Arg, which emits the dialect's
+// own placeholder ($1, $2, …) and binds the argument. It is never concatenated
+// into the SQL text, so a keyword containing a quote stays a keyword.
+func addressFieldMatches(key, pattern string) predicate.Order {
+	return func(s *entsql.Selector) {
+		s.Where(entsql.P(func(b *entsql.Builder) {
+			b.WriteString(s.C(entorder.FieldShippingAddress)).
+				WriteString("->>'" + key + "' ILIKE ").
+				Arg(pattern)
+		}))
+	}
+}
+
+// recipientOrIDMatches builds the keyword predicate for the back-office order
+// list (design D3).
+//
+// Known limit (same as the product search of change admin-commerce-catalog,
+// design D6): `ILIKE '%…%'` cannot use an index. At a single shop's order
+// volume that is fine; when it stops being fine the path is a pg_trgm GIN index
+// or full text search, and the API contract does not change.
+func recipientOrIDMatches(kw string) predicate.Order {
+	pattern := "%" + kw + "%"
+	// The key names are literals owned by order.ShippingAddress's json tags,
+	// never caller input — nothing from the request reaches the SQL text.
+	preds := []predicate.Order{
+		addressFieldMatches("recipient_name", pattern),
+		addressFieldMatches("phone", pattern),
+	}
+	// "他說訂單編號是 1234" is the other half of the same question, and the
+	// merchant should not have to know which box to type it into.
+	if id, err := strconv.Atoi(kw); err == nil && id > 0 {
+		preds = append(preds, entorder.IDEQ(id))
+	}
+	return entorder.Or(preds...)
 }
 
 func paginate(ctx context.Context, q *ent.OrderQuery, page, pageSize int) (*OrderPage, error) {
