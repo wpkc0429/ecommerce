@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	entorderitem "ksdevworks/ecommerce/api/internal/ent/orderitem"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
+	entshipmentitem "ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
@@ -138,5 +140,101 @@ func TestTenantScopeOnCatalogEntities(t *testing.T) {
 	// Without tenant context, all rows remain reachable (admin/CLI path).
 	if n := client.Category.Query().CountX(ctx); n != 3 { // catA, catB, sneaky
 		t.Fatalf("unscoped category count: got %d, want 3", n)
+	}
+}
+
+// TestTenantScopeOnShipmentItems covers change partial-shipment: shipment_items
+// is tenant data — it says what a named customer's parcel contained — so it must
+// be scoped exactly like order_items.
+//
+// The **eager-load** assertion is the one worth having. Registration in
+// tenantOwned is checked structurally next door, but every production read of
+// this table goes through `WithItems(...)` on a shipment, which ent runs as a
+// separate query for the edge. If that query did not pass through the
+// interceptor, a shop could reach another shop's parcel contents while its own
+// direct queries looked perfectly scoped — a leak whose symptom is invisible
+// from the calling code.
+func TestTenantScopeOnShipmentItems(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+
+	type fixture struct {
+		shopID, shipmentID, itemID int
+	}
+	build := func(name, email string, qty int32) fixture {
+		shop := client.Shop.Create().SetName(name).SaveX(ctx)
+		member := client.Member.Create().SetShopID(shop.ID).SetEmail(email).SetStatus(1).SaveX(ctx)
+		ord := client.Order.Create().
+			SetShopID(shop.ID).SetMemberID(member.ID).
+			SetStatus(0).SetPaymentStatus(0).SetFulfillmentStatus(0).
+			SetCurrency("TWD").SetSubtotalAmount(1000).SetTotalAmount(1000).
+			SetShippingAddress(json.RawMessage(`{}`)).
+			SaveX(ctx)
+		item := client.OrderItem.Create().
+			SetShopID(shop.ID).SetOrderID(ord.ID).
+			SetProductTitle("花").SetSkuCode("SKU-1").
+			SetQuantity(qty).SetPriceAmount(1000).SetCurrency("TWD").
+			SaveX(ctx)
+		sh := client.Shipment.Create().
+			SetShopID(shop.ID).SetOrderID(ord.ID).SetCarrier("黑貓宅急便").SetStatus(1).
+			SaveX(ctx)
+		si := client.ShipmentItem.Create().
+			SetShopID(shop.ID).SetShipmentID(sh.ID).SetOrderItemID(item.ID).SetQuantity(qty).
+			SaveX(ctx)
+		return fixture{shopID: shop.ID, shipmentID: sh.ID, itemID: si.ID}
+	}
+
+	a := build("Shop A", "a@t.dev", 1)
+	b := build("Shop B", "b@t.dev", 2)
+
+	ctxA := tenant.WithShopID(ctx, a.shopID)
+
+	// Direct query: only A's parcel line is visible.
+	rows := client.ShipmentItem.Query().AllX(ctxA)
+	if len(rows) != 1 || rows[0].ID != a.itemID {
+		t.Fatalf("shipment_items scoped query returned %d rows (%+v), want only shop A's", len(rows), rows)
+	}
+
+	// B's row is unreachable by primary key from inside A.
+	if _, err := client.ShipmentItem.Query().
+		Where(entshipmentitem.IDEQ(b.itemID)).Only(ctxA); !ent.IsNotFound(err) {
+		t.Fatalf("cross-tenant shipment_item lookup: want NotFound, got %v", err)
+	}
+
+	// Eager loading through the shipment edge is scoped too — this is the path
+	// every handler actually uses.
+	shipments := client.Shipment.Query().
+		WithItems().
+		AllX(ctxA)
+	if len(shipments) != 1 {
+		t.Fatalf("shipments scoped query returned %d rows, want 1", len(shipments))
+	}
+	if len(shipments[0].Edges.Items) != 1 || shipments[0].Edges.Items[0].ID != a.itemID {
+		t.Fatalf("eager-loaded parcel contents leaked across tenants: %+v", shipments[0].Edges.Items)
+	}
+
+	// Creation in tenant context is stamped with the context shop even when the
+	// caller passes another shop's id (same guarantee as every other entity).
+	// A second line on A's order, because UNIQUE(shipment_id, order_item_id)
+	// rightly refuses to put the same line in the same parcel twice.
+	orderA := client.OrderItem.Query().Where(entorderitem.ShopIDEQ(a.shopID)).OnlyX(ctx)
+	secondLine := client.OrderItem.Create().
+		SetShopID(a.shopID).SetOrderID(orderA.OrderID).
+		SetProductTitle("花瓶").SetSkuCode("SKU-2").
+		SetQuantity(1).SetPriceAmount(500).SetCurrency("TWD").
+		SaveX(ctx)
+	stamped := client.ShipmentItem.Create().
+		SetShopID(b.shopID).SetShipmentID(a.shipmentID).
+		SetOrderItemID(secondLine.ID).
+		SetQuantity(1).
+		SaveX(ctxA)
+	if stamped.ShopID != a.shopID {
+		t.Fatalf("create in ctx A landed in shop %d, want %d", stamped.ShopID, a.shopID)
+	}
+	client.ShipmentItem.DeleteOneID(stamped.ID).ExecX(ctx)
+
+	// Outside tenant context both rows remain reachable (back-office/CLI path).
+	if n := client.ShipmentItem.Query().CountX(ctx); n != 2 {
+		t.Fatalf("unscoped shipment_item count: got %d, want 2", n)
 	}
 }

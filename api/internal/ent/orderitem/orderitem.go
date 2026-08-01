@@ -38,6 +38,8 @@ const (
 	FieldCurrency = "currency"
 	// FieldGiftMessage holds the string denoting the gift_message field in the database.
 	FieldGiftMessage = "gift_message"
+	// FieldShippedQuantity holds the string denoting the shipped_quantity field in the database.
+	FieldShippedQuantity = "shipped_quantity"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
 	EdgeShop = "shop"
 	// EdgeOrder holds the string denoting the order edge name in mutations.
@@ -75,6 +77,7 @@ var Columns = []string{
 	FieldPriceAmount,
 	FieldCurrency,
 	FieldGiftMessage,
+	FieldShippedQuantity,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -102,6 +105,8 @@ var (
 	CurrencyValidator func(string) error
 	// DefaultGiftMessage holds the default value on creation for the "gift_message" field.
 	DefaultGiftMessage string
+	// DefaultShippedQuantity holds the default value on creation for the "shipped_quantity" field.
+	DefaultShippedQuantity int32
 )
 
 // OrderOption defines the ordering options for the OrderItem queries.
@@ -170,6 +175,11 @@ func ByCurrency(opts ...sql.OrderTermOption) OrderOption {
 // ByGiftMessage orders the results by the gift_message field.
 func ByGiftMessage(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldGiftMessage, opts...).ToFunc()
+}
+
+// ByShippedQuantity orders the results by the shipped_quantity field.
+func ByShippedQuantity(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShippedQuantity, opts...).ToFunc()
 }
 
 // ByShopField orders the results by shop field.

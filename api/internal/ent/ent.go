@@ -28,6 +28,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
@@ -127,6 +128,7 @@ func checkColumn(t, c string) error {
 			rolepermission.Table:         rolepermission.ValidColumn,
 			roleuser.Table:               roleuser.ValidColumn,
 			shipment.Table:               shipment.ValidColumn,
+			shipmentitem.Table:           shipmentitem.ValidColumn,
 			shippingmethod.Table:         shippingmethod.ValidColumn,
 			shop.Table:                   shop.ValidColumn,
 			shopallowedorigin.Table:      shopallowedorigin.ValidColumn,

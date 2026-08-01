@@ -68,14 +68,14 @@ func (ShippingMethod) Annotations() []schema.Annotation {
 	}
 }
 
-// Shipment is the (at most one per order) shipment record for an Order
-// (design D3/D4). Unlike OrderItem's product_id/sku_id (deliberately
-// edge-less informational snapshots), Shipment's order_id is a real,
-// required FK — mirrors Payment.order_id exactly, same reasoning: a
-// shipment record's entire reason to exist is "this parcel belongs to that
-// order", not a point-in-time display snapshot. No OnDelete annotation is
-// set, so Postgres's default NO ACTION applies — deleting an order with an
-// existing shipment is blocked rather than cascading it away (audit trail).
+// Shipment is one parcel dispatched for an Order. Unlike OrderItem's
+// product_id/sku_id (deliberately edge-less informational snapshots),
+// Shipment's order_id is a real, required FK — mirrors Payment.order_id
+// exactly, same reasoning: a shipment record's entire reason to exist is
+// "this parcel belongs to that order", not a point-in-time display snapshot.
+// No OnDelete annotation is set, so Postgres's default NO ACTION applies —
+// deleting an order with an existing shipment is blocked rather than
+// cascading it away (audit trail).
 //
 // status (design D2) deliberately reuses orders.fulfillment_status's
 // non-zero values (1 shipped / 2 delivered / 3 returned) rather than
@@ -83,13 +83,18 @@ func (ShippingMethod) Annotations() []schema.Annotation {
 // ReturnedStatus. A shipments row only ever comes into existence at the
 // moment of shipping (creating the row IS the shipping event — there is no
 // separate "draft" step), so there is no "0/unfulfilled" value to represent
-// here: a nonexistent row already means unfulfilled.
+// here: a nonexistent row already means unfulfilled. A shipment also never
+// takes orders.fulfillment_status's new value 4 (partially shipped): "partly"
+// is a property of an *order*, never of a single parcel.
 //
-// order_id carries a UNIQUE index (design D4): the authoritative guard for
-// "at most one shipment per order" — order.Service.UpdateFulfillmentStatus
-// has no CAS semantics of its own, so this unique index (not application-
-// layer read-then-write logic) is what a concurrent double-ship attempt
-// ultimately collides against.
+// **An order may have many shipments** (change partial-shipment). order_id
+// used to carry a UNIQUE index, which was the authoritative "at most one
+// shipment per order" guard; that index is gone and what replaced it is a
+// different question entirely. The guard is no longer "has this order shipped
+// already" but "is there anything left to ship", and its arbiter is the
+// conditional UPDATE on order_items.shipped_quantity plus the CHECK
+// constraint bounding it by quantity (design D3) — not application-layer
+// read-then-write logic, exactly as before.
 type Shipment struct {
 	ent.Schema
 }
@@ -135,13 +140,20 @@ func (Shipment) Edges() []ent.Edge {
 		// inverse edge on Order — declared entirely here, so order.go does
 		// not need to change (mirrors Payment's own edge declaration).
 		edge.To("order", Order.Type).Unique().Required().Field("order_id"),
+		// The parcel's contents (change partial-shipment). Cascade lives here,
+		// on the assoc ("To") edge, because ent's SQL diff only consults this
+		// side when generating the FK (product-catalog design D7's documented
+		// gotcha, same as Order.items).
+		edge.To("items", ShipmentItem.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }
 
 func (Shipment) Indexes() []ent.Index {
 	return []ent.Index{
-		// design D4: the authoritative "at most one shipment per order" guard.
-		index.Fields("order_id").Unique(),
+		// Plain, NOT unique since change partial-shipment — an order may have
+		// many parcels. See the type doc comment for what took over as the
+		// arbiter.
+		index.Fields("order_id"),
 		index.Fields("shop_id", "order_id"),
 	}
 }
@@ -151,6 +163,81 @@ func (Shipment) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"shipments_status_check": "status IN (1, 2, 3)",
+			},
+		},
+	}
+}
+
+// ShipmentItem is one order line inside one parcel (change partial-shipment):
+// "this shipment contains N of that order item". Both edges are real, required
+// FKs — a shipment_items row has no meaning at all detached from either side,
+// which is the same test Shipment.order_id/Payment.order_id already pass, and
+// the opposite of OrderItem.product_id/sku_id (display snapshots that may
+// dangle).
+//
+// It deliberately carries **no money column**. Shipping fees live once, on the
+// order (orders.shipping_fee, a snapshot of the selected method's flat_rate);
+// a per-parcel amount here would immediately create a second authority for
+// what the customer was charged, and nothing reconciles the two.
+//
+// It also carries no denormalized product title or sku_code. Everything a
+// caller needs to display the line is already on the order item this row points
+// at, and that row is itself an immutable snapshot — copying it again would be
+// a third copy of the same text, drifting the first time anyone edits one path.
+type ShipmentItem struct {
+	ent.Schema
+}
+
+func (ShipmentItem) Mixin() []ent.Mixin {
+	return []ent.Mixin{TimeMixin{}}
+}
+
+func (ShipmentItem) Fields() []ent.Field {
+	return []ent.Field{
+		field.Int("shop_id"),
+		field.Int("shipment_id"),
+		field.Int("order_item_id"),
+		// How many of that order line are in this parcel. Bounded above by the
+		// order item's own quantity, but that bound is enforced where it can be
+		// enforced atomically: order_items.shipped_quantity's CHECK plus the
+		// conditional UPDATE that increments it (design D3). A CHECK here could
+		// only see this row.
+		field.Int32("quantity"),
+	}
+}
+
+func (ShipmentItem) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.To("shop", Shop.Type).Unique().Required().Field("shop_id"),
+		edge.From("shipment", Shipment.Type).Ref("items").
+			Unique().Required().Field("shipment_id"),
+		// One-directional real FK to OrderItem (no inverse edge on OrderItem,
+		// mirroring how Shipment declares its own order edge). No OnDelete, so
+		// Postgres's NO ACTION applies: an order item that is inside a parcel
+		// cannot be deleted out from under it. There is no order/order-item
+		// deletion endpoint in this API at all, so this only ever matters as a
+		// backstop.
+		edge.To("order_item", OrderItem.Type).Unique().Required().Field("order_item_id"),
+	}
+}
+
+func (ShipmentItem) Indexes() []ent.Index {
+	return []ent.Index{
+		// One line per order item per parcel: a request naming the same order
+		// item twice is rejected in the service layer, and this is the arbiter
+		// that makes that a database fact rather than a check someone could
+		// later drop (same discipline as point_transactions(order_id, kind)).
+		index.Fields("shipment_id", "order_item_id").Unique(),
+		index.Fields("shop_id", "shipment_id"),
+	}
+}
+
+func (ShipmentItem) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Table: "shipment_items"},
+		entsql.Annotation{
+			Checks: map[string]string{
+				"shipment_items_quantity_check": "quantity > 0",
 			},
 		},
 	}

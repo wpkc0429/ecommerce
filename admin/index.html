@@ -194,6 +194,9 @@
               <option value="1">已出貨</option>
               <option value="2">已送達</option>
               <option value="3">已退貨</option>
+              <!-- change partial-shipment：新增的列舉值 4。篩選一律在伺服器端
+                   （design D3），這裡只是把值送過去。 -->
+              <option value="4">部分出貨</option>
             </select>
             <label class="inline">指定配送日 <input type="date" id="order-delivery-from" /></label>
             <label class="inline">至 <input type="date" id="order-delivery-to" /></label>
@@ -234,7 +237,12 @@
         <h3>品項</h3>
         <table class="table">
           <thead><tr>
-            <th>商品</th><th>SKU</th><th>單價</th><th>數量</th><th>小計</th><th>卡片訊息</th>
+            <th>商品</th><th>SKU</th><th>單價</th><th>數量</th>
+            <!-- change partial-shipment：已出貨數／訂購數。這一欄在
+                 admin-commerce-operations 是被明文禁止的，理由是系統裡沒有對應
+                 的事實；shipment_items 與 order_items.shipped_quantity 建立了
+                 那個事實，禁令連同理由一起到期。 -->
+            <th>已出貨</th><th>小計</th><th>卡片訊息</th>
           </tr></thead>
           <tbody id="order-items-tbody"></tbody>
         </table>

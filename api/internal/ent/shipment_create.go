@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"time"
 
@@ -126,6 +127,21 @@ func (_c *ShipmentCreate) SetShop(v *Shop) *ShipmentCreate {
 // SetOrder sets the "order" edge to the Order entity.
 func (_c *ShipmentCreate) SetOrder(v *Order) *ShipmentCreate {
 	return _c.SetOrderID(v.ID)
+}
+
+// AddItemIDs adds the "items" edge to the ShipmentItem entity by IDs.
+func (_c *ShipmentCreate) AddItemIDs(ids ...int) *ShipmentCreate {
+	_c.mutation.AddItemIDs(ids...)
+	return _c
+}
+
+// AddItems adds the "items" edges to the ShipmentItem entity.
+func (_c *ShipmentCreate) AddItems(v ...*ShipmentItem) *ShipmentCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddItemIDs(ids...)
 }
 
 // Mutation returns the ShipmentMutation object of the builder.
@@ -296,6 +312,22 @@ func (_c *ShipmentCreate) createSpec() (*Shipment, *sqlgraph.CreateSpec) {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.OrderID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ItemsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   shipment.ItemsTable,
+			Columns: []string{shipment.ItemsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(shipmentitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

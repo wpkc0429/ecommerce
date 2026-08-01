@@ -63,6 +63,9 @@ func (h *ShippingHandler) MountShopAdmin(r chi.Router) {
 // protected chi.Group as OrderHandler.MountShop/PaymentHandler.MountShop).
 func (h *ShippingHandler) MountShop(r chi.Router) {
 	r.Get("/orders/{orderID}/shipment", h.getMineShipment)
+	// change partial-shipment, design D6: the plural form. Additive — the
+	// singular route above keeps its path, its shape and its 404 semantics.
+	r.Get("/orders/{orderID}/shipments", h.listMineShipments)
 }
 
 // MountPublic: the storefront-facing shipping method list (change
@@ -99,13 +102,46 @@ func publicShippingMethodJSON(sm *ent.ShippingMethod) map[string]any {
 	}
 }
 
+// shipmentItemJSON is deliberately three integers (change partial-shipment).
+//
+// It carries no product title, no sku_code and no money: the order item it
+// points at already holds an immutable snapshot of all of that, and every
+// response that includes shipments is reachable by a caller that can also read
+// the order (`order.items[].id` is published). A second copy of the item text
+// here would be a third serialization of the same line — the drift member-directory
+// design D2 refused for the same reason — and a per-parcel amount would give the
+// system two authorities for what the customer was charged.
+func shipmentItemJSON(it *ent.ShipmentItem) map[string]any {
+	return map[string]any{
+		"id": it.ID, "order_item_id": it.OrderItemID, "quantity": it.Quantity,
+	}
+}
+
 func shipmentJSON(s *ent.Shipment) map[string]any {
+	items := make([]map[string]any, 0, len(s.Edges.Items))
+	for _, it := range s.Edges.Items {
+		items = append(items, shipmentItemJSON(it))
+	}
 	return map[string]any{
 		"id": s.ID, "order_id": s.OrderID,
 		"carrier": s.Carrier, "tracking_number": s.TrackingNumber, "status": s.Status,
 		"shipped_at": s.ShippedAt, "delivered_at": s.DeliveredAt,
+		// What is actually in this parcel (change partial-shipment). Always
+		// present, always an array: an order shipped in one go has one entry per
+		// order line, which is also what the migration back-filled for every
+		// shipment created before line items existed. It is never null, so a
+		// caller never has to distinguish "no items" from "old row".
+		"items":      items,
 		"created_at": s.CreatedAt, "updated_at": s.UpdatedAt,
 	}
+}
+
+func shipmentsJSON(rows []*ent.Shipment) map[string]any {
+	out := make([]map[string]any, 0, len(rows))
+	for _, sh := range rows {
+		out = append(out, shipmentJSON(sh))
+	}
+	return map[string]any{"shipments": out}
 }
 
 // ── shipping methods CRUD (merchant back office) ───────────────────────
@@ -214,9 +250,18 @@ func (h *ShippingHandler) deleteShippingMethod(w http.ResponseWriter, r *http.Re
 // (design D3): carrier is required, tracking_number is optional (a nil
 // pointer vs. an explicit empty string are both treated as "not yet known"
 // by shipping.Service.CreateShipment).
+//
+// Items is optional and **a pointer to a slice on purpose** (change
+// partial-shipment, design D5): absent means "ship everything outstanding",
+// which is what every request written before line items existed meant and still
+// means, byte for byte. An explicitly empty array is a different statement — "I
+// am shipping, and I am shipping nothing" — and is rejected. A plain []T would
+// collapse those two into one value and silently turn the contradiction into the
+// default.
 type createShipmentRequest struct {
-	Carrier        string  `json:"carrier"`
-	TrackingNumber *string `json:"tracking_number"`
+	Carrier        string                        `json:"carrier"`
+	TrackingNumber *string                       `json:"tracking_number"`
+	Items          *[]shipping.ShipmentItemInput `json:"items"`
 }
 
 func (h *ShippingHandler) createShipment(w http.ResponseWriter, r *http.Request) {
@@ -230,7 +275,7 @@ func (h *ShippingHandler) createShipment(w http.ResponseWriter, r *http.Request)
 	if !decodeJSON(w, r, &in) {
 		return
 	}
-	sh, err := h.Service.CreateShipment(r.Context(), shopID, orderID, in.Carrier, in.TrackingNumber)
+	sh, err := h.Service.CreateShipment(r.Context(), shopID, orderID, in.Carrier, in.TrackingNumber, in.Items)
 	if err != nil {
 		writeShippingError(w, h.Log, err)
 		return
@@ -292,14 +337,40 @@ func (h *ShippingHandler) listShipments(w http.ResponseWriter, r *http.Request) 
 		writeShippingError(w, h.Log, err)
 		return
 	}
-	out := make([]map[string]any, 0, len(rows))
-	for _, sh := range rows {
-		out = append(out, shipmentJSON(sh))
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"shipments": out})
+	httpx.WriteJSON(w, http.StatusOK, shipmentsJSON(rows))
 }
 
 // ── member self-service ────────────────────────────────────────────────
+
+// listMineShipments answers "where are my parcels" (change partial-shipment,
+// design D6). It exists because this change created its own consumer: with more
+// than one shipment per order, the singular endpoint below can only ever show
+// one of them, and the customer has no other way to reach the rest.
+//
+// An order with nothing shipped yet is 200 with an empty array — a collection's
+// empty case is not a 404. That is the deliberate difference from the singular
+// endpoint, whose 404 keeps its existing meaning for its existing callers.
+func (h *ShippingHandler) listMineShipments(w http.ResponseWriter, r *http.Request) {
+	shopID, ok := shopFrom(w, r)
+	if !ok {
+		return
+	}
+	memberID, ok := memberFrom(w, r)
+	if !ok {
+		return
+	}
+	orderID, ok := intParam(r, "orderID")
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	rows, err := h.Service.ListShipmentsForMember(r.Context(), shopID, memberID, orderID)
+	if err != nil {
+		writeShippingError(w, h.Log, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, shipmentsJSON(rows))
+}
 
 func (h *ShippingHandler) getMineShipment(w http.ResponseWriter, r *http.Request) {
 	shopID, ok := shopFrom(w, r)

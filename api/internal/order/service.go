@@ -602,12 +602,31 @@ func validatePurchasable(items []*ent.CartItem) error {
 // GetOrder returns one order owned by memberID within shopID, items loaded.
 // The member_id predicate is applied directly in the query (unlike cart's
 // two-step ownedItem — orders carry member_id as a direct column), so a
+// orderItemsByID orders an order's lines by id — the sequence they were created
+// in at checkout, which is the sequence every consumer displays.
+//
+// **This was load-bearing from the day it was missing, and change
+// partial-shipment is what made it visible.** Until then no path ever UPDATEd an
+// order_items row, so the physical heap order matched insertion order and an
+// unordered eager-load happened to come back sorted. shipped_quantity is the
+// first mutable column on the table (design D3), and Postgres writes an updated
+// tuple as a new version at the end of the heap — so a seq scan returns the line
+// that just shipped *last*. Concretely: a three-line order whose second line
+// ships would render 1,3,2 to the customer, and 2,3,1 after the first line ships
+// too. Nothing would error; the lines would simply shuffle every time a parcel
+// went out.
+//
+// So this is not defensive tidying. It is the rule the project already states —
+// a collection endpoint must never leave its order to the database — arriving at
+// the moment the database finally had an opinion.
+func orderItemsByID(q *ent.OrderItemQuery) { q.Order(entorderitem.ByID()) }
+
 // foreign order and a nonexistent order both surface as the same
 // ErrNotFound (no existence leakage).
 func (s *Service) GetOrder(ctx context.Context, shopID, memberID, orderID int) (*ent.Order, error) {
 	o, err := s.Client.Order.Query().
 		Where(entorder.IDEQ(orderID), entorder.ShopIDEQ(shopID), entorder.MemberIDEQ(memberID)).
-		WithItems().
+		WithItems(orderItemsByID).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
@@ -702,7 +721,7 @@ func (s *Service) ListOrders(ctx context.Context, shopID, memberID int, params L
 func (s *Service) GetOrderAdmin(ctx context.Context, shopID, orderID int) (*ent.Order, error) {
 	o, err := s.Client.Order.Query().
 		Where(entorder.IDEQ(orderID), entorder.ShopIDEQ(shopID)).
-		WithItems().
+		WithItems(orderItemsByID).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
@@ -794,7 +813,7 @@ func paginate(ctx context.Context, q *ent.OrderQuery, page, pageSize int) (*Orde
 		return nil, fmt.Errorf("order: count orders: %w", err)
 	}
 	orders, err := q.
-		WithItems().
+		WithItems(orderItemsByID).
 		Order(entorder.ByID(entsql.OrderDesc())).
 		Limit(pageSize).
 		Offset((page - 1) * pageSize).
@@ -818,6 +837,15 @@ func paginate(ctx context.Context, q *ent.OrderQuery, page, pageSize int) (*Orde
 // shipping-logistics has already advanced this order, and only they know
 // whether unwinding it is safe — so this generic cancel path refuses
 // (ConflictError, 409) rather than guessing.
+//
+// Change partial-shipment did not touch a character of this method, and that is
+// worth stating because it easily could have gone the other way. A partially
+// shipped order is fulfillment_status=4 (FulfillmentStatusPartiallyShipped), so
+// the CAS below already matches zero rows and answers 409 — which is the right
+// answer, because the restock loop further down returns each item's *ordered*
+// quantity, not the unshipped remainder. Had partial shipment been modelled as
+// "stay at 0 until everything ships", this same code would have returned 200 and
+// resurrected inventory that had already left the shop.
 func (s *Service) CancelOrder(ctx context.Context, shopID, orderID int, memberID *int) (*ent.Order, error) {
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
@@ -915,13 +943,42 @@ func (s *Service) UpdatePaymentStatus(ctx context.Context, shopID, orderID int, 
 	return updated, nil
 }
 
+// FulfillmentStatusPartiallyShipped is quoted here, not owned here. The
+// fulfillment_status enumeration belongs to shipping-logistics (design D5/D6)
+// and this package still never interprets a value beyond "unfulfilled"; the
+// constant exists only so that CancelOrder's doc comment and this package's
+// tests can name the state that makes an order uncancellable without hardcoding
+// a bare 4. shipping.PartiallyShippedStatus is the definition.
+const FulfillmentStatusPartiallyShipped int16 = 4
+
 // UpdateFulfillmentStatus is the fulfillment_status analogue of
 // UpdatePaymentStatus, owned by shipping-logistics (design D6).
 func (s *Service) UpdateFulfillmentStatus(ctx context.Context, shopID, orderID int, status int16) (*ent.Order, error) {
+	return updateFulfillmentStatus(ctx, s.Client.Order, shopID, orderID, status)
+}
+
+// UpdateFulfillmentStatusTx is UpdateFulfillmentStatus bound to a caller's
+// transaction (change partial-shipment, design D4).
+//
+// It exists because an order's fulfillment status is no longer a value the
+// shipping package decides on its own — it is derived from every shipment of the
+// order, so it must be written in the same transaction that wrote the shipment
+// rows justifying it. Splitting them would leave a window where the parcels and
+// the status disagree, and the status is what the storefront reads.
+//
+// This is a parameter, not an abstraction layer: ent generates the same
+// *ent.OrderClient type for tx.Order and client.Order, so both entry points run
+// character-for-character identical code below. shipping still never touches
+// ent.Order itself — the controlled entry point remains the only door.
+func (s *Service) UpdateFulfillmentStatusTx(ctx context.Context, tx *ent.Tx, shopID, orderID int, status int16) (*ent.Order, error) {
+	return updateFulfillmentStatus(ctx, tx.Order, shopID, orderID, status)
+}
+
+func updateFulfillmentStatus(ctx context.Context, oc *ent.OrderClient, shopID, orderID int, status int16) (*ent.Order, error) {
 	if status < 0 {
 		return nil, validationErr("/fulfillment_status", "fulfillment_status must be >= 0")
 	}
-	o, err := s.Client.Order.Query().Where(entorder.IDEQ(orderID), entorder.ShopIDEQ(shopID)).Only(ctx)
+	o, err := oc.Query().Where(entorder.IDEQ(orderID), entorder.ShopIDEQ(shopID)).Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
 	}

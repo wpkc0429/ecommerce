@@ -49,6 +49,12 @@ var tenantOwned = map[string]bool{
 	// mirrors Payment's shape).
 	"ShippingMethod": true,
 	"Shipment":       true,
+	// change partial-shipment: shipment_items carries a direct shop_id column
+	// (same shape as OrderItem). Every access in the shipping package is
+	// already explicitly shop-scoped, but registering it is the default line of
+	// defense for whoever reads this table next — and a missing registration's
+	// symptom (cross-tenant visibility) is exactly the kind nothing tests.
+	"ShipmentItem": true,
 	// change member-tiers-and-points: both tables carry a direct shop_id
 	// column (design D1 — MemberTier mirrors ShippingMethod's shape,
 	// PointTransaction mirrors Payment/Shipment's shape).

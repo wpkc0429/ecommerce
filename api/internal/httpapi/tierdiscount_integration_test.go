@@ -493,7 +493,7 @@ func TestClawbackOfADiscountedOrderUsesTheAwardRow(t *testing.T) {
 	e.client.MemberTier.UpdateOneID(tierID).SetDiscountPercent(10).SaveX(ctx)
 
 	tracking := "TRK-1"
-	sh, err := e.shippingSvc.CreateShipment(ctx, e.shopA, orderID, "黑貓宅急便", &tracking)
+	sh, err := e.shippingSvc.CreateShipment(ctx, e.shopA, orderID, "黑貓宅急便", &tracking, nil)
 	if err != nil {
 		t.Fatalf("create shipment: %v", err)
 	}

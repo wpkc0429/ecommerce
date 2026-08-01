@@ -49,9 +49,11 @@ type ShipmentEdges struct {
 	Shop *Shop `json:"shop,omitempty"`
 	// Order holds the value of the order edge.
 	Order *Order `json:"order,omitempty"`
+	// Items holds the value of the items edge.
+	Items []*ShipmentItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [2]bool
+	loadedTypes [3]bool
 }
 
 // ShopOrErr returns the Shop value or an error if the edge
@@ -74,6 +76,15 @@ func (e ShipmentEdges) OrderOrErr() (*Order, error) {
 		return nil, &NotFoundError{label: order.Label}
 	}
 	return nil, &NotLoadedError{edge: "order"}
+}
+
+// ItemsOrErr returns the Items value or an error if the edge
+// was not loaded in eager-loading.
+func (e ShipmentEdges) ItemsOrErr() ([]*ShipmentItem, error) {
+	if e.loadedTypes[2] {
+		return e.Items, nil
+	}
+	return nil, &NotLoadedError{edge: "items"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -186,6 +197,11 @@ func (_m *Shipment) QueryShop() *ShopQuery {
 // QueryOrder queries the "order" edge of the Shipment entity.
 func (_m *Shipment) QueryOrder() *OrderQuery {
 	return NewShipmentClient(_m.config).QueryOrder(_m)
+}
+
+// QueryItems queries the "items" edge of the Shipment entity.
+func (_m *Shipment) QueryItems() *ShipmentItemQuery {
+	return NewShipmentClient(_m.config).QueryItems(_m)
 }
 
 // Update returns a builder for updating this Shipment.

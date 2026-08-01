@@ -136,6 +136,20 @@ func (_c *OrderItemCreate) SetNillableGiftMessage(v *string) *OrderItemCreate {
 	return _c
 }
 
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (_c *OrderItemCreate) SetShippedQuantity(v int32) *OrderItemCreate {
+	_c.mutation.SetShippedQuantity(v)
+	return _c
+}
+
+// SetNillableShippedQuantity sets the "shipped_quantity" field if the given value is not nil.
+func (_c *OrderItemCreate) SetNillableShippedQuantity(v *int32) *OrderItemCreate {
+	if v != nil {
+		_c.SetShippedQuantity(*v)
+	}
+	return _c
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_c *OrderItemCreate) SetShop(v *Shop) *OrderItemCreate {
 	return _c.SetShopID(v.ID)
@@ -193,6 +207,10 @@ func (_c *OrderItemCreate) defaults() {
 		v := orderitem.DefaultGiftMessage
 		_c.mutation.SetGiftMessage(v)
 	}
+	if _, ok := _c.mutation.ShippedQuantity(); !ok {
+		v := orderitem.DefaultShippedQuantity
+		_c.mutation.SetShippedQuantity(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -241,6 +259,9 @@ func (_c *OrderItemCreate) check() error {
 	}
 	if _, ok := _c.mutation.GiftMessage(); !ok {
 		return &ValidationError{Name: "gift_message", err: errors.New(`ent: missing required field "OrderItem.gift_message"`)}
+	}
+	if _, ok := _c.mutation.ShippedQuantity(); !ok {
+		return &ValidationError{Name: "shipped_quantity", err: errors.New(`ent: missing required field "OrderItem.shipped_quantity"`)}
 	}
 	if len(_c.mutation.ShopIDs()) == 0 {
 		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "OrderItem.shop"`)}
@@ -314,6 +335,10 @@ func (_c *OrderItemCreate) createSpec() (*OrderItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.GiftMessage(); ok {
 		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
 		_node.GiftMessage = value
+	}
+	if value, ok := _c.mutation.ShippedQuantity(); ok {
+		_spec.SetField(orderitem.FieldShippedQuantity, field.TypeInt32, value)
+		_node.ShippedQuantity = value
 	}
 	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -569,6 +594,24 @@ func (u *OrderItemUpsert) UpdateGiftMessage() *OrderItemUpsert {
 	return u
 }
 
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (u *OrderItemUpsert) SetShippedQuantity(v int32) *OrderItemUpsert {
+	u.Set(orderitem.FieldShippedQuantity, v)
+	return u
+}
+
+// UpdateShippedQuantity sets the "shipped_quantity" field to the value that was provided on create.
+func (u *OrderItemUpsert) UpdateShippedQuantity() *OrderItemUpsert {
+	u.SetExcluded(orderitem.FieldShippedQuantity)
+	return u
+}
+
+// AddShippedQuantity adds v to the "shipped_quantity" field.
+func (u *OrderItemUpsert) AddShippedQuantity(v int32) *OrderItemUpsert {
+	u.Add(orderitem.FieldShippedQuantity, v)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -807,6 +850,27 @@ func (u *OrderItemUpsertOne) SetGiftMessage(v string) *OrderItemUpsertOne {
 func (u *OrderItemUpsertOne) UpdateGiftMessage() *OrderItemUpsertOne {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateGiftMessage()
+	})
+}
+
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (u *OrderItemUpsertOne) SetShippedQuantity(v int32) *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetShippedQuantity(v)
+	})
+}
+
+// AddShippedQuantity adds v to the "shipped_quantity" field.
+func (u *OrderItemUpsertOne) AddShippedQuantity(v int32) *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.AddShippedQuantity(v)
+	})
+}
+
+// UpdateShippedQuantity sets the "shipped_quantity" field to the value that was provided on create.
+func (u *OrderItemUpsertOne) UpdateShippedQuantity() *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateShippedQuantity()
 	})
 }
 
@@ -1214,6 +1278,27 @@ func (u *OrderItemUpsertBulk) SetGiftMessage(v string) *OrderItemUpsertBulk {
 func (u *OrderItemUpsertBulk) UpdateGiftMessage() *OrderItemUpsertBulk {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateGiftMessage()
+	})
+}
+
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (u *OrderItemUpsertBulk) SetShippedQuantity(v int32) *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetShippedQuantity(v)
+	})
+}
+
+// AddShippedQuantity adds v to the "shipped_quantity" field.
+func (u *OrderItemUpsertBulk) AddShippedQuantity(v int32) *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.AddShippedQuantity(v)
+	})
+}
+
+// UpdateShippedQuantity sets the "shipped_quantity" field to the value that was provided on create.
+func (u *OrderItemUpsertBulk) UpdateShippedQuantity() *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateShippedQuantity()
 	})
 }
 

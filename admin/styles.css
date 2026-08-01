@@ -179,6 +179,20 @@ h3 { margin: 1.25rem 0 0.6rem; font-size: 1rem; }
 .shipment-form { display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; }
 .shipment-form .field { flex-direction: column; gap: 0.3rem; }
 .shipment-form input { width: 14rem; }
+.shipment-form h4, .parcel h4 { width: 100%; margin: 0.5rem 0 0; font-size: 0.9rem; color: #374151; }
+
+/* 部分出貨（change partial-shipment）。每一箱一張卡片，每一列一個品項。 */
+.parcel { border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.75rem; }
+.parcel-contents { margin: 0.35rem 0 0; padding-left: 1.1rem; }
+.parcel-line { display: flex; gap: 0.6rem; align-items: baseline; flex-wrap: wrap; }
+.parcel-line-qty { font-weight: 600; white-space: nowrap; }
+.shipment-lines { width: 100%; display: flex; flex-direction: column; gap: 0.4rem; }
+.shipment-line { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; padding: 0.35rem 0; border-bottom: 1px dashed #e5e7eb; }
+.shipment-line-title { font-weight: 500; }
+.shipment-line-remaining { color: #6b7280; white-space: nowrap; }
+.shipment-line .shipment-line-qty { width: 5rem; }
+/* 數量不是金額：不套 .money 的等寬對齊，也不會有任何貨幣符號靠近它。 */
+.table td.shipped-qty { white-space: nowrap; color: #374151; }
 
 .table td.gift-message { max-width: 18rem; white-space: pre-wrap; color: #92400e; }
 .table td.key-value { user-select: all; }

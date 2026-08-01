@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"sync"
 	"testing"
 	"time"
 
@@ -18,6 +20,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entrole "ksdevworks/ecommerce/api/internal/ent/role"
+	entshipment "ksdevworks/ecommerce/api/internal/ent/shipment"
+	entshipmentitem "ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/rbac"
@@ -217,21 +221,34 @@ func (e *shippingEnv) memberCallJSON(t *testing.T, memberID, shopID int, domain,
 	return code, parsed
 }
 
-func (e *shippingEnv) adminCall(t *testing.T, userID int, method, path string, body any) (int, string) {
-	t.Helper()
+// adminRequest is adminCall without the t.Fatal — safe to call from a
+// goroutine, which adminCall is not (mirrors memberRequest/memberCall's split,
+// and exists for the same reason: the concurrency test below).
+func (e *shippingEnv) adminRequest(userID int, method, path string, body any) (int, string, error) {
 	tok, err := e.issuer.IssueAdmin(userID, nil)
 	if err != nil {
-		t.Fatal(err)
+		return 0, "", err
 	}
 	var buf bytes.Buffer
 	if body != nil {
-		_ = json.NewEncoder(&buf).Encode(body)
+		if err := json.NewEncoder(&buf).Encode(body); err != nil {
+			return 0, "", err
+		}
 	}
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
-	return rec.Code, rec.Body.String()
+	return rec.Code, rec.Body.String(), nil
+}
+
+func (e *shippingEnv) adminCall(t *testing.T, userID int, method, path string, body any) (int, string) {
+	t.Helper()
+	code, raw, err := e.adminRequest(userID, method, path, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return code, raw
 }
 
 func (e *shippingEnv) adminCallJSON(t *testing.T, userID int, method, path string, body any) (int, map[string]any) {
@@ -584,5 +601,405 @@ func TestSeedGrantsShippingPermissionsToMerchantOwnerAndEditor(t *testing.T) {
 	}
 	if editor["shipping_method.delete"] {
 		t.Error("expected editor NOT to be granted shipping_method.delete (mirrors category.* breadth split)")
+	}
+}
+
+// ── change partial-shipment (HTTP level) ──────────────────────────────
+
+// checkoutTwoLineOrder places an order with two distinct lines (2 + 1 units),
+// which is the smallest shape in which "partly shipped" is even expressible.
+func (e *shippingEnv) checkoutTwoLineOrder(t *testing.T, shopID, memberID int, domain string) (int, []map[string]any) {
+	t.Helper()
+	ctx := context.Background()
+	for _, spec := range []struct {
+		qty  int32
+		gift string
+	}{{2, "給媽媽"}, {1, "給岳母"}} {
+		skuID := e.newSKU(t, shopID, 1000, "TWD", 10)
+		if _, err := e.cartSvc.AddItem(ctx, shopID, memberID, skuID, spec.qty, spec.gift); err != nil {
+			t.Fatalf("seed cart: %v", err)
+		}
+	}
+	code, created := e.memberCallJSON(t, memberID, shopID, domain, "POST", "/api/v1/shop/checkout", shippingValidAddr())
+	if code != http.StatusCreated {
+		t.Fatalf("checkout: want 201, got %d: %+v", code, created)
+	}
+	raw := created["items"].([]any)
+	items := make([]map[string]any, 0, len(raw))
+	for _, it := range raw {
+		items = append(items, it.(map[string]any))
+	}
+	return int(created["id"].(float64)), items
+}
+
+// The request body that predates line items must keep working, unchanged, and
+// keep meaning what it meant. This is design D5 asserted at the wire level
+// rather than at the service level.
+func TestShipmentCreateWithoutItemsStillShipsEverything(t *testing.T) {
+	e := newShippingEnv(t)
+	orderID, orderItems := e.checkoutTwoLineOrder(t, e.shopA, e.memberA1, e.shopADomain)
+
+	code, created := e.adminCallJSON(t, e.ownerA, "POST",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+		map[string]any{"carrier": "黑貓宅急便", "tracking_number": "TRACK-ALL"})
+	if code != http.StatusCreated {
+		t.Fatalf("create shipment without items: want 201, got %d: %+v", code, created)
+	}
+	if got := len(created["items"].([]any)); got != len(orderItems) {
+		t.Fatalf("expected the parcel to carry every line (%d), got %d", len(orderItems), got)
+	}
+
+	gotOrder, err := e.orderSvc.GetOrderAdmin(context.Background(), e.shopA, orderID)
+	if err != nil {
+		t.Fatalf("GetOrderAdmin: %v", err)
+	}
+	if gotOrder.FulfillmentStatus != shipping.ShippedStatus {
+		t.Fatalf("expected fulfillment_status=1 (shipped), got %d", gotOrder.FulfillmentStatus)
+	}
+}
+
+func TestShipmentPartialFlowOverHTTP(t *testing.T) {
+	e := newShippingEnv(t)
+	orderID, orderItems := e.checkoutTwoLineOrder(t, e.shopA, e.memberA1, e.shopADomain)
+	firstLine := int(orderItems[0]["id"].(float64))
+
+	code, created := e.adminCallJSON(t, e.ownerA, "POST",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+		map[string]any{"carrier": "黑貓宅急便", "items": []any{
+			map[string]any{"order_item_id": firstLine, "quantity": 1},
+		}})
+	if code != http.StatusCreated {
+		t.Fatalf("partial create: want 201, got %d: %+v", code, created)
+	}
+	firstShipment := int(created["id"].(float64))
+
+	// The order reports the new value, and the line reports how much of it left.
+	// Read through the *customer's* endpoint on purpose: this is the payload
+	// ONDO consumes, and the new enum value plus shipped_quantity have to be
+	// visible exactly there.
+	code, ord := e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "GET",
+		fmt.Sprintf("/api/v1/shop/orders/%d", orderID), nil)
+	if code != http.StatusOK {
+		t.Fatalf("get order: want 200, got %d", code)
+	}
+	if int16(ord["fulfillment_status"].(float64)) != shipping.PartiallyShippedStatus {
+		t.Fatalf("expected fulfillment_status=4 (partially shipped), got %+v", ord["fulfillment_status"])
+	}
+	// The lines must still come back in the order they were created, and this is
+	// not a stylistic assertion. shipped_quantity is the first column anything
+	// ever UPDATEs on order_items, and Postgres rewrites an updated tuple at the
+	// end of the heap — so an unordered eager-load returns the line that just
+	// shipped last, and the customer's order detail reshuffles itself every time
+	// a parcel goes out. order.orderItemsByID is what stops that; this pins it.
+	gotIDs := make([]int, 0, len(ord["items"].([]any)))
+	for _, it := range ord["items"].([]any) {
+		gotIDs = append(gotIDs, int(it.(map[string]any)["id"].(float64)))
+	}
+	wantIDs := make([]int, 0, len(orderItems))
+	for _, it := range orderItems {
+		wantIDs = append(wantIDs, int(it["id"].(float64)))
+	}
+	if !slices.Equal(gotIDs, wantIDs) {
+		t.Fatalf("order lines reordered after a partial shipment: got %v, want %v", gotIDs, wantIDs)
+	}
+
+	line := ord["items"].([]any)[0].(map[string]any)
+	if line["shipped_quantity"].(float64) != 1 {
+		t.Fatalf("expected shipped_quantity=1 on the first line, got %+v", line["shipped_quantity"])
+	}
+
+	// Over-shipping that same line is a 422 on the offending index.
+	code, rejected := e.adminCallJSON(t, e.ownerA, "POST",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+		map[string]any{"carrier": "黑貓宅急便", "items": []any{
+			map[string]any{"order_item_id": firstLine, "quantity": 2},
+		}})
+	if code != http.StatusUnprocessableEntity {
+		t.Fatalf("over-shipment: want 422, got %d: %+v", code, rejected)
+	}
+
+	// The customer sees both parcels through the plural endpoint, and the
+	// singular one keeps answering (with the newest).
+	code, all := e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "GET",
+		fmt.Sprintf("/api/v1/shop/orders/%d/shipments", orderID), nil)
+	if code != http.StatusOK {
+		t.Fatalf("member list shipments: want 200, got %d: %+v", code, all)
+	}
+	if len(all["shipments"].([]any)) != 1 {
+		t.Fatalf("expected one parcel so far, got %+v", all)
+	}
+
+	// Ship the remainder by omitting items, then everything is shipped.
+	code, second := e.adminCallJSON(t, e.ownerA, "POST",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+		map[string]any{"carrier": "7-11 超商取貨"})
+	if code != http.StatusCreated {
+		t.Fatalf("remainder create: want 201, got %d: %+v", code, second)
+	}
+	secondShipment := int(second["id"].(float64))
+
+	code, all = e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "GET",
+		fmt.Sprintf("/api/v1/shop/orders/%d/shipments", orderID), nil)
+	if code != http.StatusOK {
+		t.Fatalf("member list shipments (2): want 200, got %d", code)
+	}
+	list := all["shipments"].([]any)
+	if len(list) != 2 {
+		t.Fatalf("expected two parcels, got %d", len(list))
+	}
+	if int(list[0].(map[string]any)["id"].(float64)) != secondShipment {
+		t.Fatalf("expected newest-first ordering, got %+v", list)
+	}
+
+	// This is the regression the singular endpoint used to have: with two rows
+	// its `.Only()` errored and the customer was told their shipment did not
+	// exist.
+	code, single := e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "GET",
+		fmt.Sprintf("/api/v1/shop/orders/%d/shipment", orderID), nil)
+	if code != http.StatusOK {
+		t.Fatalf("singular endpoint with two shipments: want 200, got %d: %+v", code, single)
+	}
+	if int(single["id"].(float64)) != secondShipment {
+		t.Fatalf("expected the most recent shipment %d, got %+v", secondShipment, single["id"])
+	}
+
+	// One parcel delivered does not deliver the order.
+	code, _ = e.adminCallJSON(t, e.ownerA, "PUT",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments/%d", orderID, firstShipment)),
+		map[string]any{"status": "delivered"})
+	if code != http.StatusOK {
+		t.Fatalf("advance first: want 200, got %d", code)
+	}
+	gotOrder, err := e.orderSvc.GetOrderAdmin(context.Background(), e.shopA, orderID)
+	if err != nil {
+		t.Fatalf("GetOrderAdmin: %v", err)
+	}
+	if gotOrder.FulfillmentStatus != shipping.ShippedStatus {
+		t.Fatalf("one delivered parcel must leave the order at shipped, got %d", gotOrder.FulfillmentStatus)
+	}
+}
+
+// A partially shipped order must not be cancellable — and order.Service.CancelOrder
+// was not touched by this change, so this asserts an emergent property of
+// modelling partial shipment as a distinct value rather than as "still 0".
+func TestPartiallyShippedOrderCannotBeCancelled(t *testing.T) {
+	e := newShippingEnv(t)
+	orderID, orderItems := e.checkoutTwoLineOrder(t, e.shopA, e.memberA1, e.shopADomain)
+	firstLine := int(orderItems[0]["id"].(float64))
+
+	code, _ := e.adminCallJSON(t, e.ownerA, "POST",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+		map[string]any{"carrier": "黑貓宅急便", "items": []any{
+			map[string]any{"order_item_id": firstLine, "quantity": 1},
+		}})
+	if code != http.StatusCreated {
+		t.Fatalf("partial create: want 201, got %d", code)
+	}
+
+	code, raw := e.memberCall(t, e.memberA1, e.shopA, e.shopADomain, "POST",
+		fmt.Sprintf("/api/v1/shop/orders/%d/cancel", orderID), nil)
+	if code != http.StatusConflict {
+		t.Fatalf("cancel a partially shipped order: want 409, got %d: %s", code, raw)
+	}
+
+	// Stock was NOT returned: that is the whole point — the restock loop gives
+	// back ordered quantities, and part of this order has already left.
+	gotOrder, err := e.orderSvc.GetOrderAdmin(context.Background(), e.shopA, orderID)
+	if err != nil {
+		t.Fatalf("GetOrderAdmin: %v", err)
+	}
+	if gotOrder.Status != order.StatusCreated {
+		t.Fatalf("expected the order to stay uncancelled, got status=%d", gotOrder.Status)
+	}
+}
+
+// checkoutSingleLineOrder produces an order with exactly one line of the given
+// quantity — the shape the over-shipment guard has to defend.
+func (e *shippingEnv) checkoutSingleLineOrder(t *testing.T, shopID, memberID int, domain string, qty int32) (int, int) {
+	t.Helper()
+	skuID := e.newSKU(t, shopID, 1000, "TWD", qty+5)
+	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, qty, ""); err != nil {
+		t.Fatalf("seed cart: %v", err)
+	}
+	code, created := e.memberCallJSON(t, memberID, shopID, domain, "POST", "/api/v1/shop/checkout", shippingValidAddr())
+	if code != http.StatusCreated {
+		t.Fatalf("checkout: want 201, got %d: %+v", code, created)
+	}
+	items := created["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("expected a single-line order, got %d lines", len(items))
+	}
+	return int(created["id"].(float64)), int(items[0].(map[string]any)["id"].(float64))
+}
+
+// TestConcurrentShipmentsNeverExceedTheOrderedQuantity is the MANDATORY
+// correctness test for change partial-shipment, and it is the exact counterpart
+// of TestCheckoutConcurrentOversellingProtection: the same idiom (conditional
+// UPDATE plus affected-rows), asserted the same way (fire N at once, count the
+// winners, then look at the number in the database).
+//
+// It proves two separate things, and they have two separate guards (design D3/D4):
+//
+//   - **Nothing over-ships.** 12 concurrent one-unit parcels against a 5-unit
+//     line must produce exactly 5 parcels. This is the conditional UPDATE's job
+//     and it would hold with no lock at all.
+//   - **The derived order status is right afterwards.** Once everything has
+//     shipped the order must read 1 (shipped), never 4 (partially shipped).
+//     This is the order row lock's job: without it two transactions shipping
+//     concurrently cannot see each other's uncommitted shipped_quantity under
+//     READ COMMITTED, both derive "partially shipped", and the order sticks at 4
+//     with nothing left to ship it out of.
+//
+// Run under -race as well as plain; both are green.
+func TestConcurrentShipmentsNeverExceedTheOrderedQuantity(t *testing.T) {
+	e := newShippingEnv(t)
+	ctx := context.Background()
+
+	const ordered int32 = 5
+	const attempts = 12
+	orderID, lineID := e.checkoutSingleLineOrder(t, e.shopA, e.memberA1, e.shopADomain, ordered)
+
+	codes := make([]int, attempts)
+	errs := make(chan error, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			code, _, err := e.adminRequest(e.ownerA, "POST",
+				e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+				map[string]any{"carrier": "黑貓宅急便", "items": []any{
+					map[string]any{"order_item_id": lineID, "quantity": 1},
+				}})
+			if err != nil {
+				errs <- err
+				return
+			}
+			codes[i] = code
+		}(i)
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+
+	var created, rejected int
+	for _, c := range codes {
+		switch c {
+		case http.StatusCreated:
+			created++
+		case http.StatusUnprocessableEntity, http.StatusConflict:
+			// 422: this line has nothing left. 409: the whole order is fully
+			// shipped (the racer that lost after the last unit went out).
+			rejected++
+		default:
+			t.Errorf("unexpected status code %d (codes=%v)", c, codes)
+		}
+	}
+	if created != int(ordered) {
+		t.Errorf("want exactly %d parcels, got %d (codes=%v)", ordered, created, codes)
+	}
+	if rejected != attempts-int(ordered) {
+		t.Errorf("want %d rejections, got %d (codes=%v)", attempts-int(ordered), rejected, codes)
+	}
+
+	// The number in the database is the one that matters.
+	line := e.client.OrderItem.GetX(ctx, lineID)
+	if line.ShippedQuantity > ordered {
+		t.Fatalf("shipped_quantity=%d exceeds the ordered %d — OVER-SHIPPED", line.ShippedQuantity, ordered)
+	}
+	if line.ShippedQuantity != ordered {
+		t.Fatalf("shipped_quantity=%d, want %d", line.ShippedQuantity, ordered)
+	}
+
+	// The derived field and its source of truth agree across every parcel.
+	var sum int32
+	for _, si := range e.client.ShipmentItem.Query().Where(entshipmentitem.OrderItemIDEQ(lineID)).AllX(ctx) {
+		sum += si.Quantity
+	}
+	if sum != ordered {
+		t.Fatalf("Σ shipment_items.quantity = %d, but order_items.shipped_quantity = %d — the derived column drifted", sum, line.ShippedQuantity)
+	}
+	if n := e.client.Shipment.Query().Where(entshipment.OrderIDEQ(orderID)).CountX(ctx); n != int(ordered) {
+		t.Fatalf("want %d shipment rows, got %d", ordered, n)
+	}
+
+	// The row lock's assertion: fully shipped means 1, not 4.
+	gotOrder, err := e.orderSvc.GetOrderAdmin(ctx, e.shopA, orderID)
+	if err != nil {
+		t.Fatalf("GetOrderAdmin: %v", err)
+	}
+	if gotOrder.FulfillmentStatus != shipping.ShippedStatus {
+		t.Fatalf("everything shipped, but fulfillment_status=%d (want %d). "+
+			"A 4 here means the order row lock stopped serializing the derivation",
+			gotOrder.FulfillmentStatus, shipping.ShippedStatus)
+	}
+}
+
+// TestConcurrentShipmentsOfDisjointLinesStillCompleteTheOrder is the order row
+// lock's own test (design D4), and it is deliberately separate from the
+// over-shipment one above because it fails for a completely different reason.
+//
+// Two goroutines ship two *different* lines of one order. They never contend on
+// an order_items row, so the conditional UPDATE — the guard that makes
+// over-shipping impossible — is not involved at all and both succeed. What can
+// still go wrong is the value they each derive for the order: under READ
+// COMMITTED neither transaction can see the other's uncommitted
+// shipped_quantity, so both compute "some of this order is still outstanding"
+// and the order is left at 4 (partially shipped) with nothing left to ship.
+//
+// Only lockOrder's SELECT ... FOR UPDATE prevents that, by making the two
+// derivations run one after the other. Verified by removing ForUpdate() and
+// watching this test go red while every other shipping test stayed green.
+func TestConcurrentShipmentsOfDisjointLinesStillCompleteTheOrder(t *testing.T) {
+	e := newShippingEnv(t)
+	ctx := context.Background()
+
+	orderID, orderItems := e.checkoutTwoLineOrder(t, e.shopA, e.memberA1, e.shopADomain)
+	if len(orderItems) != 2 {
+		t.Fatalf("expected a two-line order, got %d", len(orderItems))
+	}
+
+	codes := make([]int, len(orderItems))
+	errs := make(chan error, len(orderItems))
+	var wg sync.WaitGroup
+	for i, it := range orderItems {
+		wg.Add(1)
+		go func(i int, lineID int, qty float64) {
+			defer wg.Done()
+			code, _, err := e.adminRequest(e.ownerA, "POST",
+				e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)),
+				map[string]any{"carrier": "黑貓宅急便", "items": []any{
+					map[string]any{"order_item_id": lineID, "quantity": int(qty)},
+				}})
+			if err != nil {
+				errs <- err
+				return
+			}
+			codes[i] = code
+		}(i, int(it["id"].(float64)), it["quantity"].(float64))
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		t.Fatal(err)
+	}
+
+	for i, c := range codes {
+		if c != http.StatusCreated {
+			t.Fatalf("parcel %d: want 201 (disjoint lines never contend), got %d (codes=%v)", i, c, codes)
+		}
+	}
+
+	gotOrder, err := e.orderSvc.GetOrderAdmin(ctx, e.shopA, orderID)
+	if err != nil {
+		t.Fatalf("GetOrderAdmin: %v", err)
+	}
+	if gotOrder.FulfillmentStatus != shipping.ShippedStatus {
+		t.Fatalf("both lines shipped, but fulfillment_status=%d (want %d = shipped). "+
+			"4 here is the exact lost-update the order row lock exists to prevent: "+
+			"the order is fully shipped and there is nothing left to ship it out of that state",
+			gotOrder.FulfillmentStatus, shipping.ShippedStatus)
 	}
 }

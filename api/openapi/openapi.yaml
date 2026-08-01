@@ -679,9 +679,10 @@ components:
     OrderItem:
       type: object
       additionalProperties: false
-      required: [id, product_id, product_title, sku_id, sku_code, quantity, price_amount, currency, line_total, gift_message]
+      required: [id, product_id, product_title, sku_id, sku_code, quantity, price_amount, currency, line_total, gift_message, shipped_quantity]
       description: |
         訂單品項是**永久快照**：商品改名、改價、下架、刪除，都不會改變已成立訂單的顯示內容。
+        唯一的例外是 `shipped_quantity`，它是狀態而不是快照。
       properties:
         id: { type: integer }
         product_id:
@@ -708,6 +709,15 @@ components:
           type: string
           maxLength: 500
           description: 卡片訊息快照，永遠是字串、永不為 `null`。
+        shipped_quantity:
+          type: integer
+          format: int32
+          minimum: 0
+          description: |
+            這一列已經出貨的數量（change partial-shipment），恆滿足 `0 <= shipped_quantity <= quantity`。
+            這是**伺服器上的權威值**，也正是超量出貨防護所比對的那個數字；呼叫端 MUST NOT
+            改以加總出貨紀錄自行推導，否則畫面上的「還能出幾件」會與伺服器實際接受的數量漂移。
+            退貨**不會**使它回減。
 
     Order:
       type: object
@@ -761,8 +771,17 @@ components:
           description: "`0` 未付款／`1` 已付款／`2` 已退款／`3` 部分退款（後兩者為保留值，本階段不產生）。"
         fulfillment_status:
           type: integer
-          enum: [0, 1, 2, 3]
-          description: "`0` 未出貨／`1` 已出貨／`2` 已送達／`3` 已退回。"
+          enum: [0, 1, 2, 3, 4]
+          description: |
+            `0` 未出貨／`1` 已出貨／`2` 已送達／`3` 已退回／`4` **部分出貨**。
+
+            `4` 由 change partial-shipment 新增，`0`–`3` 的語意與數值一字未動。
+            **呼叫端 MUST 對未知的值優雅降級**（顯示原始值或「未知」），MUST NOT 假設
+            這個列舉已經封閉，也 MUST NOT 以 `<` / `>` 比較它——數值順序不再等於生命週期
+            順序（`4` 是新增值，既有值的數值不可以移動）。
+
+            這個欄位是**推導值**：沒有出貨→`0`；任一筆出貨已退貨→`3`；已出數量小於訂購
+            數量→`4`；全部出貨皆已送達→`2`；其餘→`1`。逐筆包裹的精確狀態在出貨端點。
         currency: { type: string, minLength: 3, maxLength: 3 }
         total_amount:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
@@ -1074,11 +1093,31 @@ components:
           description: 符合條件的**總筆數**（不是金額）。
 
     # ── 物流 ──────────────────────────────────────────────────
+    ShipmentItem:
+      type: object
+      additionalProperties: false
+      required: [id, order_item_id, quantity]
+      description: |
+        一筆出貨所裝載的某個訂單品項與數量。
+
+        刻意只有三個整數：顯示所需的一切（標題、SKU、單價、卡片訊息）已經是
+        `OrderItem` 上的永久快照，`order_item_id` 直接對應 `Order.items[].id`，
+        再抄一份只會多一份會漂移的序列化。**沒有任何金額欄位**——運費只存在於訂單層
+        （`Order.shipping_fee`），出貨層若也有錢，同一筆交易就會有兩個權威。
+      properties:
+        id: { type: integer }
+        order_item_id:
+          type: integer
+          description: 對應 `Order.items[].id`。
+        quantity: { type: integer, format: int32, minimum: 1 }
+
     Shipment:
       type: object
       additionalProperties: false
-      required: [id, order_id, carrier, tracking_number, status, shipped_at, delivered_at, created_at, updated_at]
-      description: 出貨紀錄。**一張訂單最多一筆**（由資料庫唯一索引保證）。
+      required: [id, order_id, carrier, tracking_number, status, shipped_at, delivered_at, items, created_at, updated_at]
+      description: |
+        一筆出貨（一個包裹）。**一張訂單可以有多筆**（change partial-shipment）。
+        `items` 說明這個包裹裡裝了什麼。
       properties:
         id: { type: integer }
         order_id: { type: integer }
@@ -1090,11 +1129,19 @@ components:
           enum: [1, 2, 3]
           description: |
             `1` 已出貨／`2` 已送達／`3` 已退回。**沒有 `0`**——沒有出貨紀錄本身就等於未出貨
-            （訂單的 `fulfillment_status = 0`）。
+            （訂單的 `fulfillment_status = 0`）。**也沒有 `4`**：「部分」是訂單的性質，
+            單一包裹永遠是完整的一個包裹。
         shipped_at:
           oneOf: [{ type: string, format: date-time }, { type: 'null' }]
         delivered_at:
           oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        items:
+          type: array
+          description: |
+            本包裹裝載的訂單品項與數量。**永遠存在、永遠是陣列**——整筆一次出貨的訂單
+            會有一筆對應每個訂單品項，change partial-shipment 之前建立的出貨紀錄也已由
+            資料遷移回填成這個形狀，所以呼叫端不必分辨「沒有品項」與「舊資料」。
+          items: { $ref: '#/components/schemas/ShipmentItem' }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
@@ -2101,8 +2148,12 @@ paths:
     get:
       tags: [storefront-order]
       operationId: getMyShipment
-      summary: 查詢自己訂單的出貨紀錄
-      description: 尚未出貨時回 **404**（沒有出貨紀錄本身就是「未出貨」）。
+      summary: 查詢自己訂單的出貨紀錄（單筆）
+      description: |
+        尚未出貨時回 **404**（沒有出貨紀錄本身就是「未出貨」）。
+
+        訂單有多筆出貨時回**最近的一筆**（change partial-shipment）。要看全部請用
+        `GET /api/v1/shop/orders/{orderID}/shipments`。
       security: [{ memberJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
@@ -2116,6 +2167,40 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Shipment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/shop/orders/{orderID}/shipments:
+    get:
+      tags: [storefront-order]
+      operationId: listMyShipments
+      summary: 查詢自己訂單的所有出貨紀錄
+      description: |
+        一張訂單可以有多筆出貨（change partial-shipment），這個端點回傳全部，
+        順序為識別碼遞減（最新的在前）。
+
+        **尚未出貨時回 200 與空陣列**，不是 404——集合的空集合是一個好答案。
+        這正是與單數端點刻意不同之處。
+      security: [{ memberJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: orderID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 出貨紀錄集合。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shipments]
+                properties:
+                  shipments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Shipment' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "404": { $ref: '#/components/responses/NotFound' }
 
@@ -2299,8 +2384,10 @@ paths:
     get:
       tags: [guest]
       operationId: getGuestShipment
-      summary: 以訂單存取權杖查詢出貨紀錄
-      description: 尚未出貨回 404。
+      summary: 以訂單存取權杖查詢出貨紀錄（單筆）
+      description: |
+        尚未出貨回 404。訂單有多筆出貨時回**最近的一筆**（change partial-shipment）；
+        要看全部請用 `GET /api/v1/shop/guest/order/shipments`。
       security: [{ orderAccessToken: [] }]
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
@@ -2310,6 +2397,35 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Shipment' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/shop/guest/order/shipments:
+    get:
+      tags: [guest]
+      operationId: listGuestShipments
+      summary: 以訂單存取權杖查詢所有出貨紀錄
+      description: |
+        回傳該訂單的全部出貨紀錄，順序為識別碼遞減。尚未出貨時回 **200 與空陣列**。
+
+        訪客與會員在此完全對等（change partial-shipment）：ONDO 全站沒有登入 UI，
+        「只給會員」等於「沒有人看得到」。
+      security: [{ orderAccessToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 出貨紀錄集合。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [shipments]
+                properties:
+                  shipments:
+                    type: array
+                    items: { $ref: '#/components/schemas/Shipment' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "404": { $ref: '#/components/responses/NotFound' }
 
@@ -4343,7 +4459,9 @@ paths:
       tags: [admin-commerce]
       operationId: listShipments
       summary: 列出訂單的出貨紀錄
-      description: 需要商家層 `shipment.view`。一張訂單最多一筆。
+      description: |
+        需要商家層 `shipment.view`。**一張訂單可以有多筆**（change partial-shipment）。
+        順序為識別碼遞減（最新的在前），與顧客端的複數端點一致。
       security: [{ adminJWT: [] }]
       responses:
         "200":
@@ -4367,8 +4485,15 @@ paths:
       summary: 建立出貨紀錄（＝出貨事件本身）
       description: |
         需要商家層 `shipment.create`。**建立這筆紀錄就是「出貨」這個事件**，
-        因此狀態直接是 `1`（已出貨）並同步訂單的 `fulfillment_status`。
-        重複建立回 409（資料庫唯一索引把關）。`carrier` 必填。
+        因此狀態直接是 `1`（已出貨），並依所有出貨紀錄重新推導訂單的 `fulfillment_status`。
+        `carrier` 必填。
+
+        **`items` 省略 ＝ 出貨全部尚未出貨的品項**（change partial-shipment）。因此不帶
+        `items` 的請求與本能力引入品項概念之前逐位元組相同——既有呼叫端一個字都不用改。
+        帶了 `items` 就是部分出貨。
+
+        409 的三種情形：訂單已取消、訂單已無未出貨數量、訂單已有出貨被標記為退貨
+        （已退貨的訂單不再接受新的出貨）。
       security: [{ adminJWT: [] }]
       requestBody:
         required: true
@@ -4382,6 +4507,23 @@ paths:
                 carrier: { type: string }
                 tracking_number:
                   oneOf: [{ type: string }, { type: 'null' }]
+                items:
+                  type: array
+                  minItems: 1
+                  description: |
+                    本次要出貨的訂單品項與數量。**省略即為出貨全部未出品項**；
+                    給一個空陣列會回 422（「要出貨但一件都不出」是矛盾，不是預設值）。
+                    每個 `order_item_id` MUST 屬於本訂單且 MUST NOT 重複，
+                    `quantity` MUST 大於 0 且不得超過該品項尚未出貨的數量。
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [order_item_id, quantity]
+                    properties:
+                      order_item_id:
+                        type: integer
+                        description: 對應 `Order.items[].id`（不是 `sku_id`——同一 SKU 可因卡片訊息不同而成為兩列）。
+                      quantity: { type: integer, format: int32, minimum: 1 }
       responses:
         "201":
           description: 已出貨。
@@ -4402,7 +4544,13 @@ paths:
       summary: 推進出貨狀態
       description: |
         需要商家層 `shipment.update`。只接受 `"delivered"` 或 `"returned"`，兩者皆為終態。
-        推進到 `returned` 會觸發點數扣回。
+
+        訂單的 `fulfillment_status` 由**所有**出貨紀錄重新推導，不是直接套用本次的目標狀態
+        （change partial-shipment）：兩箱之中的一箱送達，訂單仍是 `1` 已出貨。
+
+        推進到 `returned` 會觸發**整筆訂單**的點數扣回（即使該箱只裝了一部分品項），
+        且該訂單自此不再接受新的出貨。
+
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'

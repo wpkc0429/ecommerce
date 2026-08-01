@@ -534,7 +534,7 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 
 	// ── ONDO 路徑 ⑧：查出貨 ───────────────────────────────────────────
 	tracking := "CONF-TRACK-1"
-	if _, err := e.shippingSvc.CreateShipment(context.Background(), e.shopID, guestResult.Order.ID, "黑貓宅急便", &tracking); err != nil {
+	if _, err := e.shippingSvc.CreateShipment(context.Background(), e.shopID, guestResult.Order.ID, "黑貓宅急便", &tracking, nil); err != nil {
 		t.Fatalf("create shipment: %v", err)
 	}
 	code, body = e.do(t, http.MethodGet, "/api/v1/shop/guest/order/shipment", guestResult.Token, nil)

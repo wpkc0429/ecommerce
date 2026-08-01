@@ -8,9 +8,13 @@
 //     的語意從「品項小計」改成「應付總額」，change tier-discount-application 又在
 //     中間插入了折抵，這個畫面是唯一能讓商家察覺這兩件事的地方，所以是
 //     「小計 －折扣 ＋ 運費 ＝ 應付總額」，不是四個並列的數字。
-//  3. **出貨是整筆訂單、至多一筆**（design D1/D9）。shipments 沒有品項欄位，
-//     order_id 上有唯一索引。所以這裡沒有品項勾選、沒有數量、沒有「已出貨 3 件
-//     待出貨 2 件」——那個概念在系統裡沒有對應的事實。
+//  3. **出貨是品項層級、可多筆**（change partial-shipment）。這一條在
+//     admin-commerce-operations 時寫的是相反的話——「整筆訂單、至多一筆，所以介面
+//     不得呈現已出貨數／待出貨數」——理由是**系統裡沒有那個事實**。
+//     change partial-shipment 建立了那個事實（shipment_items 與
+//     order_items.shipped_quantity），所以禁令連同它的理由一起到期。畫面因此如實
+//     呈現「已出／訂購」，而出貨區塊本身搬到了 ./order-shipments.js（tripwire #5，
+//     design D11：檔案切分，不是新的抽象層）。
 //  4. **狀態只經既有端點**（design D8）。付款由 provider webhook 推進，後台沒有
 //     手動標記付款的路徑，這裡也不發明一個；出貨的兩個終態按鈕只在 shipped 時
 //     出現，因為伺服器的 CAS 只在 shipped 成立，一顆保證 409 的按鈕比沒有更糟。
@@ -18,6 +22,7 @@ import { api } from "../lib/api.js";
 import { $, el, clear, rows, renderPager } from "../lib/dom.js";
 import { formatMoney, formatPercent } from "../lib/money.js";
 import { can, whenCan } from "../lib/rbac.js";
+import { renderOrderShipments } from "./order-shipments.js";
 
 const PAGE_SIZE = 20;
 
@@ -26,8 +31,10 @@ const ORDER_STATUS = { 0: "處理中", 1: "已取消" };
 // （order-management design D5）。這裡只是顯示用的標籤，不認得的值原樣顯示編號，
 // 不假裝知道它是什麼。
 const PAYMENT_STATUS = { 0: "未付款", 1: "已付款", 2: "已退款", 3: "部分退款" };
-const FULFILLMENT_STATUS = { 0: "未出貨", 1: "已出貨", 2: "已送達", 3: "已退貨" };
-const SHIPMENT_STATUS = { 1: "已出貨", 2: "已送達", 3: "已退貨" };
+// `4` 是 change partial-shipment 新增的值，而它排在最後而不是插在 1 之前，因為
+// 既有值的**數值**不可以動（design D1）。列舉的閱讀順序與生命週期順序自此不再
+// 一致，這是往一個已上線的列舉加值的固有代價。
+const FULFILLMENT_STATUS = { 0: "未出貨", 1: "已出貨", 2: "已送達", 3: "已退貨", 4: "部分出貨" };
 const PAYMENT_RECORD_STATUS = { 0: "處理中", 1: "成功", 2: "失敗", 3: "已退款" };
 
 function label(map, v) {
@@ -127,7 +134,7 @@ export function createOrdersView(ctx) {
     state.order = order;
     renderSummary(order);
     renderItems(order);
-    await renderShipment(order);
+    await renderOrderShipments($("#order-shipment"), order, shipmentDeps);
     await renderPayments(order);
 
     $("#order-cancel-btn").hidden = !can("order.cancel") || order.status !== 0;
@@ -187,111 +194,35 @@ export function createOrdersView(ctx) {
       el("td", { class: "mono" }, it.sku_code),
       el("td", { class: "money" }, formatMoney(it.price_amount, it.currency)),
       el("td", {}, it.quantity),
+      // 「已出／訂購」（change partial-shipment）。**這兩個數字都是伺服器給的**：
+      // shipped_quantity 是 order_items 上的欄位，不是把出貨清單在瀏覽器裡攤平算
+      // 出來的——所以它與伺服器拒絕超量出貨時比對的是同一個數字，兩邊不可能不一致
+      // （design D3/D10）。數量不是金額，絕不經過 formatMoney。
+      el("td", { class: "shipped-qty" }, `${it.shipped_quantity ?? 0} / ${it.quantity}`),
       el("td", { class: "money" }, formatMoney(it.line_total, it.currency)),
       // 卡片訊息掛在**品項**上（change order-extras）：同一個 SKU 兩張不同卡片是
       // 兩列，所以它必須顯示在列上，不是訂單層級。
       el("td", { class: "gift-message" }, it.gift_message || "—")),
-    { empty: "這筆訂單沒有品項（不該發生）。", colspan: 6 });
+    { empty: "這筆訂單沒有品項（不該發生）。", colspan: 7 });
   }
 
-  // 出貨區塊的三態（design D9）。
-  async function renderShipment(o) {
-    const host = clear($("#order-shipment"));
-    if (!can("shipment.view") && !can("shipment.create")) {
-      host.append(el("p", { class: "hint" }, "你沒有檢視出貨紀錄的權限。"));
-      return;
-    }
-    let shipments = [];
-    if (can("shipment.view")) {
-      try {
-        const data = await api("GET", shopPath(`/orders/${o.id}/shipments`));
-        shipments = data.shipments || [];
-      } catch (e) {
-        host.append(el("p", { class: "error" }, e.message));
-        return;
-      }
-    }
-    const shipment = shipments[0] ?? null;
-
-    if (!shipment) {
-      if (o.status === 1) {
-        host.append(el("p", { class: "hint" }, "訂單已取消，無法出貨。"));
-        return;
-      }
-      if (!can("shipment.create")) {
-        host.append(el("p", { class: "hint" }, "尚未出貨。"));
-        return;
-      }
-      const carrier = el("input", { type: "text", id: "shipment-carrier", placeholder: "黑貓宅急便" });
-      const tracking = el("input", { type: "text", id: "shipment-tracking", placeholder: "追蹤號（選填）" });
-      host.append(el("div", { class: "shipment-form" },
-        el("label", { class: "field" }, el("span", { class: "field-label" }, "物流商"), carrier),
-        el("label", { class: "field" }, el("span", { class: "field-label" }, "追蹤號"), tracking),
-        el("button", {
-          id: "create-shipment-btn", class: "primary",
-          onclick: () => createShipment(o, carrier.value.trim(), tracking.value.trim()),
-        }, "將整筆訂單標記為已出貨"),
-        // 沒有品項勾選、沒有數量——這不是省略，是系統沒有部分出貨這回事。
-        el("p", { class: "hint" },
-          "出貨的粒度是整筆訂單：一筆訂單至多一筆出貨紀錄，送出後整筆訂單即為已出貨。")));
-      return;
-    }
-
-    const terminal = shipment.status !== 1;
-    host.append(el("div", { class: "detail-grid", id: "shipment-detail" },
-      el("div", { class: "kv" }, el("span", { class: "kv-k" }, "出貨狀態"),
-        el("span", { class: "kv-v" }, badge(SHIPMENT_STATUS, shipment.status, [1, 2]))),
-      el("div", { class: "kv" }, el("span", { class: "kv-k" }, "物流商"),
-        el("span", { class: "kv-v" }, shipment.carrier)),
-      el("div", { class: "kv" }, el("span", { class: "kv-k" }, "追蹤號"),
-        el("span", { class: "kv-v mono" }, shipment.tracking_number || "—")),
-      el("div", { class: "kv" }, el("span", { class: "kv-k" }, "出貨時間"),
-        el("span", { class: "kv-v" }, formatTime(shipment.shipped_at))),
-      el("div", { class: "kv" }, el("span", { class: "kv-k" }, "送達時間"),
-        el("span", { class: "kv-v" }, formatTime(shipment.delivered_at)))));
-
-    if (terminal) {
-      // 已送達／已退貨都是終態（伺服器的 CAS 只在 shipped 成立）。不畫任何按鈕。
-      host.append(el("p", { class: "hint", id: "shipment-terminal-note" },
-        "此出貨已進入終態，狀態不可再變更。"));
-      return;
-    }
-    if (!can("shipment.update")) return;
-    host.append(el("div", { class: "toolbar-actions" },
-      el("button", { id: "shipment-delivered-btn", class: "primary", onclick: () => advance(o, shipment, "delivered") }, "標記已送達"),
-      el("button", { id: "shipment-returned-btn", class: "danger", onclick: () => advance(o, shipment, "returned") }, "標記退貨")));
-  }
-
-  async function createShipment(o, carrier, tracking) {
-    const err = $("#order-detail-error");
-    err.hidden = true;
-    try {
-      await api("POST", shopPath(`/orders/${o.id}/shipments`),
-        tracking ? { carrier, tracking_number: tracking } : { carrier });
-      await loadDetail(o.id);
-    } catch (e) {
-      err.textContent = e.message;
+  // ── 出貨區塊的依賴（change partial-shipment）────────────────────────
+  //
+  // 出貨的 UI 搬到了 ./order-shipments.js（tripwire #5 / design D11：檔案切分，
+  // 不是新的 lib/ 抽象）。這裡把它需要的四樣東西交給它：路徑組裝、重讀整份詳情、
+  // 錯誤列、以及這一頁自己的兩個顯示函式。**badge/formatTime 刻意用傳的而不是搬進
+  // lib/**——它們是這一頁的格式，而本 change 一行 lib/ 都不打算動。
+  const shipmentDeps = {
+    shopPath,
+    reload: () => loadDetail(state.order.id),
+    showError: (msg) => {
+      const err = $("#order-detail-error");
+      err.textContent = msg;
       err.hidden = false;
-    }
-  }
-
-  async function advance(o, shipment, target) {
-    // 退貨會經 events.OrderReturned 讓 points 扣回這筆訂單已核發的點數
-    // （change member-tiers-and-points design D5）。那不是一個標籤，說清楚。
-    const confirmText = target === "returned"
-      ? "確定標記為退貨？此訂單已核發的點數會被扣回，且退貨是終態，無法復原。"
-      : "確定標記為已送達？已送達是終態，無法復原。";
-    if (!confirm(confirmText)) return;
-    const err = $("#order-detail-error");
-    err.hidden = true;
-    try {
-      await api("PUT", shopPath(`/orders/${o.id}/shipments/${shipment.id}`), { status: target });
-      await loadDetail(o.id);
-    } catch (e) {
-      err.textContent = e.message;
-      err.hidden = false;
-    }
-  }
+    },
+    badge,
+    formatTime,
+  };
 
   async function renderPayments(o) {
     const host = clear($("#order-payments"));

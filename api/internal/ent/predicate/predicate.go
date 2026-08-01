@@ -72,6 +72,9 @@ type RoleUser func(*sql.Selector)
 // Shipment is the predicate function for shipment builders.
 type Shipment func(*sql.Selector)
 
+// ShipmentItem is the predicate function for shipmentitem builders.
+type ShipmentItem func(*sql.Selector)
+
 // ShippingMethod is the predicate function for shippingmethod builders.
 type ShippingMethod func(*sql.Selector)
 

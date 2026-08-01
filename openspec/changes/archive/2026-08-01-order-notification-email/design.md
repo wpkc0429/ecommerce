@@ -264,6 +264,22 @@ Order.Query().Where(entorder.IDEQ(ev.OrderID), entorder.ShopIDEQ(ev.ShopID))
 
 **觸發點**：`partial-shipment` 讓 `shipments` 長出品項的那一刻，D12 到期，出貨通知信重新評估。屆時 `notify` 這一側要動的東西是有限且已知的：新增一個 `kind`、事件從 `shipping.Service` 發佈（該套件已有 dispatcher）、renderer 多一個模板。**`Sender`／分派模型／防重機制一個字都不用改。**
 
+---
+
+> **修訂 2026-08-01（由 change `partial-shipment` 補記，以上原文一字未改）**
+>
+> **這一節依賴的假設已經被推翻了。** `partial-shipment` 已落地：`shipment_items` 存在、`order_items.shipped_quantity` 存在、`shipments.order_id` 的唯一索引已移除、`orders.fulfillment_status` 新增了 `4`＝部分出貨。所以上面那三項「今天的系統事實」證據，**沒有一項還成立**。
+>
+> **① 的判斷經事後檢驗是對的**：如果當時寄了那封信，今天它會在每一筆部分出貨上說「您的訂單已出貨」而實際只出了一部分，而且正如原文預測的——`partial-shipment` 跑完全部閘門（單元／整合／四道契約／三道接線／兩支 E2E）都不會有任何一條轉紅。
+>
+> **`partial-shipment` 仍然沒有寄出貨信**，而且理由**不是** D12 那條（它已失效），是範圍紀律：寄一封顧客可見的信是獨立決定（收件人、時機、內容、額度都要重新評估，而 Gmail 額度天花板是全平台共用的），夾帶在一個資料模型 change 裡會讓兩件事都審不清楚。
+>
+> **預設答案原樣保留，而且現在有資料支撐它**：每次出貨各寄一封、只列該次品項、`UNIQUE(order_id, kind)` → `UNIQUE(shipment_id, kind)`；`Sender`／分派模型／防重機制不動。「只列該次品項」在原文寫下時還沒有對應的資料，現在有了（`shipment_items`）。
+>
+> 第二個選項（全部出完只寄一封）的成本評估**也變了**：它當時需要「一個系統今天沒有的衍生狀態」，而今天 `fulfillment_status` 從 `4` 變成 `1` 正是那個狀態，由伺服器推導、有測試守著。所以它從「需要新概念」降級成「需要一個訂閱者」——但仍然沒有人要求它，因此仍然不做（`partial-shipment` design D13：沒有消費者的事件不新增）。
+>
+> **下一個要動出貨信的人**：從 `partial-shipment` 的 design D9 接手，不要從這一節接手。
+
 ### D13: PII——信裡有，日誌裡沒有，而且要有東西守著
 
 訂單信裡必然包含收件人姓名、電話、完整地址、卡片訊息——那是這封信的**內容**，寄給下單者本人是正確的。真正的邊界在別處：

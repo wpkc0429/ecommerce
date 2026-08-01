@@ -296,6 +296,7 @@ try {
   check("published product is visible on the public catalog endpoint",
     Boolean(published), brief(publicList));
   const publicA = (published?.skus ?? []).find((s) => s.sku_code === skuA);
+  const publicB = (published?.skus ?? []).find((s) => s.sku_code === skuB);
   check("public endpoint reports the edited stock", publicA?.stock_qty === 7,
     JSON.stringify(published?.skus));
   check("public endpoint reports the unscaled price", publicA?.price_amount === 3400,
@@ -404,6 +405,95 @@ try {
   check("a terminal shipment offers no further state buttons",
     (await page.locator("#shipment-delivered-btn").count()) === 0 &&
       (await page.locator("#shipment-returned-btn").count()) === 0);
+
+  console.log("⑰.5 後台部分出貨（change partial-shipment）");
+  // A second order, deliberately with a line of quantity 2 and a line of
+  // quantity 1: the interesting case is not "two lines" but "part of one line".
+  const partPlaced = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK,
+    body: {
+      email: `e2e-partial-${runID}@example.com`,
+      items: [
+        { sku_id: publicA?.id, quantity: 2, gift_message: "E2E：分批出貨 A" },
+        { sku_id: publicB?.id, quantity: 1, gift_message: "E2E：分批出貨 B" },
+      ],
+      shipping_address: { recipient_name: `E2E 分批 ${runID}`, phone: "0955123456", line1: "台北市大安區信義路四段 1 號" },
+      shipping_method_id: methodID,
+    },
+  });
+  check("a two-line guest order was placed for the partial-shipment screen",
+    partPlaced.status === 201, brief(partPlaced));
+  const partOrder = partPlaced.json?.order ?? {};
+  const partLines = partOrder.items ?? [];
+  const lineOf = (code) => partLines.find((i) => i.sku_code === code);
+
+  await page.goto(`http://localhost:3001/#/orders/${partOrder.id}`);
+  await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector("#shipment-lines", { timeout: 8000 });
+
+  const shippedCell = async (code) =>
+    (await page.textContent(`#order-items-tbody tr[data-sku="${code}"] .shipped-qty`) ?? "").trim();
+  check("an unshipped order reports 0 of each line as shipped",
+    (await shippedCell(skuA)) === "0 / 2" && (await shippedCell(skuB)) === "0 / 1",
+    `${await shippedCell(skuA)} | ${await shippedCell(skuB)}`);
+  check("the create-shipment form offers one row per outstanding line",
+    (await page.locator("#shipment-lines .shipment-line").count()) === 2,
+    String(await page.locator("#shipment-lines .shipment-line").count()));
+
+  // **This is the assertion the whole repeater discipline exists for.** Each
+  // row's read() closes over its own input; a collector that went back to the
+  // DOM by label text (lib/schemaform.js's path) would mis-assign these two
+  // same-named quantity fields, and it would do it silently. Ship 1 of A and 0
+  // of B — if the values crossed, B would ship and A would not.
+  const qtyFor = (line) => `#shipment-lines .shipment-line-qty[data-order-item-id="${line.id}"]`;
+  await page.fill(qtyFor(lineOf(skuA)), "1");
+  await page.fill(qtyFor(lineOf(skuB)), "0");
+  await page.fill("#shipment-carrier", "E2E 快遞");
+  await page.fill("#shipment-tracking", `E2E-PART-${runID}`);
+  await page.click("#create-partial-shipment-btn");
+  await page.waitForSelector("#order-shipments-list .parcel", { timeout: 8000 });
+
+  check("shipping part of one line marks the order 部分出貨, not 已出貨",
+    ((await page.textContent("#order-summary")) ?? "").includes("部分出貨"),
+    (await page.textContent("#order-summary"))?.slice(0, 300) ?? "");
+  check("each row's quantity went to its own line (1 of A, none of B)",
+    (await shippedCell(skuA)) === "1 / 2" && (await shippedCell(skuB)) === "0 / 1",
+    `${await shippedCell(skuA)} | ${await shippedCell(skuB)}`);
+  const parcelText = (await page.textContent("#order-shipments-list")) ?? "";
+  check("the parcel says what is inside it, by product name",
+    parcelText.includes(`E2E-PART-${runID}`) && parcelText.includes("× 1"),
+    parcelText.slice(0, 300));
+  check("the remainder is still offered for a second parcel",
+    (await page.locator("#create-shipment-btn").count()) === 1 &&
+      (await page.locator("#shipment-lines .shipment-line").count()) === 2,
+    String(await page.locator("#shipment-lines .shipment-line").count()));
+
+  // Ship everything outstanding: the button that sends NO item list, i.e. the
+  // request body that predates this change, byte for byte.
+  await page.fill("#shipment-carrier", "E2E 快遞");
+  await page.click("#create-shipment-btn");
+  await page.waitForFunction(
+    () => document.querySelectorAll("#order-shipments-list .parcel").length === 2,
+    null, { timeout: 8000 });
+  check("shipping the remainder completes the order (已出貨, every line full)",
+    (await shippedCell(skuA)) === "2 / 2" && (await shippedCell(skuB)) === "1 / 1",
+    `${await shippedCell(skuA)} | ${await shippedCell(skuB)}`);
+  check("a fully shipped order stops offering a create-shipment form",
+    (await page.locator("#create-shipment-btn").count()) === 0 &&
+      (await page.locator("#order-shipment-complete-note").count()) === 1);
+  // 已出貨數不是金額：這一欄絕不能長出貨幣符號（design D4/D10 的同一條紀律）。
+  const itemsTableText = (await page.textContent("#order-items-tbody")) ?? "";
+  check("the shipped-quantity column never renders as money",
+    !/NT\$\s*[0-9]*\s*\/\s*[0-9]/.test(itemsTableText), itemsTableText.slice(0, 200));
+
+  // Back to the ops order before ⑱: that section clicks #order-points-btn, which
+  // reads the member of whatever order is currently on screen. Leaving this
+  // section's own (different) customer displayed would send ⑱ to look up a
+  // brand-new guest with no points and no ledger — a failure that looks exactly
+  // like a broken points chain and has nothing to do with points.
+  await page.goto(`http://localhost:3001/#/orders/${opsOrder.id}`);
+  await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector("#order-amounts", { timeout: 8000 });
 
   console.log("⑱ 後台看到該顧客的點數餘額與流水帳");
   await page.click("#order-points-btn");

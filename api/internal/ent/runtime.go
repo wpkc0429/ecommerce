@@ -24,6 +24,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/schema"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
@@ -459,6 +460,10 @@ func init() {
 	orderitemDescGiftMessage := orderitemFields[9].Descriptor()
 	// orderitem.DefaultGiftMessage holds the default value on creation for the gift_message field.
 	orderitem.DefaultGiftMessage = orderitemDescGiftMessage.Default.(string)
+	// orderitemDescShippedQuantity is the schema descriptor for shipped_quantity field.
+	orderitemDescShippedQuantity := orderitemFields[10].Descriptor()
+	// orderitem.DefaultShippedQuantity holds the default value on creation for the shipped_quantity field.
+	orderitem.DefaultShippedQuantity = orderitemDescShippedQuantity.Default.(int32)
 	ordernotificationMixin := schema.OrderNotification{}.Mixin()
 	ordernotificationMixinFields0 := ordernotificationMixin[0].Fields()
 	_ = ordernotificationMixinFields0
@@ -923,6 +928,21 @@ func init() {
 	shipmentDescTrackingNumber := shipmentFields[3].Descriptor()
 	// shipment.TrackingNumberValidator is a validator for the "tracking_number" field. It is called by the builders before save.
 	shipment.TrackingNumberValidator = shipmentDescTrackingNumber.Validators[0].(func(string) error)
+	shipmentitemMixin := schema.ShipmentItem{}.Mixin()
+	shipmentitemMixinFields0 := shipmentitemMixin[0].Fields()
+	_ = shipmentitemMixinFields0
+	shipmentitemFields := schema.ShipmentItem{}.Fields()
+	_ = shipmentitemFields
+	// shipmentitemDescCreatedAt is the schema descriptor for created_at field.
+	shipmentitemDescCreatedAt := shipmentitemMixinFields0[0].Descriptor()
+	// shipmentitem.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shipmentitem.DefaultCreatedAt = shipmentitemDescCreatedAt.Default.(func() time.Time)
+	// shipmentitemDescUpdatedAt is the schema descriptor for updated_at field.
+	shipmentitemDescUpdatedAt := shipmentitemMixinFields0[1].Descriptor()
+	// shipmentitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	shipmentitem.DefaultUpdatedAt = shipmentitemDescUpdatedAt.Default.(func() time.Time)
+	// shipmentitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	shipmentitem.UpdateDefaultUpdatedAt = shipmentitemDescUpdatedAt.UpdateDefault.(func() time.Time)
 	shippingmethodMixin := schema.ShippingMethod{}.Mixin()
 	shippingmethodMixinFields0 := shippingmethodMixin[0].Fields()
 	_ = shippingmethodMixinFields0

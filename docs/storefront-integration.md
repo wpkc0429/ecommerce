@@ -385,11 +385,32 @@ function submitForm({ method, action, fields }) {
 ## 7. 查訂單與出貨
 
 ```
-GET /api/v1/shop/guest/order            → 該筆訂單（含 payment_status / fulfillment_status）
-GET /api/v1/shop/guest/order/shipment   → 該筆訂單的出貨資訊（尚未出貨時 404）
+GET /api/v1/shop/guest/order             → 該筆訂單（含 payment_status / fulfillment_status）
+GET /api/v1/shop/guest/order/shipments   → 該筆訂單的**所有**出貨（清單；尚未出貨時 200 ＋ 空陣列）
+GET /api/v1/shop/guest/order/shipment    → **最近一筆**出貨（單一物件；尚未出貨時 404）
 ```
 
 同樣帶 `X-Publishable-Key` ＋ `Authorization: Bearer <order_access_token>`，同樣**不帶訂單 id**。
+
+### 一筆訂單可以有多箱（change partial-shipment）
+
+商家可以分多次出貨（花瓶今天走、鮮花週五走），所以：
+
+- **請用複數的 `/shipments`。** 它回 `{"shipments": [...]}`，**依出貨編號遞減**（最新的在最前面）。每一筆帶 `items`（`order_item_id` ＋ `quantity`），也就是「這箱裝了什麼」；品項名稱請用 `order_item_id` 回訂單的 `items` 裡查，出貨紀錄刻意不重複一份商品文案。
+- **單數的 `/shipment` 仍然可用**，語意是「最近一筆」。單箱訂單的回應與過去逐位元組相同；多箱時它只看得到最新那箱。
+- 訂單的 `items[]` 新增 `shipped_quantity`：這一行**已經出貨的數量**。`quantity - shipped_quantity` 就是還沒出的。
+
+### `fulfillment_status` 新增了值 `4`
+
+| 值 | 意思 |
+| --- | --- |
+| 0 | 未出貨 |
+| 1 | 已出貨（**全部**品項都出了） |
+| 2 | 已送達（**每一箱**都送達了） |
+| 3 | 已退貨（**任一箱**被標記退貨） |
+| **4** | **部分出貨**（有些品項出了，有些還沒）← change partial-shipment 新增 |
+
+既有四個值的意思**一個字都沒變**，`4` 是新增的。若你的前端用陣列索引取標籤，請補上第五個元素——**索引 4 沒補會顯示 `undefined`，不會崩，但也不會正確**。`4` 排在最後而不是插在 `1` 之前，因為既有值的數值不可以動。
 
 ### 這枚權杖能做什麼、不能做什麼
 
@@ -397,7 +418,7 @@ GET /api/v1/shop/guest/order/shipment   → 該筆訂單的出貨資訊（尚未
 | --- | --- |
 | 讀取它指名的那一筆訂單 | 列出訂單歷史（`GET /api/v1/shop/orders` 回 401） |
 | 對那一筆訂單發起付款 | 取消訂單 |
-| 讀那一筆訂單的出貨資訊 | 讀取／修改顧客資料、密碼 |
+| 讀那一筆訂單的出貨資訊（單數與複數皆可） | 讀取／修改顧客資料、密碼 |
 | | 讀取或兌換點數 |
 | | 換發或延長自己（沒有 refresh） |
 

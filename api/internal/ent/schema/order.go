@@ -217,6 +217,13 @@ func (OrderItem) Annotations() []schema.Annotation {
 			Checks: map[string]string{
 				"order_items_quantity_check":     "quantity > 0",
 				"order_items_price_amount_check": "price_amount >= 0",
+				// change partial-shipment, design D3: you cannot ship what was
+				// never ordered. This lives in the database for the same reason
+				// orders_total_amount_composition_check does — it is the second,
+				// independent arbiter behind the conditional UPDATE, so a
+				// mistyped predicate aborts the transaction instead of writing an
+				// impossible number that nothing would ever notice.
+				"order_items_shipped_quantity_check": "shipped_quantity >= 0 AND shipped_quantity <= quantity",
 			},
 		},
 	}
@@ -250,6 +257,31 @@ func (OrderItem) Fields() []ent.Field {
 		// cart.Service's character-counted check.
 		field.String("gift_message").
 			SchemaType(map[string]string{dialect.Postgres: "varchar(500)"}).Default(""),
+		// shipped_quantity (change partial-shipment, design D3): how many of
+		// this line have left the shop. **The only mutable column on this
+		// table** — everything above it is a permanent snapshot, and that
+		// contrast is the point.
+		//
+		// It is a stored counter rather than a SUM over shipment_items, and the
+		// reason is not performance: the over-shipment guard has to be the same
+		// shape as the one concurrency-safe decrement this API has (order.Service.
+		// Checkout's stock loop), i.e. one conditional UPDATE plus an affected-rows
+		// check. A SUM cannot appear in that UPDATE's predicate without either
+		// SELECT … FOR UPDATE or an application-level read-then-write, and this
+		// codebase refuses both (checkout-idempotency design D3).
+		//
+		// Written only by shipping.Service, inside the transaction that also
+		// writes the shipments/shipment_items rows justifying it. Never by
+		// checkout, never by cancellation (which only proceeds while
+		// fulfillment_status is still 0, i.e. while this is still 0 everywhere),
+		// never by any back-office endpoint.
+		//
+		// Never decremented on return. Returns are terminal and an order with a
+		// returned shipment accepts no further shipments, so a decrement would
+		// have no consumer — and the moment this stops being monotonic, "how much
+		// has ever shipped" and "how much is out there now" become two different
+		// numbers wearing one name.
+		field.Int32("shipped_quantity").Default(0),
 	}
 }
 

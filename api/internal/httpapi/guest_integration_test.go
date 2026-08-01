@@ -587,12 +587,48 @@ func TestOrderAccessTokenScope(t *testing.T) {
 	})
 
 	t.Run("reads its own shipment", func(t *testing.T) {
-		if _, err := e.shippingSvc.CreateShipment(ctx, e.shopA, orderID, "黑貓", nil); err != nil {
+		if _, err := e.shippingSvc.CreateShipment(ctx, e.shopA, orderID, "黑貓", nil, nil); err != nil {
 			t.Fatal(err)
 		}
 		code, body := e.tokenCall(t, token, e.shopADomain, "GET", "/api/v1/shop/guest/order/shipment", nil)
 		if code != http.StatusOK || int(body["order_id"].(float64)) != orderID {
 			t.Fatalf("want 200 for order %d's shipment, got %d: %+v", orderID, code, body)
+		}
+		if len(body["items"].([]any)) == 0 {
+			t.Fatalf("a shipment must say what is in it (change partial-shipment): %+v", body)
+		}
+	})
+
+	// change partial-shipment, design D6: guests reach the plural form too —
+	// ONDO has no login UI, so "members only" would mean nobody.
+	t.Run("reads every shipment of its order", func(t *testing.T) {
+		code, body := e.tokenCall(t, token, e.shopADomain, "GET", "/api/v1/shop/guest/order/shipments", nil)
+		if code != http.StatusOK {
+			t.Fatalf("want 200, got %d: %+v", code, body)
+		}
+		list := body["shipments"].([]any)
+		if len(list) != 1 {
+			t.Fatalf("expected exactly this order's one parcel, got %+v", body)
+		}
+		if int(list[0].(map[string]any)["order_id"].(float64)) != orderID {
+			t.Fatalf("token reached the wrong order's parcels: %+v", body)
+		}
+	})
+
+	// A collection's empty case is 200 with an empty array, unlike the singular
+	// endpoint's 404. Asserted against the *other* guest's order, which has
+	// nothing shipped.
+	t.Run("lists no shipments as an empty collection", func(t *testing.T) {
+		code, body := e.tokenCall(t, otherToken, e.shopADomain, "GET", "/api/v1/shop/guest/order/shipments", nil)
+		if code != http.StatusOK {
+			t.Fatalf("want 200 for an unshipped order, got %d: %+v", code, body)
+		}
+		if len(body["shipments"].([]any)) != 0 {
+			t.Fatalf("expected an empty collection, got %+v", body)
+		}
+		code, _ = e.tokenCall(t, otherToken, e.shopADomain, "GET", "/api/v1/shop/guest/order/shipment", nil)
+		if code != http.StatusNotFound {
+			t.Fatalf("the singular endpoint must keep its 404, got %d", code)
 		}
 	})
 

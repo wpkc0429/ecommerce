@@ -495,7 +495,7 @@ func TestPointsAreAwardedOnTheSubtotalNotOnShipping(t *testing.T) {
 
 	// Returning the goods claws back exactly what the goods earned.
 	memberID := e.client.Order.GetX(ctx, shippedOrder).MemberID
-	sh, err := e.shippingSvc.CreateShipment(ctx, e.shopA, shippedOrder, "黑貓宅急便", nil)
+	sh, err := e.shippingSvc.CreateShipment(ctx, e.shopA, shippedOrder, "黑貓宅急便", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

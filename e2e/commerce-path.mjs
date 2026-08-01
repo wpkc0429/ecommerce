@@ -57,6 +57,12 @@ const BOUQUET_SKU = "BQ-ANNI-M";
 // restore stock — only cancellation does — so a seeded database supports a
 // bounded number of runs before it needs re-seeding (design D7). BQ-ANNI-M is
 // seeded with 36, i.e. 7 runs.
+//
+// This counts BQ-ANNI-M only, which is why change partial-shipment's section ⑬
+// deliberately buys the S and L sizes instead: it ends delivered (a partially
+// shipped order cannot be cancelled, by design), so its 2 units are gone for
+// good, and spending them here would have halved the runs-per-seed. S is seeded
+// with 24 and L with 18, so ⑬ constrains nothing.
 const STOCK_PER_RUN = 5;
 
 class Abort extends Error {}
@@ -781,6 +787,144 @@ async function commercePath() {
       orphanLookup.json.payments[0].status === 1 &&
       orphanLookup.json.payments[0].order_id === orphanOrder.id,
     brief(orphanLookup));
+
+  // ── ⑬ 部分出貨：一張訂單、兩箱、兩次 ──
+  //
+  // change partial-shipment. Deliberately the whole arc rather than a spot
+  // check, because every interesting property here is about a *sequence*: the
+  // order-level status is derived from all shipments (never asserted), so the
+  // only way to catch a wrong derivation is to walk the states.
+  //
+  // Two S/L bouquets rather than the tracked BQ-ANNI-M: this section consumes
+  // two units permanently (the order ends delivered, and only cancellation
+  // restocks), and spending them on the M budget would cut the runs-per-seed
+  // roughly in half. S has 24 and L has 18 seeded, so this is the section that
+  // constrains nothing.
+  section("⑬ Partial shipment: one order, two parcels, derived order status");
+  const partSKUs = ["S", "L"].map((sz) =>
+    (detail.json.skus ?? []).find((s) => s.sku_code === `${BOUQUET_SKU.slice(0, -1)}${sz}`));
+  need(partSKUs.every(Boolean),
+    `seeded S/L bouquet SKUs missing — run \`make seed-demo\``);
+
+  await req("DELETE", "/api/v1/shop/cart/items", { token: member, pk: PK });
+  for (const s of partSKUs) {
+    await req("POST", "/api/v1/shop/cart/items", { token: member, pk: PK, body: { sku_id: s.id, quantity: 1 } });
+  }
+  const pRes = await req("POST", "/api/v1/shop/checkout", {
+    token: member, pk: PK,
+    body: {
+      recipient_name: "E2E 分批", phone: "0955666777", line1: "台北市信義區松高路 11 號",
+      shipping_method_id: freeMethod.id,
+    },
+  });
+  need(pRes.status === 201, `partial-shipment checkout failed: ${brief(pRes)}`);
+  const pOrder = pRes.json;
+  need((pOrder.items ?? []).length === 2, `expected a two-line order, got ${(pOrder.items ?? []).length}`);
+  check("a fresh order reports every line as entirely unshipped",
+    pOrder.items.every((i) => i.shipped_quantity === 0) && pOrder.fulfillment_status === 0,
+    JSON.stringify(pOrder.items.map((i) => i.shipped_quantity)));
+
+  // The plural customer endpoint answers 200 with an empty collection before
+  // anything ships — a list's empty case is not a 404 (design D6).
+  const pNone = await req("GET", `/api/v1/shop/orders/${pOrder.id}/shipments`, { token: member, pk: PK });
+  check("the customer's shipment list is an empty collection, not a 404, before anything ships",
+    pNone.status === 200 && (pNone.json?.shipments ?? []).length === 0, brief(pNone));
+
+  // 第一箱：只出第一個品項。
+  const [lineA, lineB] = pOrder.items;
+  const ship1 = await req("POST", shopPath(`/orders/${pOrder.id}/shipments`), {
+    token: admin,
+    body: {
+      carrier: freeMethod.carrier, tracking_number: `E2E-${runID}-P1`,
+      items: [{ order_item_id: lineA.id, quantity: 1 }],
+    },
+  });
+  need(ship1.status === 201, `first partial shipment failed: ${brief(ship1)}`);
+  check("a parcel says exactly what is in it",
+    (ship1.json.items ?? []).length === 1 &&
+      ship1.json.items[0].order_item_id === lineA.id &&
+      ship1.json.items[0].quantity === 1,
+    JSON.stringify(ship1.json.items));
+
+  const afterFirst = await req("GET", `/api/v1/shop/orders/${pOrder.id}`, { token: member, pk: PK });
+  check("shipping part of an order makes it PARTIALLY SHIPPED (the new value 4)",
+    afterFirst.json?.fulfillment_status === 4, JSON.stringify(afterFirst.json?.fulfillment_status));
+  const afterFirstLines = afterFirst.json?.items ?? [];
+  check("the shipped line reports what left and the untouched line reports nothing",
+    afterFirstLines.find((i) => i.id === lineA.id)?.shipped_quantity === 1 &&
+      afterFirstLines.find((i) => i.id === lineB.id)?.shipped_quantity === 0,
+    JSON.stringify(afterFirstLines.map((i) => [i.id, i.shipped_quantity])));
+  // The order lines must not reorder themselves just because one of them was
+  // updated. order_items only became a mutable table in this change, and an
+  // unordered eager-load returns the just-updated row last.
+  check("the order's lines keep their original order after a line is updated",
+    afterFirstLines.map((i) => i.id).join(",") === pOrder.items.map((i) => i.id).join(","),
+    `${pOrder.items.map((i) => i.id)} → ${afterFirstLines.map((i) => i.id)}`);
+
+  const oneParcel = await req("GET", `/api/v1/shop/orders/${pOrder.id}/shipments`, { token: member, pk: PK });
+  check("the customer sees the one parcel that has gone out",
+    oneParcel.status === 200 && (oneParcel.json?.shipments ?? []).length === 1 &&
+      oneParcel.json.shipments[0].tracking_number === `E2E-${runID}-P1`,
+    brief(oneParcel));
+
+  // 超出訂購量：被拒，而且是 422（請求主體上的值），不是 409。
+  const overShip = await req("POST", shopPath(`/orders/${pOrder.id}/shipments`), {
+    token: admin,
+    body: { carrier: freeMethod.carrier, items: [{ order_item_id: lineA.id, quantity: 1 }] },
+  });
+  check("shipping more of a line than was ordered is refused (422)",
+    overShip.status === 422, brief(overShip));
+  const stillFour = await req("GET", `/api/v1/shop/orders/${pOrder.id}`, { token: member, pk: PK });
+  check("a refused shipment changes nothing",
+    stillFour.json?.fulfillment_status === 4 &&
+      (stillFour.json?.items ?? []).find((i) => i.id === lineA.id)?.shipped_quantity === 1,
+    brief(stillFour));
+
+  // 第二箱：省略 items ＝ 出貨全部未出品項（design D5，與本 change 之前逐位元組相同）。
+  const ship2 = await req("POST", shopPath(`/orders/${pOrder.id}/shipments`), {
+    token: admin, body: { carrier: freeMethod.carrier, tracking_number: `E2E-${runID}-P2` },
+  });
+  need(ship2.status === 201, `second (remainder) shipment failed: ${brief(ship2)}`);
+  check("omitting the item list ships exactly what was still outstanding",
+    (ship2.json.items ?? []).length === 1 && ship2.json.items[0].order_item_id === lineB.id,
+    JSON.stringify(ship2.json.items));
+
+  const afterSecond = await req("GET", `/api/v1/shop/orders/${pOrder.id}`, { token: member, pk: PK });
+  check("once every line has gone out the order is SHIPPED, not still partial",
+    afterSecond.json?.fulfillment_status === 1, JSON.stringify(afterSecond.json?.fulfillment_status));
+
+  const bothParcels = await req("GET", `/api/v1/shop/orders/${pOrder.id}/shipments`, { token: member, pk: PK });
+  const parcelIDs = (bothParcels.json?.shipments ?? []).map((s) => s.id);
+  check("the customer sees both parcels, newest first",
+    parcelIDs.length === 2 && parcelIDs[0] > parcelIDs[1], JSON.stringify(parcelIDs));
+  // 單數端點在多筆出貨下回**最近一筆**，不是 404 —— 它今天的 .Only() 會壞掉。
+  const singular = await req("GET", `/api/v1/shop/orders/${pOrder.id}/shipment`, { token: member, pk: PK });
+  check("the singular endpoint still answers on a multi-parcel order (the newest one)",
+    singular.status === 200 && singular.json?.id === parcelIDs[0], brief(singular));
+
+  // 一箱送達不會讓整張訂單變成已送達。
+  const deliver1 = await req("PUT", shopPath(`/orders/${pOrder.id}/shipments/${ship1.json.id}`), {
+    token: admin, body: { status: "delivered" },
+  });
+  need(deliver1.status === 200, `delivering the first parcel failed: ${brief(deliver1)}`);
+  const oneDelivered = await req("GET", `/api/v1/shop/orders/${pOrder.id}`, { token: member, pk: PK });
+  check("one parcel arriving does NOT mark the whole order delivered",
+    oneDelivered.json?.fulfillment_status === 1, JSON.stringify(oneDelivered.json?.fulfillment_status));
+
+  const deliver2 = await req("PUT", shopPath(`/orders/${pOrder.id}/shipments/${ship2.json.id}`), {
+    token: admin, body: { status: "delivered" },
+  });
+  need(deliver2.status === 200, `delivering the second parcel failed: ${brief(deliver2)}`);
+  const allDelivered = await req("GET", `/api/v1/shop/orders/${pOrder.id}`, { token: member, pk: PK });
+  check("only when every parcel has arrived is the order DELIVERED",
+    allDelivered.json?.fulfillment_status === 2, JSON.stringify(allDelivered.json?.fulfillment_status));
+
+  // 全部出完之後再出貨：409（沒有未出品項），不是 422。
+  const nothingLeft = await req("POST", shopPath(`/orders/${pOrder.id}/shipments`), {
+    token: admin, body: { carrier: freeMethod.carrier },
+  });
+  check("a fully shipped order refuses a further parcel (409)",
+    nothingLeft.status === 409, brief(nothingLeft));
 }
 
 

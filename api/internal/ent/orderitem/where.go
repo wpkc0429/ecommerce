@@ -115,6 +115,11 @@ func GiftMessage(v string) predicate.OrderItem {
 	return predicate.OrderItem(sql.FieldEQ(FieldGiftMessage, v))
 }
 
+// ShippedQuantity applies equality check predicate on the "shipped_quantity" field. It's identical to ShippedQuantityEQ.
+func ShippedQuantity(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldEQ(FieldShippedQuantity, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.OrderItem {
 	return predicate.OrderItem(sql.FieldEQ(FieldCreatedAt, v))
@@ -673,6 +678,46 @@ func GiftMessageEqualFold(v string) predicate.OrderItem {
 // GiftMessageContainsFold applies the ContainsFold predicate on the "gift_message" field.
 func GiftMessageContainsFold(v string) predicate.OrderItem {
 	return predicate.OrderItem(sql.FieldContainsFold(FieldGiftMessage, v))
+}
+
+// ShippedQuantityEQ applies the EQ predicate on the "shipped_quantity" field.
+func ShippedQuantityEQ(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldEQ(FieldShippedQuantity, v))
+}
+
+// ShippedQuantityNEQ applies the NEQ predicate on the "shipped_quantity" field.
+func ShippedQuantityNEQ(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldNEQ(FieldShippedQuantity, v))
+}
+
+// ShippedQuantityIn applies the In predicate on the "shipped_quantity" field.
+func ShippedQuantityIn(vs ...int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldIn(FieldShippedQuantity, vs...))
+}
+
+// ShippedQuantityNotIn applies the NotIn predicate on the "shipped_quantity" field.
+func ShippedQuantityNotIn(vs ...int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldNotIn(FieldShippedQuantity, vs...))
+}
+
+// ShippedQuantityGT applies the GT predicate on the "shipped_quantity" field.
+func ShippedQuantityGT(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldGT(FieldShippedQuantity, v))
+}
+
+// ShippedQuantityGTE applies the GTE predicate on the "shipped_quantity" field.
+func ShippedQuantityGTE(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldGTE(FieldShippedQuantity, v))
+}
+
+// ShippedQuantityLT applies the LT predicate on the "shipped_quantity" field.
+func ShippedQuantityLT(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldLT(FieldShippedQuantity, v))
+}
+
+// ShippedQuantityLTE applies the LTE predicate on the "shipped_quantity" field.
+func ShippedQuantityLTE(v int32) predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldLTE(FieldShippedQuantity, v))
 }
 
 // HasShop applies the HasEdge predicate on the "shop" edge.

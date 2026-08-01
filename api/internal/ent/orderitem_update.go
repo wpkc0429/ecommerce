@@ -217,6 +217,27 @@ func (_u *OrderItemUpdate) SetNillableGiftMessage(v *string) *OrderItemUpdate {
 	return _u
 }
 
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (_u *OrderItemUpdate) SetShippedQuantity(v int32) *OrderItemUpdate {
+	_u.mutation.ResetShippedQuantity()
+	_u.mutation.SetShippedQuantity(v)
+	return _u
+}
+
+// SetNillableShippedQuantity sets the "shipped_quantity" field if the given value is not nil.
+func (_u *OrderItemUpdate) SetNillableShippedQuantity(v *int32) *OrderItemUpdate {
+	if v != nil {
+		_u.SetShippedQuantity(*v)
+	}
+	return _u
+}
+
+// AddShippedQuantity adds value to the "shipped_quantity" field.
+func (_u *OrderItemUpdate) AddShippedQuantity(v int32) *OrderItemUpdate {
+	_u.mutation.AddShippedQuantity(v)
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *OrderItemUpdate) SetShop(v *Shop) *OrderItemUpdate {
 	return _u.SetShopID(v.ID)
@@ -368,6 +389,12 @@ func (_u *OrderItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.GiftMessage(); ok {
 		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ShippedQuantity(); ok {
+		_spec.SetField(orderitem.FieldShippedQuantity, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedShippedQuantity(); ok {
+		_spec.AddField(orderitem.FieldShippedQuantity, field.TypeInt32, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -635,6 +662,27 @@ func (_u *OrderItemUpdateOne) SetNillableGiftMessage(v *string) *OrderItemUpdate
 	return _u
 }
 
+// SetShippedQuantity sets the "shipped_quantity" field.
+func (_u *OrderItemUpdateOne) SetShippedQuantity(v int32) *OrderItemUpdateOne {
+	_u.mutation.ResetShippedQuantity()
+	_u.mutation.SetShippedQuantity(v)
+	return _u
+}
+
+// SetNillableShippedQuantity sets the "shipped_quantity" field if the given value is not nil.
+func (_u *OrderItemUpdateOne) SetNillableShippedQuantity(v *int32) *OrderItemUpdateOne {
+	if v != nil {
+		_u.SetShippedQuantity(*v)
+	}
+	return _u
+}
+
+// AddShippedQuantity adds value to the "shipped_quantity" field.
+func (_u *OrderItemUpdateOne) AddShippedQuantity(v int32) *OrderItemUpdateOne {
+	_u.mutation.AddShippedQuantity(v)
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *OrderItemUpdateOne) SetShop(v *Shop) *OrderItemUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -816,6 +864,12 @@ func (_u *OrderItemUpdateOne) sqlSave(ctx context.Context) (_node *OrderItem, er
 	}
 	if value, ok := _u.mutation.GiftMessage(); ok {
 		_spec.SetField(orderitem.FieldGiftMessage, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ShippedQuantity(); ok {
+		_spec.SetField(orderitem.FieldShippedQuantity, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedShippedQuantity(); ok {
+		_spec.AddField(orderitem.FieldShippedQuantity, field.TypeInt32, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

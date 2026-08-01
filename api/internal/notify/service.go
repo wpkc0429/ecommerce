@@ -11,6 +11,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	entmember "ksdevworks/ecommerce/api/internal/ent/member"
 	entorder "ksdevworks/ecommerce/api/internal/ent/order"
+	entorderitem "ksdevworks/ecommerce/api/internal/ent/orderitem"
 	entnotification "ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/events"
 )
@@ -246,7 +247,11 @@ func (s *Service) deliver(ctx context.Context, j job) error {
 
 	ord, err := s.Client.Order.Query().
 		Where(entorder.IDEQ(j.orderID), entorder.ShopIDEQ(j.shopID)).
-		WithItems().
+		// Explicitly by id: the confirmation email lists these lines, and since
+		// change partial-shipment order_items is a table that gets UPDATEd, so an
+		// unordered eager-load no longer comes back in insertion order (see
+		// order.orderItemsByID for the full account).
+		WithItems(func(q *ent.OrderItemQuery) { q.Order(entorderitem.ByID()) }).
 		Only(ctx)
 	if err != nil {
 		return fmt.Errorf("notify: load order: %w", err)

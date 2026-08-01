@@ -369,6 +369,7 @@ var (
 		{Name: "price_amount", Type: field.TypeInt64},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
 		{Name: "gift_message", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(500)"}},
+		{Name: "shipped_quantity", Type: field.TypeInt32, Default: 0},
 		{Name: "order_id", Type: field.TypeInt},
 		{Name: "shop_id", Type: field.TypeInt},
 	}
@@ -380,13 +381,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "order_items_orders_items",
-				Columns:    []*schema.Column{OrderItemsColumns[11]},
+				Columns:    []*schema.Column{OrderItemsColumns[12]},
 				RefColumns: []*schema.Column{OrdersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "order_items_shops_shop",
-				Columns:    []*schema.Column{OrderItemsColumns[12]},
+				Columns:    []*schema.Column{OrderItemsColumns[13]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -395,12 +396,12 @@ var (
 			{
 				Name:    "orderitem_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[11]},
+				Columns: []*schema.Column{OrderItemsColumns[12]},
 			},
 			{
 				Name:    "orderitem_shop_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[12]},
+				Columns: []*schema.Column{OrderItemsColumns[13]},
 			},
 		},
 	}
@@ -877,13 +878,61 @@ var (
 		Indexes: []*schema.Index{
 			{
 				Name:    "shipment_order_id",
-				Unique:  true,
+				Unique:  false,
 				Columns: []*schema.Column{ShipmentsColumns[9]},
 			},
 			{
 				Name:    "shipment_shop_id_order_id",
 				Unique:  false,
 				Columns: []*schema.Column{ShipmentsColumns[8], ShipmentsColumns[9]},
+			},
+		},
+	}
+	// ShipmentItemsColumns holds the columns for the "shipment_items" table.
+	ShipmentItemsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "quantity", Type: field.TypeInt32},
+		{Name: "shipment_id", Type: field.TypeInt},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "order_item_id", Type: field.TypeInt},
+	}
+	// ShipmentItemsTable holds the schema information for the "shipment_items" table.
+	ShipmentItemsTable = &schema.Table{
+		Name:       "shipment_items",
+		Columns:    ShipmentItemsColumns,
+		PrimaryKey: []*schema.Column{ShipmentItemsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shipment_items_shipments_items",
+				Columns:    []*schema.Column{ShipmentItemsColumns[4]},
+				RefColumns: []*schema.Column{ShipmentsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "shipment_items_shops_shop",
+				Columns:    []*schema.Column{ShipmentItemsColumns[5]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "shipment_items_order_items_order_item",
+				Columns:    []*schema.Column{ShipmentItemsColumns[6]},
+				RefColumns: []*schema.Column{OrderItemsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shipmentitem_shipment_id_order_item_id",
+				Unique:  true,
+				Columns: []*schema.Column{ShipmentItemsColumns[4], ShipmentItemsColumns[6]},
+			},
+			{
+				Name:    "shipmentitem_shop_id_shipment_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShipmentItemsColumns[5], ShipmentItemsColumns[4]},
 			},
 		},
 	}
@@ -1244,6 +1293,7 @@ var (
 		RolePermissionTable,
 		RoleUserTable,
 		ShipmentsTable,
+		ShipmentItemsTable,
 		ShippingMethodsTable,
 		ShopsTable,
 		ShopAllowedOriginsTable,
@@ -1323,8 +1373,9 @@ func init() {
 		Table: "order_items",
 	}
 	OrderItemsTable.Annotation.Checks = map[string]string{
-		"order_items_price_amount_check": "price_amount >= 0",
-		"order_items_quantity_check":     "quantity > 0",
+		"order_items_price_amount_check":     "price_amount >= 0",
+		"order_items_quantity_check":         "quantity > 0",
+		"order_items_shipped_quantity_check": "shipped_quantity >= 0 AND shipped_quantity <= quantity",
 	}
 	OrderNotificationsTable.ForeignKeys[0].RefTable = ShopsTable
 	OrderNotificationsTable.ForeignKeys[1].RefTable = OrdersTable
@@ -1400,6 +1451,15 @@ func init() {
 	ShipmentsTable.Annotation = &entsql.Annotation{}
 	ShipmentsTable.Annotation.Checks = map[string]string{
 		"shipments_status_check": "status IN (1, 2, 3)",
+	}
+	ShipmentItemsTable.ForeignKeys[0].RefTable = ShipmentsTable
+	ShipmentItemsTable.ForeignKeys[1].RefTable = ShopsTable
+	ShipmentItemsTable.ForeignKeys[2].RefTable = OrderItemsTable
+	ShipmentItemsTable.Annotation = &entsql.Annotation{
+		Table: "shipment_items",
+	}
+	ShipmentItemsTable.Annotation.Checks = map[string]string{
+		"shipment_items_quantity_check": "quantity > 0",
 	}
 	ShippingMethodsTable.ForeignKeys[0].RefTable = ShopsTable
 	ShippingMethodsTable.Annotation = &entsql.Annotation{

@@ -252,6 +252,9 @@ GET /api/v1/shop/guest/order header X-Publishable-Key optional
 GET /api/v1/shop/guest/order/shipment
 GET /api/v1/shop/guest/order/shipment header X-Publishable-Key
 GET /api/v1/shop/guest/order/shipment header X-Publishable-Key optional
+GET /api/v1/shop/guest/order/shipments
+GET /api/v1/shop/guest/order/shipments header X-Publishable-Key
+GET /api/v1/shop/guest/order/shipments header X-Publishable-Key optional
 GET /api/v1/shop/me
 GET /api/v1/shop/me header X-Publishable-Key
 GET /api/v1/shop/me header X-Publishable-Key optional
@@ -270,6 +273,10 @@ GET /api/v1/shop/orders/{orderID}/shipment
 GET /api/v1/shop/orders/{orderID}/shipment header X-Publishable-Key
 GET /api/v1/shop/orders/{orderID}/shipment header X-Publishable-Key optional
 GET /api/v1/shop/orders/{orderID}/shipment path orderID
+GET /api/v1/shop/orders/{orderID}/shipments
+GET /api/v1/shop/orders/{orderID}/shipments header X-Publishable-Key
+GET /api/v1/shop/orders/{orderID}/shipments header X-Publishable-Key optional
+GET /api/v1/shop/orders/{orderID}/shipments path orderID
 GET /api/v1/shop/points
 GET /api/v1/shop/points header X-Publishable-Key
 GET /api/v1/shop/points header X-Publishable-Key optional
@@ -372,6 +379,7 @@ OrderItem.price_amount
 OrderItem.product_id
 OrderItem.product_title
 OrderItem.quantity
+OrderItem.shipped_quantity
 OrderItem.sku_code
 OrderItem.sku_id
 OrderPage.orders
@@ -612,11 +620,15 @@ Shipment.carrier
 Shipment.created_at
 Shipment.delivered_at
 Shipment.id
+Shipment.items
 Shipment.order_id
 Shipment.shipped_at
 Shipment.status
 Shipment.tracking_number
 Shipment.updated_at
+ShipmentItem.id
+ShipmentItem.order_item_id
+ShipmentItem.quantity
 ShippingAddress.city
 ShippingAddress.country
 ShippingAddress.line1

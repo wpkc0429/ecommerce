@@ -4,10 +4,12 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"math"
 
@@ -27,6 +29,7 @@ type ShipmentQuery struct {
 	predicates []predicate.Shipment
 	withShop   *ShopQuery
 	withOrder  *OrderQuery
+	withItems  *ShipmentItemQuery
 	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -101,6 +104,28 @@ func (_q *ShipmentQuery) QueryOrder() *OrderQuery {
 			sqlgraph.From(shipment.Table, shipment.FieldID, selector),
 			sqlgraph.To(order.Table, order.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, shipment.OrderTable, shipment.OrderColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryItems chains the current query on the "items" edge.
+func (_q *ShipmentQuery) QueryItems() *ShipmentItemQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shipment.Table, shipment.FieldID, selector),
+			sqlgraph.To(shipmentitem.Table, shipmentitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, shipment.ItemsTable, shipment.ItemsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -302,6 +327,7 @@ func (_q *ShipmentQuery) Clone() *ShipmentQuery {
 		predicates: append([]predicate.Shipment{}, _q.predicates...),
 		withShop:   _q.withShop.Clone(),
 		withOrder:  _q.withOrder.Clone(),
+		withItems:  _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -328,6 +354,17 @@ func (_q *ShipmentQuery) WithOrder(opts ...func(*OrderQuery)) *ShipmentQuery {
 		opt(query)
 	}
 	_q.withOrder = query
+	return _q
+}
+
+// WithItems tells the query-builder to eager-load the nodes that are connected to
+// the "items" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ShipmentQuery) WithItems(opts ...func(*ShipmentItemQuery)) *ShipmentQuery {
+	query := (&ShipmentItemClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withItems = query
 	return _q
 }
 
@@ -409,9 +446,10 @@ func (_q *ShipmentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shi
 	var (
 		nodes       = []*Shipment{}
 		_spec       = _q.querySpec()
-		loadedTypes = [2]bool{
+		loadedTypes = [3]bool{
 			_q.withShop != nil,
 			_q.withOrder != nil,
+			_q.withItems != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -444,6 +482,13 @@ func (_q *ShipmentQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shi
 	if query := _q.withOrder; query != nil {
 		if err := _q.loadOrder(ctx, query, nodes, nil,
 			func(n *Shipment, e *Order) { n.Edges.Order = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withItems; query != nil {
+		if err := _q.loadItems(ctx, query, nodes,
+			func(n *Shipment) { n.Edges.Items = []*ShipmentItem{} },
+			func(n *Shipment, e *ShipmentItem) { n.Edges.Items = append(n.Edges.Items, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -505,6 +550,36 @@ func (_q *ShipmentQuery) loadOrder(ctx context.Context, query *OrderQuery, nodes
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *ShipmentQuery) loadItems(ctx context.Context, query *ShipmentItemQuery, nodes []*Shipment, init func(*Shipment), assign func(*Shipment, *ShipmentItem)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Shipment)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(shipmentitem.FieldShipmentID)
+	}
+	query.Where(predicate.ShipmentItem(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(shipment.ItemsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ShipmentID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "shipment_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

@@ -91,6 +91,11 @@ func (h *GuestHandler) MountOrderAccess(r chi.Router) {
 	r.Get("/order", h.getOrder)
 	r.Post("/order/payments", h.initiatePayment)
 	r.Get("/order/shipment", h.getShipment)
+	// change partial-shipment, design D6: guests get the plural form too. ONDO
+	// has no login UI at all, so "member only" would mean "nobody" — the same
+	// reasoning that gave guests the tier discount (tier-discount-application
+	// design D9).
+	r.Get("/order/shipments", h.listShipments)
 }
 
 // ── guest checkout ─────────────────────────────────────────────────────
@@ -269,4 +274,20 @@ func (h *GuestHandler) getShipment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, shipmentJSON(sh))
+}
+
+// listShipments returns every parcel of the token's order (change
+// partial-shipment). Nothing shipped yet is 200 with an empty array, unlike the
+// singular endpoint's 404 — see ShippingHandler.listMineShipments.
+func (h *GuestHandler) listShipments(w http.ResponseWriter, r *http.Request) {
+	shopID, o, ok := h.tokenOrder(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.Shipping.ListShipmentsForMember(r.Context(), shopID, o.MemberID, o.ID)
+	if err != nil {
+		writeShippingError(w, h.Log, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, shipmentsJSON(rows))
 }

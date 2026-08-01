@@ -30,6 +30,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shipment"
+	"ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
@@ -695,6 +696,33 @@ func (f TraverseShipment) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.ShipmentQuery", q)
 }
 
+// The ShipmentItemFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShipmentItemFunc func(context.Context, *ent.ShipmentItemQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShipmentItemFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShipmentItemQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShipmentItemQuery", q)
+}
+
+// The TraverseShipmentItem type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShipmentItem func(context.Context, *ent.ShipmentItemQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShipmentItem) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShipmentItem) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShipmentItemQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShipmentItemQuery", q)
+}
+
 // The ShippingMethodFunc type is an adapter to allow the use of ordinary function as a Querier.
 type ShippingMethodFunc func(context.Context, *ent.ShippingMethodQuery) (ent.Value, error)
 
@@ -1039,6 +1067,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.RoleUserQuery, predicate.RoleUser, roleuser.OrderOption]{typ: ent.TypeRoleUser, tq: q}, nil
 	case *ent.ShipmentQuery:
 		return &query[*ent.ShipmentQuery, predicate.Shipment, shipment.OrderOption]{typ: ent.TypeShipment, tq: q}, nil
+	case *ent.ShipmentItemQuery:
+		return &query[*ent.ShipmentItemQuery, predicate.ShipmentItem, shipmentitem.OrderOption]{typ: ent.TypeShipmentItem, tq: q}, nil
 	case *ent.ShippingMethodQuery:
 		return &query[*ent.ShippingMethodQuery, predicate.ShippingMethod, shippingmethod.OrderOption]{typ: ent.TypeShippingMethod, tq: q}, nil
 	case *ent.ShopQuery:

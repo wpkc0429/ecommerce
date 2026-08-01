@@ -43,6 +43,8 @@ type OrderItem struct {
 	Currency string `json:"currency,omitempty"`
 	// GiftMessage holds the value of the "gift_message" field.
 	GiftMessage string `json:"gift_message,omitempty"`
+	// ShippedQuantity holds the value of the "shipped_quantity" field.
+	ShippedQuantity int32 `json:"shipped_quantity,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the OrderItemQuery when eager-loading is set.
 	Edges        OrderItemEdges `json:"edges"`
@@ -87,7 +89,7 @@ func (*OrderItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case orderitem.FieldID, orderitem.FieldShopID, orderitem.FieldOrderID, orderitem.FieldProductID, orderitem.FieldSkuID, orderitem.FieldQuantity, orderitem.FieldPriceAmount:
+		case orderitem.FieldID, orderitem.FieldShopID, orderitem.FieldOrderID, orderitem.FieldProductID, orderitem.FieldSkuID, orderitem.FieldQuantity, orderitem.FieldPriceAmount, orderitem.FieldShippedQuantity:
 			values[i] = new(sql.NullInt64)
 		case orderitem.FieldProductTitle, orderitem.FieldSkuCode, orderitem.FieldCurrency, orderitem.FieldGiftMessage:
 			values[i] = new(sql.NullString)
@@ -188,6 +190,12 @@ func (_m *OrderItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.GiftMessage = value.String
 			}
+		case orderitem.FieldShippedQuantity:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field shipped_quantity", values[i])
+			} else if value.Valid {
+				_m.ShippedQuantity = int32(value.Int64)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -273,6 +281,9 @@ func (_m *OrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("gift_message=")
 	builder.WriteString(_m.GiftMessage)
+	builder.WriteString(", ")
+	builder.WriteString("shipped_quantity=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ShippedQuantity))
 	builder.WriteByte(')')
 	return builder.String()
 }

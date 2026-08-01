@@ -79,6 +79,13 @@ func orderItemJSON(it *ent.OrderItem) map[string]any {
 		"line_total": it.PriceAmount * int64(it.Quantity),
 		// change order-extras: always a string, never null.
 		"gift_message": it.GiftMessage,
+		// change partial-shipment: how many of this line have left the shop.
+		// The only non-snapshot value on this object, and the authoritative one —
+		// it is the same number the server's own over-shipment guard tests
+		// against, so a client showing "1 of 3 shipped" and the server refusing a
+		// fourth can never disagree. Callers must not re-derive it by summing
+		// shipments.
+		"shipped_quantity": it.ShippedQuantity,
 	}
 }
 
