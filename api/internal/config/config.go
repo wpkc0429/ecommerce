@@ -66,6 +66,13 @@ type Config struct {
 	// ECPay carries the 綠界 全方位金流 credentials and endpoints.
 	ECPay ECPayConfig
 
+	// SMTP carries the outbound mail credentials for order notification emails
+	// (change order-notification-email).
+	SMTP SMTPConfig
+
+	// Notify carries the notification dispatch tuning (worker pool bounds).
+	Notify NotifyConfig
+
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
 
@@ -119,6 +126,56 @@ type ECPayConfig struct {
 	// break the notification flow. Non-instant methods (ATM/CVS/BARCODE) also
 	// require the PaymentInfoURL notification this change does not implement.
 	ChoosePayment string
+}
+
+// SMTPConfig carries the outbound mail account for order notification emails
+// (change order-notification-email, design D9/D10).
+//
+// **Nothing is required, and an unset account means "do not send"** — the same
+// treatment PaymentMockWebhookSecret and ECPayConfig get, for a stronger reason:
+// with no credentials this system must behave byte for byte as it did before
+// notifications existed. No mail, no error, no rows, no goroutines.
+//
+// The defaults point at Gmail because that is what this deployment uses today
+// (design D9), but no code in internal/notify is Gmail-specific. Moving to a
+// transactional provider with domain authentication is, in the cheapest case,
+// these three values.
+type SMTPConfig struct {
+	Host string
+	Port int
+	// Username/Password: for Gmail, Password MUST be an **App Password**
+	// generated after enabling 2-step verification — Google removed "less secure
+	// app access", and an account password simply fails to authenticate.
+	Username string
+	Password string
+	// From defaults to Username. Gmail rewrites From to the authenticated
+	// account unless the address is a verified alias, so setting this to
+	// something else looks like it works and does not.
+	From string
+	// FromName is the display name. Today it is a platform-level value: the
+	// sender is the platform's mailbox, not the merchant's, and shops carry no
+	// sender identity at all (design D3 — including what has to change when that
+	// stops being acceptable, which is when the second merchant goes live).
+	FromName string
+	// Timeout bounds one whole submission (dial + TLS + auth + DATA). Without a
+	// hard bound a black-holed route parks a worker on the kernel's TCP retry
+	// schedule for ~130 seconds.
+	Timeout time.Duration
+}
+
+// Enabled reports whether outbound mail is configured. Both halves of the
+// credential are required: a username without a password is a half-finished
+// configuration, and treating it as "on" would produce authentication failures
+// on every order instead of the silence an unconfigured deployment expects.
+func (c SMTPConfig) Enabled() bool { return c.Username != "" && c.Password != "" }
+
+// NotifyConfig tunes the notification dispatcher (change
+// order-notification-email, design D5). Both values bound an in-process,
+// non-durable worker pool — this is deliberately not a work queue, and the
+// design records what that costs.
+type NotifyConfig struct {
+	Workers   int
+	QueueSize int
 }
 
 // RateLimitConfig carries the sliding-window thresholds for the
@@ -183,6 +240,14 @@ func Load() (*Config, error) {
 			ClientBackURL: getenv("ECPAY_CLIENT_BACK_URL", ""),
 			ChoosePayment: getenv("ECPAY_CHOOSE_PAYMENT", "Credit"),
 		},
+
+		SMTP: SMTPConfig{
+			Host:     getenv("SMTP_HOST", "smtp.gmail.com"),
+			Username: getenv("SMTP_USERNAME", ""),
+			Password: getenv("SMTP_PASSWORD", ""),
+			From:     getenv("SMTP_FROM", ""),
+			FromName: getenv("SMTP_FROM_NAME", ""),
+		},
 	}
 
 	origins := getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3001,http://localhost:3000")
@@ -206,6 +271,25 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.CheckoutIdempotencyTTL, err = parseDuration("CHECKOUT_IDEMPOTENCY_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
+
+	// Outbound mail (change order-notification-email). All optional; an unset
+	// SMTP_USERNAME/SMTP_PASSWORD means notifications are off entirely.
+	if cfg.SMTP.Port, err = parseInt("SMTP_PORT", 587); err != nil {
+		return nil, err
+	}
+	if cfg.SMTP.Timeout, err = parseDuration("SMTP_TIMEOUT", 20*time.Second); err != nil {
+		return nil, err
+	}
+	if cfg.SMTP.From == "" {
+		// Gmail would rewrite anything else anyway (see SMTPConfig.From).
+		cfg.SMTP.From = cfg.SMTP.Username
+	}
+	if cfg.Notify.Workers, err = parseInt("NOTIFY_WORKERS", 4); err != nil {
+		return nil, err
+	}
+	if cfg.Notify.QueueSize, err = parseInt("NOTIFY_QUEUE_SIZE", 256); err != nil {
 		return nil, err
 	}
 

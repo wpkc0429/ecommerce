@@ -116,6 +116,18 @@ func (f OrderItemFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OrderItemMutation", m)
 }
 
+// The OrderNotificationFunc type is an adapter to allow the use of ordinary
+// function as OrderNotification mutator.
+type OrderNotificationFunc func(context.Context, *ent.OrderNotificationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f OrderNotificationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.OrderNotificationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.OrderNotificationMutation", m)
+}
+
 // The PageFunc type is an adapter to allow the use of ordinary
 // function as Page mutator.
 type PageFunc func(context.Context, *ent.PageMutation) (ent.Value, error)

@@ -17,6 +17,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/idempotency"
 	"ksdevworks/ecommerce/api/internal/member"
+	"ksdevworks/ecommerce/api/internal/notify"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/payment/ecpay"
@@ -147,10 +148,47 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	cartService := &cart.Service{Client: client}
 	deps.Cart = &httpapi.CartHandler{Client: client, Service: cartService, Log: a.log}
 
+	// Order notification emails (change order-notification-email): a second
+	// non-cache subscriber, alongside points. It reacts to events.OrderPlaced
+	// (published by order.Checkout below) and events.OrderPaymentSucceeded
+	// (published by payment), and — like points — imports none of them.
+	//
+	// The Sender is where "are notifications on" is decided (design D10): no
+	// SMTP credentials means DiscardSender, which makes Handle a no-op and
+	// leaves this deployment behaving byte for byte as it did before this change.
+	// **The Subscribe call below is unconditional on purpose** — hanging it off
+	// a config check would make the subscriber lock (wiring check ⑦, an equality
+	// comparison) depend on the environment of whoever runs the tests.
+	var mailSender notify.Sender = notify.DiscardSender{}
+	if cfg.SMTP.Enabled() {
+		mailSender = &notify.SMTPSender{
+			Host: cfg.SMTP.Host, Port: cfg.SMTP.Port,
+			Username: cfg.SMTP.Username, Password: cfg.SMTP.Password,
+			From: cfg.SMTP.From, FromName: cfg.SMTP.FromName,
+			Timeout: cfg.SMTP.Timeout,
+		}
+	} else {
+		a.log.Info("SMTP credentials not configured — order notification emails are disabled")
+	}
+	notifier := &notify.Service{
+		Client: client, Sender: mailSender, Log: a.log,
+		Workers: cfg.Notify.Workers, QueueSize: cfg.Notify.QueueSize, Timeout: cfg.SMTP.Timeout,
+	}
+	notifier.Start()
+	// Drains whatever the workers already accepted; a no-op when disabled.
+	a.closers = append(a.closers, notifier.Close)
+	dispatcher.Subscribe(notifier.Handle)
+
 	// Order management (change order-management): checkout consumes the
 	// active cart directly via ent (design D9); member routes are RBAC-free
 	// like Cart, admin routes reuse the same authz engine as Products.
-	orderService := &order.Service{Client: client}
+	//
+	// change order-notification-email: order.Service becomes a publisher for the
+	// first time (events.OrderPlaced, from inside Checkout after its transaction
+	// commits — design D15). It must be THE dispatcher, not a new one: a
+	// publisher holding its own instance produces exactly the symptom of nobody
+	// being subscribed, which is why wiring check ⑦ asserts the single instance.
+	orderService := &order.Service{Client: client, Dispatcher: dispatcher}
 
 	// Checkout idempotency (change checkout-idempotency): one service shared by
 	// both order-placing endpoints, so there is exactly one implementation of the

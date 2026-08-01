@@ -404,6 +404,51 @@ var (
 			},
 		},
 	}
+	// OrderNotificationsColumns holds the columns for the "order_notifications" table.
+	OrderNotificationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "kind", Type: field.TypeInt16},
+		{Name: "recipient_email", Type: field.TypeString, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "sent_at", Type: field.TypeTime, Nullable: true},
+		{Name: "error_reason", Type: field.TypeString, Nullable: true, Size: 500, SchemaType: map[string]string{"postgres": "varchar(500)"}},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "order_id", Type: field.TypeInt},
+	}
+	// OrderNotificationsTable holds the schema information for the "order_notifications" table.
+	OrderNotificationsTable = &schema.Table{
+		Name:       "order_notifications",
+		Columns:    OrderNotificationsColumns,
+		PrimaryKey: []*schema.Column{OrderNotificationsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "order_notifications_shops_shop",
+				Columns:    []*schema.Column{OrderNotificationsColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "order_notifications_orders_order",
+				Columns:    []*schema.Column{OrderNotificationsColumns[9]},
+				RefColumns: []*schema.Column{OrdersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "ordernotification_order_id_kind",
+				Unique:  true,
+				Columns: []*schema.Column{OrderNotificationsColumns[9], OrderNotificationsColumns[3]},
+			},
+			{
+				Name:    "ordernotification_shop_id_order_id",
+				Unique:  false,
+				Columns: []*schema.Column{OrderNotificationsColumns[8], OrderNotificationsColumns[9]},
+			},
+		},
+	}
 	// PagesColumns holds the columns for the "pages" table.
 	PagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1186,6 +1231,7 @@ var (
 		MemberTiersTable,
 		OrdersTable,
 		OrderItemsTable,
+		OrderNotificationsTable,
 		PagesTable,
 		PaymentsTable,
 		PermissionsTable,
@@ -1279,6 +1325,15 @@ func init() {
 	OrderItemsTable.Annotation.Checks = map[string]string{
 		"order_items_price_amount_check": "price_amount >= 0",
 		"order_items_quantity_check":     "quantity > 0",
+	}
+	OrderNotificationsTable.ForeignKeys[0].RefTable = ShopsTable
+	OrderNotificationsTable.ForeignKeys[1].RefTable = OrdersTable
+	OrderNotificationsTable.Annotation = &entsql.Annotation{
+		Table: "order_notifications",
+	}
+	OrderNotificationsTable.Annotation.Checks = map[string]string{
+		"order_notifications_kind_check":   "kind IN (0, 1)",
+		"order_notifications_status_check": "status IN (0, 1, 2)",
 	}
 	PagesTable.ForeignKeys[0].RefTable = ShopsTable
 	PagesTable.Annotation = &entsql.Annotation{}

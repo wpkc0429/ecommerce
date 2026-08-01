@@ -33,6 +33,9 @@ type Order func(*sql.Selector)
 // OrderItem is the predicate function for orderitem builders.
 type OrderItem func(*sql.Selector)
 
+// OrderNotification is the predicate function for ordernotification builders.
+type OrderNotification func(*sql.Selector)
+
 // Page is the predicate function for page builders.
 type Page func(*sql.Selector)
 

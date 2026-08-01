@@ -204,6 +204,15 @@ var expectedSubscribers = []string{
 	"ksdevworks/ecommerce/api/internal/app.(*App).wire.<closure>",   // StorefrontClientChanged → key/origin cache
 	"ksdevworks/ecommerce/api/internal/points.(*Service).Handle-fm", // 付款核發點數 / 退貨扣回
 	"ksdevworks/ecommerce/api/internal/render.(*Invalidator).Handle-fm",
+	// change order-notification-email: 訂單成立信 / 付款成功信。
+	//
+	// 這一行是本 change 被迫明示的那個決定，順便回答了它逼出的問題——「e2e 要不要補
+	// 一條斷言？」答案是不要，理由是可觀測性：本 change 刻意沒有新增任何 API（寄送
+	// 狀態不長出端點），而 demo 環境沒有 SMTP 憑證所以根本不寄信，因此 e2e 唯一能斷
+	// 言的是「寄信沒把結帳弄壞」——那已經被既有的每一條結帳斷言涵蓋。取而代之的覆蓋
+	// 是本檢查（有沒有接）＋ internal/notify 的整合測試（接上之後寄了什麼、重複投遞
+	// 只寄一封、跨店不外洩、金額組成正確）。完整論證見 design D11。
+	"ksdevworks/ecommerce/api/internal/notify.(*Service).Handle-fm",
 }
 
 // closureSuffix matches the compiler's numbering of anonymous functions.
@@ -238,6 +247,11 @@ func TestWiredDispatcherSubscribers(t *testing.T) {
 		"Pages.cms":  deps.Pages.Service.Dispatcher,
 		"Payments":   deps.Payments.Service.Dispatcher,
 		"Shipping":   deps.Shipping.Service.Dispatcher,
+		// change order-notification-email: order.Service became a publisher
+		// (events.OrderPlaced from inside Checkout). A second dispatcher here
+		// would mean every order confirmation email silently stops — with the
+		// subscriber set below still perfectly correct.
+		"Orders": deps.Orders.Service.Dispatcher,
 	} {
 		if held != dispatcher {
 			t.Errorf("%s 持有的 dispatcher 不是同一個實例——"+

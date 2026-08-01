@@ -68,6 +68,14 @@ var tenantOwned = map[string]bool{
 	// explicitly on every query (same convention as members): this entry is
 	// defense in depth, not the primary guard.
 	"CheckoutIdempotencyKey": true,
+	// change order-notification-email (design D16): carries a direct shop_id
+	// column, mirroring Payment/Shipment's shape. Every access in that change
+	// runs outside tenant context (the dispatcher delivers events there) and
+	// carries shop_id explicitly, so this entry is the default guard for
+	// whatever back-office endpoint reads this table next — and the symptom of
+	// forgetting it (one shop's notification rows visible to another) is
+	// something no existing test would notice.
+	"OrderNotification": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

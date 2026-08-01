@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
+	"ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -341,6 +342,33 @@ func (f TraverseOrderItem) Traverse(ctx context.Context, q ent.Query) error {
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.OrderItemQuery", q)
+}
+
+// The OrderNotificationFunc type is an adapter to allow the use of ordinary function as a Querier.
+type OrderNotificationFunc func(context.Context, *ent.OrderNotificationQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f OrderNotificationFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.OrderNotificationQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.OrderNotificationQuery", q)
+}
+
+// The TraverseOrderNotification type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseOrderNotification func(context.Context, *ent.OrderNotificationQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseOrderNotification) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseOrderNotification) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.OrderNotificationQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.OrderNotificationQuery", q)
 }
 
 // The PageFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -985,6 +1013,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.OrderQuery, predicate.Order, order.OrderOption]{typ: ent.TypeOrder, tq: q}, nil
 	case *ent.OrderItemQuery:
 		return &query[*ent.OrderItemQuery, predicate.OrderItem, orderitem.OrderOption]{typ: ent.TypeOrderItem, tq: q}, nil
+	case *ent.OrderNotificationQuery:
+		return &query[*ent.OrderNotificationQuery, predicate.OrderNotification, ordernotification.OrderOption]{typ: ent.TypeOrderNotification, tq: q}, nil
 	case *ent.PageQuery:
 		return &query[*ent.PageQuery, predicate.Page, page.OrderOption]{typ: ent.TypePage, tq: q}, nil
 	case *ent.PaymentQuery:

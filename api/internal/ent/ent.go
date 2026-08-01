@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
+	"ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -113,6 +114,7 @@ func checkColumn(t, c string) error {
 			membertier.Table:             membertier.ValidColumn,
 			order.Table:                  order.ValidColumn,
 			orderitem.Table:              orderitem.ValidColumn,
+			ordernotification.Table:      ordernotification.ValidColumn,
 			page.Table:                   page.ValidColumn,
 			payment.Table:                payment.ValidColumn,
 			permission.Table:             permission.ValidColumn,

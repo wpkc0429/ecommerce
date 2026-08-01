@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
+	"ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -65,6 +66,7 @@ const (
 	TypeMemberTier             = "MemberTier"
 	TypeOrder                  = "Order"
 	TypeOrderItem              = "OrderItem"
+	TypeOrderNotification      = "OrderNotification"
 	TypePage                   = "Page"
 	TypePayment                = "Payment"
 	TypePermission             = "Permission"
@@ -9586,6 +9588,974 @@ func (m *OrderItemMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown OrderItem edge %s", name)
+}
+
+// OrderNotificationMutation represents an operation that mutates the OrderNotification nodes in the graph.
+type OrderNotificationMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *int
+	created_at      *time.Time
+	updated_at      *time.Time
+	kind            *int16
+	addkind         *int16
+	recipient_email *string
+	status          *int16
+	addstatus       *int16
+	sent_at         *time.Time
+	error_reason    *string
+	clearedFields   map[string]struct{}
+	shop            *int
+	clearedshop     bool
+	_order          *int
+	cleared_order   bool
+	done            bool
+	oldValue        func(context.Context) (*OrderNotification, error)
+	predicates      []predicate.OrderNotification
+}
+
+var _ ent.Mutation = (*OrderNotificationMutation)(nil)
+
+// ordernotificationOption allows management of the mutation configuration using functional options.
+type ordernotificationOption func(*OrderNotificationMutation)
+
+// newOrderNotificationMutation creates new mutation for the OrderNotification entity.
+func newOrderNotificationMutation(c config, op Op, opts ...ordernotificationOption) *OrderNotificationMutation {
+	m := &OrderNotificationMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeOrderNotification,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withOrderNotificationID sets the ID field of the mutation.
+func withOrderNotificationID(id int) ordernotificationOption {
+	return func(m *OrderNotificationMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *OrderNotification
+		)
+		m.oldValue = func(ctx context.Context) (*OrderNotification, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().OrderNotification.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withOrderNotification sets the old OrderNotification of the mutation.
+func withOrderNotification(node *OrderNotification) ordernotificationOption {
+	return func(m *OrderNotificationMutation) {
+		m.oldValue = func(context.Context) (*OrderNotification, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m OrderNotificationMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m OrderNotificationMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *OrderNotificationMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *OrderNotificationMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().OrderNotification.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *OrderNotificationMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *OrderNotificationMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *OrderNotificationMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *OrderNotificationMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *OrderNotificationMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *OrderNotificationMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *OrderNotificationMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *OrderNotificationMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *OrderNotificationMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetOrderID sets the "order_id" field.
+func (m *OrderNotificationMutation) SetOrderID(i int) {
+	m._order = &i
+}
+
+// OrderID returns the value of the "order_id" field in the mutation.
+func (m *OrderNotificationMutation) OrderID() (r int, exists bool) {
+	v := m._order
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOrderID returns the old "order_id" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldOrderID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOrderID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOrderID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOrderID: %w", err)
+	}
+	return oldValue.OrderID, nil
+}
+
+// ResetOrderID resets all changes to the "order_id" field.
+func (m *OrderNotificationMutation) ResetOrderID() {
+	m._order = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *OrderNotificationMutation) SetKind(i int16) {
+	m.kind = &i
+	m.addkind = nil
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *OrderNotificationMutation) Kind() (r int16, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldKind(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// AddKind adds i to the "kind" field.
+func (m *OrderNotificationMutation) AddKind(i int16) {
+	if m.addkind != nil {
+		*m.addkind += i
+	} else {
+		m.addkind = &i
+	}
+}
+
+// AddedKind returns the value that was added to the "kind" field in this mutation.
+func (m *OrderNotificationMutation) AddedKind() (r int16, exists bool) {
+	v := m.addkind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *OrderNotificationMutation) ResetKind() {
+	m.kind = nil
+	m.addkind = nil
+}
+
+// SetRecipientEmail sets the "recipient_email" field.
+func (m *OrderNotificationMutation) SetRecipientEmail(s string) {
+	m.recipient_email = &s
+}
+
+// RecipientEmail returns the value of the "recipient_email" field in the mutation.
+func (m *OrderNotificationMutation) RecipientEmail() (r string, exists bool) {
+	v := m.recipient_email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRecipientEmail returns the old "recipient_email" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldRecipientEmail(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRecipientEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRecipientEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRecipientEmail: %w", err)
+	}
+	return oldValue.RecipientEmail, nil
+}
+
+// ResetRecipientEmail resets all changes to the "recipient_email" field.
+func (m *OrderNotificationMutation) ResetRecipientEmail() {
+	m.recipient_email = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *OrderNotificationMutation) SetStatus(i int16) {
+	m.status = &i
+	m.addstatus = nil
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *OrderNotificationMutation) Status() (r int16, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldStatus(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// AddStatus adds i to the "status" field.
+func (m *OrderNotificationMutation) AddStatus(i int16) {
+	if m.addstatus != nil {
+		*m.addstatus += i
+	} else {
+		m.addstatus = &i
+	}
+}
+
+// AddedStatus returns the value that was added to the "status" field in this mutation.
+func (m *OrderNotificationMutation) AddedStatus() (r int16, exists bool) {
+	v := m.addstatus
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *OrderNotificationMutation) ResetStatus() {
+	m.status = nil
+	m.addstatus = nil
+}
+
+// SetSentAt sets the "sent_at" field.
+func (m *OrderNotificationMutation) SetSentAt(t time.Time) {
+	m.sent_at = &t
+}
+
+// SentAt returns the value of the "sent_at" field in the mutation.
+func (m *OrderNotificationMutation) SentAt() (r time.Time, exists bool) {
+	v := m.sent_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSentAt returns the old "sent_at" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldSentAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSentAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSentAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSentAt: %w", err)
+	}
+	return oldValue.SentAt, nil
+}
+
+// ClearSentAt clears the value of the "sent_at" field.
+func (m *OrderNotificationMutation) ClearSentAt() {
+	m.sent_at = nil
+	m.clearedFields[ordernotification.FieldSentAt] = struct{}{}
+}
+
+// SentAtCleared returns if the "sent_at" field was cleared in this mutation.
+func (m *OrderNotificationMutation) SentAtCleared() bool {
+	_, ok := m.clearedFields[ordernotification.FieldSentAt]
+	return ok
+}
+
+// ResetSentAt resets all changes to the "sent_at" field.
+func (m *OrderNotificationMutation) ResetSentAt() {
+	m.sent_at = nil
+	delete(m.clearedFields, ordernotification.FieldSentAt)
+}
+
+// SetErrorReason sets the "error_reason" field.
+func (m *OrderNotificationMutation) SetErrorReason(s string) {
+	m.error_reason = &s
+}
+
+// ErrorReason returns the value of the "error_reason" field in the mutation.
+func (m *OrderNotificationMutation) ErrorReason() (r string, exists bool) {
+	v := m.error_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldErrorReason returns the old "error_reason" field's value of the OrderNotification entity.
+// If the OrderNotification object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderNotificationMutation) OldErrorReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldErrorReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldErrorReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldErrorReason: %w", err)
+	}
+	return oldValue.ErrorReason, nil
+}
+
+// ClearErrorReason clears the value of the "error_reason" field.
+func (m *OrderNotificationMutation) ClearErrorReason() {
+	m.error_reason = nil
+	m.clearedFields[ordernotification.FieldErrorReason] = struct{}{}
+}
+
+// ErrorReasonCleared returns if the "error_reason" field was cleared in this mutation.
+func (m *OrderNotificationMutation) ErrorReasonCleared() bool {
+	_, ok := m.clearedFields[ordernotification.FieldErrorReason]
+	return ok
+}
+
+// ResetErrorReason resets all changes to the "error_reason" field.
+func (m *OrderNotificationMutation) ResetErrorReason() {
+	m.error_reason = nil
+	delete(m.clearedFields, ordernotification.FieldErrorReason)
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *OrderNotificationMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[ordernotification.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *OrderNotificationMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *OrderNotificationMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *OrderNotificationMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// ClearOrder clears the "order" edge to the Order entity.
+func (m *OrderNotificationMutation) ClearOrder() {
+	m.cleared_order = true
+	m.clearedFields[ordernotification.FieldOrderID] = struct{}{}
+}
+
+// OrderCleared reports if the "order" edge to the Order entity was cleared.
+func (m *OrderNotificationMutation) OrderCleared() bool {
+	return m.cleared_order
+}
+
+// OrderIDs returns the "order" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// OrderID instead. It exists only for internal usage by the builders.
+func (m *OrderNotificationMutation) OrderIDs() (ids []int) {
+	if id := m._order; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetOrder resets all changes to the "order" edge.
+func (m *OrderNotificationMutation) ResetOrder() {
+	m._order = nil
+	m.cleared_order = false
+}
+
+// Where appends a list predicates to the OrderNotificationMutation builder.
+func (m *OrderNotificationMutation) Where(ps ...predicate.OrderNotification) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the OrderNotificationMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *OrderNotificationMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.OrderNotification, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *OrderNotificationMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *OrderNotificationMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (OrderNotification).
+func (m *OrderNotificationMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *OrderNotificationMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.created_at != nil {
+		fields = append(fields, ordernotification.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, ordernotification.FieldUpdatedAt)
+	}
+	if m.shop != nil {
+		fields = append(fields, ordernotification.FieldShopID)
+	}
+	if m._order != nil {
+		fields = append(fields, ordernotification.FieldOrderID)
+	}
+	if m.kind != nil {
+		fields = append(fields, ordernotification.FieldKind)
+	}
+	if m.recipient_email != nil {
+		fields = append(fields, ordernotification.FieldRecipientEmail)
+	}
+	if m.status != nil {
+		fields = append(fields, ordernotification.FieldStatus)
+	}
+	if m.sent_at != nil {
+		fields = append(fields, ordernotification.FieldSentAt)
+	}
+	if m.error_reason != nil {
+		fields = append(fields, ordernotification.FieldErrorReason)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *OrderNotificationMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case ordernotification.FieldCreatedAt:
+		return m.CreatedAt()
+	case ordernotification.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case ordernotification.FieldShopID:
+		return m.ShopID()
+	case ordernotification.FieldOrderID:
+		return m.OrderID()
+	case ordernotification.FieldKind:
+		return m.Kind()
+	case ordernotification.FieldRecipientEmail:
+		return m.RecipientEmail()
+	case ordernotification.FieldStatus:
+		return m.Status()
+	case ordernotification.FieldSentAt:
+		return m.SentAt()
+	case ordernotification.FieldErrorReason:
+		return m.ErrorReason()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *OrderNotificationMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case ordernotification.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case ordernotification.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case ordernotification.FieldShopID:
+		return m.OldShopID(ctx)
+	case ordernotification.FieldOrderID:
+		return m.OldOrderID(ctx)
+	case ordernotification.FieldKind:
+		return m.OldKind(ctx)
+	case ordernotification.FieldRecipientEmail:
+		return m.OldRecipientEmail(ctx)
+	case ordernotification.FieldStatus:
+		return m.OldStatus(ctx)
+	case ordernotification.FieldSentAt:
+		return m.OldSentAt(ctx)
+	case ordernotification.FieldErrorReason:
+		return m.OldErrorReason(ctx)
+	}
+	return nil, fmt.Errorf("unknown OrderNotification field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OrderNotificationMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case ordernotification.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case ordernotification.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case ordernotification.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case ordernotification.FieldOrderID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOrderID(v)
+		return nil
+	case ordernotification.FieldKind:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case ordernotification.FieldRecipientEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRecipientEmail(v)
+		return nil
+	case ordernotification.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case ordernotification.FieldSentAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSentAt(v)
+		return nil
+	case ordernotification.FieldErrorReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetErrorReason(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *OrderNotificationMutation) AddedFields() []string {
+	var fields []string
+	if m.addkind != nil {
+		fields = append(fields, ordernotification.FieldKind)
+	}
+	if m.addstatus != nil {
+		fields = append(fields, ordernotification.FieldStatus)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *OrderNotificationMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case ordernotification.FieldKind:
+		return m.AddedKind()
+	case ordernotification.FieldStatus:
+		return m.AddedStatus()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *OrderNotificationMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case ordernotification.FieldKind:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddKind(v)
+		return nil
+	case ordernotification.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStatus(v)
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *OrderNotificationMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(ordernotification.FieldSentAt) {
+		fields = append(fields, ordernotification.FieldSentAt)
+	}
+	if m.FieldCleared(ordernotification.FieldErrorReason) {
+		fields = append(fields, ordernotification.FieldErrorReason)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *OrderNotificationMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *OrderNotificationMutation) ClearField(name string) error {
+	switch name {
+	case ordernotification.FieldSentAt:
+		m.ClearSentAt()
+		return nil
+	case ordernotification.FieldErrorReason:
+		m.ClearErrorReason()
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *OrderNotificationMutation) ResetField(name string) error {
+	switch name {
+	case ordernotification.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case ordernotification.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case ordernotification.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case ordernotification.FieldOrderID:
+		m.ResetOrderID()
+		return nil
+	case ordernotification.FieldKind:
+		m.ResetKind()
+		return nil
+	case ordernotification.FieldRecipientEmail:
+		m.ResetRecipientEmail()
+		return nil
+	case ordernotification.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case ordernotification.FieldSentAt:
+		m.ResetSentAt()
+		return nil
+	case ordernotification.FieldErrorReason:
+		m.ResetErrorReason()
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *OrderNotificationMutation) AddedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.shop != nil {
+		edges = append(edges, ordernotification.EdgeShop)
+	}
+	if m._order != nil {
+		edges = append(edges, ordernotification.EdgeOrder)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *OrderNotificationMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case ordernotification.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	case ordernotification.EdgeOrder:
+		if id := m._order; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *OrderNotificationMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 2)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *OrderNotificationMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *OrderNotificationMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 2)
+	if m.clearedshop {
+		edges = append(edges, ordernotification.EdgeShop)
+	}
+	if m.cleared_order {
+		edges = append(edges, ordernotification.EdgeOrder)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *OrderNotificationMutation) EdgeCleared(name string) bool {
+	switch name {
+	case ordernotification.EdgeShop:
+		return m.clearedshop
+	case ordernotification.EdgeOrder:
+		return m.cleared_order
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *OrderNotificationMutation) ClearEdge(name string) error {
+	switch name {
+	case ordernotification.EdgeShop:
+		m.ClearShop()
+		return nil
+	case ordernotification.EdgeOrder:
+		m.ClearOrder()
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *OrderNotificationMutation) ResetEdge(name string) error {
+	switch name {
+	case ordernotification.EdgeShop:
+		m.ResetShop()
+		return nil
+	case ordernotification.EdgeOrder:
+		m.ResetOrder()
+		return nil
+	}
+	return fmt.Errorf("unknown OrderNotification edge %s", name)
 }
 
 // PageMutation represents an operation that mutates the Page nodes in the graph.

@@ -66,6 +66,35 @@ type StorefrontClientChanged struct {
 
 func (StorefrontClientChanged) EventName() string { return "storefront.client_changed" }
 
+// OrderPlaced — order.Service.Checkout committed a new order (change
+// order-notification-email, design D15). Published from *inside* Checkout,
+// after the transaction commits, which makes "exactly one event per order
+// created" a structural property rather than a discipline every entry point has
+// to remember: Checkout is the only implementation of order creation in this
+// API, and the paths that do not create an order (validation failure,
+// insufficient stock, cart already converted, and — the one that matters — an
+// Idempotency-Key replay) never reach it.
+//
+// It carries identifiers only, and that is the deliberate opposite of
+// OrderPaymentSucceeded's AwardBasisAmount. The rule behind both is the same:
+// a number whose *definition* is subtle (the points basis has been renamed
+// twice for exactly this reason) must be computed once, by the publisher; a
+// whole aggregate's *current shape* (items, address, the amount triple,
+// delivery date) must not be copied into an event, because that produces a
+// second serialization of the order that will drift from the first — the same
+// reasoning change member-directory used (design D2) to refuse a second order
+// payload inside the customer endpoint.
+//
+// Subscribers re-read the order themselves, carrying shop_id explicitly: this
+// event is delivered outside tenant context, so the interceptor adds nothing.
+type OrderPlaced struct {
+	ShopID   int
+	OrderID  int
+	MemberID int
+}
+
+func (OrderPlaced) EventName() string { return "order.placed" }
+
 // OrderPaymentSucceeded — payment.Service.HandleWebhook advanced an order's
 // payment_status to paid (change member-tiers-and-points design D1): the
 // first non-cache consumer of this dispatcher. Published every time the

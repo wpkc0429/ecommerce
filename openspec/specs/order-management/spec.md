@@ -203,7 +203,9 @@ TBD - created by archiving change order-management. Update Purpose after archive
 
 **等級折扣的解析與計算亦 MUST 只有一份實作，且 MUST 落在該同一個結帳服務方法內**（spec tier-discount-application）。任何下單入口 MUST NOT 自行決定折扣率、自行計算折抵金額，也 MUST NOT 接受由請求主體指定的折扣率或折抵金額。
 
-新增下單入口時，其與既有入口的差異 MUST 僅止於「如何取得顧客身分」與「如何取得品項與訂單層附加輸入」，MUST NOT 觸及庫存扣減、訂單品項快照、金額組成、折扣套用、購物車狀態轉換或冪等鍵定案的邏輯。
+**「訂單已成立」領域事件的發佈亦 MUST 只有一處，且 MUST 落在該同一個結帳服務方法內**（spec order-notification-email）。發佈 MUST 發生在建單交易成功提交**之後**，且 MUST 對每一張成功建立的訂單恰好發佈一次。任何未建立訂單的路徑——輸入驗證失敗、庫存不足、購物車狀態衝突、冪等鍵回放——MUST NOT 發佈該事件。任何下單入口 MUST NOT 自行發佈該事件，因為那會使「一張訂單一個事件」退化為各入口自行遵守的紀律，而非結構性質。
+
+新增下單入口時，其與既有入口的差異 MUST 僅止於「如何取得顧客身分」與「如何取得品項與訂單層附加輸入」，MUST NOT 觸及庫存扣減、訂單品項快照、金額組成、折扣套用、購物車狀態轉換、冪等鍵定案或訂單成立事件發佈的邏輯。
 
 #### Scenario: 不同下單入口共用同一份庫存保護
 
@@ -229,6 +231,21 @@ TBD - created by archiving change order-management. Update Purpose after archive
 
 - **WHEN** 分別對會員結帳與訪客結帳送出帶相同形式冪等鍵的重複請求
 - **THEN** 兩者的回放語意、錯誤碼與狀態碼完全一致，且皆 MUST NOT 建立第二筆訂單
+
+#### Scenario: 每一張建立出來的訂單恰好發佈一個訂單成立事件
+
+- **WHEN** 任一下單入口成功建立一筆訂單
+- **THEN** 系統恰好發佈一次「訂單已成立」領域事件，且發佈時該訂單已可被其他連線讀取
+
+#### Scenario: 未建立訂單的路徑不發佈訂單成立事件
+
+- **WHEN** 一次結帳請求因輸入驗證失敗、庫存不足或購物車狀態衝突而未建立訂單
+- **THEN** 系統 MUST NOT 發佈「訂單已成立」領域事件
+
+#### Scenario: 冪等回放不發佈第二個訂單成立事件
+
+- **WHEN** 一次帶冪等鍵的結帳請求以同一把鍵重送並取得回放回應
+- **THEN** 系統 MUST NOT 發佈第二次「訂單已成立」領域事件
 
 ### Requirement: Order amounts are composed of an item subtotal and a shipping fee
 

@@ -34,6 +34,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
+	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/idempotency"
 )
 
@@ -211,8 +212,17 @@ func parseRequestedDeliveryDate(raw *string) (*time.Time, error) {
 // convention as cart.Service/catalog.Service: keeps the package testable
 // without faking context values, and the caller — the HTTP handler — is the
 // single place responsible for extracting identity from the request).
+//
+// Dispatcher is optional (nil-safe) and publishes events.OrderPlaced after
+// Checkout's transaction commits (change order-notification-email, design
+// D15/D1). Like payment.Service and shipping.Service before it, this package
+// still imports nothing from whoever subscribes — it publishes a generic domain
+// event and knows nothing about who (if anyone) reacts to it. A nil Dispatcher
+// publishes nothing, which is exactly what every test that constructs
+// order.Service{Client: …} did before this field existed.
 type Service struct {
-	Client *ent.Client
+	Client     *ent.Client
+	Dispatcher *events.Dispatcher
 }
 
 // resolveShippingMethod validates the selected shipping method and returns the
@@ -538,6 +548,26 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("order: commit checkout: %w", err)
+	}
+
+	// change order-notification-email, design D15: the one place an
+	// "order placed" domain event is published, and it is here rather than in
+	// the two HTTP handlers on purpose.
+	//
+	// This method is the only implementation of order creation, so "exactly one
+	// event per order" is a property of the code's shape, not of what each entry
+	// point remembers to do. In particular the Idempotency-Key replay path never
+	// reaches this line — it loads the existing order and re-serializes it — so a
+	// retried checkout cannot produce a second confirmation email. Publishing
+	// from the handlers would have made that a matter of two `if` statements
+	// staying correct forever.
+	//
+	// After Commit, never before: a subscriber that reads the order from another
+	// connection must be able to find it (the dispatcher runs handlers
+	// synchronously on this goroutine, but the notification subscriber hands the
+	// work to its own worker, which uses its own connection).
+	if s.Dispatcher != nil {
+		s.Dispatcher.Publish(ctx, events.OrderPlaced{ShopID: shopID, OrderID: o.ID, MemberID: memberID})
 	}
 
 	return s.GetOrderAdmin(ctx, shopID, o.ID)

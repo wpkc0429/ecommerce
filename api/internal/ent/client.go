@@ -20,6 +20,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
+	"ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -75,6 +76,8 @@ type Client struct {
 	Order *OrderClient
 	// OrderItem is the client for interacting with the OrderItem builders.
 	OrderItem *OrderItemClient
+	// OrderNotification is the client for interacting with the OrderNotification builders.
+	OrderNotification *OrderNotificationClient
 	// Page is the client for interacting with the Page builders.
 	Page *PageClient
 	// Payment is the client for interacting with the Payment builders.
@@ -141,6 +144,7 @@ func (c *Client) init() {
 	c.MemberTier = NewMemberTierClient(c.config)
 	c.Order = NewOrderClient(c.config)
 	c.OrderItem = NewOrderItemClient(c.config)
+	c.OrderNotification = NewOrderNotificationClient(c.config)
 	c.Page = NewPageClient(c.config)
 	c.Payment = NewPaymentClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
@@ -265,6 +269,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		MemberTier:             NewMemberTierClient(cfg),
 		Order:                  NewOrderClient(cfg),
 		OrderItem:              NewOrderItemClient(cfg),
+		OrderNotification:      NewOrderNotificationClient(cfg),
 		Page:                   NewPageClient(cfg),
 		Payment:                NewPaymentClient(cfg),
 		Permission:             NewPermissionClient(cfg),
@@ -316,6 +321,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		MemberTier:             NewMemberTierClient(cfg),
 		Order:                  NewOrderClient(cfg),
 		OrderItem:              NewOrderItemClient(cfg),
+		OrderNotification:      NewOrderNotificationClient(cfg),
 		Page:                   NewPageClient(cfg),
 		Payment:                NewPaymentClient(cfg),
 		Permission:             NewPermissionClient(cfg),
@@ -369,11 +375,12 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.Page, c.Payment,
-		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductSKU,
-		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop,
-		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
+		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
+		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -384,11 +391,12 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.Page, c.Payment,
-		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductSKU,
-		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop,
-		c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
+		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
+		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
+		c.RoleUser, c.Shipment, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -415,6 +423,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Order.mutate(ctx, m)
 	case *OrderItemMutation:
 		return c.OrderItem.mutate(ctx, m)
+	case *OrderNotificationMutation:
+		return c.OrderNotification.mutate(ctx, m)
 	case *PageMutation:
 		return c.Page.mutate(ctx, m)
 	case *PaymentMutation:
@@ -2028,6 +2038,171 @@ func (c *OrderItemClient) mutate(ctx context.Context, m *OrderItemMutation) (Val
 		return (&OrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown OrderItem mutation op: %q", m.Op())
+	}
+}
+
+// OrderNotificationClient is a client for the OrderNotification schema.
+type OrderNotificationClient struct {
+	config
+}
+
+// NewOrderNotificationClient returns a client for the OrderNotification from the given config.
+func NewOrderNotificationClient(c config) *OrderNotificationClient {
+	return &OrderNotificationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `ordernotification.Hooks(f(g(h())))`.
+func (c *OrderNotificationClient) Use(hooks ...Hook) {
+	c.hooks.OrderNotification = append(c.hooks.OrderNotification, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `ordernotification.Intercept(f(g(h())))`.
+func (c *OrderNotificationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OrderNotification = append(c.inters.OrderNotification, interceptors...)
+}
+
+// Create returns a builder for creating a OrderNotification entity.
+func (c *OrderNotificationClient) Create() *OrderNotificationCreate {
+	mutation := newOrderNotificationMutation(c.config, OpCreate)
+	return &OrderNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OrderNotification entities.
+func (c *OrderNotificationClient) CreateBulk(builders ...*OrderNotificationCreate) *OrderNotificationCreateBulk {
+	return &OrderNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OrderNotificationClient) MapCreateBulk(slice any, setFunc func(*OrderNotificationCreate, int)) *OrderNotificationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OrderNotificationCreateBulk{err: fmt.Errorf("calling to OrderNotificationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OrderNotificationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OrderNotificationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OrderNotification.
+func (c *OrderNotificationClient) Update() *OrderNotificationUpdate {
+	mutation := newOrderNotificationMutation(c.config, OpUpdate)
+	return &OrderNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OrderNotificationClient) UpdateOne(_m *OrderNotification) *OrderNotificationUpdateOne {
+	mutation := newOrderNotificationMutation(c.config, OpUpdateOne, withOrderNotification(_m))
+	return &OrderNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OrderNotificationClient) UpdateOneID(id int) *OrderNotificationUpdateOne {
+	mutation := newOrderNotificationMutation(c.config, OpUpdateOne, withOrderNotificationID(id))
+	return &OrderNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OrderNotification.
+func (c *OrderNotificationClient) Delete() *OrderNotificationDelete {
+	mutation := newOrderNotificationMutation(c.config, OpDelete)
+	return &OrderNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OrderNotificationClient) DeleteOne(_m *OrderNotification) *OrderNotificationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OrderNotificationClient) DeleteOneID(id int) *OrderNotificationDeleteOne {
+	builder := c.Delete().Where(ordernotification.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OrderNotificationDeleteOne{builder}
+}
+
+// Query returns a query builder for OrderNotification.
+func (c *OrderNotificationClient) Query() *OrderNotificationQuery {
+	return &OrderNotificationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOrderNotification},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OrderNotification entity by its id.
+func (c *OrderNotificationClient) Get(ctx context.Context, id int) (*OrderNotification, error) {
+	return c.Query().Where(ordernotification.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OrderNotificationClient) GetX(ctx context.Context, id int) *OrderNotification {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a OrderNotification.
+func (c *OrderNotificationClient) QueryShop(_m *OrderNotification) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(ordernotification.Table, ordernotification.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, ordernotification.ShopTable, ordernotification.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOrder queries the order edge of a OrderNotification.
+func (c *OrderNotificationClient) QueryOrder(_m *OrderNotification) *OrderQuery {
+	query := (&OrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(ordernotification.Table, ordernotification.FieldID, id),
+			sqlgraph.To(order.Table, order.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, ordernotification.OrderTable, ordernotification.OrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *OrderNotificationClient) Hooks() []Hook {
+	return c.hooks.OrderNotification
+}
+
+// Interceptors returns the client interceptors.
+func (c *OrderNotificationClient) Interceptors() []Interceptor {
+	return c.inters.OrderNotification
+}
+
+func (c *OrderNotificationClient) mutate(ctx context.Context, m *OrderNotificationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OrderNotificationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OrderNotificationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OrderNotificationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OrderNotificationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OrderNotification mutation op: %q", m.Op())
 	}
 }
 
@@ -5770,17 +5945,18 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 type (
 	hooks struct {
 		Cart, CartItem, Category, CheckoutIdempotencyKey, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductSKU, PublishableKey, Role, RolePermission,
-		RoleUser, Shipment, ShippingMethod, Shop, ShopAllowedOrigin, ShopUser, Site,
-		SiteShop, Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
+		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopUser, Site, SiteShop, Theme, ThemePage, User, UserPermission,
+		UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		Cart, CartItem, Category, CheckoutIdempotencyKey, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductSKU, PublishableKey, Role, RolePermission,
-		RoleUser, Shipment, ShippingMethod, Shop, ShopAllowedOrigin, ShopUser, Site,
-		SiteShop, Theme, ThemePage, User, UserPermission,
+		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopUser, Site, SiteShop, Theme, ThemePage, User, UserPermission,
 		UserRefreshToken []ent.Interceptor
 	}
 )

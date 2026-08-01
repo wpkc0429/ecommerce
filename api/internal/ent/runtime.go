@@ -13,6 +13,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
+	"ksdevworks/ecommerce/api/internal/ent/ordernotification"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -458,6 +459,47 @@ func init() {
 	orderitemDescGiftMessage := orderitemFields[9].Descriptor()
 	// orderitem.DefaultGiftMessage holds the default value on creation for the gift_message field.
 	orderitem.DefaultGiftMessage = orderitemDescGiftMessage.Default.(string)
+	ordernotificationMixin := schema.OrderNotification{}.Mixin()
+	ordernotificationMixinFields0 := ordernotificationMixin[0].Fields()
+	_ = ordernotificationMixinFields0
+	ordernotificationFields := schema.OrderNotification{}.Fields()
+	_ = ordernotificationFields
+	// ordernotificationDescCreatedAt is the schema descriptor for created_at field.
+	ordernotificationDescCreatedAt := ordernotificationMixinFields0[0].Descriptor()
+	// ordernotification.DefaultCreatedAt holds the default value on creation for the created_at field.
+	ordernotification.DefaultCreatedAt = ordernotificationDescCreatedAt.Default.(func() time.Time)
+	// ordernotificationDescUpdatedAt is the schema descriptor for updated_at field.
+	ordernotificationDescUpdatedAt := ordernotificationMixinFields0[1].Descriptor()
+	// ordernotification.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	ordernotification.DefaultUpdatedAt = ordernotificationDescUpdatedAt.Default.(func() time.Time)
+	// ordernotification.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	ordernotification.UpdateDefaultUpdatedAt = ordernotificationDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// ordernotificationDescRecipientEmail is the schema descriptor for recipient_email field.
+	ordernotificationDescRecipientEmail := ordernotificationFields[3].Descriptor()
+	// ordernotification.RecipientEmailValidator is a validator for the "recipient_email" field. It is called by the builders before save.
+	ordernotification.RecipientEmailValidator = func() func(string) error {
+		validators := ordernotificationDescRecipientEmail.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(recipient_email string) error {
+			for _, fn := range fns {
+				if err := fn(recipient_email); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// ordernotificationDescStatus is the schema descriptor for status field.
+	ordernotificationDescStatus := ordernotificationFields[4].Descriptor()
+	// ordernotification.DefaultStatus holds the default value on creation for the status field.
+	ordernotification.DefaultStatus = ordernotificationDescStatus.Default.(int16)
+	// ordernotificationDescErrorReason is the schema descriptor for error_reason field.
+	ordernotificationDescErrorReason := ordernotificationFields[6].Descriptor()
+	// ordernotification.ErrorReasonValidator is a validator for the "error_reason" field. It is called by the builders before save.
+	ordernotification.ErrorReasonValidator = ordernotificationDescErrorReason.Validators[0].(func(string) error)
 	pageMixin := schema.Page{}.Mixin()
 	pageMixinFields0 := pageMixin[0].Fields()
 	_ = pageMixinFields0

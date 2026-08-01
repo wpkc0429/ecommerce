@@ -23,6 +23,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/idempotency"
+	"ksdevworks/ecommerce/api/internal/notify"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
@@ -49,6 +50,14 @@ type guestEnv struct {
 	orderSvc    *order.Service
 	shippingSvc *shipping.Service
 	idemSvc     *idempotency.Service
+
+	// change order-notification-email: the notification chain is wired into this
+	// env so the HTTP-level tests can assert what a customer actually receives.
+	// Every pre-existing test in this file is unaffected — a RecordingSender
+	// touches no network — which is the same evidence-by-silence the
+	// Idempotency-Key wiring left above.
+	notifySender *notify.RecordingSender
+	notifySvc    *notify.Service
 
 	webhookSecret string
 
@@ -97,8 +106,22 @@ func newGuestEnv(t *testing.T) *guestEnv {
 	pointsSvc := &points.Service{Client: client, Log: log}
 	dispatcher.Subscribe(pointsSvc.Handle)
 
+	// change order-notification-email: subscribed synchronously on purpose.
+	// Production hands each job to a worker pool so an SMTP round trip never
+	// lands on the checkout response (design D5); a test asserting "was an email
+	// produced for this request" must not race that pool. What is under test
+	// here is the chain — event published, notification produced, exactly once —
+	// not the hop.
+	e.notifySender = &notify.RecordingSender{}
+	e.notifySvc = &notify.Service{Client: client, Sender: e.notifySender, Log: log}
+	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
+		_ = e.notifySvc.DeliverEvent(ctx, ev)
+	})
+
 	e.cartSvc = &cart.Service{Client: client}
-	e.orderSvc = &order.Service{Client: client}
+	// The dispatcher makes Checkout publish events.OrderPlaced after it commits
+	// (change order-notification-email, design D15).
+	e.orderSvc = &order.Service{Client: client, Dispatcher: dispatcher}
 	// change checkout-idempotency: wired on both checkout handlers below. Every
 	// pre-existing test in this file sends no Idempotency-Key header and is
 	// therefore completely unaffected — that is the point of the header being
