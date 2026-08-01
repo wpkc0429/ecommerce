@@ -131,6 +131,26 @@ func (d *Dispatcher) Subscribe(h Handler) {
 	d.handlers = append(d.handlers, h)
 }
 
+// Subscribers returns the registered handlers, in subscription order.
+//
+// It exists for exactly one reason, and no production path calls it: **"who
+// subscribed to what" is otherwise not a checkable fact.** The packages on both
+// ends of a domain event never import each other (points deliberately never
+// imports order/payment/shipping), so the entire connection between them is a
+// line of app/wire.go — and deleting that line has been measured to leave the
+// whole Go suite green while the real server silently stops awarding points
+// (change commerce-demo-seed). Handing out the subscriber list lets a CI test
+// assert the set, which is the only thing that turns that deletion red anywhere
+// other than an e2e script nobody is obliged to run (change
+// contract-router-completeness, design D8).
+//
+// The result is a copy: reading the wiring must not be a way to change it.
+func (d *Dispatcher) Subscribers() []Handler {
+	out := make([]Handler, len(d.handlers))
+	copy(out, d.handlers)
+	return out
+}
+
 // Publish delivers events to every subscriber. Call only after the writing
 // transaction committed successfully.
 func (d *Dispatcher) Publish(ctx context.Context, evs ...Event) {

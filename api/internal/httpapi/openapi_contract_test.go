@@ -11,6 +11,29 @@ package httpapi
 //	檢查 2  TestOpenAPIMoneyFieldsDeclareUnit 金額欄位必須 $ref MinorUnitAmount
 //	檢查 4  TestOpenAPIV1SurfaceLock          v1 已承諾的表面不得消失
 //
+// ── 檢查 1 的路由來源（change contract-router-completeness）─────────────────
+//
+// **這一節記錄的是一個曾經真實存在、且被實測證實的洞。** 檢查 1 走的不是伺服器啟動時
+// 組出來的那個 router，而是本檔的 contractRouter()。它過去逐欄位手寫 Deps，也就是一份
+// app/wire.go 的鏡像——而鏡像的漂移方向恰好是最常發生的那個：**新增**。實測（本 change
+// 動工前）：在 Deps 上新增一個 handler、在 router.go 掛上兩條路由、不碰那份清單，
+// 檢查 1／2／4 全部 PASS，兩條零文件的公開路由沒有任何人提起。
+//
+// 處置是**把清單刪掉**而不是把它守得更牢：contractDeps 以 testutil.FillNonNil 從
+// Deps 的結構本身逐欄位填出一個「每個相依都在」的值。新增一個 handler 欄位不需要碰本檔
+// 任何一行，它的路由自動被列舉，沒寫進 openapi.yaml 就自動轉紅。填不出來的型別（介面）
+// MUST 讓測試明確失敗並要求登記——靜默留 nil 等於把今天修掉的洞換一個型別重新打開。
+//
+// 另有三道檢查在整合層守著「生產環境是不是真的這樣接」（internal/app/wiring_integration_test.go）：
+//
+//	檢查 5  TestWireFillsEveryDependency            真實 wire 的每一項相依都被賦值（含巢狀）
+//	檢查 6  TestWiredRouteTableMatchesContractSource 真實 app.New 的路由表 == 本檔走的路由表
+//	檢查 7  TestWiredDispatcherSubscribers           真實 dispatcher 的訂閱者集合
+//
+// 分工：本檔（單元層，`make test`，零基礎設施）證明「文件與這個 router 相符」；
+// 檢查 6（整合層，CI 內）證明「這個 router 與真實伺服器相符」。兩者合起來才是
+// 「文件與真實伺服器相符」。
+//
 // 重新產生表面鎖檔（**刪行代表破壞 v1，請確認你真的要這麼做**）：
 //
 //	cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface
@@ -50,6 +73,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -59,13 +83,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"sort"
 	"strings"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	"gopkg.in/yaml.v3"
+
+	"ksdevworks/ecommerce/api/internal/testutil"
 )
 
 // updateSurface regenerates api/openapi/v1-surface.txt instead of checking it.
@@ -164,54 +190,90 @@ func documentedRoutes(t *testing.T, doc map[string]any) map[string]bool {
 
 // ── 檢查 1：路由覆蓋 ───────────────────────────────────────────────────
 
+// nullOriginRegistry is the CORSOrigins override: an OriginRegistry that answers
+// "no" to everything. It affects no route (CORSOrigins only decides whether the
+// CORS middleware is mounted), but leaving the field nil would put an exception
+// into the sentence the whole mechanism rests on — "every Deps field is set".
+type nullOriginRegistry struct{}
+
+func (nullOriginRegistry) IsRegisteredOrigin(context.Context, string) bool { return false }
+
+// contractDeps is the "everything is wired" Deps the coverage check enumerates.
+//
+// **It is derived from the struct, not enumerated by hand** (change
+// contract-router-completeness, design D1). The previous version listed each
+// handler literally, which made this function a mirror of app/wire.go — and a
+// mirror nobody checked: adding a handler and forgetting the line here removed
+// its entire route group from check 1, silently, while all three unit checks
+// stayed green (measured before this change).
+//
+// testutil.FillNonNil walks Deps' own fields, so a new dependency is enumerated
+// without anyone touching this file, and a field type it cannot fill mechanically
+// fails loudly instead of staying nil.
+func contractDeps(t *testing.T) Deps {
+	t.Helper()
+	var deps Deps
+	testutil.FillNonNil(t, &deps, map[string]any{
+		// A zero *slog.Logger has a nil handler, and the reachability probe below
+		// really does serve requests — the first Log.Info would panic.
+		"Log": slog.New(slog.NewTextHandler(io.Discard, nil)),
+		// An interface: Go cannot synthesize an implementation, so FillNonNil's
+		// rule 5 demands this entry rather than silently leaving it nil.
+		"CORSOrigins": nullOriginRegistry{},
+	})
+	return deps
+}
+
 // contractRouter builds the production router with zero-value handlers.
 //
 // This works because httpapi.New only ever nil-checks Deps fields, and the RBAC
 // guards return closures without dereferencing their receiver at mount time —
 // so the route table is identical to production's without a database, a Redis,
 // or a config file anywhere in sight.
-func contractRouter() http.Handler {
-	passthrough := func(next http.Handler) http.Handler { return next }
-	return New(Deps{
-		Log:           slog.New(slog.NewTextHandler(io.Discard, nil)),
-		AdminAuth:     &AdminAuthHandler{},
-		MemberAuth:    &MemberAuthHandler{},
-		Roles:         &RolesHandler{},
-		Sites:         &SitesHandler{},
-		Shops:         &ShopsHandler{},
-		Themes:        &ThemesHandler{},
-		Pages:         &PagesHandler{},
-		Render:        &RenderHandler{},
-		Categories:    &CategoriesHandler{},
-		Products:      &ProductsHandler{},
-		Cart:          &CartHandler{},
-		Orders:        &OrderHandler{},
-		Payments:      &PaymentHandler{},
-		Shipping:      &ShippingHandler{},
-		Points:        &PointsHandler{},
-		Members:       &MembersHandler{},
-		ClientAuth:    &ClientAuthHandler{},
-		Guest:         &GuestHandler{},
-		AdminMW:       passthrough,
-		TenantMW:      passthrough,
-		MemberMW:      passthrough,
-		OrderAccessMW: passthrough,
-	})
+//
+// "Identical to production's" is no longer only an argument: because every field
+// on both sides is non-nil and every mount decision in New is a nil check, the two
+// tables must agree — and TestWiredRouteTableMatchesContractSource (internal/app)
+// re-proves it against a really-booted server on every CI run, so the day someone
+// writes a mount condition that is not a nil check, it turns red instead of
+// quietly making this router a fiction.
+func contractRouter(t *testing.T) http.Handler {
+	t.Helper()
+	return New(contractDeps(t))
+}
+
+// TestContractRouterFillsEveryDep states the invariant the coverage check depends
+// on, so a violation reports itself as "this dependency is unset" rather than as
+// the much harder-to-read "some routes are missing from the contract".
+func TestContractRouterFillsEveryDep(t *testing.T) {
+	deps := contractDeps(t)
+	v := reflect.ValueOf(deps)
+	var unset []string
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Type().Field(i)
+		if !f.IsExported() {
+			continue
+		}
+		switch v.Field(i).Kind() {
+		case reflect.Pointer, reflect.Interface, reflect.Func, reflect.Map, reflect.Slice, reflect.Chan:
+			if v.Field(i).IsNil() {
+				unset = append(unset, f.Name+" ("+f.Type.String()+")")
+			}
+		}
+	}
+	sort.Strings(unset)
+	if len(unset) > 0 {
+		t.Errorf("%d 個 Deps 欄位在契約檢查的 router 上是 nil——它們掛載的路由不會被列舉，"+
+			"因此不寫進 openapi.yaml 也不會轉紅：\n  %s", len(unset), strings.Join(unset, "\n  "))
+	}
+	t.Logf("契約檢查的 router 填滿了 %d 個 Deps 欄位", v.NumField())
 }
 
 func walkedRoutes(t *testing.T, h http.Handler) map[string]bool {
 	t.Helper()
-	routes, ok := h.(chi.Routes)
-	if !ok {
-		t.Fatal("router is not a chi.Routes; the coverage check cannot enumerate it")
-	}
 	out := map[string]bool{}
-	err := chi.Walk(routes, func(method, route string, _ http.Handler, _ ...func(http.Handler) http.Handler) error {
-		out[method+" "+route] = true
-		return nil
-	})
-	if err != nil {
-		t.Fatalf("chi.Walk: %v", err)
+	for _, route := range testutil.RouteTable(t, h) {
+		out[route] = true
 	}
 	return out
 }
@@ -235,7 +297,7 @@ func TestOpenAPICoversEveryRoute(t *testing.T) {
 	doc := loadOpenAPI(t)
 	documented := documentedRoutes(t, doc)
 
-	router := contractRouter()
+	router := contractRouter(t)
 	walked := walkedRoutes(t, router)
 
 	// (a) Every route the server actually registers MUST be documented.

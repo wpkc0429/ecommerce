@@ -30,6 +30,10 @@ lint: ## golangci-lint over /api
 # ── API 契約（change openapi-contract）──────────────────────────────────
 # 這三個 target 都是「給人用的捷徑」。CI 的保證來自既有的 `go test ./...`：
 # 四道檢查是普通的 Go 測試，不需要任何額外接線（design D2）。
+#
+# 守著「生產環境是不是真的這樣接」的另外三道（change contract-router-completeness）
+# 在 internal/app/wiring_integration_test.go，刻意不掛在這個 target 上：它們守的
+# 不是契約文件而是接線本身。它們由 `make test-int`（＝CI 跑的那一行）執行。
 
 openapi: ## Run the four contract checks (routes / money units / responses / v1 surface)
 	cd api && INTEGRATION=1 go test ./internal/httpapi/ -run TestOpenAPI -count=1 -v
