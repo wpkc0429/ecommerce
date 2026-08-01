@@ -461,7 +461,67 @@ try {
     amountsText.includes("銀卡會員") && amountsText.includes("5%") && !amountsText.includes("NT$5"),
     amountsText.replace(/\s+/g, " ").slice(0, 200));
 
-  console.log("⑲ 產生 publishable key");
+  console.log("⑲ 顧客名冊：搜尋 → 詳情 → 點數與訂單（change member-directory）");
+  // No setup at all: by this point ⑯ paid an order for `guestEmail` (34 points →
+  // 銀卡會員) and ⑱.5 placed a second one. So the roster has a customer with a
+  // tier, two orders, and — because guest checkout never sets a password — the
+  // "訪客身分" case, which is the one this change most needed to get right.
+  await page.click('.tab[data-tab="members"]');
+  await page.waitForSelector("#tab-members:not([hidden])", { timeout: 8000 });
+  const rosterNotice = (await page.textContent("#tab-members")) ?? "";
+  check("the roster states guest identities never registered nor consented",
+    rosterNotice.includes("訪客身分") && rosterNotice.includes("未曾註冊") && rosterNotice.includes("行銷"),
+    rosterNotice.replace(/\s+/g, " ").slice(0, 160));
+
+  await page.fill("#member-q", guestEmail);
+  await page.click("#member-search");
+  const memberRow = page.locator(`#members-tbody tr:has-text("${guestEmail}")`);
+  await memberRow.waitFor({ timeout: 8000 });
+  const memberRowText = (await memberRow.textContent()) ?? "";
+  check("server-side search finds the customer who placed those orders", true, guestEmail);
+  check("a guest-checkout identity is labelled as such, not as a registered member",
+    memberRowText.includes("訪客身分") && !memberRowText.includes("已註冊"), memberRowText);
+  // Points are points on the roster too — 34 must never render as NT$34.
+  check("roster shows the balance as points, not money",
+    memberRowText.includes("34 點") && !memberRowText.includes("NT$"), memberRowText);
+  check("roster shows the tier the customer reached", memberRowText.includes("銀卡會員"), memberRowText);
+
+  await memberRow.locator("button", { hasText: "詳情" }).click();
+  await page.waitForSelector("#tab-member-detail:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector("#member-orders-tbody tr", { timeout: 8000 });
+  const memberID = Number((await page.getAttribute(`#members-tbody tr:has-text("${guestEmail}")`, "data-member-id")));
+  const detailText = (await page.textContent("#member-summary")) ?? "";
+  check("detail shows the customer's email", detailText.includes(guestEmail), detailText.slice(0, 200));
+  const memberPoints = (await page.textContent("#member-points")).trim();
+  check("detail shows the balance as points, not money",
+    memberPoints === "34 點" && !memberPoints.includes("NT$"), memberPoints);
+  check("detail names the current tier",
+    ((await page.textContent("#member-level")) ?? "").includes("銀卡會員"),
+    await page.textContent("#member-level"));
+  check("detail explains that a guest identity cannot log in",
+    (await page.locator("#member-guest-note").count()) === 1);
+  // design D9: the customer detail must NOT own points. No adjust form here —
+  // one balance, one write path, one audit trail.
+  check("the customer detail offers no points adjustment (points has exactly one owner)",
+    (await page.locator("#tab-member-detail input").count()) === 0 &&
+      (await page.locator("#tab-member-detail form").count()) === 0,
+    `inputs=${await page.locator("#tab-member-detail input").count()} forms=${await page.locator("#tab-member-detail form").count()}`);
+
+  const memberOrdersText = (await page.textContent("#member-orders-tbody")) ?? "";
+  check("detail lists both of this customer's orders",
+    memberOrdersText.includes(String(opsOrder.id)) && memberOrdersText.includes(String(repeatOrder.id)),
+    memberOrdersText.replace(/\s+/g, " ").slice(0, 200));
+  check("order amounts on the customer detail are money and unscaled",
+    memberOrdersText.includes("NT$3,550") && memberOrdersText.includes("NT$3,380"),
+    memberOrdersText.replace(/\s+/g, " ").slice(0, 200));
+
+  await page.click("#member-points-btn");
+  await page.waitForSelector("#tab-points:not([hidden])", { timeout: 8000 });
+  check("the detail's points button hands off to the view that owns adjustment",
+    (await page.textContent("#points-member-label")).includes(String(memberID)),
+    await page.textContent("#points-member-label"));
+
+  console.log("⑳ 產生 publishable key");
   await page.click('.tab[data-tab="storefront-clients"]');
   await page.waitForSelector("#tab-storefront-clients:not([hidden])");
   const keyLabel = `e2e-${runID}`;
@@ -474,7 +534,7 @@ try {
   check("the key is shown in full (public identifier, not a credential)",
     keyValue.length > 10 && !keyValue.includes("…") && !keyValue.includes("*"), keyValue);
 
-  console.log("⑳ allowed origin（平台層）登記與移除");
+  console.log("㉑ allowed origin（平台層）登記與移除");
   const e2eOrigin = `https://e2e-${runID}.example.com`;
   check("platform-level origins block is visible to the platform admin",
     await page.isVisible("#allowed-origins-block"));
@@ -488,7 +548,7 @@ try {
   await originRow.waitFor({ state: "detached", timeout: 8000 });
   check("allowed origin removed again (globally unique — leaving it would 422 next run)", true);
 
-  console.log("㉑ 會員等級 CRUD（門檻極高 + 用完刪除，對點數階梯淨零影響）");
+  console.log("㉒ 會員等級 CRUD（門檻極高 + 用完刪除，對點數階梯淨零影響）");
   await page.click('.tab[data-tab="member-tiers"]');
   await page.waitForSelector("#tab-member-tiers:not([hidden])");
   const tierName = `E2E 等級 ${runID}`;

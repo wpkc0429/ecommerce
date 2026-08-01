@@ -947,3 +947,52 @@ func contains(ids []int, want int) bool {
 	}
 	return false
 }
+
+// Scenario: 依顧客識別碼篩出該顧客的全部訂單 / 顧客識別碼篩選受商家範圍約束 /
+// 不帶新參數時行為不變 (spec Merchant back-office order access is scoped by
+// shop and RBAC; change member-directory design D2).
+//
+// This is the parameter the customer roster's detail view uses instead of
+// growing its own copy of the order payload.
+func TestOrderAdminListMemberFilter(t *testing.T) {
+	e := newOrderEnv(t)
+
+	// Two orders for memberA1 (checkoutAs always uses it) and one for memberA2.
+	firstA1 := e.checkoutAs(t, "顧客甲", "0922000001", "")
+	secondA1 := e.checkoutAs(t, "顧客甲", "0922000002", "")
+
+	_, skuForA2 := e.newSKU(t, e.shopA, 1000, "TWD", 10, true, true)
+	e.addToCart(t, e.shopA, e.memberA2, skuForA2, 1)
+	code, created := e.memberCallJSON(t, e.memberA2, e.shopA, e.shopADomain, "POST", "/api/v1/shop/checkout",
+		map[string]any{"recipient_name": "顧客乙", "phone": "0922000003", "line1": "民生東路一段2號"})
+	if code != http.StatusCreated {
+		t.Fatalf("memberA2 checkout: %d %+v", code, created)
+	}
+	orderA2 := int(created["id"].(float64))
+
+	// Baseline: without the parameter the list still returns everything, which
+	// is the "不帶新參數時行為不變" clause made mechanical.
+	unfiltered := e.listIDs(t, e.ownerA, e.shopA, "")
+	if !sameIDs(unfiltered, firstA1, secondA1, orderA2) {
+		t.Fatalf("unfiltered list must be unchanged by the new parameter: %v", unfiltered)
+	}
+
+	if got := e.listIDs(t, e.ownerA, e.shopA, fmt.Sprintf("?member_id=%d", e.memberA1)); !sameIDs(got, firstA1, secondA1) {
+		t.Fatalf("member_id must return exactly that customer's orders: %v", got)
+	}
+	if got := e.listIDs(t, e.ownerA, e.shopA, fmt.Sprintf("?member_id=%d", e.memberA2)); !sameIDs(got, orderA2) {
+		t.Fatalf("member_id for the other customer: %v", got)
+	}
+
+	// The shop predicate still applies, so another shop's member id matches
+	// nothing rather than reaching across the tenant boundary.
+	if got := e.listIDs(t, e.ownerA, e.shopA, fmt.Sprintf("?member_id=%d", e.memberB1)); len(got) != 0 {
+		t.Fatalf("a foreign member id must match nothing: %v", got)
+	}
+
+	// Composes with the pre-existing filters.
+	q := fmt.Sprintf("?member_id=%d&status=%d", e.memberA1, order.StatusCreated)
+	if got := e.listIDs(t, e.ownerA, e.shopA, q); !sameIDs(got, firstA1, secondA1) {
+		t.Fatalf("member_id + status: %v", got)
+	}
+}

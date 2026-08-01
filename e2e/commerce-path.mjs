@@ -257,6 +257,62 @@ async function commercePath() {
     gExpectedTier !== null && tierFor(tiers, 0)?.min_points !== gExpectedTier.min_points,
     `${tierName(tierFor(tiers, 0))} → ${tierName(gExpectedTier)}`);
 
+  // ── ③.5 顧客名冊（change member-directory）──
+  //
+  // These assertions live here, with a MERCHANT OWNER token, for the same reason
+  // the allowed-origins asymmetry does (change admin-commerce-operations design
+  // D11): happy-path.mjs drives the browser as a PLATFORM admin, who holds every
+  // node and therefore cannot show that member.view reaches a merchant at all.
+  //
+  // The password_hash assertion is deliberately made against the REAL server's
+  // raw response text rather than in Go: ent's Sensitive() and the hand-written
+  // serializer both stop it today, but both are one line away from being undone,
+  // and neither undoing would fail a test that only checks the JSON parses.
+  section("③.5 Customer roster: member.view, disclosure boundary, tenant isolation");
+  check("the merchant owner holds member.view", myPerms.includes("member.view"), JSON.stringify(myPerms));
+  check("member.edit is not a node anyone holds (no endpoint writes to members)",
+    !myPerms.some((p) => p.startsWith("member.") && p !== "member.view"),
+    JSON.stringify(myPerms.filter((p) => p.startsWith("member."))));
+
+  const roster = await req("GET", shopPath(`/members?q=${encodeURIComponent(guestEmail)}`), { token: admin });
+  check("the merchant can search their own customer roster", roster.status === 200, brief(roster));
+  const rosterRow = (roster.json?.members ?? [])[0];
+  check("server-side search finds the guest who just ordered",
+    rosterRow?.id === gOrder.member_id && rosterRow?.email === guestEmail, brief(roster));
+  check("a guest-checkout identity reports registered=false (it has no password and cannot log in)",
+    rosterRow?.registered === false, JSON.stringify(rosterRow?.registered));
+  // The raw text, not the parsed object: a renamed key would still carry the
+  // bcrypt prefix, and this catches that too.
+  for (const forbidden of ["password_hash", "$2a$", "$2b$", "$2y$", "phone"]) {
+    check(`the roster response never contains ${forbidden}`,
+      !roster.text.includes(forbidden), roster.text.slice(0, 300));
+  }
+  check("…and the assertion is meaningful (this really is that customer's payload)",
+    roster.text.includes(guestEmail), roster.text.slice(0, 200));
+
+  const rosterOne = await req("GET", shopPath(`/members/${gOrder.member_id}`), { token: admin });
+  check("a single customer can be fetched by id, same shape as the list row",
+    rosterOne.status === 200 && rosterOne.json?.id === gOrder.member_id, brief(rosterOne));
+  check("the single-customer response never contains password_hash either",
+    !rosterOne.text.includes("password_hash") && !rosterOne.text.includes("$2a$") &&
+      !rosterOne.text.includes("$2b$"), rosterOne.text.slice(0, 300));
+
+  // "What has this customer bought" reuses the order list, so there is exactly
+  // one order serialization on the platform (design D2).
+  const theirOrders = await req("GET", shopPath(`/orders?member_id=${gOrder.member_id}`), { token: admin });
+  check("the customer's orders come from the order list's member_id filter",
+    theirOrders.status === 200 &&
+      (theirOrders.json?.orders ?? []).every((o) => o.member_id === gOrder.member_id) &&
+      (theirOrders.json?.orders ?? []).some((o) => o.id === gOrder.id),
+    brief(theirOrders));
+
+  // Tenant isolation: a shop this owner has no standing in is 403, before any
+  // handler runs. shopID + 1 is either another shop or none — the cross-shop
+  // guard answers the same way for both, which is itself the point.
+  const foreignRoster = await req("GET", `/api/v1/admin/shops/${shopID + 1}/members`, { token: admin });
+  check("querying another shop's roster is refused (403), not answered",
+    foreignRoster.status === 403, brief(foreignRoster));
+
   // ── ④ 訪客路徑：出貨 → 退貨 → 點數扣回 ──
   section("④ Guest path: ship → return → points clawed back");
   const gShip = await req("POST", shopPath(`/orders/${gOrder.id}/shipments`), {

@@ -619,6 +619,16 @@ type AdminListParams struct {
 	// "whenever".
 	DeliveryFrom *time.Time
 	DeliveryTo   *time.Time
+	// MemberID matches orders.member_id exactly (change member-directory,
+	// design D2). It exists so "what has this customer bought" is answered by
+	// THIS list — with its existing pagination, its existing filters and its
+	// existing serialization — rather than by growing a second copy of the order
+	// payload inside the customer endpoint. The order shape has changed three
+	// times in three changes (order-extras' three amounts, checkout-idempotency,
+	// tier-discount-application's discount snapshot); two serializations would
+	// have drifted by now, and the way that drift shows up is "the amount on the
+	// customer page differs from the amount on the order page".
+	MemberID *int
 	// Q matches the recipient's name or phone (case-insensitive substring), and
 	// additionally the order id when Q parses as a positive integer. It does NOT
 	// match address lines: a merchant is looking for a person, and matching
@@ -695,6 +705,12 @@ func (s *Service) ListOrdersAdmin(ctx context.Context, shopID int, params AdminL
 	}
 	if params.DeliveryTo != nil {
 		q = q.Where(entorder.RequestedDeliveryDateLTE(*params.DeliveryTo))
+	}
+	// The shop predicate above still applies, so a member id belonging to
+	// another shop simply matches nothing — it cannot reach across the tenant
+	// boundary even if a caller guesses one.
+	if params.MemberID != nil {
+		q = q.Where(entorder.MemberIDEQ(*params.MemberID))
 	}
 	if kw := strings.TrimSpace(params.Q); kw != "" {
 		q = q.Where(recipientOrIDMatches(kw))

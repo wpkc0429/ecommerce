@@ -36,6 +36,7 @@ type Deps struct {
 	Payments   *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
 	Shipping   *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
 	Points     *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
+	Members    *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
 	ClientAuth *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
 	Guest      *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
 
@@ -131,6 +132,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Points != nil {
 							d.Points.MountShopAdmin(sh)
+						}
+						if d.Members != nil {
+							d.Members.MountShopAdmin(sh)
 						}
 						if d.ClientAuth != nil {
 							d.ClientAuth.MountShopAdmin(sh)

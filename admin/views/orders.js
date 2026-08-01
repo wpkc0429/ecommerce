@@ -175,7 +175,9 @@ export function createOrdersView(ctx) {
       row("收件人", addr.recipient_name || "—"),
       row("電話", addr.phone || "—"),
       row("地址", [addr.postal_code, addr.city, addr.line1, addr.line2].filter(Boolean).join(" ") || "—"),
-      row("顧客", el("a", { href: `#/points/${o.member_id}` }, `會員 #${o.member_id}`)),
+      // change member-directory：顧客現在有自己的畫面，所以這條連結指向那裡而不是
+      // 直接跳進點數（點數仍有工具列上的專屬按鈕）。
+      row("顧客", el("a", { href: `#/members/${o.member_id}` }, `顧客 #${o.member_id}`)),
       o.cancelled_at ? row("取消時間", formatTime(o.cancelled_at)) : ""));
   }
 

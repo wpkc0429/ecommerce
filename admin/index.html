@@ -308,6 +308,58 @@
         </dialog>
       </div>
 
+      <!-- 顧客名冊（change member-directory） -->
+      <div id="tab-members" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>顧客</h2>
+          <div class="filters">
+            <input type="search" id="member-q" placeholder="搜尋 email / 顧客編號" />
+            <button id="member-search">搜尋</button>
+          </div>
+        </div>
+        <p class="hint">
+          「<strong>訪客身分</strong>」是顧客在結帳時自動建立的：<strong>這些顧客未曾註冊帳號，也未曾同意接收行銷訊息</strong>，
+          而且無法登入——請他們「登入查看訂單」是行不通的，正確的說法是「以同一個 email 註冊，先前的訂單就會出現」。
+          這份名冊是營運用的顧客清單，不是行銷名單。
+        </p>
+        <p id="members-error" class="error" hidden></p>
+        <table class="table">
+          <thead><tr>
+            <th>ID</th><th>Email</th><th>身分</th><th>點數</th><th>等級</th><th>建立時間</th><th>動作</th>
+          </tr></thead>
+          <tbody id="members-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="members-prev">← 上一頁</button>
+          <span id="members-pageinfo"></span>
+          <button id="members-next">下一頁 →</button>
+        </div>
+      </div>
+
+      <!-- 顧客詳情 -->
+      <div id="tab-member-detail" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2 id="member-detail-title">顧客</h2>
+          <div class="toolbar-actions">
+            <button id="member-back">← 返回名冊</button>
+            <button id="member-points-btn">檢視流水帳／調整點數</button>
+          </div>
+        </div>
+        <p id="member-detail-error" class="error" hidden></p>
+        <div id="member-summary" class="detail-section"></div>
+
+        <div id="member-orders-block">
+          <h3>訂單紀錄</h3>
+          <table class="table">
+            <thead><tr>
+              <th>ID</th><th>建立時間</th><th>指定配送日</th><th>應付總額</th><th>付款</th><th>出貨</th><th>動作</th>
+            </tr></thead>
+            <tbody id="member-orders-tbody"></tbody>
+          </table>
+          <p class="hint">只顯示最近的訂單；完整清單與篩選請用「訂單」分頁。</p>
+        </div>
+      </div>
+
       <!-- 會員點數 -->
       <div id="tab-points" class="tab-panel" hidden>
         <div class="toolbar">
@@ -318,7 +370,8 @@
           </div>
         </div>
         <p id="points-hint" class="hint">
-          輸入會員編號，或從訂單詳情的「檢視此顧客點數」進來。平台目前沒有顧客名冊端點，因此無法在此瀏覽全部會員。
+          輸入會員編號，或從「顧客」分頁的詳情、訂單詳情的「檢視此顧客點數」進來。
+          <strong>點數的調整與流水帳只在這個畫面上</strong>——顧客詳情只顯示唯讀餘額，兩個畫面各自維護一份餘額會漂移。
         </p>
         <p id="points-error" class="error" hidden></p>
         <div id="points-body" hidden>

@@ -189,6 +189,7 @@ func contractRouter() http.Handler {
 		Payments:      &PaymentHandler{},
 		Shipping:      &ShippingHandler{},
 		Points:        &PointsHandler{},
+		Members:       &MembersHandler{},
 		ClientAuth:    &ClientAuthHandler{},
 		Guest:         &GuestHandler{},
 		AdminMW:       passthrough,
@@ -307,6 +308,7 @@ var moneyExemptions = map[string]string{
 	"/components/schemas/OrderPage/properties/total":            "pagination count",
 	"/components/schemas/ShopPage/properties/total":             "pagination count",
 	"/components/schemas/PointTransactionPage/properties/total": "pagination count",
+	"/components/schemas/MemberPage/properties/total":           "pagination count",
 }
 
 // refsMinorUnit accepts either a bare $ref to MinorUnitAmount or a single-element

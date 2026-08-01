@@ -139,6 +139,7 @@ TBD - created by archiving change order-management. Update Purpose after archive
 - 依 `fulfillment_status` 精確比對
 - 依 `requested_delivery_date` 的閉區間（以日曆日表達，區間端點皆為選填且可單邊給定）
 - 依關鍵字：可解析為正整數時 MUST 比對訂單編號；同時 MUST 對收件人姓名與收件人電話做大小寫不敏感的子字串比對
+- 依顧客識別碼精確比對（`member_id`）——「這位顧客買過什麼」MUST 由本列表回答，MUST NOT 由顧客端點另行回傳一份訂單內容
 
 未提供任何上述選填參數時，列表的查詢與回應 MUST 與本需求變更前完全相同。
 
@@ -173,6 +174,14 @@ TBD - created by archiving change order-management. Update Purpose after archive
 #### Scenario: 關鍵字為數字時亦比對訂單編號
 - **WHEN** 以一個存在於該商家的訂單編號作為關鍵字查詢
 - **THEN** 該訂單 MUST 出現在結果中
+
+#### Scenario: 依顧客識別碼篩出該顧客的全部訂單
+- **WHEN** 以某位顧客的識別碼作為 `member_id` 查詢
+- **THEN** 僅回傳該商家中屬於該顧客的訂單，且該顧客的每一筆訂單 MUST 可經由分頁取得
+
+#### Scenario: 顧客識別碼篩選受商家範圍約束
+- **WHEN** 以一個屬於另一商家的顧客識別碼作為 `member_id` 查詢本商家的訂單列表
+- **THEN** 回傳零筆，MUST NOT 回傳任何其他商家的訂單
 
 #### Scenario: 不帶新參數時行為不變
 - **WHEN** 呼叫端未提供任何新增的選填篩選參數

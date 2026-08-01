@@ -98,6 +98,14 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"member_tier.delete", "刪除會員等級"},
 	{"point.view", "檢視會員點數餘額與流水帳"},
 	{"point.adjust", "手動調整會員點數"},
+	// change member-directory (design D4): exactly one node, because a
+	// permission node with no endpoint behind it is a lie told to whoever
+	// grants it. There is deliberately no `member.edit` — the platform has no
+	// back-office write path to `members` at all today (registration, guest
+	// claim and points.Service are the only writers). When a PATCH endpoint
+	// exists (disabling a customer is the named next gap), that node gets its
+	// consumer and can be added additively.
+	{"member.view", "檢視顧客名冊與單一顧客"},
 }
 
 // roleDefs maps seeded roles to their scope and granted permissions.
@@ -119,6 +127,7 @@ var roleDefs = []struct {
 		"shipment.view", "shipment.create", "shipment.update",
 		"member_tier.view", "member_tier.create", "member_tier.edit", "member_tier.delete",
 		"point.view", "point.adjust",
+		"member.view",
 		// change storefront-client-auth: key rotation is the merchant's own
 		// operational rhythm. Deliberately not granted to `editor` — minting a
 		// client identity is an integration action, not content editing.
@@ -134,6 +143,15 @@ var roleDefs = []struct {
 		"shipment.view", "shipment.create", "shipment.update",
 		"member_tier.view", "member_tier.create", "member_tier.edit",
 		"point.view", "point.adjust",
+		// change member-directory (design D4): granted, and the reason is not
+		// "editor sees everything". editor already reaches WIDER customer PII
+		// through order.view — every order carries the recipient's name, phone
+		// and full address, and that list is paginated and keyword-searchable
+		// too. The roster adds email + points. Withholding member.view would
+		// remove nothing from what an editor can see; it would only force the
+		// same work through the order list. A boundary that stops nobody is
+		// worse than none, because it stops the thinking.
+		"member.view",
 	}},
 }
 

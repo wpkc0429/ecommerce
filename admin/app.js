@@ -21,6 +21,7 @@ import { createProductsView } from "./views/products.js";
 import { createOrdersView } from "./views/orders.js";
 import { createShippingMethodsView } from "./views/shipping-methods.js";
 import { createMemberTiersView } from "./views/member-tiers.js";
+import { createMembersView } from "./views/members.js";
 import { createPointsView } from "./views/points.js";
 import { createStorefrontClientsView } from "./views/storefront-clients.js";
 
@@ -55,6 +56,9 @@ const views = {
     label: "會員等級", panel: "tab-member-tiers", nav: true,
     perm: "member_tier.view", view: createMemberTiersView(ctx),
   },
+  // 顧客名冊（change member-directory）。與 orders 同型：一個註冊表項目、兩個面貌
+  // （#/members 名冊、#/members/57 詳情），詳情的 panel 由視圖自己 showPanel 切過去。
+  members: { label: "顧客", panel: "tab-members", nav: true, perm: "member.view", view: createMembersView(ctx) },
   points: { label: "會員點數", panel: "tab-points", nav: true, perm: "point.view", view: createPointsView(ctx) },
   // 前端接入：金鑰是商家層、origin 是平台層（design D6）。分頁只要其中一邊看得到
   // 就該出現，區塊各自再判一次。

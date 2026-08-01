@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/idempotency"
+	"ksdevworks/ecommerce/api/internal/member"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
@@ -193,6 +194,15 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// member-tiers-and-points HTTP layer (points.Service was already
 	// constructed and subscribed above, alongside the render invalidator).
 	deps.Points = &httpapi.PointsHandler{Client: client, Service: pointsService, Authz: authz, Log: a.log}
+
+	// Customer roster (change member-directory): a read-only back-office view
+	// over `members`. It owns no state and subscribes to no events; the whole
+	// design content is which fields it emits (httpapi.memberJSON) and the fact
+	// that every query carries shop_id explicitly, because back-office paths run
+	// outside the tenant context (member-identity-per-shop design D4).
+	deps.Members = &httpapi.MembersHandler{
+		Client: client, Service: &member.Service{Client: client}, Authz: authz, Log: a.log,
+	}
 
 	// Guest checkout (change guest-checkout): a coordinator over the services
 	// already constructed above — it creates no state of its own and, in

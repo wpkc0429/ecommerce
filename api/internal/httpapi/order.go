@@ -303,7 +303,10 @@ func (h *OrderHandler) listAdmin(w http.ResponseWriter, r *http.Request) {
 		FulfillmentStatus: optionalInt16Query(r, "fulfillment_status"),
 		DeliveryFrom:      optionalDateQuery(r, "delivery_from"),
 		DeliveryTo:        optionalDateQuery(r, "delivery_to"),
-		Q:                 r.URL.Query().Get("q"),
+		// change member-directory (design D2): "this customer's orders", so the
+		// roster never needs its own copy of the order payload.
+		MemberID: optionalIntQuery(r, "member_id"),
+		Q:        r.URL.Query().Get("q"),
 	}
 	op, err := h.Service.ListOrdersAdmin(r.Context(), shopID, params)
 	if err != nil {

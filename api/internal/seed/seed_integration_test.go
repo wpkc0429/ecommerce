@@ -7,9 +7,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	entmember "ksdevworks/ecommerce/api/internal/ent/member"
 	entmembertier "ksdevworks/ecommerce/api/internal/ent/membertier"
+	entpermission "ksdevworks/ecommerce/api/internal/ent/permission"
 	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
 	entpublishablekey "ksdevworks/ecommerce/api/internal/ent/publishablekey"
+	entrole "ksdevworks/ecommerce/api/internal/ent/role"
+	entrolepermission "ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/seed"
@@ -287,5 +290,58 @@ func TestBaselineSeedProvisionsNoDemoData(t *testing.T) {
 	}
 	if n, err := client.Theme.Query().Count(ctx); err != nil || n == 0 {
 		t.Errorf("baseline seed did not create the starter theme (n=%d err=%v)", n, err)
+	}
+}
+
+// Scenario: 預設商家角色可使用顧客名冊 (spec member-directory/顧客名冊由
+// `member.view` 授權; change member-directory design D4).
+//
+// Two things are being pinned here and neither is obvious from reading
+// seed.go's tables:
+//
+//  1. member.view exists in the catalog at all — without the row, RBAC's
+//     Snapshot.Allows returns false for everyone and the roster endpoints 403
+//     for the whole platform. Fail-closed, but silently.
+//  2. `editor` holds it. That grant is the disclosure decision (design D4): an
+//     editor already reaches WIDER customer PII through order.view — every
+//     order carries recipient name, phone and full address — so withholding
+//     member.view would remove nothing while looking like a boundary.
+//
+// The negative half matters just as much: member.edit MUST NOT exist, because
+// no endpoint writes to `members` from the back office. A permission node with
+// nothing behind it is a lie told to whoever grants it.
+func TestSeedGrantsMemberViewToMerchantRoles(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	node, err := client.Permission.Query().Where(entpermission.NameEQ("member.view")).Only(ctx)
+	if err != nil {
+		t.Fatalf("member.view must be in the permission catalog: %v", err)
+	}
+
+	for _, roleName := range []string{"merchant_owner", "editor"} {
+		r, err := client.Role.Query().
+			Where(entrole.NameEQ(roleName), entrole.ScopeEQ("merchant")).Only(ctx)
+		if err != nil {
+			t.Fatalf("role %s: %v", roleName, err)
+		}
+		granted, err := client.RolePermission.Query().
+			Where(entrolepermission.RoleIDEQ(r.ID), entrolepermission.PermissionIDEQ(node.ID)).Exist(ctx)
+		if err != nil {
+			t.Fatalf("role_permission %s: %v", roleName, err)
+		}
+		if !granted {
+			t.Errorf("role %s must be granted member.view (change member-directory design D4)", roleName)
+		}
+	}
+
+	exists, err := client.Permission.Query().Where(entpermission.NameEQ("member.edit")).Exist(ctx)
+	if err != nil {
+		t.Fatalf("query member.edit: %v", err)
+	}
+	if exists {
+		t.Error("member.edit must not exist: the platform has no back-office write path to `members`, " +
+			"and a node with no consumer misleads whoever grants it (design D4)")
 	}
 }

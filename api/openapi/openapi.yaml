@@ -1068,6 +1068,67 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
 
+    Member:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, email, registered, status, points, level_id, level, created_at, updated_at]
+      description: |
+        後台顧客名冊上的一位顧客（change member-directory）。**這個 schema 的內容有一半是它的
+        省略**，逐項理由見 design D3/D5/D6/D7：
+
+        - **沒有 `password_hash`**，也沒有任何足以還原它的值。`registered` 是它唯一的布林投影。
+        - **沒有 `phone`**：系統目前沒有任何寫入 `members.phone` 的路徑（註冊只收 email，訪客結帳
+          刻意不寫入），交付一個恆為空的欄位會讓消費端以為它有值。顧客的聯絡電話在
+          `Order.shipping_address` 裡——那才是它的語意（這一筆的收件電話）。日後真有 phone
+          註冊路徑時，加回來是純 additive 的。
+        - **沒有訂單筆數／累計消費金額**：口徑未定（含不含已取消、未付款、運費、折抵），而一個
+          看起來權威的錯數字比沒有數字更有害。要看這位顧客買過什麼，用
+          `GET /admin/shops/{shopID}/orders?member_id=…`。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        email:
+          oneOf: [{ type: string, format: email }, { type: 'null' }]
+        registered:
+          type: boolean
+          description: |
+            這位顧客是否已設定密碼——等價於「他能不能登入」。`false` 代表這是訪客結帳自動建立的
+            無密碼身分（change guest-checkout）：**這個人從未主動註冊、也從未同意成為任何名單的
+            一員**，商家介面必須據此區分呈現，且不得把他當成已註冊會員。日後以同一 email 註冊
+            （認領）之後會變成 `true`。
+        status:
+          type: integer
+          description: '0 停用 / 1 啟用。停用的顧客無法登入，訪客結帳亦會被拒。'
+        points:
+          type: integer
+          format: int32
+          description: 目前點數餘額。**這是點數不是金額**，不得以任何貨幣格式呈現。
+        level_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        level:
+          oneOf:
+            - $ref: '#/components/schemas/MemberTier'
+            - type: 'null'
+          description: 目前等級的完整內容；尚未達到任何等級時為 `null`。
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    MemberPage:
+      type: object
+      additionalProperties: false
+      required: [members, page, page_size, total]
+      properties:
+        members:
+          type: array
+          items: { $ref: '#/components/schemas/Member' }
+        page: { type: integer }
+        page_size:
+          type: integer
+          description: 實際每頁筆數。**上限 100**——這是名冊唯一的節流。
+        total:
+          type: integer
+          description: 總筆數（不是金額，也不是點數）。
+
     MemberPoints:
       type: object
       additionalProperties: false
@@ -4007,6 +4068,15 @@ paths:
           required: false
           description: '`requested_delivery_date` 的上界（含）。語意同 `delivery_from`。'
           schema: { type: string, format: date }
+        - name: member_id
+          in: query
+          required: false
+          description: |
+            精確比對 `member_id`（change member-directory, design D2）。「這位顧客買過什麼」由本列表
+            回答，而不是由顧客端點另外回傳一份訂單內容——訂單的形狀在三個 change 裡動過三次，
+            兩份序列化遲早會分歧，而分歧的樣子是「顧客頁上的金額和訂單頁上的不一樣」。
+            商家範圍仍然適用：屬於別家商家的顧客 id 只會篩出零筆。
+          schema: { type: integer, minimum: 1 }
         - name: q
           in: query
           required: false
@@ -4446,6 +4516,70 @@ paths:
       security: [{ adminJWT: [] }]
       responses:
         "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/members:
+    get:
+      tags: [admin-commerce]
+      operationId: listMembersAdmin
+      summary: 列出商家的顧客
+      description: |
+        需要商家層 `member.view`（change member-directory）。顧客身分以商家為界，本端點只回傳
+        `{shopID}` 的顧客。
+
+        **這個端點的主要設計內容是它不回傳什麼**，見 `Member` schema 的說明：沒有 `password_hash`、
+        沒有 `phone`、沒有任何由訂單推導的彙總。
+
+        搜尋 `q` 是子字串比對而非精確比對。**列舉面是列表端點本身，不是搜尋**——一份分頁名冊
+        本來就可以被逐頁讀完，只給精確比對只會增加合法商家的摩擦而不減少任何暴露。界定它的是
+        `member.view`、`page_size` 的上限，以及平台刻意不提供匯出端點。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          required: false
+          description: |
+            關鍵字：對 email 做大小寫不敏感的子字串比對；可解析為正整數時另比對顧客識別碼
+            （商家從訂單詳情讀到「會員 #57」，把 57 貼進來應該要能用——與訂單列表的 `q` 同型）。
+          schema: { type: string }
+      responses:
+        "200":
+          description: 顧客的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemberPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/members/{memberID}:
+    get:
+      tags: [admin-commerce]
+      operationId: getMemberAdmin
+      summary: 取得單一顧客
+      description: |
+        需要商家層 `member.view`（change member-directory）。回應形狀與列表中的元素完全相同。
+
+        兩種跨商家有兩種答案：呼叫者無權存取該商家時回 **403**（cross-shop access guard）；
+        呼叫者有權存取該商家但 `{memberID}` 屬於另一商家時回 **404**——那一列不在這家店，
+        說「不存在」比說「你沒權限碰那個」洩漏更少。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: memberID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 顧客。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Member' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }

@@ -130,6 +130,17 @@ GET /api/v1/admin/shops/{shopID}/member-tiers path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
 GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
 GET /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID
+GET /api/v1/admin/shops/{shopID}/members
+GET /api/v1/admin/shops/{shopID}/members path shopID
+GET /api/v1/admin/shops/{shopID}/members query page
+GET /api/v1/admin/shops/{shopID}/members query page optional
+GET /api/v1/admin/shops/{shopID}/members query page_size
+GET /api/v1/admin/shops/{shopID}/members query page_size optional
+GET /api/v1/admin/shops/{shopID}/members query q
+GET /api/v1/admin/shops/{shopID}/members query q optional
+GET /api/v1/admin/shops/{shopID}/members/{memberID}
+GET /api/v1/admin/shops/{shopID}/members/{memberID} path memberID
+GET /api/v1/admin/shops/{shopID}/members/{memberID} path shopID
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points path memberID
 GET /api/v1/admin/shops/{shopID}/members/{memberID}/points path shopID
@@ -148,6 +159,8 @@ GET /api/v1/admin/shops/{shopID}/orders query delivery_to
 GET /api/v1/admin/shops/{shopID}/orders query delivery_to optional
 GET /api/v1/admin/shops/{shopID}/orders query fulfillment_status
 GET /api/v1/admin/shops/{shopID}/orders query fulfillment_status optional
+GET /api/v1/admin/shops/{shopID}/orders query member_id
+GET /api/v1/admin/shops/{shopID}/orders query member_id optional
 GET /api/v1/admin/shops/{shopID}/orders query page
 GET /api/v1/admin/shops/{shopID}/orders query page optional
 GET /api/v1/admin/shops/{shopID}/orders query page_size
@@ -287,6 +300,16 @@ GuestCheckoutResult.order
 GuestCheckoutResult.order_access_token
 GuestCheckoutResult.token_type
 HealthStatus.status
+Member.created_at
+Member.email
+Member.id
+Member.level
+Member.level_id
+Member.points
+Member.registered
+Member.shop_id
+Member.status
+Member.updated_at
 MemberCheckoutRequest.city
 MemberCheckoutRequest.country
 MemberCheckoutRequest.line1
@@ -296,6 +319,10 @@ MemberCheckoutRequest.postal_code
 MemberCheckoutRequest.recipient_name
 MemberCheckoutRequest.requested_delivery_date
 MemberCheckoutRequest.shipping_method_id
+MemberPage.members
+MemberPage.page
+MemberPage.page_size
+MemberPage.total
 MemberPoints.level
 MemberPoints.level_id
 MemberPoints.member_id
