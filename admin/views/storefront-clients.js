@@ -17,6 +17,7 @@
 import { api, ApiError } from "../lib/api.js";
 import { $, el, rows } from "../lib/dom.js";
 import { can } from "../lib/rbac.js";
+import { formatTime } from "../lib/format.js";
 
 export function createStorefrontClientsView(ctx) {
   async function load() {
@@ -145,8 +146,3 @@ export function createStorefrontClientsView(ctx) {
   return { load };
 }
 
-function formatTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("zh-Hant-TW");
-}

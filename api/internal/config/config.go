@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ksdevworks/ecommerce/api/internal/shoptz"
 )
 
 // Config carries every runtime setting for the API service.
@@ -72,6 +74,21 @@ type Config struct {
 
 	// Notify carries the notification dispatch tuning (worker pool bounds).
 	Notify NotifyConfig
+
+	// ReportDefaultTimezone is the IANA zone merchant reports fall back to when
+	// a shop has not set one (change merchant-reports, design D1).
+	//
+	// It is the ONE new setting that makes boot fail when it is wrong, and that
+	// is deliberate — the opposite treatment from PaymentMockWebhookSecret and
+	// the ECPay/SMTP blocks. Those are optional features whose absence means
+	// "off". This one is not optional and has no "off": a typo here makes every
+	// report, for every shop that has not configured a zone, answer 500. That is
+	// discoverable in one second at boot and only through a support ticket
+	// otherwise.
+	//
+	// Unset behaves exactly as the default value, and since no report existed
+	// before this change, "unchanged from before" is automatic.
+	ReportDefaultTimezone string
 
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
@@ -231,6 +248,8 @@ func Load() (*Config, error) {
 		PaymentMockWebhookSecret: getenv("PAYMENT_MOCK_WEBHOOK_SECRET", "dev-only-mock-payment-webhook-secret"),
 		PaymentDefaultProvider:   getenv("PAYMENT_DEFAULT_PROVIDER", "mock"),
 
+		ReportDefaultTimezone: getenv("REPORT_DEFAULT_TIMEZONE", "Asia/Taipei"),
+
 		ECPay: ECPayConfig{
 			MerchantID:    getenv("ECPAY_MERCHANT_ID", "3002607"),
 			HashKey:       getenv("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
@@ -337,6 +356,13 @@ func Load() (*Config, error) {
 	}
 	if cfg.RateLimit.GuestCheckoutTightWindow, err = parseDuration("RATE_LIMIT_GUEST_CHECKOUT_TIGHT_WINDOW", 10*time.Minute); err != nil {
 		return nil, err
+	}
+
+	// change merchant-reports (design D1): validated at boot, in every
+	// environment. A bad value here is not a degraded feature, it is a 500 on
+	// every report of every unconfigured shop — and it is free to catch now.
+	if err := shoptz.Validate(cfg.ReportDefaultTimezone); err != nil {
+		return nil, fmt.Errorf("config: REPORT_DEFAULT_TIMEZONE: %w", err)
 	}
 
 	if cfg.Env == "production" {

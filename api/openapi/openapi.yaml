@@ -1377,6 +1377,253 @@ components:
           type: object
         updated_at: { type: string, format: date-time }
 
+    # ── 商家設定與時區 (change merchant-reports) ──────────────
+    EffectiveTimezone:
+      type: object
+      additionalProperties: false
+      required: [name, source]
+      description: |
+        某次查詢實際用來切「一天」的時區，以及它從哪裡來。
+
+        **`source` 不是裝飾。** 「這家商家選了 Asia/Taipei」與「這家商家什麼都沒選、
+        而平台預設剛好是 Asia/Taipei」算出來的數字一模一樣，但它們是兩件不同的事實：
+        只有後者應該讓一個開在東京的商家停下來去設定它。介面 MUST 如實標示這件事。
+      properties:
+        name:
+          type: string
+          description: IANA 時區名稱。
+          examples: ["Asia/Taipei"]
+        source:
+          type: string
+          enum: [shop, default]
+          description: |
+            `shop` ＝ 商家自己設定的；`default` ＝ 商家未設定，回落到平台的
+            `REPORT_DEFAULT_TIMEZONE`。
+
+    ShopSettings:
+      type: object
+      additionalProperties: false
+      required: [shop_id, timezone, effective_timezone]
+      description: 商家自己可維護的設定。目前只有時區一項。
+      properties:
+        shop_id: { type: integer }
+        timezone:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: |
+            **儲存的原始值**：商家從未設定過時為 `null`。這與 `effective_timezone.name`
+            不同——後者是套用回落之後、報表實際使用的值。
+          examples: ["Asia/Taipei"]
+        effective_timezone: { $ref: '#/components/schemas/EffectiveTimezone' }
+
+    # ── 營運報表 (change merchant-reports) ────────────────────
+    ReportAmounts:
+      type: object
+      additionalProperties: false
+      required:
+        [order_count, subtotal_amount, discount_amount, net_amount, shipping_fee, total_amount,
+         returned_order_count, returned_total_amount, cancelled_order_count, unpaid_order_count]
+      description: |
+        一組數字，同時包含**金額**與**對帳分割**。
+
+        **口徑（計入營業額的訂單）**：未取消（`status = 0`）**且**已付款
+        （`payment_status = 1`）**且**未退貨（`fulfillment_status ≠ 3`）。
+
+        - 已取消不計：取消會歸還庫存並扣回點數，系統已視為未發生。
+        - 未付款不計：未付款的訂單可能永遠不會付，計入會讓報表恆定高於實收金額。
+        - 已退貨不計入金額，但**單獨呈現**（`returned_*`）——「這個月退了三筆」正是
+          商家最需要看見的一件事，藏起來就是報表開始粉飾的第一步。
+
+        **時間軸是訂單建立時間**，不是付款時間也不是出貨時間。**因此這份報表不是
+        現金流量表**，介面必須說出這句話。
+
+        **對帳分割**：`order_count ＋ returned_order_count ＋ cancelled_order_count
+        ＋ unpaid_order_count` **等於**該期間內建立的全部訂單筆數。四類互斥（依序判定，
+        已取消的訂單必然也未付款，但只計一次），所以商家可以拿訂單列表的總筆數自行驗證
+        這份報表，而不是只能相信它。
+
+        **金額不縮減成單一「營業額」**：`subtotal_amount − discount_amount = net_amount`，
+        `net_amount + shipping_fee = total_amount`。`total_amount` 的語意在 change
+        order-extras 改過、其組成在 change tier-discount-application 又被插入折抵——
+        組合式呈現是商家唯一能察覺這兩件事的地方。
+
+        **本端點不產出任何需要除法的數字**（平均客單價、比率、成長率）：除法需要一個
+        捨入方向，而全系統只有一種捨入。`order_count` 與 `total_amount` 都在這裡，
+        要平均的人可以自己除。
+      properties:
+        order_count:
+          type: integer
+          description: 計入營業額的訂單筆數。**這是筆數不是金額**，介面不得以貨幣格式呈現。
+        subtotal_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 品項小計合計（折扣前）。
+        discount_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 等級折扣合計。
+        net_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 商品淨額 ＝ `subtotal_amount − discount_amount`。
+        shipping_fee:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 運費合計。**運費不打折、不計點、不計入商品排行。**
+        total_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 應付總額合計 ＝ `net_amount + shipping_fee`，即實際請款的金額。
+        returned_order_count:
+          type: integer
+          description: 已付款後被標記退貨的訂單筆數。**不含在 `order_count` 內。**
+        returned_total_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: 上述退貨訂單的應付總額合計。
+        cancelled_order_count:
+          type: integer
+          description: 期間內建立且已取消的訂單筆數。
+        unpaid_order_count:
+          type: integer
+          description: 期間內建立、未取消、但尚未付款的訂單筆數。
+
+    SalesBucket:
+      type: object
+      additionalProperties: false
+      required:
+        [period, order_count, subtotal_amount, discount_amount, net_amount, shipping_fee, total_amount,
+         returned_order_count, returned_total_amount, cancelled_order_count, unpaid_order_count]
+      description: 一個商家當地日（或當地月）的數字。欄位語意與 `ReportAmounts` 完全相同。
+      properties:
+        period:
+          type: string
+          format: date
+          description: |
+            **商家當地的日曆日**（`YYYY-MM-DD`），不是時間戳。`group_by=month` 時為該月的第一天，
+            所以兩種分組只有一種形狀，消費端不必解析兩種格式。
+
+            刻意不回傳完整時間戳：那會誘使消費端對一個**已經套用過偏移量**的值再套一次，
+            而那正是本端點存在的意義所在（與 `requested_delivery_date` 同一個理由）。
+          examples: ["2026-08-01"]
+        order_count: { type: integer }
+        subtotal_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        discount_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        net_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        shipping_fee: { $ref: '#/components/schemas/MinorUnitAmount' }
+        total_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        returned_order_count: { type: integer }
+        returned_total_amount: { $ref: '#/components/schemas/MinorUnitAmount' }
+        cancelled_order_count: { type: integer }
+        unpaid_order_count: { type: integer }
+
+    SalesReportCurrency:
+      type: object
+      additionalProperties: false
+      required: [currency, summary, buckets]
+      description: 單一幣別的**完整且自足**的報表。
+      properties:
+        currency:
+          type: string
+          description: ISO 4217 三碼大寫。
+          examples: ["TWD"]
+        summary: { $ref: '#/components/schemas/ReportAmounts' }
+        buckets:
+          type: array
+          description: 依 `period` 遞增排序。沒有任何訂單的日／月不會出現（不補零列）。
+          items: { $ref: '#/components/schemas/SalesBucket' }
+
+    SalesReport:
+      type: object
+      additionalProperties: false
+      required: [shop_id, from, to, group_by, timezone, currencies]
+      description: |
+        期間營業額報表。
+
+        **多幣別不會被加總，而且是結構上做不到的**：`currencies` 是最外層的維度，
+        這份回應裡**沒有任何地方**可以放一個跨幣別的總額。替代方案（回一個總額
+        ＋ 一個「本期含多種幣別」的旗標）要求每一個消費端都記得檢查那個旗標，
+        而遲早會有一個忘記。
+      properties:
+        shop_id: { type: integer }
+        from:
+          type: string
+          format: date
+          description: 期間起日（商家當地日，**包含**）。
+        to:
+          type: string
+          format: date
+          description: 期間迄日（商家當地日，**包含**）。
+        group_by:
+          type: string
+          enum: [day, month]
+          description: 實際採用的分組粒度（原樣回傳，消費端不必猜伺服器的預設值）。
+        timezone: { $ref: '#/components/schemas/EffectiveTimezone' }
+        currencies:
+          type: array
+          description: 依幣別代碼遞增排序。期間內沒有任何訂單時為空陣列。
+          items: { $ref: '#/components/schemas/SalesReportCurrency' }
+
+    ProductSalesRow:
+      type: object
+      additionalProperties: false
+      required: [product_title, sku_code, quantity, gross_amount]
+      description: |
+        商品銷售排行的一列。
+
+        **分組鍵是訂單品項上的快照（商品名稱 ＋ SKU 代碼），不是識別碼。**
+        `order_items.product_id`／`sku_id` 在本系統是明訂的「僅供參考、可能指向已不存在
+        的資料、消費端絕不可依賴它解析得到」，用它們分組會直接違反那句話；因此本回應
+        **也不回傳它們**——回傳一個可能失效的 id，唯一的用途是讓前端做出一個會 404 的連結。
+
+        代價是**商品改名後會出現兩列**。這是誠實的：那些訂單列上真的寫著兩個名字。
+      properties:
+        product_title: { type: string }
+        sku_code: { type: string }
+        quantity:
+          type: integer
+          format: int64
+          description: 售出件數。**這是數量不是金額**，介面不得以貨幣格式呈現。
+        gross_amount:
+          allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
+          description: |
+            **折扣前**的品項金額（單價 × 數量），**不含運費**。
+
+            訂單層的折扣是整筆訂單的一個百分比，把它攤回品項需要一個分攤規則，而任何
+            分攤規則都會產生一個對不上任何單據的每商品數字。所以這一欄回答的是
+            **「賣了多少貨」**，不是「這個商品貢獻多少收入」，介面必須這麼寫。
+
+    ProductSalesCurrency:
+      type: object
+      additionalProperties: false
+      required: [currency, items]
+      properties:
+        currency: { type: string, examples: ["TWD"] }
+        items:
+          type: array
+          description: |
+            依 `gross_amount` 遞減排序；同額時依 `quantity` 遞減，再同則依 `sku_code`、
+            `product_title` 遞增——**排序是完全確定的**，不交由資料庫決定。
+            `limit` **逐幣別**套用。
+          items: { $ref: '#/components/schemas/ProductSalesRow' }
+
+    ProductSalesReport:
+      type: object
+      additionalProperties: false
+      required: [shop_id, from, to, limit, timezone, currencies]
+      description: |
+        同期間的商品銷售排行。**訂單口徑與 `SalesReport` 完全相同**（共用同一組 SQL 條件），
+        所以排行不可能包含一筆營業額報表排除掉的訂單。
+      properties:
+        shop_id: { type: integer }
+        from: { type: string, format: date }
+        to: { type: string, format: date }
+        limit:
+          type: integer
+          description: 實際採用的每幣別列數上限（上限 100）。
+        timezone:
+          allOf: [{ $ref: '#/components/schemas/EffectiveTimezone' }]
+          description: |
+            排行本身不需要時區來分組（期間已是兩個瞬間），但時區決定了那兩個瞬間，
+            所以照樣回報。
+        currencies:
+          type: array
+          description: 依幣別代碼遞增排序。
+          items: { $ref: '#/components/schemas/ProductSalesCurrency' }
+
     ShopPage:
       type: object
       additionalProperties: false
@@ -5113,6 +5360,150 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AllowedOrigin' }
         "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 商家設定與營運報表 (change merchant-reports) ═══════════════════════
+
+  /api/v1/admin/shops/{shopID}/settings:
+    put:
+      tags: [admin-commerce]
+      operationId: updateShopSettings
+      summary: 更新商家自己的設定（目前只有時區）
+      description: |
+        需要**商家層** `shop.update`（既有節點）。
+
+        刻意**不是**擴充既有的 `PUT /api/v1/admin/shops/{shopID}`：那一條是**平台層**的
+        （守衛是平台權限判定，商家自己碰不到），而且它的主體是主題／內容／狀態——把時區
+        塞進去會讓「更新主題內容」變成一個也能順手改掉時區的請求。
+
+        **`timezone` 送 `null`（或省略）＝ 清除設定**，回到平台預設。這與「把它設成平台
+        預設的那個字串」是兩件不同的事：只有前者會在報表上被標示為 `source: "default"`，
+        也只有前者會跟著平台日後調整預設值。
+
+        本端點**不會**改動商家的名稱、狀態、主題或全域內容。
+
+        刻意**沒有對應的 GET**：沒有消費者。生效中的時區由報表回應自己帶著
+        （`timezone.name` ／ `timezone.source`），而那是唯一需要知道它的地方。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                timezone:
+                  oneOf: [{ type: string }, { type: 'null' }]
+                  description: |
+                    IANA 時區名稱（例如 `Asia/Taipei`）。`null` 或省略即清除設定。
+
+                    **不接受固定 UTC 偏移量**（`+08:00`）：偏移量無法表達日光節約時間的切換，
+                    其錯誤只會在切換當日出現一次，而且不會有任何錯誤訊息。
+                    亦不接受 `Local`——它會解析成伺服器自己的時區，那正是這個欄位要消除的歧義。
+                  examples: ["Asia/Taipei"]
+      responses:
+        "200":
+          description: 更新後的設定。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopSettings' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/reports/sales:
+    get:
+      tags: [admin-commerce]
+      operationId: getSalesReport
+      summary: 期間營業額報表（摘要 ＋ 依商家當地日／月分組）
+      description: |
+        需要商家層 `report.view`（change merchant-reports 唯一的新權限節點）。
+
+        **口徑、對帳分割與金額組合的完整定義見 `ReportAmounts` schema 的說明——請先讀它。**
+        摘要重述三句：只計「未取消 ＋ 已付款 ＋ 未退貨」的訂單；時間軸是**訂單建立時間**
+        （所以這不是現金流量表）；四類筆數相加等於期間內建立的全部訂單，商家可以自行驗證。
+
+        **`from` / `to` 是必填的。** 一份期間沒有被明講的報表，是一份數字無法被重現的報表——
+        伺服器不替呼叫端挑一個預設期間。
+
+        期間的起訖界限與分組的日界線**使用同一個時區**（商家的生效時區）。以不同時區判定
+        兩者，會讓一筆訂單出現在某個分組裡卻不在期間內（或反之），而那種錯誤只在跨日邊界顯現。
+
+        期間長度有上限：`group_by=day` 為 366 天、`group_by=month` 為 1830 天，超過回 422。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: from
+          in: query
+          required: true
+          description: 期間起日（商家當地日，`YYYY-MM-DD`，**包含**）。
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          description: 期間迄日（商家當地日，`YYYY-MM-DD`，**包含**）。
+          schema: { type: string, format: date }
+        - name: group_by
+          in: query
+          required: false
+          description: 分組粒度，預設 `day`。
+          schema: { type: string, enum: [day, month] }
+      responses:
+        "200":
+          description: 期間報表。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesReport' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/reports/products:
+    get:
+      tags: [admin-commerce]
+      operationId: getProductSalesReport
+      summary: 期間商品銷售排行
+      description: |
+        需要商家層 `report.view`。
+
+        **訂單口徑與 `/reports/sales` 完全相同**（共用同一組條件），所以排行不可能含有
+        一筆營業額報表排除掉的訂單。
+
+        排行依**訂單品項上的快照**（商品名稱 ＋ SKU 代碼）分組，金額是**折扣前、不含運費**——
+        兩者的理由見 `ProductSalesRow` schema。`limit` 逐幣別套用。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: from
+          in: query
+          required: true
+          description: 期間起日（商家當地日，`YYYY-MM-DD`，**包含**）。
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          required: true
+          description: 期間迄日（商家當地日，`YYYY-MM-DD`，**包含**）。
+          schema: { type: string, format: date }
+        - name: limit
+          in: query
+          required: false
+          description: 每個幣別最多回傳幾列。預設 20，上限 100；缺漏或無法解析時使用預設，**不會回 400**。
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: 期間排行。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductSalesReport' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }

@@ -23,6 +23,7 @@ import { createShippingMethodsView } from "./views/shipping-methods.js";
 import { createMemberTiersView } from "./views/member-tiers.js";
 import { createMembersView } from "./views/members.js";
 import { createPointsView } from "./views/points.js";
+import { createReportsView } from "./views/reports.js";
 import { createStorefrontClientsView } from "./views/storefront-clients.js";
 
 const state = { me: null, shopID: null };
@@ -60,6 +61,9 @@ const views = {
   // （#/members 名冊、#/members/57 詳情），詳情的 panel 由視圖自己 showPanel 切過去。
   members: { label: "顧客", panel: "tab-members", nav: true, perm: "member.view", view: createMembersView(ctx) },
   points: { label: "會員點數", panel: "tab-points", nav: true, perm: "point.view", view: createPointsView(ctx) },
+  // 營運報表（change merchant-reports）。時區的設定入口也住在這裡——一個只有一個
+  // 欄位的「設定」分頁，其存在的理由會比它的內容多（design D7）。
+  reports: { label: "報表", panel: "tab-reports", nav: true, perm: "report.view", view: createReportsView(ctx) },
   // 前端接入：金鑰是商家層、origin 是平台層（design D6）。分頁只要其中一邊看得到
   // 就該出現，區塊各自再判一次。
   "storefront-clients": {

@@ -1043,6 +1043,10 @@ func init() {
 	shopDescMeta := shopFields[4].Descriptor()
 	// shop.DefaultMeta holds the default value on creation for the meta field.
 	shop.DefaultMeta = shopDescMeta.Default.(json.RawMessage)
+	// shopDescTimezone is the schema descriptor for timezone field.
+	shopDescTimezone := shopFields[5].Descriptor()
+	// shop.TimezoneValidator is a validator for the "timezone" field. It is called by the builders before save.
+	shop.TimezoneValidator = shopDescTimezone.Validators[0].(func(string) error)
 	shopallowedoriginFields := schema.ShopAllowedOrigin{}.Fields()
 	_ = shopallowedoriginFields
 	// shopallowedoriginDescOrigin is the schema descriptor for origin field.

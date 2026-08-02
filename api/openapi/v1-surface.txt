@@ -101,6 +101,8 @@ DELETE /api/v1/shop/cart/items/{itemID}
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
 DELETE /api/v1/shop/cart/items/{itemID} path itemID
+EffectiveTimezone.name
+EffectiveTimezone.source
 Error.error
 GET /api/v1/admin/me
 GET /api/v1/admin/permissions
@@ -215,6 +217,18 @@ GET /api/v1/admin/shops/{shopID}/products/{productID} path productID
 GET /api/v1/admin/shops/{shopID}/products/{productID} path shopID
 GET /api/v1/admin/shops/{shopID}/publishable-keys
 GET /api/v1/admin/shops/{shopID}/publishable-keys path shopID
+GET /api/v1/admin/shops/{shopID}/reports/products
+GET /api/v1/admin/shops/{shopID}/reports/products path shopID
+GET /api/v1/admin/shops/{shopID}/reports/products query from
+GET /api/v1/admin/shops/{shopID}/reports/products query limit
+GET /api/v1/admin/shops/{shopID}/reports/products query limit optional
+GET /api/v1/admin/shops/{shopID}/reports/products query to
+GET /api/v1/admin/shops/{shopID}/reports/sales
+GET /api/v1/admin/shops/{shopID}/reports/sales path shopID
+GET /api/v1/admin/shops/{shopID}/reports/sales query from
+GET /api/v1/admin/shops/{shopID}/reports/sales query group_by
+GET /api/v1/admin/shops/{shopID}/reports/sales query group_by optional
+GET /api/v1/admin/shops/{shopID}/reports/sales query to
 GET /api/v1/admin/shops/{shopID}/roles
 GET /api/v1/admin/shops/{shopID}/roles path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods
@@ -502,6 +516,8 @@ PUT /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 PUT /api/v1/admin/shops/{shopID}/products/{productID}
 PUT /api/v1/admin/shops/{shopID}/products/{productID} path productID
 PUT /api/v1/admin/shops/{shopID}/products/{productID} path shopID
+PUT /api/v1/admin/shops/{shopID}/settings
+PUT /api/v1/admin/shops/{shopID}/settings path shopID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
@@ -601,6 +617,18 @@ ProductSKU.options
 ProductSKU.price_amount
 ProductSKU.sku_code
 ProductSKU.stock_qty
+ProductSalesCurrency.currency
+ProductSalesCurrency.items
+ProductSalesReport.currencies
+ProductSalesReport.from
+ProductSalesReport.limit
+ProductSalesReport.shop_id
+ProductSalesReport.timezone
+ProductSalesReport.to
+ProductSalesRow.gross_amount
+ProductSalesRow.product_title
+ProductSalesRow.quantity
+ProductSalesRow.sku_code
 PublicShippingMethod.carrier
 PublicShippingMethod.flat_rate
 PublicShippingMethod.id
@@ -612,10 +640,40 @@ PublishableKey.label
 PublishableKey.revoked_at
 RenderBundle.page
 RenderBundle.shop
+ReportAmounts.cancelled_order_count
+ReportAmounts.discount_amount
+ReportAmounts.net_amount
+ReportAmounts.order_count
+ReportAmounts.returned_order_count
+ReportAmounts.returned_total_amount
+ReportAmounts.shipping_fee
+ReportAmounts.subtotal_amount
+ReportAmounts.total_amount
+ReportAmounts.unpaid_order_count
 Role.id
 Role.name
 Role.permissions
 Role.scope
+SalesBucket.cancelled_order_count
+SalesBucket.discount_amount
+SalesBucket.net_amount
+SalesBucket.order_count
+SalesBucket.period
+SalesBucket.returned_order_count
+SalesBucket.returned_total_amount
+SalesBucket.shipping_fee
+SalesBucket.subtotal_amount
+SalesBucket.total_amount
+SalesBucket.unpaid_order_count
+SalesReport.currencies
+SalesReport.from
+SalesReport.group_by
+SalesReport.shop_id
+SalesReport.timezone
+SalesReport.to
+SalesReportCurrency.buckets
+SalesReportCurrency.currency
+SalesReportCurrency.summary
 Shipment.carrier
 Shipment.created_at
 Shipment.delivered_at
@@ -665,6 +723,9 @@ ShopPage.total
 ShopPermissions.permissions
 ShopPermissions.shop_id
 ShopPermissions.user_id
+ShopSettings.effective_timezone
+ShopSettings.shop_id
+ShopSettings.timezone
 ShopUser.email
 ShopUser.roles
 ShopUser.status

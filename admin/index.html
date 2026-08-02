@@ -204,7 +204,8 @@
           </div>
         </div>
         <p id="orders-date-note" class="hint" hidden>
-          已套用指定配送日篩選：<strong>未填寫指定配送日的訂單不會出現在結果中</strong>。清空日期即可看到全部。
+          已套用指定配送日篩選：這裡篩的是<strong>指定配送日</strong>，不是訂單建立日（「報表」分頁篩的才是建立日，同一段日期在兩邊是兩批訂單）。
+          且<strong>未填寫指定配送日的訂單不會出現在結果中</strong>。清空日期即可看到全部。
         </p>
         <p id="orders-error" class="error" hidden></p>
         <table class="table">
@@ -413,6 +414,80 @@
             <button id="points-next">下一頁 →</button>
           </div>
         </div>
+      </div>
+
+      <!-- 營運報表（change merchant-reports） -->
+      <div id="tab-reports" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>報表</h2>
+          <div class="filters">
+            <label class="inline">起日 <input type="date" id="report-from" /></label>
+            <label class="inline">迄日 <input type="date" id="report-to" /></label>
+            <select id="report-group-by">
+              <option value="day">依日</option>
+              <option value="month">依月</option>
+            </select>
+            <button id="report-search" class="primary">查詢</button>
+          </div>
+        </div>
+
+        <!-- 時區。生效值由報表回應自己帶著（後端刻意沒有 GET settings），
+             所以這一段的內容是 loadReport() 填的。 -->
+        <div class="detail-section">
+          <div class="detail-grid">
+            <div class="kv">
+              <span class="kv-k">日界線時區</span>
+              <span class="kv-v" id="report-timezone">—</span>
+            </div>
+          </div>
+          <form id="report-timezone-form" class="inline-form" hidden>
+            <label class="inline">
+              設定商家時區
+              <input type="text" id="report-timezone-input" placeholder="Asia/Taipei" list="report-timezone-list" />
+            </label>
+            <datalist id="report-timezone-list">
+              <option value="Asia/Taipei"></option>
+              <option value="Asia/Tokyo"></option>
+              <option value="Asia/Shanghai"></option>
+              <option value="Asia/Singapore"></option>
+              <option value="America/New_York"></option>
+              <option value="America/Los_Angeles"></option>
+              <option value="Europe/London"></option>
+              <option value="UTC"></option>
+            </datalist>
+            <button type="submit">儲存</button>
+            <button type="button" id="report-timezone-clear">清除設定</button>
+          </form>
+          <p class="hint" id="report-timezone-note" hidden>
+            <strong>變更時區會改變所有歷史報表的日界線</strong>：同一段期間的數字會跟著改變。這是正確行為，不是故障。
+          </p>
+        </div>
+
+        <!-- 口徑揭露。刻意是靜態 HTML：它是散文，不是資料，放進 JS 只會讓視圖檔變長
+             而不會讓它更正確（design D14 的 #5 事前定調）。 -->
+        <div class="detail-section">
+          <h3>這份報表算了什麼</h3>
+          <p class="hint">
+            <strong>計入的訂單</strong>：未取消、<strong>已付款</strong>、且未退貨。<br />
+            已取消的不計（取消會歸還庫存並扣回點數，系統已視為未發生）；未付款的不計（可能永遠不會付，計入會讓報表恆定高於實收）；
+            已退貨的<strong>不計入金額但單獨列出</strong>，不會從報表上消失。
+          </p>
+          <p class="hint">
+            <strong>時間軸是訂單建立日</strong>，不是付款日也不是出貨日——所以<strong>這不是現金流量表</strong>。
+            月底下單、月初付款的那一筆，算在下單的那個月。
+          </p>
+          <p class="hint">
+            <strong>四類筆數相加等於該期間內建立的全部訂單。</strong>拿「訂單」分頁篩同一段期間的總筆數即可自行核對；
+            對不上就是這份報表有問題，而不是你算錯。
+          </p>
+          <p class="hint">
+            商品排行的金額是<strong>折扣前、不含運費</strong>，回答的是「賣了多少貨」而不是「貢獻多少收入」；
+            依訂單上記錄的<strong>商品名稱</strong>分組，所以<strong>商品改名後會分成兩列</strong>。
+          </p>
+        </div>
+
+        <p id="report-error" class="error" hidden></p>
+        <div id="report-currencies"></div>
       </div>
 
       <!-- 前端接入（publishable key ＋ allowed origin） -->

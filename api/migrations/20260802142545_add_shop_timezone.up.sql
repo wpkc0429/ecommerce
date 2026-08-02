@@ -1,0 +1,25 @@
+-- change merchant-reports: the shop's IANA time zone (design D1) — the single
+-- authority for what "one day" means anywhere in this system.
+--
+-- **Nullable, and NOT backfilled. Not one existing row changes.** NULL means
+-- "this merchant has never set a time zone", which is a different fact from
+-- "this merchant chose Asia/Taipei": reports fall back to
+-- REPORT_DEFAULT_TIMEZONE and say so, the merchant can still tell they have not
+-- configured it, and the platform keeps the ability to change that default and
+-- have never-configured shops follow. A backfill would destroy all three.
+--
+-- Hand-fixed (per cmd/migrategen's documented caveat, same as every sibling
+-- change before it): the raw atlas diff again proposed dropping the handwritten
+-- constraints the ent schema cannot express — members' UNIQUE(shop_id, email)
+-- and UNIQUE(shop_id, phone) (20260730152723_member_identity_per_shop) and
+-- role_user/user_permission's UNIQUE NULLS NOT DISTINCT
+-- (20260718063900_rbac_unique_nulls_not_distinct). Those four DROP statements
+-- were removed from this file, and their re-CREATE counterparts from the
+-- .down.sql.
+--
+-- **No CHECK expression is amended by this change**, and no index is added.
+-- (atlas compares CHECK constraints by NAME — changing an expression in place
+-- is completely silent to it, so any future CHECK edit must be handwritten.)
+
+-- modify "shops" table
+ALTER TABLE "shops" ADD COLUMN "timezone" character varying(64) NULL;

@@ -32,6 +32,7 @@ import { api } from "../lib/api.js";
 import { $, el, clear, rows, renderPager } from "../lib/dom.js";
 import { formatMoney, formatPoints } from "../lib/money.js";
 import { can } from "../lib/rbac.js";
+import { formatTime } from "../lib/format.js";
 
 const PAGE_SIZE = 20;
 const RECENT_ORDERS = 10;
@@ -44,11 +45,6 @@ function label(map, v) {
   return map[v] ?? `#${v}`;
 }
 
-function formatTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("zh-Hant-TW");
-}
 
 /** 註冊狀態徽章。訪客不是「比較差的會員」，是一個沒有同意過任何事的人。 */
 function identityBadge(m) {

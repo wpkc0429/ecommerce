@@ -25,6 +25,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
+	"ksdevworks/ecommerce/api/internal/report"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
@@ -282,6 +283,25 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Cfg:         cfg,
 		Log:         a.log,
 		Idempotency: idempotencyService,
+	}
+
+	// Merchant reports (change merchant-reports): the platform's first aggregate
+	// queries. A pure read path — it writes nothing, publishes no event and
+	// subscribes to none, so wiring check ⑦'s expectedSubscribers is untouched
+	// (design D9).
+	//
+	// DefaultTimezone is a plain string, so the nil-dependency audit (check ⑤)
+	// cannot report it as unset. shoptz.Resolve rejects an empty value loudly
+	// for exactly that reason — otherwise forgetting this line would silently
+	// cut every unconfigured shop's days in UTC.
+	deps.Reports = &httpapi.ReportsHandler{
+		Client: client, Authz: authz, Log: a.log,
+		Service: &report.Service{Client: client, DefaultTimezone: cfg.ReportDefaultTimezone},
+	}
+	// The merchant-scoped settings endpoint that owns shops.timezone. Kept
+	// separate from ShopsHandler because that one is platform-scoped (design D7).
+	deps.ShopSettings = &httpapi.ShopSettingsHandler{
+		Client: client, Authz: authz, Log: a.log, DefaultTimezone: cfg.ReportDefaultTimezone,
 	}
 
 	deps.Render = &httpapi.RenderHandler{

@@ -39,6 +39,10 @@ type Deps struct {
 	Members    *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
 	ClientAuth *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
 	Guest      *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
+	// change merchant-reports: the platform's first aggregate queries, and the
+	// merchant-scoped settings endpoint that gives them a time zone to cut days by.
+	Reports      *ReportsHandler
+	ShopSettings *ShopSettingsHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
@@ -138,6 +142,12 @@ func New(d Deps) http.Handler {
 						}
 						if d.ClientAuth != nil {
 							d.ClientAuth.MountShopAdmin(sh)
+						}
+						if d.Reports != nil {
+							d.Reports.MountShopAdmin(sh)
+						}
+						if d.ShopSettings != nil {
+							d.ShopSettings.MountShopAdmin(sh)
 						}
 					})
 					// Platform-level resources.

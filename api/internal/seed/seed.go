@@ -106,6 +106,15 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	// exists (disabling a customer is the named next gap), that node gets its
 	// consumer and can be added additively.
 	{"member.view", "檢視顧客名冊與單一顧客"},
+	// change merchant-reports (design D6): exactly one node, same rule as
+	// member.view. There is deliberately no `report.export` — the platform has
+	// no export endpoint, and a node that guards nothing is a lie told to
+	// whoever grants it. There is no `report.manage` either: a report has
+	// nothing to write.
+	//
+	// The shop's time zone is edited through the EXISTING `shop.update` node
+	// (design D7), because it is a shop setting, not a report.
+	{"report.view", "檢視營運報表（營業額與商品銷售排行）"},
 }
 
 // roleDefs maps seeded roles to their scope and granted permissions.
@@ -128,6 +137,8 @@ var roleDefs = []struct {
 		"member_tier.view", "member_tier.create", "member_tier.edit", "member_tier.delete",
 		"point.view", "point.adjust",
 		"member.view",
+		// change merchant-reports (design D6).
+		"report.view",
 		// change storefront-client-auth: key rotation is the merchant's own
 		// operational rhythm. Deliberately not granted to `editor` — minting a
 		// client identity is an integration action, not content editing.
@@ -152,6 +163,18 @@ var roleDefs = []struct {
 		// same work through the order list. A boundary that stops nobody is
 		// worse than none, because it stops the thinking.
 		"member.view",
+		// change merchant-reports (design D6): granted for the same reason, and
+		// it is the stronger version of that argument. Every figure in a report
+		// is a sum of orders `editor` can ALREADY read one page at a time
+		// through order.view — the report adds convenience, not access.
+		// Withholding it would remove nothing from what an editor can learn; it
+		// would only make them add the numbers up by hand.
+		//
+		// Note what is NOT granted here: `shop.update`, which owns the time
+		// zone. An editor sees the report and sees which zone cut its days, but
+		// cannot change that zone — editing a shop setting is not content
+		// editing.
+		"report.view",
 	}},
 }
 

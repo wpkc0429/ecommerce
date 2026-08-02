@@ -29,6 +29,8 @@ const (
 	FieldContentJSON = "content_json"
 	// FieldMeta holds the string denoting the meta field in the database.
 	FieldMeta = "meta"
+	// FieldTimezone holds the string denoting the timezone field in the database.
+	FieldTimezone = "timezone"
 	// EdgeTheme holds the string denoting the theme edge name in mutations.
 	EdgeTheme = "theme"
 	// EdgePages holds the string denoting the pages edge name in mutations.
@@ -77,6 +79,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldContentJSON,
 	FieldMeta,
+	FieldTimezone,
 }
 
 var (
@@ -110,6 +113,8 @@ var (
 	DefaultContentJSON json.RawMessage
 	// DefaultMeta holds the default value on creation for the "meta" field.
 	DefaultMeta json.RawMessage
+	// TimezoneValidator is a validator for the "timezone" field. It is called by the builders before save.
+	TimezoneValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the Shop queries.
@@ -143,6 +148,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByTimezone orders the results by the timezone field.
+func ByTimezone(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTimezone, opts...).ToFunc()
 }
 
 // ByThemeField orders the results by theme field.

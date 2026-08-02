@@ -18,6 +18,7 @@ import { api } from "../lib/api.js";
 import { $, el, rows, renderPager } from "../lib/dom.js";
 import { formatPoints, formatPointsDelta } from "../lib/money.js";
 import { can } from "../lib/rbac.js";
+import { formatTime } from "../lib/format.js";
 
 const PAGE_SIZE = 20;
 
@@ -141,8 +142,3 @@ export function createPointsView(ctx) {
   return { load };
 }
 
-function formatTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("zh-Hant-TW");
-}

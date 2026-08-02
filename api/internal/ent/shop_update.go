@@ -119,6 +119,26 @@ func (_u *ShopUpdate) AppendMeta(v json.RawMessage) *ShopUpdate {
 	return _u
 }
 
+// SetTimezone sets the "timezone" field.
+func (_u *ShopUpdate) SetTimezone(v string) *ShopUpdate {
+	_u.mutation.SetTimezone(v)
+	return _u
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_u *ShopUpdate) SetNillableTimezone(v *string) *ShopUpdate {
+	if v != nil {
+		_u.SetTimezone(*v)
+	}
+	return _u
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (_u *ShopUpdate) ClearTimezone() *ShopUpdate {
+	_u.mutation.ClearTimezone()
+	return _u
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_u *ShopUpdate) SetTheme(v *Theme) *ShopUpdate {
 	return _u.SetThemeID(v.ID)
@@ -250,6 +270,11 @@ func (_u *ShopUpdate) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Shop.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Timezone(); ok {
+		if err := shop.TimezoneValidator(v); err != nil {
+			return &ValidationError{Name: "timezone", err: fmt.Errorf(`ent: validator failed for field "Shop.timezone": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -298,6 +323,12 @@ func (_u *ShopUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, shop.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.Timezone(); ok {
+		_spec.SetField(shop.FieldTimezone, field.TypeString, value)
+	}
+	if _u.mutation.TimezoneCleared() {
+		_spec.ClearField(shop.FieldTimezone, field.TypeString)
 	}
 	if _u.mutation.ThemeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -537,6 +568,26 @@ func (_u *ShopUpdateOne) AppendMeta(v json.RawMessage) *ShopUpdateOne {
 	return _u
 }
 
+// SetTimezone sets the "timezone" field.
+func (_u *ShopUpdateOne) SetTimezone(v string) *ShopUpdateOne {
+	_u.mutation.SetTimezone(v)
+	return _u
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_u *ShopUpdateOne) SetNillableTimezone(v *string) *ShopUpdateOne {
+	if v != nil {
+		_u.SetTimezone(*v)
+	}
+	return _u
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (_u *ShopUpdateOne) ClearTimezone() *ShopUpdateOne {
+	_u.mutation.ClearTimezone()
+	return _u
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_u *ShopUpdateOne) SetTheme(v *Theme) *ShopUpdateOne {
 	return _u.SetThemeID(v.ID)
@@ -681,6 +732,11 @@ func (_u *ShopUpdateOne) check() error {
 			return &ValidationError{Name: "name", err: fmt.Errorf(`ent: validator failed for field "Shop.name": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Timezone(); ok {
+		if err := shop.TimezoneValidator(v); err != nil {
+			return &ValidationError{Name: "timezone", err: fmt.Errorf(`ent: validator failed for field "Shop.timezone": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -746,6 +802,12 @@ func (_u *ShopUpdateOne) sqlSave(ctx context.Context) (_node *Shop, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, shop.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.Timezone(); ok {
+		_spec.SetField(shop.FieldTimezone, field.TypeString, value)
+	}
+	if _u.mutation.TimezoneCleared() {
+		_spec.ClearField(shop.FieldTimezone, field.TypeString)
 	}
 	if _u.mutation.ThemeCleared() {
 		edge := &sqlgraph.EdgeSpec{

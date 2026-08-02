@@ -21,6 +21,7 @@
 import { api } from "../lib/api.js";
 import { $, el, clear, rows, renderPager } from "../lib/dom.js";
 import { formatMoney, formatPercent } from "../lib/money.js";
+import { formatTime } from "../lib/format.js";
 import { can, whenCan } from "../lib/rbac.js";
 import { renderOrderShipments } from "./order-shipments.js";
 
@@ -46,11 +47,6 @@ function badge(map, v, okValues) {
   return el("span", { class: cls }, label(map, v));
 }
 
-function formatTime(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? String(iso) : d.toLocaleString("zh-Hant-TW");
-}
 
 export function createOrdersView(ctx) {
   const state = { page: 1, total: 0, order: null };

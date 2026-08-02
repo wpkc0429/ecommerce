@@ -21475,6 +21475,7 @@ type ShopMutation struct {
 	appendcontent_json json.RawMessage
 	meta               *json.RawMessage
 	appendmeta         json.RawMessage
+	timezone           *string
 	clearedFields      map[string]struct{}
 	theme              *int
 	clearedtheme       bool
@@ -21902,6 +21903,55 @@ func (m *ShopMutation) ResetMeta() {
 	m.appendmeta = nil
 }
 
+// SetTimezone sets the "timezone" field.
+func (m *ShopMutation) SetTimezone(s string) {
+	m.timezone = &s
+}
+
+// Timezone returns the value of the "timezone" field in the mutation.
+func (m *ShopMutation) Timezone() (r string, exists bool) {
+	v := m.timezone
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTimezone returns the old "timezone" field's value of the Shop entity.
+// If the Shop object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopMutation) OldTimezone(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTimezone is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTimezone requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTimezone: %w", err)
+	}
+	return oldValue.Timezone, nil
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (m *ShopMutation) ClearTimezone() {
+	m.timezone = nil
+	m.clearedFields[shop.FieldTimezone] = struct{}{}
+}
+
+// TimezoneCleared returns if the "timezone" field was cleared in this mutation.
+func (m *ShopMutation) TimezoneCleared() bool {
+	_, ok := m.clearedFields[shop.FieldTimezone]
+	return ok
+}
+
+// ResetTimezone resets all changes to the "timezone" field.
+func (m *ShopMutation) ResetTimezone() {
+	m.timezone = nil
+	delete(m.clearedFields, shop.FieldTimezone)
+}
+
 // ClearTheme clears the "theme" edge to the Theme entity.
 func (m *ShopMutation) ClearTheme() {
 	m.clearedtheme = true
@@ -22071,7 +22121,7 @@ func (m *ShopMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShopMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 8)
 	if m.created_at != nil {
 		fields = append(fields, shop.FieldCreatedAt)
 	}
@@ -22092,6 +22142,9 @@ func (m *ShopMutation) Fields() []string {
 	}
 	if m.meta != nil {
 		fields = append(fields, shop.FieldMeta)
+	}
+	if m.timezone != nil {
+		fields = append(fields, shop.FieldTimezone)
 	}
 	return fields
 }
@@ -22115,6 +22168,8 @@ func (m *ShopMutation) Field(name string) (ent.Value, bool) {
 		return m.ContentJSON()
 	case shop.FieldMeta:
 		return m.Meta()
+	case shop.FieldTimezone:
+		return m.Timezone()
 	}
 	return nil, false
 }
@@ -22138,6 +22193,8 @@ func (m *ShopMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldContentJSON(ctx)
 	case shop.FieldMeta:
 		return m.OldMeta(ctx)
+	case shop.FieldTimezone:
+		return m.OldTimezone(ctx)
 	}
 	return nil, fmt.Errorf("unknown Shop field %s", name)
 }
@@ -22196,6 +22253,13 @@ func (m *ShopMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMeta(v)
 		return nil
+	case shop.FieldTimezone:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTimezone(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Shop field %s", name)
 }
@@ -22244,6 +22308,9 @@ func (m *ShopMutation) ClearedFields() []string {
 	if m.FieldCleared(shop.FieldThemeID) {
 		fields = append(fields, shop.FieldThemeID)
 	}
+	if m.FieldCleared(shop.FieldTimezone) {
+		fields = append(fields, shop.FieldTimezone)
+	}
 	return fields
 }
 
@@ -22260,6 +22327,9 @@ func (m *ShopMutation) ClearField(name string) error {
 	switch name {
 	case shop.FieldThemeID:
 		m.ClearThemeID()
+		return nil
+	case shop.FieldTimezone:
+		m.ClearTimezone()
 		return nil
 	}
 	return fmt.Errorf("unknown Shop nullable field %s", name)
@@ -22289,6 +22359,9 @@ func (m *ShopMutation) ResetField(name string) error {
 		return nil
 	case shop.FieldMeta:
 		m.ResetMeta()
+		return nil
+	case shop.FieldTimezone:
+		m.ResetTimezone()
 		return nil
 	}
 	return fmt.Errorf("unknown Shop field %s", name)

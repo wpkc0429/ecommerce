@@ -33,6 +33,8 @@ type Shop struct {
 	ContentJSON json.RawMessage `json:"content_json,omitempty"`
 	// Meta holds the value of the "meta" field.
 	Meta json.RawMessage `json:"meta,omitempty"`
+	// Timezone holds the value of the "timezone" field.
+	Timezone *string `json:"timezone,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ShopQuery when eager-loading is set.
 	Edges        ShopEdges `json:"edges"`
@@ -101,7 +103,7 @@ func (*Shop) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case shop.FieldID, shop.FieldThemeID, shop.FieldStatus:
 			values[i] = new(sql.NullInt64)
-		case shop.FieldName:
+		case shop.FieldName, shop.FieldTimezone:
 			values[i] = new(sql.NullString)
 		case shop.FieldCreatedAt, shop.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -172,6 +174,13 @@ func (_m *Shop) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.Meta); err != nil {
 					return fmt.Errorf("unmarshal field meta: %w", err)
 				}
+			}
+		case shop.FieldTimezone:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field timezone", values[i])
+			} else if value.Valid {
+				_m.Timezone = new(string)
+				*_m.Timezone = value.String
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -251,6 +260,11 @@ func (_m *Shop) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("meta=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Meta))
+	builder.WriteString(", ")
+	if v := _m.Timezone; v != nil {
+		builder.WriteString("timezone=")
+		builder.WriteString(*v)
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

@@ -59,10 +59,12 @@ const BOUQUET_SKU = "BQ-ANNI-M";
 // seeded with 36, i.e. 7 runs.
 //
 // This counts BQ-ANNI-M only, which is why change partial-shipment's section ⑬
-// deliberately buys the S and L sizes instead: it ends delivered (a partially
-// shipped order cannot be cancelled, by design), so its 2 units are gone for
-// good, and spending them here would have halved the runs-per-seed. S is seeded
-// with 24 and L with 18, so ⑬ constrains nothing.
+// and change merchant-reports' section ⑭ deliberately buy the S size instead.
+// Both end in a state that never restocks — ⑬ delivered, ⑭ paid and left alone
+// on purpose (it is the section's whole point that one order stays COUNTED) —
+// so their units are gone for good, and spending them here would have cut the
+// runs-per-seed. S is seeded with 24 (2 per run) and L with 18 (1 per run), so
+// neither section constrains anything; BQ-ANNI-M's 36 ÷ 5 remains the budget.
 const STOCK_PER_RUN = 5;
 
 class Abort extends Error {}
@@ -925,6 +927,179 @@ async function commercePath() {
   });
   check("a fully shipped order refuses a further parcel (409)",
     nothingLeft.status === 409, brief(nothingLeft));
+
+  // ── ⑭ 營運報表（change merchant-reports）──
+  //
+  // 這一節與其他節不同的地方在於**期望值是算得出來的**：這一輪跑過的每一筆訂單
+  // 都是本檔自己建的，金額、折扣、運費在前面幾節都已經斷言過了。所以「報表的數字
+  // 對不對」是一條硬斷言，不是「回了 200」。
+  //
+  // 它同時是唯一能證明「口徑真的被套用」的地方：本輪刻意製造過已取消的訂單（⑩）、
+  // 已退貨的訂單（⑨、⑫）與未付款的訂單（⑫ 的 ECPay pending），而它們必須各自
+  // 落在對帳分割的正確那一格。
+  section("⑭ Merchant reports: criteria, reconciliation, timezone disclosure");
+  // The window is ±1 UTC day around now, and that width is not laziness: the
+  // report's days are cut in the SHOP's zone, isoDate() produces UTC days, and
+  // between 16:00Z and midnight those two disagree. A one-day window would go
+  // green or red depending on what time of day the suite runs.
+  const from = isoDate(-1);
+  const to = isoDate(1);
+  const reportQS = `from=${from}&to=${to}`;
+
+  // **A measured surprise, recorded because it is the point of this section.**
+  // Every order the preceding sections create ends up cancelled, returned or
+  // unpaid — that is what they exist to test — so at this moment the shop's
+  // counted revenue is genuinely ZERO, and the product ranking is genuinely
+  // empty. That is the report being right, and it is also why this section has
+  // to place an order of its own: without one, the revenue lines would only
+  // ever be asserted against 0, which any broken query also produces.
+  const before = await req("GET", shopPath(`/reports/sales?${reportQS}`), { token: admin });
+  need(before.status === 200, `baseline sales report failed: ${brief(before)}`);
+  const baseline = (before.json?.currencies ?? []).find((c) => c.currency === "TWD")?.summary
+    ?? { order_count: 0, subtotal_amount: 0, discount_amount: 0, shipping_fee: 0, total_amount: 0 };
+
+  // One order that STAYS counted: paid, not returned, not cancelled.
+  //
+  // **It is placed by a throwaway GUEST identity, and that is load-bearing, not
+  // stylistic.** This file is documented as repeatable, and the reason it is
+  // repeatable is that every order the other sections create is eventually
+  // returned or cancelled, so the demo customer's points return to where they
+  // started. An order that stays paid permanently awards points — and a first
+  // draft of this section used the demo member, which pushed them onto 銀卡會員
+  // and made section ⑥'s "enters this order on a tier that grants no discount"
+  // fail on the NEXT run. Measured, not theorised.
+  //
+  // A per-run guest email creates a fresh member row each time, so the points
+  // land somewhere nobody asserts on and repeatability is preserved.
+  //
+  // It buys the S bouquet rather than the tracked M so the runs-per-seed budget
+  // is unaffected (S is seeded with 24 and only ⑬ otherwise touches it).
+  const reportSKU = (detail.json.skus ?? []).find((s) => s.sku_code === `${BOUQUET_SKU.slice(0, -1)}S`);
+  need(reportSKU, "seeded S bouquet SKU missing — run `make seed-demo`");
+  const rGuest = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK,
+    body: {
+      email: `e2e-report-${runID}@example.com`,
+      items: [{ sku_id: reportSKU.id, quantity: 1 }],
+      shipping_address: {
+        recipient_name: "E2E 報表", phone: "0955000111", line1: "台北市中正區重慶南路一段 122 號",
+      },
+      shipping_method_id: paidMethod.id,
+    },
+  });
+  need(rGuest.status === 201, `report fixture checkout failed: ${brief(rGuest)}`);
+  const rOrder = rGuest.json.order;
+  const rPay = await req("POST", "/api/v1/shop/guest/order/payments", {
+    token: rGuest.json.order_access_token, pk: PK, body: {},
+  });
+  need(rPay.json?.provider_reference, `report fixture payment failed: ${brief(rPay)}`);
+  need((await deliverWebhook(rPay.json.provider_reference)).status === 200, "report fixture webhook failed");
+
+  const sales = await req("GET", shopPath(`/reports/sales?${reportQS}`), { token: admin });
+  need(sales.status === 200, `sales report failed: ${brief(sales)}`);
+
+  // 時區：demo 商家從未設定過，所以生效值必須被標示為**回落**而不是選擇。
+  check("an unconfigured shop's report says its timezone is a platform fallback",
+    sales.json?.timezone?.source === "default" && Boolean(sales.json?.timezone?.name),
+    JSON.stringify(sales.json?.timezone));
+
+  const twd = (sales.json?.currencies ?? []).find((c) => c.currency === "TWD");
+  need(twd, `no TWD block in the report: ${brief(sales)}`);
+  const sum = twd.summary;
+
+  // 金額的組合恆等式，套在彙總值上。它成立不是巧合——報表只做 int64 加法，
+  // 而每一筆訂單的組成本身由 DB CHECK 強制。
+  check("report: subtotal − discount = net",
+    sum.net_amount === sum.subtotal_amount - sum.discount_amount,
+    JSON.stringify([sum.subtotal_amount, sum.discount_amount, sum.net_amount]));
+  check("report: net + shipping = payable total",
+    sum.total_amount === sum.net_amount + sum.shipping_fee,
+    JSON.stringify([sum.net_amount, sum.shipping_fee, sum.total_amount]));
+
+  // **這是本節最重要的一組斷言**：報表的增量必須逐項等於那一筆訂單自己的欄位。
+  // 期望值不是猜的——`rOrder` 是本檔剛剛建立的，它的每一個金額都在回應裡。
+  check("report: the paid order moved order_count by exactly one",
+    sum.order_count === baseline.order_count + 1, `${baseline.order_count} → ${sum.order_count}`);
+  check("report: subtotal moved by exactly the order's own subtotal",
+    sum.subtotal_amount === baseline.subtotal_amount + rOrder.subtotal_amount,
+    `${baseline.subtotal_amount} + ${rOrder.subtotal_amount} vs ${sum.subtotal_amount}`);
+  check("report: the tier discount moved by exactly the order's own discount",
+    sum.discount_amount === baseline.discount_amount + rOrder.discount_amount,
+    `${baseline.discount_amount} + ${rOrder.discount_amount} vs ${sum.discount_amount}`);
+  check("report: shipping moved by exactly the selected method's flat rate",
+    sum.shipping_fee === baseline.shipping_fee + paidMethod.flat_rate,
+    `${baseline.shipping_fee} + ${paidMethod.flat_rate} vs ${sum.shipping_fee}`);
+  check("report: the payable total moved by exactly what will be charged",
+    sum.total_amount === baseline.total_amount + rOrder.total_amount,
+    `${baseline.total_amount} + ${rOrder.total_amount} vs ${sum.total_amount}`);
+
+  // 對帳分割：四類互斥且窮盡。與訂單列表的總筆數逐一比對——那是商家自己會做的
+  // 動作，也是這份報表唯一能被驗證的方式。
+  const partition = sum.order_count + sum.returned_order_count
+    + sum.cancelled_order_count + sum.unpaid_order_count;
+  check("report: the four classes are a partition (counted + returned + cancelled + unpaid)",
+    partition > 0, JSON.stringify([sum.order_count, sum.returned_order_count,
+      sum.cancelled_order_count, sum.unpaid_order_count]));
+
+  // 本輪一定製造過這三種訂單，所以三個計數都不得為零——一份把它們算進營業額
+  // （或整批漏掉）的報表會在這裡露出來。
+  check("report: this run's cancelled order landed in the cancelled class",
+    sum.cancelled_order_count >= 1, String(sum.cancelled_order_count));
+  check("report: this run's returned orders landed in the returned class, not in revenue",
+    sum.returned_order_count >= 1 && sum.returned_total_amount > 0,
+    JSON.stringify([sum.returned_order_count, sum.returned_total_amount]));
+  check("report: this run's unpaid order landed in the unpaid class",
+    sum.unpaid_order_count >= 1, String(sum.unpaid_order_count));
+
+  // 期間內建立的訂單總數，由訂單列表獨立取得——不同的端點、不同的查詢、不同的
+  // 程式路徑（ent vs 原生 SQL）。兩者相等是「四類窮盡且互斥」的證明；不等就是
+  // 報表漏算或重複計算了某一類，而那正是商家會自己做的核對動作。
+  //
+  // 日期在這裡**以商家的生效時區重新推導一次**（報表自己說了那是哪一個時區），
+  // 所以這條斷言順帶端到端驗證了時區換算：拿 UTC 日去比會在 16:00Z 之後對不上。
+  const tzName = sales.json.timezone.name;
+  const localDay = (isoStr) => new Intl.DateTimeFormat("en-CA", {
+    timeZone: tzName, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date(isoStr));
+
+  const allOrders = [];
+  for (let page = 1; ; page++) {
+    const r = await req("GET", shopPath(`/orders?page=${page}&page_size=100`), { token: admin });
+    need(r.status === 200, `order list page ${page} failed: ${brief(r)}`);
+    allOrders.push(...(r.json?.orders ?? []));
+    if (allOrders.length >= (r.json?.total ?? 0) || (r.json?.orders ?? []).length === 0) break;
+  }
+  const inWindow = allOrders.filter((o) => {
+    const d = localDay(o.created_at);
+    return o.currency === "TWD" && d >= from && d <= to;
+  }).length;
+  check("report: the partition equals the order list's own count for the same window",
+    partition === inWindow, `report=${partition} list=${inWindow} tz=${tzName}`);
+
+  // 商品排行：口徑相同，金額折扣前，且不回傳識別碼（它們可能指向已刪除的列）。
+  const ranking = await req("GET", shopPath(`/reports/products?${reportQS}`), { token: admin });
+  need(ranking.status === 200, `product ranking failed: ${brief(ranking)}`);
+  const rankTWD = (ranking.json?.currencies ?? []).find((c) => c.currency === "TWD");
+  need(rankTWD, `no TWD block in the ranking: ${brief(ranking)}`);
+  check("ranking lists the bouquet this section actually sold, and nothing that was returned",
+    rankTWD.items.some((i) => i.sku_code === reportSKU.sku_code),
+    JSON.stringify(rankTWD.items.map((i) => i.sku_code)));
+  // 折扣前：這一筆若套用了等級折扣，排行上的金額仍必須是單價 × 數量。
+  const rankedRow = rankTWD.items.find((i) => i.sku_code === reportSKU.sku_code);
+  check("ranking amounts are pre-discount (price × quantity), matching the order's own line",
+    rankedRow.gross_amount >= rOrder.items[0].line_total,
+    `${rankedRow.gross_amount} vs line_total ${rOrder.items[0].line_total}`);
+  check("ranking rows carry snapshots only — no product_id/sku_id to build a dead link from",
+    rankTWD.items.every((i) => i.product_id === undefined && i.sku_id === undefined),
+    JSON.stringify(rankTWD.items[0] ?? {}));
+  check("ranking is ordered by gross amount descending",
+    rankTWD.items.every((it, i) => i === 0 || rankTWD.items[i - 1].gross_amount >= it.gross_amount),
+    JSON.stringify(rankTWD.items.map((i) => i.gross_amount)));
+
+  // 期間是必填的：一份沒講清楚期間的報表，是一份數字無法被重現的報表。
+  const noPeriod = await req("GET", shopPath("/reports/sales"), { token: admin });
+  check("a report without an explicit period is refused (422), not silently defaulted",
+    noPeriod.status === 422, brief(noPeriod));
 }
 
 

@@ -675,6 +675,64 @@ try {
   await tierRow.locator("button", { hasText: "刪除" }).click();
   await tierRow.waitFor({ state: "detached", timeout: 8000 });
   check("member tier deleted (the seeded ladder is left exactly as it was)", true);
+
+  console.log("㉓ 營運報表：口徑揭露、時區來源、金額組合、筆數不是金額（change merchant-reports）");
+  // 零佈置：⑯ 已付了一筆訂單、⑱.5 又下了一筆，兩筆都是今天建立的，所以報表
+  // 的預設期間（本月一日 → 今天）一定不是空的。
+  await page.goto("http://localhost:3001/#/reports");
+  await page.waitForSelector("#tab-reports:not([hidden])", { timeout: 8000 });
+  await page.waitForSelector('#report-currencies [data-currency="TWD"]', { timeout: 8000 });
+
+  // 口徑必須在畫面上，不是只在文件裡。三句缺一不可：算什麼、時間軸是什麼、
+  // 以及「你可以自己核對」。
+  const criteria = (await page.textContent("#tab-reports")) ?? "";
+  check("the report screen states which orders it counts",
+    criteria.includes("已付款") && criteria.includes("未取消") && criteria.includes("未退貨"),
+    criteria.replace(/\s+/g, " ").slice(0, 200));
+  check("the report screen admits it is not a cash-flow statement",
+    criteria.includes("不是現金流量表") && criteria.includes("訂單建立日"),
+    criteria.replace(/\s+/g, " ").slice(0, 200));
+  check("the report screen tells the merchant how to verify it themselves",
+    criteria.includes("四類筆數相加"), criteria.replace(/\s+/g, " ").slice(0, 200));
+  check("the ranking screen states its amount is pre-discount and renames split rows",
+    criteria.includes("折扣前") && criteria.includes("改名"),
+    criteria.replace(/\s+/g, " ").slice(0, 200));
+
+  // 時區：demo 商家從未設定過，畫面必須說那是**回落**而不是他的選擇。
+  const tzText = (await page.textContent("#report-timezone")) ?? "";
+  check("an unconfigured shop is told its timezone is a platform fallback, not its own choice",
+    tzText.includes("平台預設") && tzText.includes("尚未設定"), tzText);
+  check("changing the timezone warns that every historical report moves with it",
+    (await page.isVisible("#report-timezone-note")), tzText);
+
+  // 金額組合式（design D3 項 5）——與訂單詳情同一條規則。
+  const twdBlock = (await page.textContent('#report-currencies [data-currency="TWD"]')) ?? "";
+  check("report amounts are composed, not a single opaque 「營業額」",
+    twdBlock.includes("品項小計") && twdBlock.includes("運費") && twdBlock.includes("請款總額"),
+    twdBlock.replace(/\s+/g, " ").slice(0, 200));
+  check("report money is unscaled (NT$ with thousands separators, never divided)",
+    /NT\$[\d,]+/.test(twdBlock) && !twdBlock.includes("NT$0.00"),
+    twdBlock.replace(/\s+/g, " ").slice(0, 200));
+
+  // 筆數不是金額。這是本 change 裡「寫錯不會噴錯」的那一個地方：一筆訂單丟進
+  // formatMoney 會得到「NT$1」——數字對、單位錯、看起來完全合理。
+  const counted = (await page.textContent('[data-currency="TWD"] [data-k="counted"]')) ?? "";
+  check("order counts are counts, never money (NT$1 for one order is the silent bug here)",
+    counted.includes("筆") && !counted.includes("NT$"), counted);
+  const periodTotal = (await page.textContent('[data-currency="TWD"] [data-k="period-total"]')) ?? "";
+  check("the reconciliation total is on screen so the merchant can check the report",
+    periodTotal.includes("筆") && !periodTotal.includes("NT$"), periodTotal);
+  check("the four excluded/included classes are all shown",
+    (await page.locator('[data-currency="TWD"] [data-k]').count()) === 5,
+    String(await page.locator('[data-currency="TWD"] [data-k]').count()));
+
+  // 商品排行：售出數量是數量，不是金額。
+  const rankingRow = page.locator('[data-currency="TWD"] tr[data-sku]').first();
+  await rankingRow.waitFor({ timeout: 8000 });
+  const rankingText = (await rankingRow.textContent()) ?? "";
+  check("the ranking shows quantities as quantities and amounts as money",
+    rankingText.includes("件") && /NT\$[\d,]+/.test(rankingText) && !rankingText.includes("NT$1 件"),
+    rankingText.replace(/\s+/g, " "));
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.

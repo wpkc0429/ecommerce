@@ -977,6 +977,7 @@ var (
 		{Name: "status", Type: field.TypeInt16, Default: 1},
 		{Name: "content_json", Type: field.TypeJSON},
 		{Name: "meta", Type: field.TypeJSON},
+		{Name: "timezone", Type: field.TypeString, Nullable: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
 		{Name: "theme_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ShopsTable holds the schema information for the "shops" table.
@@ -987,7 +988,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shops_themes_theme",
-				Columns:    []*schema.Column{ShopsColumns[7]},
+				Columns:    []*schema.Column{ShopsColumns[8]},
 				RefColumns: []*schema.Column{ThemesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -996,7 +997,7 @@ var (
 			{
 				Name:    "shop_theme_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShopsColumns[7]},
+				Columns: []*schema.Column{ShopsColumns[8]},
 			},
 		},
 	}

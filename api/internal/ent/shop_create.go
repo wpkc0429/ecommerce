@@ -100,6 +100,20 @@ func (_c *ShopCreate) SetMeta(v json.RawMessage) *ShopCreate {
 	return _c
 }
 
+// SetTimezone sets the "timezone" field.
+func (_c *ShopCreate) SetTimezone(v string) *ShopCreate {
+	_c.mutation.SetTimezone(v)
+	return _c
+}
+
+// SetNillableTimezone sets the "timezone" field if the given value is not nil.
+func (_c *ShopCreate) SetNillableTimezone(v *string) *ShopCreate {
+	if v != nil {
+		_c.SetTimezone(*v)
+	}
+	return _c
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_c *ShopCreate) SetTheme(v *Theme) *ShopCreate {
 	return _c.SetThemeID(v.ID)
@@ -217,6 +231,11 @@ func (_c *ShopCreate) check() error {
 	if _, ok := _c.mutation.Meta(); !ok {
 		return &ValidationError{Name: "meta", err: errors.New(`ent: missing required field "Shop.meta"`)}
 	}
+	if v, ok := _c.mutation.Timezone(); ok {
+		if err := shop.TimezoneValidator(v); err != nil {
+			return &ValidationError{Name: "timezone", err: fmt.Errorf(`ent: validator failed for field "Shop.timezone": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -267,6 +286,10 @@ func (_c *ShopCreate) createSpec() (*Shop, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Meta(); ok {
 		_spec.SetField(shop.FieldMeta, field.TypeJSON, value)
 		_node.Meta = value
+	}
+	if value, ok := _c.mutation.Timezone(); ok {
+		_spec.SetField(shop.FieldTimezone, field.TypeString, value)
+		_node.Timezone = &value
 	}
 	if nodes := _c.mutation.ThemeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -457,6 +480,24 @@ func (u *ShopUpsert) UpdateMeta() *ShopUpsert {
 	return u
 }
 
+// SetTimezone sets the "timezone" field.
+func (u *ShopUpsert) SetTimezone(v string) *ShopUpsert {
+	u.Set(shop.FieldTimezone, v)
+	return u
+}
+
+// UpdateTimezone sets the "timezone" field to the value that was provided on create.
+func (u *ShopUpsert) UpdateTimezone() *ShopUpsert {
+	u.SetExcluded(shop.FieldTimezone)
+	return u
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (u *ShopUpsert) ClearTimezone() *ShopUpsert {
+	u.SetNull(shop.FieldTimezone)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -597,6 +638,27 @@ func (u *ShopUpsertOne) SetMeta(v json.RawMessage) *ShopUpsertOne {
 func (u *ShopUpsertOne) UpdateMeta() *ShopUpsertOne {
 	return u.Update(func(s *ShopUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetTimezone sets the "timezone" field.
+func (u *ShopUpsertOne) SetTimezone(v string) *ShopUpsertOne {
+	return u.Update(func(s *ShopUpsert) {
+		s.SetTimezone(v)
+	})
+}
+
+// UpdateTimezone sets the "timezone" field to the value that was provided on create.
+func (u *ShopUpsertOne) UpdateTimezone() *ShopUpsertOne {
+	return u.Update(func(s *ShopUpsert) {
+		s.UpdateTimezone()
+	})
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (u *ShopUpsertOne) ClearTimezone() *ShopUpsertOne {
+	return u.Update(func(s *ShopUpsert) {
+		s.ClearTimezone()
 	})
 }
 
@@ -906,6 +968,27 @@ func (u *ShopUpsertBulk) SetMeta(v json.RawMessage) *ShopUpsertBulk {
 func (u *ShopUpsertBulk) UpdateMeta() *ShopUpsertBulk {
 	return u.Update(func(s *ShopUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetTimezone sets the "timezone" field.
+func (u *ShopUpsertBulk) SetTimezone(v string) *ShopUpsertBulk {
+	return u.Update(func(s *ShopUpsert) {
+		s.SetTimezone(v)
+	})
+}
+
+// UpdateTimezone sets the "timezone" field to the value that was provided on create.
+func (u *ShopUpsertBulk) UpdateTimezone() *ShopUpsertBulk {
+	return u.Update(func(s *ShopUpsert) {
+		s.UpdateTimezone()
+	})
+}
+
+// ClearTimezone clears the value of the "timezone" field.
+func (u *ShopUpsertBulk) ClearTimezone() *ShopUpsertBulk {
+	return u.Update(func(s *ShopUpsert) {
+		s.ClearTimezone()
 	})
 }
 

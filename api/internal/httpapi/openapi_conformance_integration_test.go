@@ -55,6 +55,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 	"ksdevworks/ecommerce/api/internal/points"
+	"ksdevworks/ecommerce/api/internal/rbac"
+	"ksdevworks/ecommerce/api/internal/report"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -75,6 +77,12 @@ var requiredSchemas = []string{
 	"PublicShippingMethod",
 	"Shipment",
 	"TokenResponse",
+	// change merchant-reports: the largest new schema surface of that change,
+	// and `additionalProperties: false` on it only bites when a REAL response
+	// is validated — which is what this file does and nothing else does.
+	"EffectiveTimezone", "ShopSettings",
+	"ReportAmounts", "SalesBucket", "SalesReport", "SalesReportCurrency",
+	"ProductSalesReport", "ProductSalesCurrency", "ProductSalesRow",
 }
 
 // ── 契約驅動的回應驗證 ────────────────────────────────────────────────
@@ -239,6 +247,13 @@ type conformanceEnv struct {
 	shipID   int
 	memberID int
 
+	// change merchant-reports: the one back-office identity this file needs.
+	// The report endpoints are RBAC-gated, and their responses are the largest
+	// new schema surface in that change — so this env grew an admin half rather
+	// than leaving those schemas validated only by hand-written assertions.
+	adminUserID int
+	issuer      *auth.TokenIssuer
+
 	shippingSvc   *shipping.Service
 	idemSvc       *idempotency.Service
 	webhookSecret string
@@ -287,10 +302,27 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		SetShopID(e.shopID).SetEmail("conformance-member@t.dev").SetPasswordHash(hash).SetStatus(1).
 		SaveX(ctx).ID
 
+	// change merchant-reports: a merchant owner holding the two nodes the
+	// report and settings routes are guarded by.
+	reportPerm := client.Permission.Create().SetName("report.view").SaveX(ctx).ID
+	updatePerm := client.Permission.Create().SetName("shop.update").SaveX(ctx).ID
+	ownerRole := client.Role.Create().SetName("merchant_owner").SetScope("merchant").SaveX(ctx)
+	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(reportPerm).SaveX(ctx)
+	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(updatePerm).SaveX(ctx)
+	adminHash, err := auth.HashPassword("conformance-admin-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.adminUserID = client.User.Create().
+		SetEmail("conformance-admin@t.dev").SetPasswordHash(adminHash).SaveX(ctx).ID
+	client.ShopUser.Create().SetShopID(e.shopID).SetUserID(e.adminUserID).SaveX(ctx)
+	client.RoleUser.Create().SetUserID(e.adminUserID).SetRoleID(ownerRole.ID).SetShopID(e.shopID).SaveX(ctx)
+
 	issuer, err := auth.NewTokenIssuer("conf-admin-secret", "conf-member-secret", "test", 15*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}
+	e.issuer = issuer
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
 	resolver := tenant.NewResolver(client, rdb, log)
 	refresh := auth.NewRefreshService(client, 30*24*time.Hour)
@@ -322,8 +354,18 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	e.idemSvc = &idempotency.Service{Client: client, TTL: time.Hour}
 	cfg := &config.Config{OrderAccessTokenTTL: time.Hour}
 
+	authz := &AuthzMW{Engine: rbac.NewEngine(client, rdb, log)}
 	e.router = New(Deps{
 		Cfg: cfg, Log: log,
+		AdminMW: NewAdminMiddleware(issuer),
+		// change merchant-reports.
+		Reports: &ReportsHandler{
+			Client: client, Authz: authz, Log: log,
+			Service: &report.Service{Client: client, DefaultTimezone: "Asia/Taipei"},
+		},
+		ShopSettings: &ShopSettingsHandler{
+			Client: client, Authz: authz, Log: log, DefaultTimezone: "Asia/Taipei",
+		},
 		TenantMW:      NewTenantMiddleware(resolver),
 		MemberMW:      NewMemberMiddleware(issuer),
 		OrderAccessMW: NewOrderAccessMiddleware(issuer),
@@ -673,6 +715,33 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	requireStatus(t, code, http.StatusConflict, body)
 	v.assertResponse(t, "/api/v1/shop/guest/checkout", http.MethodPost, http.StatusConflict, body)
 	assertErrorCode(t, body, "idempotency_key_in_progress")
+
+	// ── 營運報表（change merchant-reports）────────────────────────────
+	//
+	// Placed last on purpose: by now this run has created and paid for real
+	// orders, so the buckets and the ranking are non-empty and their item
+	// schemas are actually exercised. An empty array validates against anything.
+	adminTok, err := e.issuer.IssueAdmin(e.adminUserID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	today := time.Now().UTC()
+	period := fmt.Sprintf("?from=%s&to=%s",
+		today.AddDate(0, 0, -1).Format("2006-01-02"), today.AddDate(0, 0, 1).Format("2006-01-02"))
+	shopPrefix := fmt.Sprintf("/api/v1/admin/shops/%d", e.shopID)
+
+	code, body = e.do(t, http.MethodGet, shopPrefix+"/reports/sales"+period, adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/reports/sales", http.MethodGet, http.StatusOK, body)
+
+	code, body = e.do(t, http.MethodGet, shopPrefix+"/reports/products"+period, adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/reports/products", http.MethodGet, http.StatusOK, body)
+
+	code, body = e.do(t, http.MethodPut, shopPrefix+"/settings", adminTok,
+		map[string]any{"timezone": "Asia/Taipei"})
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/settings", http.MethodPut, http.StatusOK, body)
 
 	// ── 規則 2：共用 schema 覆蓋 ──────────────────────────────────────
 	var uncovered []string
