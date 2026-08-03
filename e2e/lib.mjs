@@ -199,8 +199,16 @@ export function ecpayCheckMac(fields) {
  *
  * Like deliverWebhook, this signs its own request rather than driving the
  * cashier simulator, so the ECPay chain still needs nothing but the API.
+ *
+ * shopID targets the per-shop webhook route (change
+ * ecpay-per-shop-credentials, design D2) — credentials are resolved per shop
+ * now, so the shop id has to travel in the URL the same way it travels in the
+ * ReturnURL the API itself hands back at InitiatePayment time. The demo
+ * shop's seeded credentials (internal/seed) use the same 綠界 sandbox sample
+ * values this function's defaults assume, so ECPAY_HASH_KEY/ECPAY_HASH_IV
+ * only need setting if that seed data was ever changed.
  */
-export async function deliverECPayCallback(merchantTradeNo, amount, outcome = "success") {
+export async function deliverECPayCallback(shopID, merchantTradeNo, amount, outcome = "success") {
   const { merchantID } = ecpayKeys();
   // 綠界 sends Taipei local time in this exact format, with no offset marker —
   // so the fixture has to be Taipei time too, or paid_at would be off by the
@@ -231,7 +239,7 @@ export async function deliverECPayCallback(merchantTradeNo, amount, outcome = "s
   };
   fields.CheckMacValue = ecpayCheckMac(fields);
   const body = new URLSearchParams(fields).toString();
-  const res = await req("POST", "/api/v1/webhooks/payments/ecpay", {
+  const res = await req("POST", `/api/v1/webhooks/payments/ecpay/${shopID}`, {
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body,
   });

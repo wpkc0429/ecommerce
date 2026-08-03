@@ -28,6 +28,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -1071,6 +1072,61 @@ func init() {
 	shopallowedoriginDescCreatedAt := shopallowedoriginFields[2].Descriptor()
 	// shopallowedorigin.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shopallowedorigin.DefaultCreatedAt = shopallowedoriginDescCreatedAt.Default.(func() time.Time)
+	shoppaymentprovidercredentialMixin := schema.ShopPaymentProviderCredential{}.Mixin()
+	shoppaymentprovidercredentialMixinFields0 := shoppaymentprovidercredentialMixin[0].Fields()
+	_ = shoppaymentprovidercredentialMixinFields0
+	shoppaymentprovidercredentialFields := schema.ShopPaymentProviderCredential{}.Fields()
+	_ = shoppaymentprovidercredentialFields
+	// shoppaymentprovidercredentialDescCreatedAt is the schema descriptor for created_at field.
+	shoppaymentprovidercredentialDescCreatedAt := shoppaymentprovidercredentialMixinFields0[0].Descriptor()
+	// shoppaymentprovidercredential.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shoppaymentprovidercredential.DefaultCreatedAt = shoppaymentprovidercredentialDescCreatedAt.Default.(func() time.Time)
+	// shoppaymentprovidercredentialDescUpdatedAt is the schema descriptor for updated_at field.
+	shoppaymentprovidercredentialDescUpdatedAt := shoppaymentprovidercredentialMixinFields0[1].Descriptor()
+	// shoppaymentprovidercredential.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	shoppaymentprovidercredential.DefaultUpdatedAt = shoppaymentprovidercredentialDescUpdatedAt.Default.(func() time.Time)
+	// shoppaymentprovidercredential.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	shoppaymentprovidercredential.UpdateDefaultUpdatedAt = shoppaymentprovidercredentialDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// shoppaymentprovidercredentialDescProvider is the schema descriptor for provider field.
+	shoppaymentprovidercredentialDescProvider := shoppaymentprovidercredentialFields[1].Descriptor()
+	// shoppaymentprovidercredential.ProviderValidator is a validator for the "provider" field. It is called by the builders before save.
+	shoppaymentprovidercredential.ProviderValidator = func() func(string) error {
+		validators := shoppaymentprovidercredentialDescProvider.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(provider string) error {
+			for _, fn := range fns {
+				if err := fn(provider); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shoppaymentprovidercredentialDescMerchantID is the schema descriptor for merchant_id field.
+	shoppaymentprovidercredentialDescMerchantID := shoppaymentprovidercredentialFields[2].Descriptor()
+	// shoppaymentprovidercredential.MerchantIDValidator is a validator for the "merchant_id" field. It is called by the builders before save.
+	shoppaymentprovidercredential.MerchantIDValidator = func() func(string) error {
+		validators := shoppaymentprovidercredentialDescMerchantID.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(merchant_id string) error {
+			for _, fn := range fns {
+				if err := fn(merchant_id); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shoppaymentprovidercredentialDescChoosePayment is the schema descriptor for choose_payment field.
+	shoppaymentprovidercredentialDescChoosePayment := shoppaymentprovidercredentialFields[5].Descriptor()
+	// shoppaymentprovidercredential.ChoosePaymentValidator is a validator for the "choose_payment" field. It is called by the builders before save.
+	shoppaymentprovidercredential.ChoosePaymentValidator = shoppaymentprovidercredentialDescChoosePayment.Validators[0].(func(string) error)
 	shopuserFields := schema.ShopUser{}.Fields()
 	_ = shopuserFields
 	// shopuserDescCreatedAt is the schema descriptor for created_at field.

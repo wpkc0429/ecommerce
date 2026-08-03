@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/shoptz"
 )
 
@@ -65,8 +66,24 @@ type Config struct {
 	// e2e pass {"provider":"ecpay"} explicitly.
 	PaymentDefaultProvider string
 
-	// ECPay carries the 綠界 全方位金流 credentials and endpoints.
+	// ECPay carries the 綠界 全方位金流 endpoints. Per-merchant credentials
+	// (MerchantID/HashKey/HashIV/ChoosePayment) moved to per-shop, encrypted
+	// storage (change ecpay-per-shop-credentials, design D5) — this is what is
+	// left that is genuinely platform-wide: which environment (simulator vs.
+	// 綠界's own test/production hosts) the whole deployment talks to.
 	ECPay ECPayConfig
+
+	// PaymentCredentialsEncryptionKey encrypts the per-shop payment provider
+	// secrets stored in shop_payment_provider_credentials (change
+	// ecpay-per-shop-credentials, design D4) — hex or base64, must decode to
+	// exactly cryptbox.KeySize bytes. Validated at boot in every environment,
+	// the same treatment ReportDefaultTimezone gets and for the same reason: a
+	// bad value here does not disable a feature, it makes every credential
+	// read/write 500 — discoverable in one second at boot, not through a
+	// support ticket. The default below is a fixed, publicly-known value (it
+	// ships in this repository) — fine for local development, MUST be
+	// overridden before any real ECPay credential is ever stored.
+	PaymentCredentialsEncryptionKey string
 
 	// SMTP carries the outbound mail credentials for order notification emails
 	// (change order-notification-email).
@@ -98,30 +115,13 @@ type Config struct {
 	RateLimit RateLimitConfig
 }
 
-// ECPayConfig carries one 綠界 merchant account's credentials and endpoints
-// (change ecpay-payment-provider).
-//
-// **Every field has a default, and none of them is required in production** —
-// the same treatment PaymentMockWebhookSecret gets, for the same reason: the
-// default provider is not ecpay, so an unconfigured deployment never reaches
-// this code. Making it a boot-time hard failure would only stop people who just
-// want to run the thing locally; a real deployment that forgets to swap the
-// credentials discovers it the first time no money arrives.
+// ECPayConfig carries the platform-wide 綠界 endpoints — what is left after
+// per-merchant credentials moved to per-shop storage (change
+// ecpay-per-shop-credentials, design D5/D7). Every field here decides "which
+// environment the whole deployment talks to", not "whose money this is",
+// which is why it stays platform-level: the same 綠界 production host serves
+// every shop that has gone live.
 type ECPayConfig struct {
-	// MerchantID/HashKey/HashIV default to 綠界's **published AIO test store**
-	// (3002607). These are printed in the public documentation and are not
-	// secrets.
-	//
-	// Note for whoever changes them: the widely-circulated 2000132 /
-	// 5294y06JbISpM5x9 / v77hoKGq4kWxNNIS is an OLD set, and the
-	// 2000132 / ejCk326UnaZWKisg / q9jcZX8Ib9LM8wYk that search engines love
-	// belongs to the **B2C 電子發票** API, not to AIO. Using either produces a
-	// checksum that never matches — a symptom indistinguishable from a bug in
-	// the algorithm.
-	MerchantID string
-	HashKey    string
-	HashIV     string
-
 	// CheckoutURL is where the customer's browser POSTs the cashier form.
 	//
 	// **This single value is the entire difference between simulated and live
@@ -131,18 +131,17 @@ type ECPayConfig struct {
 	// https://payment-stage.ecpay.com.tw/Cashier/AioCheckOut/V5 (or the
 	// production host) and not one byte of the form or its checksum changes.
 	CheckoutURL string
-	// ReturnURL is the absolute, publicly reachable URL 綠界 POSTs the payment
-	// result to. 綠界 only supports ports 80 and 443 and does not accept
-	// internationalized domain names — a self-hosted dev environment needs a
-	// tunnel or reverse proxy, which this change deliberately does not solve.
+	// ReturnURL is the BASE of the absolute, publicly reachable URL 綠界 POSTs
+	// the payment result to — the per-shop webhook path
+	// (`/webhooks/payments/ecpay/{shopID}`) is appended to it at InitiatePayment
+	// time (change ecpay-per-shop-credentials, design D2), because 綠界 only
+	// ever echoes back whatever ReturnURL we hand it. 綠界 only supports ports
+	// 80 and 443 and does not accept internationalized domain names — a
+	// self-hosted dev environment needs a tunnel or reverse proxy, which this
+	// change deliberately does not solve.
 	ReturnURL string
 	// ClientBackURL is where 綠界's page sends the browser afterwards. Optional.
 	ClientBackURL string
-	// ChoosePayment defaults to Credit. 綠界's own guidance is to name a specific
-	// method rather than ALL, because they keep adding methods and a new one can
-	// break the notification flow. Non-instant methods (ATM/CVS/BARCODE) also
-	// require the PaymentInfoURL notification this change does not implement.
-	ChoosePayment string
 }
 
 // SMTPConfig carries the outbound mail account for order notification emails
@@ -251,14 +250,17 @@ func Load() (*Config, error) {
 		ReportDefaultTimezone: getenv("REPORT_DEFAULT_TIMEZONE", "Asia/Taipei"),
 
 		ECPay: ECPayConfig{
-			MerchantID:    getenv("ECPAY_MERCHANT_ID", "3002607"),
-			HashKey:       getenv("ECPAY_HASH_KEY", "pwFHCqoQZGmho4w6"),
-			HashIV:        getenv("ECPAY_HASH_IV", "EkRm7iFT261dpevs"),
 			CheckoutURL:   getenv("ECPAY_CHECKOUT_URL", "http://localhost:8090/Cashier/AioCheckOut/V5"),
 			ReturnURL:     getenv("ECPAY_RETURN_URL", "http://localhost:8080/api/v1/webhooks/payments/ecpay"),
 			ClientBackURL: getenv("ECPAY_CLIENT_BACK_URL", ""),
-			ChoosePayment: getenv("ECPAY_CHOOSE_PAYMENT", "Credit"),
 		},
+
+		// change ecpay-per-shop-credentials, design D4: a fixed dev-only value.
+		// It is public (it ships in this repository) — fine for local
+		// development and CI, MUST be overridden with a private value before
+		// any real credential is stored.
+		PaymentCredentialsEncryptionKey: getenv("PAYMENT_CREDENTIALS_ENCRYPTION_KEY",
+			"87cdc594ad8dada3e6447ee26c8e6ac18842eadaf7170f4820d53057acb78ae4"),
 
 		SMTP: SMTPConfig{
 			Host:     getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -363,6 +365,13 @@ func Load() (*Config, error) {
 	// every report of every unconfigured shop — and it is free to catch now.
 	if err := shoptz.Validate(cfg.ReportDefaultTimezone); err != nil {
 		return nil, fmt.Errorf("config: REPORT_DEFAULT_TIMEZONE: %w", err)
+	}
+
+	// change ecpay-per-shop-credentials (design D4): same treatment, same
+	// reason. Only Load itself needs the parsed Box (to fail fast); callers
+	// that actually encrypt/decrypt re-parse it from the validated string.
+	if _, err := cryptbox.ParseKey(cfg.PaymentCredentialsEncryptionKey); err != nil {
+		return nil, fmt.Errorf("config: PAYMENT_CREDENTIALS_ENCRYPTION_KEY: %w", err)
 	}
 
 	if cfg.Env == "production" {

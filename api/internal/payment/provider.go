@@ -26,6 +26,7 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 )
@@ -216,6 +217,41 @@ type WebhookResponse struct {
 func (r WebhookResponse) IsZero() bool {
 	return r.Status == 0 && r.ContentType == "" && len(r.Body) == 0
 }
+
+// ShopScopedProvider is an optional capability (change
+// ecpay-per-shop-credentials, design D1): a provider whose credentials are
+// resolved per shop rather than fixed once at process startup implements
+// this in addition to being registered in Service.Providers.
+//
+// This is how per-shop credential resolution was added WITHOUT reopening the
+// promise this package's doc comment makes ("adding a real provider means
+// implementing Provider once; nothing in httpapi or Service's control flow
+// needs to change for provider NAMES") — the one narrow exception ecpay-
+// payment-provider already carved into that promise. Service and the HTTP
+// layer check for this interface, once, generically: "does this provider need
+// shop resolution", never "is this provider literally named ecpay". A second
+// provider that needs the same treatment implements the same interface and
+// changes nothing at the call site.
+//
+// ResolveForShop returns ErrProviderNotConfigured when shopID has not set up
+// credentials for this provider — callers MUST NOT fall back to any other
+// shop's credentials or to a platform-wide default.
+type ShopScopedProvider interface {
+	// Name mirrors Provider.Name() — the registry key this resolver is
+	// registered under.
+	Name() string
+	// ResolveForShop returns a Provider instance configured with shopID's own
+	// credentials. Called once per InitiatePayment/webhook-verification —
+	// implementations are expected to be cheap (no network calls), the same
+	// property Provider.InitiatePayment itself already relies on.
+	ResolveForShop(ctx context.Context, shopID int) (Provider, error)
+}
+
+// ErrProviderNotConfigured is returned by ResolveForShop when shopID has not
+// configured credentials for this provider (change ecpay-per-shop-credentials,
+// design D5). Distinct from ErrNotFound (which means "this order/payment does
+// not exist") — this means "this shop cannot use this provider yet".
+var ErrProviderNotConfigured = errors.New("payment: provider has no credentials configured for this shop")
 
 // Provider is the provider-neutral gateway abstraction (design D1). Every
 // provider — mock or real — implements exactly these capabilities;

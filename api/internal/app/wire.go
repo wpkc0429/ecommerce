@@ -11,6 +11,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/cms"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
@@ -220,16 +221,25 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// package doc), but httpapi's control flow and the webhook route did not
 	// change shape. DefaultProvider stays "mock" unless configuration says
 	// otherwise (design D13), so this line changes nothing for existing callers.
+	//
+	// change ecpay-per-shop-credentials: ecpay's registry entry is now a
+	// ShopScopedProvider (ecpay.ShopResolver) instead of a fixed *ecpay.Provider
+	// — Config.MerchantID/HashKey/HashIV came from ECPAY_* env vars before this
+	// change, now from each shop's own encrypted row. CheckoutURL/ClientBackURL/
+	// ReturnURL stay platform-wide (design D7): which 綠界 environment the whole
+	// deployment talks to, appended per shop id at resolve time (design D2).
+	credentialsBox, err := cryptbox.ParseKey(cfg.PaymentCredentialsEncryptionKey)
+	if err != nil {
+		return fmt.Errorf("wire: payment credentials encryption key: %w", err)
+	}
 	mockProvider := payment.NewMockProvider(cfg.PaymentMockWebhookSecret)
-	ecpayProvider := ecpay.New(ecpay.Config{
-		MerchantID:    cfg.ECPay.MerchantID,
-		HashKey:       cfg.ECPay.HashKey,
-		HashIV:        cfg.ECPay.HashIV,
+	ecpayResolver := &ecpay.ShopResolver{
+		Client:        client,
+		Box:           credentialsBox,
 		CheckoutURL:   cfg.ECPay.CheckoutURL,
-		ReturnURL:     cfg.ECPay.ReturnURL,
 		ClientBackURL: cfg.ECPay.ClientBackURL,
-		ChoosePayment: cfg.ECPay.ChoosePayment,
-	}, nil)
+		ReturnURLBase: cfg.ECPay.ReturnURL,
+	}
 	paymentService := &payment.Service{
 		Client:     client,
 		Orders:     orderService,
@@ -237,13 +247,19 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		// The only consumer is the "paid, but the order was already cancelled"
 		// warning (design D9) — a state only a human can resolve.
 		Log: a.log,
-		Providers: map[string]payment.Provider{
+		Providers: map[string]any{
 			mockProvider.Name():  mockProvider,
-			ecpayProvider.Name(): ecpayProvider,
+			ecpayResolver.Name(): ecpayResolver,
 		},
 		DefaultProvider: cfg.PaymentDefaultProvider,
 	}
 	deps.Payments = &httpapi.PaymentHandler{Client: client, Service: paymentService, Authz: authz, Log: a.log}
+	// The merchant-scoped credentials endpoint that lets a shop set its own
+	// ecpay MerchantID/HashKey/HashIV/ChoosePayment (change
+	// ecpay-per-shop-credentials, design D6).
+	deps.PaymentCredentials = &httpapi.PaymentCredentialsHandler{
+		Client: client, Authz: authz, Log: a.log, Box: credentialsBox,
+	}
 
 	// Shipping logistics (change shipping-logistics): shipping methods CRUD
 	// + shipment records, no external carrier integration (design D9 — no

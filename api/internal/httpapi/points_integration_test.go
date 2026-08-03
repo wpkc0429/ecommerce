@@ -145,7 +145,7 @@ func newPointsEnv(t *testing.T) *pointsEnv {
 		Client:          client,
 		Orders:          e.orderSvc,
 		Dispatcher:      dispatcher,
-		Providers:       map[string]payment.Provider{mock.Name(): mock},
+		Providers:       map[string]any{mock.Name(): mock},
 		DefaultProvider: mock.Name(),
 	}
 	e.shipSvc = &shipping.Service{Client: client, Orders: e.orderSvc, Dispatcher: dispatcher}

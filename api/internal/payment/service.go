@@ -58,8 +58,39 @@ type Service struct {
 	// Providers is the provider registry (design D1), keyed by
 	// Provider.Name(). DefaultProvider is used when a caller does not
 	// specify one explicitly.
-	Providers       map[string]Provider
+	//
+	// Values are `any` rather than Provider (change ecpay-per-shop-credentials,
+	// design D1): an entry may instead be a ShopScopedProvider (a provider
+	// resolved per shop rather than fixed at startup) — mock stays a plain
+	// Provider, ecpay is a ShopScopedProvider. ResolveProvider is the one place
+	// that distinguishes the two; every other call site goes through it.
+	Providers       map[string]any
 	DefaultProvider string
+}
+
+// ResolveProvider returns the Provider registered under providerName. If the
+// registration implements ShopScopedProvider, it resolves shopID's own
+// instance (change ecpay-per-shop-credentials, design D1) — shopID is unused
+// for registrations that are plain Providers (mock), so 0 is a safe value to
+// pass when the caller has no shop id (the {provider}-only webhook route).
+//
+// This is the ONE place that checks "does this provider need shop
+// resolution" — by interface capability, never by comparing providerName to a
+// literal string (design D1 of ecpay-payment-provider, extended by this
+// change: the exception it carved stays narrow and generic).
+func (s *Service) ResolveProvider(ctx context.Context, providerName string, shopID int) (Provider, error) {
+	raw, ok := s.Providers[providerName]
+	if !ok {
+		return nil, validationErr("/provider", "unknown payment provider")
+	}
+	if ssp, ok := raw.(ShopScopedProvider); ok {
+		return ssp.ResolveForShop(ctx, shopID)
+	}
+	prov, ok := raw.(Provider)
+	if !ok {
+		return nil, fmt.Errorf("payment: registry entry %q implements neither Provider nor ShopScopedProvider", providerName)
+	}
+	return prov, nil
 }
 
 // InitiatePayment starts a new payment attempt for orderID on behalf of
@@ -91,9 +122,19 @@ func (s *Service) InitiatePayment(ctx context.Context, shopID, memberID, orderID
 	if providerName == "" {
 		providerName = s.DefaultProvider
 	}
-	prov, ok := s.Providers[providerName]
-	if !ok {
-		return nil, nil, validationErr("/provider", "unknown payment provider")
+	prov, err := s.ResolveProvider(ctx, providerName, shopID)
+	if err != nil {
+		if errors.Is(err, ErrProviderNotConfigured) {
+			// design D5: a shop that has not set up this provider's credentials
+			// gets a clear, typed rejection — never a silent fallback to another
+			// shop's or a platform-default credential.
+			return nil, nil, validationErr("/provider", "payment provider not configured for this shop")
+		}
+		var ve *ValidationError
+		if errors.As(err, &ve) {
+			return nil, nil, ve
+		}
+		return nil, nil, fmt.Errorf("payment: resolve provider %s: %w", providerName, err)
 	}
 
 	res, err := prov.InitiatePayment(ctx, InitiateRequest{
@@ -160,7 +201,16 @@ func initiateItems(ord *ent.Order) []InitiateItem {
 //	D7  A reported amount that disagrees with the stored one aborts everything.
 //	D9  A CANCELLED order records the money but is never advanced to paid, and
 //	    publishes no loyalty event.
-func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *WebhookResult) (*ent.Payment, error) {
+//
+// shopID is the shop id carried in the webhook URL for shop-scoped providers
+// (change ecpay-per-shop-credentials, design D2), 0 for the {provider}-only
+// route (mock). When non-zero, it MUST match the located payment's own
+// shop_id or the delivery is treated as unrecognized — a defensive assertion,
+// not the primary guard: using the wrong shop's URL already fails signature
+// verification with that shop's key before this function is ever called
+// (design D2's safety argument), so in the ordinary case this check can never
+// actually trip.
+func (s *Service) HandleWebhook(ctx context.Context, providerName string, shopID int, res *WebhookResult) (*ent.Payment, error) {
 	p, err := s.Client.Payment.Query().
 		Where(entpayment.ProviderEQ(providerName), entpayment.ProviderReferenceEQ(res.ProviderReference)).
 		Only(ctx)
@@ -169,6 +219,9 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, res *W
 	}
 	if err != nil {
 		return nil, fmt.Errorf("payment: query payment: %w", err)
+	}
+	if shopID > 0 && p.ShopID != shopID {
+		return nil, ErrNotFound
 	}
 
 	// design D7: before any state moves, the two systems must agree on how much

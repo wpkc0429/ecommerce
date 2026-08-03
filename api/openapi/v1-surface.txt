@@ -101,6 +101,14 @@ DELETE /api/v1/shop/cart/items/{itemID}
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
 DELETE /api/v1/shop/cart/items/{itemID} path itemID
+ECPayCredentials.choose_payment
+ECPayCredentials.configured
+ECPayCredentials.hash_iv_configured
+ECPayCredentials.hash_key_configured
+ECPayCredentials.merchant_id
+ECPayCredentials.provider
+ECPayCredentials.shop_id
+ECPayCredentials.updated_at
 EffectiveTimezone.name
 EffectiveTimezone.source
 Error.error
@@ -125,6 +133,8 @@ GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
+GET /api/v1/admin/shops/{shopID}/ecpay-credentials
+GET /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 GET /api/v1/admin/shops/{shopID}/me
 GET /api/v1/admin/shops/{shopID}/me path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers
@@ -494,6 +504,9 @@ POST /api/v1/shop/orders/{orderID}/payments header X-Publishable-Key optional
 POST /api/v1/shop/orders/{orderID}/payments path orderID
 POST /api/v1/webhooks/payments/{provider}
 POST /api/v1/webhooks/payments/{provider} path provider
+POST /api/v1/webhooks/payments/{provider}/{shopID}
+POST /api/v1/webhooks/payments/{provider}/{shopID} path provider
+POST /api/v1/webhooks/payments/{provider}/{shopID} path shopID
 PUT /api/v1/admin/roles/{roleID}/permissions
 PUT /api/v1/admin/roles/{roleID}/permissions path roleID
 PUT /api/v1/admin/shops/{shopID}
@@ -503,6 +516,8 @@ PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
 PUT /api/v1/admin/shops/{shopID}/content
 PUT /api/v1/admin/shops/{shopID}/content path shopID
+PUT /api/v1/admin/shops/{shopID}/ecpay-credentials
+PUT /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
 PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
 PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID

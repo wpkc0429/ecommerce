@@ -66,6 +66,8 @@ type Tx struct {
 	Shop *ShopClient
 	// ShopAllowedOrigin is the client for interacting with the ShopAllowedOrigin builders.
 	ShopAllowedOrigin *ShopAllowedOriginClient
+	// ShopPaymentProviderCredential is the client for interacting with the ShopPaymentProviderCredential builders.
+	ShopPaymentProviderCredential *ShopPaymentProviderCredentialClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -239,6 +241,7 @@ func (tx *Tx) init() {
 	tx.ShippingMethod = NewShippingMethodClient(tx.config)
 	tx.Shop = NewShopClient(tx.config)
 	tx.ShopAllowedOrigin = NewShopAllowedOriginClient(tx.config)
+	tx.ShopPaymentProviderCredential = NewShopPaymentProviderCredentialClient(tx.config)
 	tx.ShopUser = NewShopUserClient(tx.config)
 	tx.Site = NewSiteClient(tx.config)
 	tx.SiteShop = NewSiteShopClient(tx.config)

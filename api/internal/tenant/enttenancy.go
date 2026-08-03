@@ -82,6 +82,12 @@ var tenantOwned = map[string]bool{
 	// forgetting it (one shop's notification rows visible to another) is
 	// something no existing test would notice.
 	"OrderNotification": true,
+	// change ecpay-per-shop-credentials: carries a direct shop_id column
+	// (design D5). Every access (credential resolution at InitiatePayment/
+	// webhook-verification time, and the admin management endpoint) already
+	// passes shop_id explicitly — same defense-in-depth reasoning as
+	// PublishableKey/ShopAllowedOrigin above.
+	"ShopPaymentProviderCredential": true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

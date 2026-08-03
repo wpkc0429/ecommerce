@@ -65,10 +65,12 @@ const views = {
   // 欄位的「設定」分頁，其存在的理由會比它的內容多（design D7）。
   reports: { label: "報表", panel: "tab-reports", nav: true, perm: "report.view", view: createReportsView(ctx) },
   // 前端接入：金鑰是商家層、origin 是平台層（design D6）。分頁只要其中一邊看得到
-  // 就該出現，區塊各自再判一次。
+  // 就該出現，區塊各自再判一次。change ecpay-per-shop-credentials 加了第三個
+  // 區塊（ECPay 憑證，payment_credential.manage）——同一個「我怎麼跟外界接上」
+  // 分頁底下再一塊，不是新分頁。
   "storefront-clients": {
     label: "前端接入", panel: "tab-storefront-clients", nav: true,
-    perms: ["publishable_key.view", "shop.manage_client_origins"],
+    perms: ["publishable_key.view", "shop.manage_client_origins", "payment_credential.manage"],
     view: createStorefrontClientsView(ctx),
   },
 };

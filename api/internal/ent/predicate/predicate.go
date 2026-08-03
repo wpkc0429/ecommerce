@@ -84,6 +84,9 @@ type Shop func(*sql.Selector)
 // ShopAllowedOrigin is the predicate function for shopallowedorigin builders.
 type ShopAllowedOrigin func(*sql.Selector)
 
+// ShopPaymentProviderCredential is the predicate function for shoppaymentprovidercredential builders.
+type ShopPaymentProviderCredential func(*sql.Selector)
+
 // ShopUser is the predicate function for shopuser builders.
 type ShopUser func(*sql.Selector)
 

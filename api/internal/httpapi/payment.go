@@ -225,11 +225,13 @@ func writeAck(w http.ResponseWriter, prov payment.Provider, ack payment.Ack) {
 	}
 }
 
-// Webhook handles POST /api/v1/webhooks/payments/{provider}. It is mounted
-// directly under /api/v1 in router.go, outside every other middleware
-// group: there is no tenant to resolve (the provider doesn't know our
-// domain scheme) and no JWT to check (the caller is a payment provider's
-// server, not a browser session).
+// Webhook handles both POST /api/v1/webhooks/payments/{provider} and POST
+// /api/v1/webhooks/payments/{provider}/{shopID} (change
+// ecpay-per-shop-credentials, design D2). It is mounted directly under
+// /api/v1 in router.go, outside every other middleware group: there is no
+// tenant to resolve (the provider doesn't know our domain scheme) and no JWT
+// to check (the caller is a payment provider's server, not a browser
+// session).
 //
 // **Where the provider's protocol starts and ours ends** (design D3): the two
 // failures below happen before the caller has been authenticated at all — an
@@ -237,10 +239,23 @@ func writeAck(w http.ResponseWriter, prov payment.Provider, ack payment.Ack) {
 // 64 KiB limit. Everything from signature verification onward is answered in the
 // provider's own terms. That line can be stated in one sentence, which is why it
 // holds up.
+//
+// **The {shopID} segment is unverified until signature verification succeeds
+// (design D2)** — it exists to pick WHICH shop's credentials to verify
+// against, nothing more. Using the wrong shop's URL for a genuine notification
+// means verifying it with the wrong key, which fails outright: it can never
+// cause anything to be trusted that should not be. A missing {shopID} (the
+// legacy route shape) resolves shopID as 0, which ResolveProvider passes
+// through unused for providers that are not shop-scoped (mock).
 func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 	providerName := chi.URLParam(r, "provider")
-	prov, ok := h.Service.Providers[providerName]
-	if !ok {
+	shopID, _ := intParam(r, "shopID")
+
+	prov, err := h.Service.ResolveProvider(r.Context(), providerName, shopID)
+	if err != nil {
+		// design D5: an unknown provider name and "this shop has not configured
+		// ecpay yet" both surface the same way here — 404, with no provider
+		// context to answer to, so there is no WebhookAck to defer to either.
 		httpx.NotFound(w)
 		return
 	}
@@ -263,7 +278,7 @@ func (h *PaymentHandler) Webhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := h.Service.HandleWebhook(r.Context(), providerName, res); err != nil {
+	if _, err := h.Service.HandleWebhook(r.Context(), providerName, shopID, res); err != nil {
 		if errors.Is(err, payment.ErrNotFound) {
 			// Signature already authenticated the caller (design D7) — an
 			// unrecognized provider_reference is acknowledged rather than

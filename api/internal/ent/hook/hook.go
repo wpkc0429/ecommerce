@@ -320,6 +320,18 @@ func (f ShopAllowedOriginFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopAllowedOriginMutation", m)
 }
 
+// The ShopPaymentProviderCredentialFunc type is an adapter to allow the use of ordinary
+// function as ShopPaymentProviderCredential mutator.
+type ShopPaymentProviderCredentialFunc func(context.Context, *ent.ShopPaymentProviderCredentialMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopPaymentProviderCredentialFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopPaymentProviderCredentialMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopPaymentProviderCredentialMutation", m)
+}
+
 // The ShopUserFunc type is an adapter to allow the use of ordinary
 // function as ShopUser mutator.
 type ShopUserFunc func(context.Context, *ent.ShopUserMutation) (ent.Value, error)

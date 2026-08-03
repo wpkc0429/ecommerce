@@ -28,9 +28,13 @@ export function createStorefrontClientsView(ctx) {
     const originsVisible = can("shop.manage_client_origins");
     $("#allowed-origins-block").hidden = !originsVisible;
 
+    const ecpayVisible = can("payment_credential.manage");
+    $("#ecpay-credentials-block").hidden = !ecpayVisible;
+
     await Promise.all([
       keysVisible ? loadKeys() : Promise.resolve(),
       originsVisible ? loadOrigins() : Promise.resolve(),
+      ecpayVisible ? loadECPayCredentials() : Promise.resolve(),
     ]);
   }
 
@@ -140,8 +144,61 @@ export function createStorefrontClientsView(ctx) {
     }
   }
 
+  // ── ECPay 金流憑證（change ecpay-per-shop-credentials, design D6）──────
+  // HashKey/HashIV 從 GET 拿到的永遠只有「是否已設定」的布林值，兩個輸入框
+  // 永遠留白帶入下一次 load——本頁絕不把密鑰明文緩存在畫面或 JS 狀態裡。
+  async function loadECPayCredentials() {
+    const err = $("#ecpay-credentials-error");
+    err.hidden = true;
+    let data;
+    try {
+      data = await api("GET", `/admin/shops/${ctx.getShopID()}/ecpay-credentials`);
+    } catch (e) {
+      err.textContent = e.message;
+      err.hidden = false;
+      return;
+    }
+    $("#ecpay-merchant-id").value = data.merchant_id || "";
+    $("#ecpay-choose-payment").value = data.choose_payment || "";
+    $("#ecpay-hash-key").value = "";
+    $("#ecpay-hash-iv").value = "";
+    const status = $("#ecpay-credentials-status");
+    if (!data.configured) {
+      status.textContent = "尚未設定";
+      status.className = "badge";
+    } else if (data.hash_key_configured && data.hash_iv_configured) {
+      status.textContent = "已設定";
+      status.className = "badge ok";
+    } else {
+      status.textContent = "設定不完整";
+      status.className = "badge";
+    }
+  }
+
+  async function saveECPayCredentials(e) {
+    e.preventDefault();
+    const err = $("#ecpay-credentials-error");
+    err.hidden = true;
+    const body = {
+      merchant_id: $("#ecpay-merchant-id").value.trim(),
+      hash_key: $("#ecpay-hash-key").value,
+      hash_iv: $("#ecpay-hash-iv").value,
+      choose_payment: $("#ecpay-choose-payment").value.trim() || null,
+    };
+    try {
+      await api("PUT", `/admin/shops/${ctx.getShopID()}/ecpay-credentials`, body);
+      await loadECPayCredentials();
+    } catch (ex) {
+      err.textContent = ex.message +
+        (ex instanceof ApiError && ex.details.length
+          ? `（${ex.details.map((d) => `${d.pointer} ${d.message}`).join("；")}）` : "");
+      err.hidden = false;
+    }
+  }
+
   $("#new-publishable-key-btn").addEventListener("click", createKey);
   $("#allowed-origin-form").addEventListener("submit", addOrigin);
+  $("#ecpay-credentials-form").addEventListener("submit", saveECPayCredentials);
 
   return { load };
 }

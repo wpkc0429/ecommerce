@@ -34,6 +34,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -58,40 +59,41 @@ const (
 	OpUpdateOne = ent.OpUpdateOne
 
 	// Node types.
-	TypeCart                   = "Cart"
-	TypeCartItem               = "CartItem"
-	TypeCategory               = "Category"
-	TypeCheckoutIdempotencyKey = "CheckoutIdempotencyKey"
-	TypeMember                 = "Member"
-	TypeMemberRefreshToken     = "MemberRefreshToken"
-	TypeMemberTier             = "MemberTier"
-	TypeOrder                  = "Order"
-	TypeOrderItem              = "OrderItem"
-	TypeOrderNotification      = "OrderNotification"
-	TypePage                   = "Page"
-	TypePayment                = "Payment"
-	TypePermission             = "Permission"
-	TypePointTransaction       = "PointTransaction"
-	TypeProduct                = "Product"
-	TypeProductCategory        = "ProductCategory"
-	TypeProductSKU             = "ProductSKU"
-	TypePublishableKey         = "PublishableKey"
-	TypeRole                   = "Role"
-	TypeRolePermission         = "RolePermission"
-	TypeRoleUser               = "RoleUser"
-	TypeShipment               = "Shipment"
-	TypeShipmentItem           = "ShipmentItem"
-	TypeShippingMethod         = "ShippingMethod"
-	TypeShop                   = "Shop"
-	TypeShopAllowedOrigin      = "ShopAllowedOrigin"
-	TypeShopUser               = "ShopUser"
-	TypeSite                   = "Site"
-	TypeSiteShop               = "SiteShop"
-	TypeTheme                  = "Theme"
-	TypeThemePage              = "ThemePage"
-	TypeUser                   = "User"
-	TypeUserPermission         = "UserPermission"
-	TypeUserRefreshToken       = "UserRefreshToken"
+	TypeCart                          = "Cart"
+	TypeCartItem                      = "CartItem"
+	TypeCategory                      = "Category"
+	TypeCheckoutIdempotencyKey        = "CheckoutIdempotencyKey"
+	TypeMember                        = "Member"
+	TypeMemberRefreshToken            = "MemberRefreshToken"
+	TypeMemberTier                    = "MemberTier"
+	TypeOrder                         = "Order"
+	TypeOrderItem                     = "OrderItem"
+	TypeOrderNotification             = "OrderNotification"
+	TypePage                          = "Page"
+	TypePayment                       = "Payment"
+	TypePermission                    = "Permission"
+	TypePointTransaction              = "PointTransaction"
+	TypeProduct                       = "Product"
+	TypeProductCategory               = "ProductCategory"
+	TypeProductSKU                    = "ProductSKU"
+	TypePublishableKey                = "PublishableKey"
+	TypeRole                          = "Role"
+	TypeRolePermission                = "RolePermission"
+	TypeRoleUser                      = "RoleUser"
+	TypeShipment                      = "Shipment"
+	TypeShipmentItem                  = "ShipmentItem"
+	TypeShippingMethod                = "ShippingMethod"
+	TypeShop                          = "Shop"
+	TypeShopAllowedOrigin             = "ShopAllowedOrigin"
+	TypeShopPaymentProviderCredential = "ShopPaymentProviderCredential"
+	TypeShopUser                      = "ShopUser"
+	TypeSite                          = "Site"
+	TypeSiteShop                      = "SiteShop"
+	TypeTheme                         = "Theme"
+	TypeThemePage                     = "ThemePage"
+	TypeUser                          = "User"
+	TypeUserPermission                = "UserPermission"
+	TypeUserRefreshToken              = "UserRefreshToken"
 )
 
 // CartMutation represents an operation that mutates the Cart nodes in the graph.
@@ -22984,6 +22986,789 @@ func (m *ShopAllowedOriginMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown ShopAllowedOrigin edge %s", name)
+}
+
+// ShopPaymentProviderCredentialMutation represents an operation that mutates the ShopPaymentProviderCredential nodes in the graph.
+type ShopPaymentProviderCredentialMutation struct {
+	config
+	op                  Op
+	typ                 string
+	id                  *int
+	created_at          *time.Time
+	updated_at          *time.Time
+	provider            *string
+	merchant_id         *string
+	hash_key_ciphertext *[]byte
+	hash_iv_ciphertext  *[]byte
+	choose_payment      *string
+	clearedFields       map[string]struct{}
+	shop                *int
+	clearedshop         bool
+	done                bool
+	oldValue            func(context.Context) (*ShopPaymentProviderCredential, error)
+	predicates          []predicate.ShopPaymentProviderCredential
+}
+
+var _ ent.Mutation = (*ShopPaymentProviderCredentialMutation)(nil)
+
+// shoppaymentprovidercredentialOption allows management of the mutation configuration using functional options.
+type shoppaymentprovidercredentialOption func(*ShopPaymentProviderCredentialMutation)
+
+// newShopPaymentProviderCredentialMutation creates new mutation for the ShopPaymentProviderCredential entity.
+func newShopPaymentProviderCredentialMutation(c config, op Op, opts ...shoppaymentprovidercredentialOption) *ShopPaymentProviderCredentialMutation {
+	m := &ShopPaymentProviderCredentialMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeShopPaymentProviderCredential,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withShopPaymentProviderCredentialID sets the ID field of the mutation.
+func withShopPaymentProviderCredentialID(id int) shoppaymentprovidercredentialOption {
+	return func(m *ShopPaymentProviderCredentialMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ShopPaymentProviderCredential
+		)
+		m.oldValue = func(ctx context.Context) (*ShopPaymentProviderCredential, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ShopPaymentProviderCredential.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withShopPaymentProviderCredential sets the old ShopPaymentProviderCredential of the mutation.
+func withShopPaymentProviderCredential(node *ShopPaymentProviderCredential) shoppaymentprovidercredentialOption {
+	return func(m *ShopPaymentProviderCredentialMutation) {
+		m.oldValue = func(context.Context) (*ShopPaymentProviderCredential, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ShopPaymentProviderCredentialMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ShopPaymentProviderCredentialMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ShopPaymentProviderCredentialMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ShopPaymentProviderCredentialMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ShopPaymentProviderCredential.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ShopPaymentProviderCredentialMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ShopPaymentProviderCredentialMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *ShopPaymentProviderCredentialMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetProvider sets the "provider" field.
+func (m *ShopPaymentProviderCredentialMutation) SetProvider(s string) {
+	m.provider = &s
+}
+
+// Provider returns the value of the "provider" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) Provider() (r string, exists bool) {
+	v := m.provider
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldProvider returns the old "provider" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldProvider(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldProvider is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldProvider requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldProvider: %w", err)
+	}
+	return oldValue.Provider, nil
+}
+
+// ResetProvider resets all changes to the "provider" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetProvider() {
+	m.provider = nil
+}
+
+// SetMerchantID sets the "merchant_id" field.
+func (m *ShopPaymentProviderCredentialMutation) SetMerchantID(s string) {
+	m.merchant_id = &s
+}
+
+// MerchantID returns the value of the "merchant_id" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) MerchantID() (r string, exists bool) {
+	v := m.merchant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMerchantID returns the old "merchant_id" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldMerchantID(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMerchantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMerchantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMerchantID: %w", err)
+	}
+	return oldValue.MerchantID, nil
+}
+
+// ResetMerchantID resets all changes to the "merchant_id" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetMerchantID() {
+	m.merchant_id = nil
+}
+
+// SetHashKeyCiphertext sets the "hash_key_ciphertext" field.
+func (m *ShopPaymentProviderCredentialMutation) SetHashKeyCiphertext(b []byte) {
+	m.hash_key_ciphertext = &b
+}
+
+// HashKeyCiphertext returns the value of the "hash_key_ciphertext" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) HashKeyCiphertext() (r []byte, exists bool) {
+	v := m.hash_key_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHashKeyCiphertext returns the old "hash_key_ciphertext" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldHashKeyCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHashKeyCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHashKeyCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHashKeyCiphertext: %w", err)
+	}
+	return oldValue.HashKeyCiphertext, nil
+}
+
+// ResetHashKeyCiphertext resets all changes to the "hash_key_ciphertext" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetHashKeyCiphertext() {
+	m.hash_key_ciphertext = nil
+}
+
+// SetHashIvCiphertext sets the "hash_iv_ciphertext" field.
+func (m *ShopPaymentProviderCredentialMutation) SetHashIvCiphertext(b []byte) {
+	m.hash_iv_ciphertext = &b
+}
+
+// HashIvCiphertext returns the value of the "hash_iv_ciphertext" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) HashIvCiphertext() (r []byte, exists bool) {
+	v := m.hash_iv_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHashIvCiphertext returns the old "hash_iv_ciphertext" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldHashIvCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHashIvCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHashIvCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHashIvCiphertext: %w", err)
+	}
+	return oldValue.HashIvCiphertext, nil
+}
+
+// ResetHashIvCiphertext resets all changes to the "hash_iv_ciphertext" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetHashIvCiphertext() {
+	m.hash_iv_ciphertext = nil
+}
+
+// SetChoosePayment sets the "choose_payment" field.
+func (m *ShopPaymentProviderCredentialMutation) SetChoosePayment(s string) {
+	m.choose_payment = &s
+}
+
+// ChoosePayment returns the value of the "choose_payment" field in the mutation.
+func (m *ShopPaymentProviderCredentialMutation) ChoosePayment() (r string, exists bool) {
+	v := m.choose_payment
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChoosePayment returns the old "choose_payment" field's value of the ShopPaymentProviderCredential entity.
+// If the ShopPaymentProviderCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopPaymentProviderCredentialMutation) OldChoosePayment(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChoosePayment is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChoosePayment requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChoosePayment: %w", err)
+	}
+	return oldValue.ChoosePayment, nil
+}
+
+// ClearChoosePayment clears the value of the "choose_payment" field.
+func (m *ShopPaymentProviderCredentialMutation) ClearChoosePayment() {
+	m.choose_payment = nil
+	m.clearedFields[shoppaymentprovidercredential.FieldChoosePayment] = struct{}{}
+}
+
+// ChoosePaymentCleared returns if the "choose_payment" field was cleared in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) ChoosePaymentCleared() bool {
+	_, ok := m.clearedFields[shoppaymentprovidercredential.FieldChoosePayment]
+	return ok
+}
+
+// ResetChoosePayment resets all changes to the "choose_payment" field.
+func (m *ShopPaymentProviderCredentialMutation) ResetChoosePayment() {
+	m.choose_payment = nil
+	delete(m.clearedFields, shoppaymentprovidercredential.FieldChoosePayment)
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *ShopPaymentProviderCredentialMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[shoppaymentprovidercredential.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *ShopPaymentProviderCredentialMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *ShopPaymentProviderCredentialMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *ShopPaymentProviderCredentialMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// Where appends a list predicates to the ShopPaymentProviderCredentialMutation builder.
+func (m *ShopPaymentProviderCredentialMutation) Where(ps ...predicate.ShopPaymentProviderCredential) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ShopPaymentProviderCredentialMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ShopPaymentProviderCredentialMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ShopPaymentProviderCredential, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ShopPaymentProviderCredentialMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ShopPaymentProviderCredentialMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ShopPaymentProviderCredential).
+func (m *ShopPaymentProviderCredentialMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ShopPaymentProviderCredentialMutation) Fields() []string {
+	fields := make([]string, 0, 8)
+	if m.created_at != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldUpdatedAt)
+	}
+	if m.shop != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldShopID)
+	}
+	if m.provider != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldProvider)
+	}
+	if m.merchant_id != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldMerchantID)
+	}
+	if m.hash_key_ciphertext != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldHashKeyCiphertext)
+	}
+	if m.hash_iv_ciphertext != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldHashIvCiphertext)
+	}
+	if m.choose_payment != nil {
+		fields = append(fields, shoppaymentprovidercredential.FieldChoosePayment)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ShopPaymentProviderCredentialMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case shoppaymentprovidercredential.FieldCreatedAt:
+		return m.CreatedAt()
+	case shoppaymentprovidercredential.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case shoppaymentprovidercredential.FieldShopID:
+		return m.ShopID()
+	case shoppaymentprovidercredential.FieldProvider:
+		return m.Provider()
+	case shoppaymentprovidercredential.FieldMerchantID:
+		return m.MerchantID()
+	case shoppaymentprovidercredential.FieldHashKeyCiphertext:
+		return m.HashKeyCiphertext()
+	case shoppaymentprovidercredential.FieldHashIvCiphertext:
+		return m.HashIvCiphertext()
+	case shoppaymentprovidercredential.FieldChoosePayment:
+		return m.ChoosePayment()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ShopPaymentProviderCredentialMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case shoppaymentprovidercredential.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case shoppaymentprovidercredential.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case shoppaymentprovidercredential.FieldShopID:
+		return m.OldShopID(ctx)
+	case shoppaymentprovidercredential.FieldProvider:
+		return m.OldProvider(ctx)
+	case shoppaymentprovidercredential.FieldMerchantID:
+		return m.OldMerchantID(ctx)
+	case shoppaymentprovidercredential.FieldHashKeyCiphertext:
+		return m.OldHashKeyCiphertext(ctx)
+	case shoppaymentprovidercredential.FieldHashIvCiphertext:
+		return m.OldHashIvCiphertext(ctx)
+	case shoppaymentprovidercredential.FieldChoosePayment:
+		return m.OldChoosePayment(ctx)
+	}
+	return nil, fmt.Errorf("unknown ShopPaymentProviderCredential field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ShopPaymentProviderCredentialMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case shoppaymentprovidercredential.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case shoppaymentprovidercredential.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case shoppaymentprovidercredential.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case shoppaymentprovidercredential.FieldProvider:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetProvider(v)
+		return nil
+	case shoppaymentprovidercredential.FieldMerchantID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMerchantID(v)
+		return nil
+	case shoppaymentprovidercredential.FieldHashKeyCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHashKeyCiphertext(v)
+		return nil
+	case shoppaymentprovidercredential.FieldHashIvCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHashIvCiphertext(v)
+		return nil
+	case shoppaymentprovidercredential.FieldChoosePayment:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChoosePayment(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ShopPaymentProviderCredentialMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ShopPaymentProviderCredentialMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ShopPaymentProviderCredentialMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ShopPaymentProviderCredentialMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(shoppaymentprovidercredential.FieldChoosePayment) {
+		fields = append(fields, shoppaymentprovidercredential.FieldChoosePayment)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ShopPaymentProviderCredentialMutation) ClearField(name string) error {
+	switch name {
+	case shoppaymentprovidercredential.FieldChoosePayment:
+		m.ClearChoosePayment()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ShopPaymentProviderCredentialMutation) ResetField(name string) error {
+	switch name {
+	case shoppaymentprovidercredential.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case shoppaymentprovidercredential.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case shoppaymentprovidercredential.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case shoppaymentprovidercredential.FieldProvider:
+		m.ResetProvider()
+		return nil
+	case shoppaymentprovidercredential.FieldMerchantID:
+		m.ResetMerchantID()
+		return nil
+	case shoppaymentprovidercredential.FieldHashKeyCiphertext:
+		m.ResetHashKeyCiphertext()
+		return nil
+	case shoppaymentprovidercredential.FieldHashIvCiphertext:
+		m.ResetHashIvCiphertext()
+		return nil
+	case shoppaymentprovidercredential.FieldChoosePayment:
+		m.ResetChoosePayment()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.shop != nil {
+		edges = append(edges, shoppaymentprovidercredential.EdgeShop)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case shoppaymentprovidercredential.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedshop {
+		edges = append(edges, shoppaymentprovidercredential.EdgeShop)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ShopPaymentProviderCredentialMutation) EdgeCleared(name string) bool {
+	switch name {
+	case shoppaymentprovidercredential.EdgeShop:
+		return m.clearedshop
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ShopPaymentProviderCredentialMutation) ClearEdge(name string) error {
+	switch name {
+	case shoppaymentprovidercredential.EdgeShop:
+		m.ClearShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ShopPaymentProviderCredentialMutation) ResetEdge(name string) error {
+	switch name {
+	case shoppaymentprovidercredential.EdgeShop:
+		m.ResetShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ShopPaymentProviderCredential edge %s", name)
 }
 
 // ShopUserMutation represents an operation that mutates the ShopUser nodes in the graph.

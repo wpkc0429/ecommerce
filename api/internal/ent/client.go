@@ -37,6 +37,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
@@ -111,6 +112,8 @@ type Client struct {
 	Shop *ShopClient
 	// ShopAllowedOrigin is the client for interacting with the ShopAllowedOrigin builders.
 	ShopAllowedOrigin *ShopAllowedOriginClient
+	// ShopPaymentProviderCredential is the client for interacting with the ShopPaymentProviderCredential builders.
+	ShopPaymentProviderCredential *ShopPaymentProviderCredentialClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
 	// Site is the client for interacting with the Site builders.
@@ -164,6 +167,7 @@ func (c *Client) init() {
 	c.ShippingMethod = NewShippingMethodClient(c.config)
 	c.Shop = NewShopClient(c.config)
 	c.ShopAllowedOrigin = NewShopAllowedOriginClient(c.config)
+	c.ShopPaymentProviderCredential = NewShopPaymentProviderCredentialClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
 	c.Site = NewSiteClient(c.config)
 	c.SiteShop = NewSiteShopClient(c.config)
@@ -262,42 +266,43 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	cfg := c.config
 	cfg.driver = tx
 	return &Tx{
-		ctx:                    ctx,
-		config:                 cfg,
-		Cart:                   NewCartClient(cfg),
-		CartItem:               NewCartItemClient(cfg),
-		Category:               NewCategoryClient(cfg),
-		CheckoutIdempotencyKey: NewCheckoutIdempotencyKeyClient(cfg),
-		Member:                 NewMemberClient(cfg),
-		MemberRefreshToken:     NewMemberRefreshTokenClient(cfg),
-		MemberTier:             NewMemberTierClient(cfg),
-		Order:                  NewOrderClient(cfg),
-		OrderItem:              NewOrderItemClient(cfg),
-		OrderNotification:      NewOrderNotificationClient(cfg),
-		Page:                   NewPageClient(cfg),
-		Payment:                NewPaymentClient(cfg),
-		Permission:             NewPermissionClient(cfg),
-		PointTransaction:       NewPointTransactionClient(cfg),
-		Product:                NewProductClient(cfg),
-		ProductCategory:        NewProductCategoryClient(cfg),
-		ProductSKU:             NewProductSKUClient(cfg),
-		PublishableKey:         NewPublishableKeyClient(cfg),
-		Role:                   NewRoleClient(cfg),
-		RolePermission:         NewRolePermissionClient(cfg),
-		RoleUser:               NewRoleUserClient(cfg),
-		Shipment:               NewShipmentClient(cfg),
-		ShipmentItem:           NewShipmentItemClient(cfg),
-		ShippingMethod:         NewShippingMethodClient(cfg),
-		Shop:                   NewShopClient(cfg),
-		ShopAllowedOrigin:      NewShopAllowedOriginClient(cfg),
-		ShopUser:               NewShopUserClient(cfg),
-		Site:                   NewSiteClient(cfg),
-		SiteShop:               NewSiteShopClient(cfg),
-		Theme:                  NewThemeClient(cfg),
-		ThemePage:              NewThemePageClient(cfg),
-		User:                   NewUserClient(cfg),
-		UserPermission:         NewUserPermissionClient(cfg),
-		UserRefreshToken:       NewUserRefreshTokenClient(cfg),
+		ctx:                           ctx,
+		config:                        cfg,
+		Cart:                          NewCartClient(cfg),
+		CartItem:                      NewCartItemClient(cfg),
+		Category:                      NewCategoryClient(cfg),
+		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		Member:                        NewMemberClient(cfg),
+		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
+		MemberTier:                    NewMemberTierClient(cfg),
+		Order:                         NewOrderClient(cfg),
+		OrderItem:                     NewOrderItemClient(cfg),
+		OrderNotification:             NewOrderNotificationClient(cfg),
+		Page:                          NewPageClient(cfg),
+		Payment:                       NewPaymentClient(cfg),
+		Permission:                    NewPermissionClient(cfg),
+		PointTransaction:              NewPointTransactionClient(cfg),
+		Product:                       NewProductClient(cfg),
+		ProductCategory:               NewProductCategoryClient(cfg),
+		ProductSKU:                    NewProductSKUClient(cfg),
+		PublishableKey:                NewPublishableKeyClient(cfg),
+		Role:                          NewRoleClient(cfg),
+		RolePermission:                NewRolePermissionClient(cfg),
+		RoleUser:                      NewRoleUserClient(cfg),
+		Shipment:                      NewShipmentClient(cfg),
+		ShipmentItem:                  NewShipmentItemClient(cfg),
+		ShippingMethod:                NewShippingMethodClient(cfg),
+		Shop:                          NewShopClient(cfg),
+		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
+		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
+		ShopUser:                      NewShopUserClient(cfg),
+		Site:                          NewSiteClient(cfg),
+		SiteShop:                      NewSiteShopClient(cfg),
+		Theme:                         NewThemeClient(cfg),
+		ThemePage:                     NewThemePageClient(cfg),
+		User:                          NewUserClient(cfg),
+		UserPermission:                NewUserPermissionClient(cfg),
+		UserRefreshToken:              NewUserRefreshTokenClient(cfg),
 	}, nil
 }
 
@@ -315,42 +320,43 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	cfg := c.config
 	cfg.driver = &txDriver{tx: tx, drv: c.driver}
 	return &Tx{
-		ctx:                    ctx,
-		config:                 cfg,
-		Cart:                   NewCartClient(cfg),
-		CartItem:               NewCartItemClient(cfg),
-		Category:               NewCategoryClient(cfg),
-		CheckoutIdempotencyKey: NewCheckoutIdempotencyKeyClient(cfg),
-		Member:                 NewMemberClient(cfg),
-		MemberRefreshToken:     NewMemberRefreshTokenClient(cfg),
-		MemberTier:             NewMemberTierClient(cfg),
-		Order:                  NewOrderClient(cfg),
-		OrderItem:              NewOrderItemClient(cfg),
-		OrderNotification:      NewOrderNotificationClient(cfg),
-		Page:                   NewPageClient(cfg),
-		Payment:                NewPaymentClient(cfg),
-		Permission:             NewPermissionClient(cfg),
-		PointTransaction:       NewPointTransactionClient(cfg),
-		Product:                NewProductClient(cfg),
-		ProductCategory:        NewProductCategoryClient(cfg),
-		ProductSKU:             NewProductSKUClient(cfg),
-		PublishableKey:         NewPublishableKeyClient(cfg),
-		Role:                   NewRoleClient(cfg),
-		RolePermission:         NewRolePermissionClient(cfg),
-		RoleUser:               NewRoleUserClient(cfg),
-		Shipment:               NewShipmentClient(cfg),
-		ShipmentItem:           NewShipmentItemClient(cfg),
-		ShippingMethod:         NewShippingMethodClient(cfg),
-		Shop:                   NewShopClient(cfg),
-		ShopAllowedOrigin:      NewShopAllowedOriginClient(cfg),
-		ShopUser:               NewShopUserClient(cfg),
-		Site:                   NewSiteClient(cfg),
-		SiteShop:               NewSiteShopClient(cfg),
-		Theme:                  NewThemeClient(cfg),
-		ThemePage:              NewThemePageClient(cfg),
-		User:                   NewUserClient(cfg),
-		UserPermission:         NewUserPermissionClient(cfg),
-		UserRefreshToken:       NewUserRefreshTokenClient(cfg),
+		ctx:                           ctx,
+		config:                        cfg,
+		Cart:                          NewCartClient(cfg),
+		CartItem:                      NewCartItemClient(cfg),
+		Category:                      NewCategoryClient(cfg),
+		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		Member:                        NewMemberClient(cfg),
+		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
+		MemberTier:                    NewMemberTierClient(cfg),
+		Order:                         NewOrderClient(cfg),
+		OrderItem:                     NewOrderItemClient(cfg),
+		OrderNotification:             NewOrderNotificationClient(cfg),
+		Page:                          NewPageClient(cfg),
+		Payment:                       NewPaymentClient(cfg),
+		Permission:                    NewPermissionClient(cfg),
+		PointTransaction:              NewPointTransactionClient(cfg),
+		Product:                       NewProductClient(cfg),
+		ProductCategory:               NewProductCategoryClient(cfg),
+		ProductSKU:                    NewProductSKUClient(cfg),
+		PublishableKey:                NewPublishableKeyClient(cfg),
+		Role:                          NewRoleClient(cfg),
+		RolePermission:                NewRolePermissionClient(cfg),
+		RoleUser:                      NewRoleUserClient(cfg),
+		Shipment:                      NewShipmentClient(cfg),
+		ShipmentItem:                  NewShipmentItemClient(cfg),
+		ShippingMethod:                NewShippingMethodClient(cfg),
+		Shop:                          NewShopClient(cfg),
+		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
+		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
+		ShopUser:                      NewShopUserClient(cfg),
+		Site:                          NewSiteClient(cfg),
+		SiteShop:                      NewSiteShopClient(cfg),
+		Theme:                         NewThemeClient(cfg),
+		ThemePage:                     NewThemePageClient(cfg),
+		User:                          NewUserClient(cfg),
+		UserPermission:                NewUserPermissionClient(cfg),
+		UserRefreshToken:              NewUserRefreshTokenClient(cfg),
 	}, nil
 }
 
@@ -385,8 +391,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
 		c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop,
-		c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage,
-		c.User, c.UserPermission, c.UserRefreshToken,
+		c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser, c.Site,
+		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -401,8 +407,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
 		c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop,
-		c.ShopAllowedOrigin, c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage,
-		c.User, c.UserPermission, c.UserRefreshToken,
+		c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser, c.Site,
+		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -463,6 +469,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Shop.mutate(ctx, m)
 	case *ShopAllowedOriginMutation:
 		return c.ShopAllowedOrigin.mutate(ctx, m)
+	case *ShopPaymentProviderCredentialMutation:
+		return c.ShopPaymentProviderCredential.mutate(ctx, m)
 	case *ShopUserMutation:
 		return c.ShopUser.mutate(ctx, m)
 	case *SiteMutation:
@@ -4859,6 +4867,155 @@ func (c *ShopAllowedOriginClient) mutate(ctx context.Context, m *ShopAllowedOrig
 	}
 }
 
+// ShopPaymentProviderCredentialClient is a client for the ShopPaymentProviderCredential schema.
+type ShopPaymentProviderCredentialClient struct {
+	config
+}
+
+// NewShopPaymentProviderCredentialClient returns a client for the ShopPaymentProviderCredential from the given config.
+func NewShopPaymentProviderCredentialClient(c config) *ShopPaymentProviderCredentialClient {
+	return &ShopPaymentProviderCredentialClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shoppaymentprovidercredential.Hooks(f(g(h())))`.
+func (c *ShopPaymentProviderCredentialClient) Use(hooks ...Hook) {
+	c.hooks.ShopPaymentProviderCredential = append(c.hooks.ShopPaymentProviderCredential, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shoppaymentprovidercredential.Intercept(f(g(h())))`.
+func (c *ShopPaymentProviderCredentialClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopPaymentProviderCredential = append(c.inters.ShopPaymentProviderCredential, interceptors...)
+}
+
+// Create returns a builder for creating a ShopPaymentProviderCredential entity.
+func (c *ShopPaymentProviderCredentialClient) Create() *ShopPaymentProviderCredentialCreate {
+	mutation := newShopPaymentProviderCredentialMutation(c.config, OpCreate)
+	return &ShopPaymentProviderCredentialCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopPaymentProviderCredential entities.
+func (c *ShopPaymentProviderCredentialClient) CreateBulk(builders ...*ShopPaymentProviderCredentialCreate) *ShopPaymentProviderCredentialCreateBulk {
+	return &ShopPaymentProviderCredentialCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopPaymentProviderCredentialClient) MapCreateBulk(slice any, setFunc func(*ShopPaymentProviderCredentialCreate, int)) *ShopPaymentProviderCredentialCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopPaymentProviderCredentialCreateBulk{err: fmt.Errorf("calling to ShopPaymentProviderCredentialClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopPaymentProviderCredentialCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopPaymentProviderCredentialCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopPaymentProviderCredential.
+func (c *ShopPaymentProviderCredentialClient) Update() *ShopPaymentProviderCredentialUpdate {
+	mutation := newShopPaymentProviderCredentialMutation(c.config, OpUpdate)
+	return &ShopPaymentProviderCredentialUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopPaymentProviderCredentialClient) UpdateOne(_m *ShopPaymentProviderCredential) *ShopPaymentProviderCredentialUpdateOne {
+	mutation := newShopPaymentProviderCredentialMutation(c.config, OpUpdateOne, withShopPaymentProviderCredential(_m))
+	return &ShopPaymentProviderCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopPaymentProviderCredentialClient) UpdateOneID(id int) *ShopPaymentProviderCredentialUpdateOne {
+	mutation := newShopPaymentProviderCredentialMutation(c.config, OpUpdateOne, withShopPaymentProviderCredentialID(id))
+	return &ShopPaymentProviderCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopPaymentProviderCredential.
+func (c *ShopPaymentProviderCredentialClient) Delete() *ShopPaymentProviderCredentialDelete {
+	mutation := newShopPaymentProviderCredentialMutation(c.config, OpDelete)
+	return &ShopPaymentProviderCredentialDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopPaymentProviderCredentialClient) DeleteOne(_m *ShopPaymentProviderCredential) *ShopPaymentProviderCredentialDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopPaymentProviderCredentialClient) DeleteOneID(id int) *ShopPaymentProviderCredentialDeleteOne {
+	builder := c.Delete().Where(shoppaymentprovidercredential.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopPaymentProviderCredentialDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopPaymentProviderCredential.
+func (c *ShopPaymentProviderCredentialClient) Query() *ShopPaymentProviderCredentialQuery {
+	return &ShopPaymentProviderCredentialQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopPaymentProviderCredential},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopPaymentProviderCredential entity by its id.
+func (c *ShopPaymentProviderCredentialClient) Get(ctx context.Context, id int) (*ShopPaymentProviderCredential, error) {
+	return c.Query().Where(shoppaymentprovidercredential.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopPaymentProviderCredentialClient) GetX(ctx context.Context, id int) *ShopPaymentProviderCredential {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a ShopPaymentProviderCredential.
+func (c *ShopPaymentProviderCredentialClient) QueryShop(_m *ShopPaymentProviderCredential) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shoppaymentprovidercredential.Table, shoppaymentprovidercredential.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shoppaymentprovidercredential.ShopTable, shoppaymentprovidercredential.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShopPaymentProviderCredentialClient) Hooks() []Hook {
+	return c.hooks.ShopPaymentProviderCredential
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopPaymentProviderCredentialClient) Interceptors() []Interceptor {
+	return c.inters.ShopPaymentProviderCredential
+}
+
+func (c *ShopPaymentProviderCredentialClient) mutate(ctx context.Context, m *ShopPaymentProviderCredentialMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopPaymentProviderCredentialCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopPaymentProviderCredentialUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopPaymentProviderCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopPaymentProviderCredentialDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopPaymentProviderCredential mutation op: %q", m.Op())
+	}
+}
+
 // ShopUserClient is a client for the ShopUser schema.
 type ShopUserClient struct {
 	config
@@ -6153,16 +6310,16 @@ type (
 		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
 		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopUser, Site, SiteShop, Theme, ThemePage, User,
-		UserPermission, UserRefreshToken []ent.Hook
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		Cart, CartItem, Category, CheckoutIdempotencyKey, Member, MemberRefreshToken,
 		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
 		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopUser, Site, SiteShop, Theme, ThemePage, User,
-		UserPermission, UserRefreshToken []ent.Interceptor
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

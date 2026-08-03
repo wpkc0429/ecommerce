@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/config"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/order"
@@ -51,9 +52,11 @@ type paymentEnv struct {
 	memberA1, memberA2 int // shop A members: cross-member isolation
 	memberB1           int // shop B member: cross-shop isolation
 
-	ownerA  int // merchant_owner of shop A: payment.view
-	viewerA int // shop A role WITHOUT payment.view
+	ownerA  int // merchant_owner of shop A: payment.view + payment_credential.manage
+	viewerA int // shop A role WITHOUT payment.view / payment_credential.manage
 	ownerB  int // merchant_owner of shop B: cross-shop isolation checks
+
+	credentialsBox *cryptbox.Box // change ecpay-per-shop-credentials
 
 	seq int // fixture uniqueness counter
 }
@@ -70,11 +73,15 @@ func newPaymentEnv(t *testing.T) *paymentEnv {
 	}
 
 	permIDs := map[string]int{}
-	for _, p := range []string{"payment.view"} {
+	for _, p := range []string{"payment.view", "payment_credential.manage"} {
 		permIDs[p] = client.Permission.Create().SetName(p).SaveX(ctx).ID
 	}
 	ownerRole := client.Role.Create().SetName("merchant_owner").SetScope("merchant").SaveX(ctx)
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(permIDs["payment.view"]).SaveX(ctx)
+	// change ecpay-per-shop-credentials (design D6): granted to merchant_owner
+	// only — viewerRole below (an "editor"-shaped role with no permissions
+	// granted) never gets it, mirroring seed.go's real grant.
+	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(permIDs["payment_credential.manage"]).SaveX(ctx)
 	viewerRole := client.Role.Create().SetName("editor").SetScope("merchant").SaveX(ctx) // no permissions granted
 
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
@@ -128,11 +135,17 @@ func newPaymentEnv(t *testing.T) *paymentEnv {
 		Client: client,
 		Orders: e.orderSvc,
 		Log:    log,
-		Providers: map[string]payment.Provider{
+		Providers: map[string]any{
 			mock.Name(): mock, ecpayProv.Name(): ecpayProv,
 		},
 		DefaultProvider: mock.Name(),
 	}
+
+	box, berr := cryptbox.ParseKey("2dc4b492d52044d57f475c789f3d3d75375a13709d9e7625ff89d1b924c7f64c")
+	if berr != nil {
+		t.Fatal(berr)
+	}
+	e.credentialsBox = box
 
 	e.router = httpapi.New(httpapi.Deps{
 		Cfg:      &config.Config{},
@@ -142,6 +155,10 @@ func newPaymentEnv(t *testing.T) *paymentEnv {
 		MemberMW: httpapi.NewMemberMiddleware(issuer),
 		Orders:   &httpapi.OrderHandler{Client: client, Service: e.orderSvc, Authz: authz, Log: log},
 		Payments: &httpapi.PaymentHandler{Client: client, Service: e.paymentSvc, Authz: authz, Log: log},
+		// change ecpay-per-shop-credentials.
+		PaymentCredentials: &httpapi.PaymentCredentialsHandler{
+			Client: client, Authz: authz, Log: log, Box: box,
+		},
 	})
 	return e
 }

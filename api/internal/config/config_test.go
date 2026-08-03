@@ -47,3 +47,28 @@ func TestReportDefaultTimezoneFallsBackToTaipei(t *testing.T) {
 		t.Errorf("unset REPORT_DEFAULT_TIMEZONE gave %q, want Asia/Taipei", cfg.ReportDefaultTimezone)
 	}
 }
+
+// TestLoadValidatesPaymentCredentialsEncryptionKey (change
+// ecpay-per-shop-credentials, design D4): same treatment as
+// REPORT_DEFAULT_TIMEZONE and for the same reason — a bad value here does not
+// disable a feature, it makes every stored credential unreadable, silently,
+// until someone tries to use it.
+func TestLoadValidatesPaymentCredentialsEncryptionKey(t *testing.T) {
+	t.Setenv("PAYMENT_CREDENTIALS_ENCRYPTION_KEY", "too-short")
+	if _, err := Load(); err == nil {
+		t.Fatal("Load() accepted a bogus PAYMENT_CREDENTIALS_ENCRYPTION_KEY — the service would boot and fail only when a credential is read/written")
+	} else if !strings.Contains(err.Error(), "PAYMENT_CREDENTIALS_ENCRYPTION_KEY") {
+		t.Errorf("error does not name the offending setting: %v", err)
+	}
+}
+
+func TestLoadDefaultsPaymentCredentialsEncryptionKeyToAValidDevKey(t *testing.T) {
+	t.Setenv("PAYMENT_CREDENTIALS_ENCRYPTION_KEY", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load(): %v", err)
+	}
+	if cfg.PaymentCredentialsEncryptionKey == "" {
+		t.Fatal("unset PAYMENT_CREDENTIALS_ENCRYPTION_KEY produced an empty value")
+	}
+}

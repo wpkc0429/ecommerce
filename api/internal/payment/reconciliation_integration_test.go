@@ -67,7 +67,7 @@ func TestHandleWebhookPendingOutcomeLeavesTheRowClaimable(t *testing.T) {
 	}
 
 	// Delivery 1: non-terminal.
-	p, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomePending,
 		ProviderTransactionID: "2412311225437371",
 	})
@@ -97,7 +97,7 @@ func TestHandleWebhookPendingOutcomeLeavesTheRowClaimable(t *testing.T) {
 
 	// Delivery 2: the real thing. It can only succeed because delivery 1 left
 	// the row pending.
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	}); err != nil {
 		t.Fatalf("second HandleWebhook: %v", err)
@@ -128,7 +128,7 @@ func TestHandleWebhookRejectsAnAmountThatDisagrees(t *testing.T) {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
 
-	_, err = svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	_, err = svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 		Amount: 34, // the classic off-by-100
 	})
@@ -158,7 +158,7 @@ func TestHandleWebhookAcceptsAMatchingAmount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	p, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded, Amount: 3400,
 	})
 	if err != nil {
@@ -183,7 +183,7 @@ func TestHandleWebhookRecordsProviderTransactionIDAndPaidAt(t *testing.T) {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
 	paidAt := time.Date(2026, 8, 1, 12, 26, 9, 0, time.UTC)
-	p, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 		ProviderTransactionID: "2412311225437371", PaidAt: &paidAt,
 	})
@@ -199,7 +199,7 @@ func TestHandleWebhookRecordsProviderTransactionIDAndPaidAt(t *testing.T) {
 
 	// A later redelivery carrying nothing must not erase what the first one
 	// established.
-	p, err = svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err = svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	})
 	if err != nil {
@@ -224,7 +224,7 @@ func TestHandleWebhookLeavesProviderFactsNullWhenNotReported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	p, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	})
 	if err != nil {
@@ -266,7 +266,7 @@ func TestCancelledOrderIsNeverAdvancedToPaid(t *testing.T) {
 	}
 
 	// The customer finishes paying on the provider's page anyway.
-	p, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	})
 	if err != nil {
@@ -311,7 +311,7 @@ func TestPaidOrderCannotBeCancelled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	}); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
@@ -385,7 +385,7 @@ func TestListAdminFindsAPaymentByEitherIdentifier(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference:     res.ProviderReference,
 		Outcome:               payment.OutcomeSucceeded,
 		ProviderTransactionID: "2412311225437371",
@@ -485,7 +485,7 @@ func TestListAdminFindsThePaymentThatNeedsAManualRefund(t *testing.T) {
 	if _, err := f.orders.CancelOrder(ctx, f.shopID, ord.ID, nil); err != nil {
 		t.Fatalf("CancelOrder: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 		ProviderTransactionID: "2412311225437371",
 	}); err != nil {

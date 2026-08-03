@@ -1029,6 +1029,39 @@ var (
 			},
 		},
 	}
+	// ShopPaymentProviderCredentialsColumns holds the columns for the "shop_payment_provider_credentials" table.
+	ShopPaymentProviderCredentialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "provider", Type: field.TypeString, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
+		{Name: "merchant_id", Type: field.TypeString, Size: 191, SchemaType: map[string]string{"postgres": "varchar(191)"}},
+		{Name: "hash_key_ciphertext", Type: field.TypeBytes},
+		{Name: "hash_iv_ciphertext", Type: field.TypeBytes},
+		{Name: "choose_payment", Type: field.TypeString, Nullable: true, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ShopPaymentProviderCredentialsTable holds the schema information for the "shop_payment_provider_credentials" table.
+	ShopPaymentProviderCredentialsTable = &schema.Table{
+		Name:       "shop_payment_provider_credentials",
+		Columns:    ShopPaymentProviderCredentialsColumns,
+		PrimaryKey: []*schema.Column{ShopPaymentProviderCredentialsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shop_payment_provider_credentials_shops_shop",
+				Columns:    []*schema.Column{ShopPaymentProviderCredentialsColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shoppaymentprovidercredential_shop_id_provider",
+				Unique:  true,
+				Columns: []*schema.Column{ShopPaymentProviderCredentialsColumns[8], ShopPaymentProviderCredentialsColumns[3]},
+			},
+		},
+	}
 	// ShopUserColumns holds the columns for the "shop_user" table.
 	ShopUserColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1298,6 +1331,7 @@ var (
 		ShippingMethodsTable,
 		ShopsTable,
 		ShopAllowedOriginsTable,
+		ShopPaymentProviderCredentialsTable,
 		ShopUserTable,
 		SitesTable,
 		SiteShopTable,
@@ -1477,6 +1511,10 @@ func init() {
 	ShopAllowedOriginsTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopAllowedOriginsTable.Annotation = &entsql.Annotation{
 		Table: "shop_allowed_origins",
+	}
+	ShopPaymentProviderCredentialsTable.ForeignKeys[0].RefTable = ShopsTable
+	ShopPaymentProviderCredentialsTable.Annotation = &entsql.Annotation{
+		Table: "shop_payment_provider_credentials",
 	}
 	ShopUserTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopUserTable.ForeignKeys[1].RefTable = UsersTable

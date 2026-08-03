@@ -3,6 +3,7 @@ package payment_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"testing"
 
@@ -73,7 +74,7 @@ func newTestService(f *paymentFixtures) *payment.Service {
 	return &payment.Service{
 		Client:          f.client,
 		Orders:          f.orders,
-		Providers:       map[string]payment.Provider{mock.Name(): mock},
+		Providers:       map[string]any{mock.Name(): mock},
 		DefaultProvider: mock.Name(),
 	}
 }
@@ -99,7 +100,7 @@ func TestServiceInitiatePaymentAndWebhookSuccessFlow(t *testing.T) {
 		t.Fatal("expected a provider reference")
 	}
 
-	updated, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	updated, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	})
 	if err != nil {
@@ -130,7 +131,7 @@ func TestServiceHandleWebhookFailedDoesNotTouchOrder(t *testing.T) {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
 
-	updated, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	updated, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeFailed,
 	})
 	if err != nil {
@@ -171,11 +172,11 @@ func TestServiceHandleWebhookDuplicateSucceededIsSafeNoOp(t *testing.T) {
 	}
 	wh := &payment.WebhookResult{ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded}
 
-	if _, err := svc.HandleWebhook(ctx, "mock", wh); err != nil {
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, wh); err != nil {
 		t.Fatalf("first HandleWebhook: %v", err)
 	}
 	// Deliver the exact same successful webhook a second time.
-	second, err := svc.HandleWebhook(ctx, "mock", wh)
+	second, err := svc.HandleWebhook(ctx, "mock", 0, wh)
 	if err != nil {
 		t.Fatalf("second HandleWebhook (must be a safe no-op, not an error): %v", err)
 	}
@@ -208,14 +209,14 @@ func TestServiceHandleWebhookConflictingSucceededAfterFailedIsIgnored(t *testing
 		t.Fatalf("InitiatePayment: %v", err)
 	}
 
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeFailed,
 	}); err != nil {
 		t.Fatalf("HandleWebhook (failed): %v", err)
 	}
 
 	// A later, conflicting "succeeded" redelivery for the same reference.
-	conflicting, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	conflicting, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	})
 	if err != nil {
@@ -237,7 +238,7 @@ func TestServiceHandleWebhookConflictingSucceededAfterFailedIsIgnored(t *testing
 func TestServiceHandleWebhookUnknownReferenceIsErrNotFound(t *testing.T) {
 	f := setupPaymentFixtures(t)
 	svc := newTestService(f)
-	_, err := svc.HandleWebhook(context.Background(), "mock", &payment.WebhookResult{
+	_, err := svc.HandleWebhook(context.Background(), "mock", 0, &payment.WebhookResult{
 		ProviderReference: "mock_does-not-exist", Outcome: payment.OutcomeSucceeded,
 	})
 	if err != payment.ErrNotFound {
@@ -344,7 +345,7 @@ func TestServiceHandleWebhookPublishesOrderPaymentSucceeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	}); err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
@@ -388,10 +389,10 @@ func TestServiceHandleWebhookDuplicateSucceededPublishesEventAgain(t *testing.T)
 		t.Fatalf("InitiatePayment: %v", err)
 	}
 	wh := &payment.WebhookResult{ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded}
-	if _, err := svc.HandleWebhook(ctx, "mock", wh); err != nil {
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, wh); err != nil {
 		t.Fatalf("first HandleWebhook: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", wh); err != nil {
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, wh); err != nil {
 		t.Fatalf("second HandleWebhook: %v", err)
 	}
 
@@ -415,10 +416,47 @@ func TestServiceHandleWebhookWithoutDispatcherIsNilSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitiatePayment: %v", err)
 	}
-	if _, err := svc.HandleWebhook(ctx, "mock", &payment.WebhookResult{
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
 		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
 	}); err != nil {
 		t.Fatalf("HandleWebhook must not fail with a nil Dispatcher: %v", err)
+	}
+}
+
+// Scenario: webhook 用錯商家 id 驗簽必然失敗 (change ecpay-per-shop-credentials,
+// design D2's defensive assertion in HandleWebhook itself): a shopID that does
+// not match the located payment's own shop_id is treated as unrecognized —
+// the same ErrNotFound an unknown provider_reference gets, not a data leak.
+func TestHandleWebhookRejectsMismatchedShopID(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	ctx := context.Background()
+	memberID := f.newMember(t, "mismatch@t.dev")
+	ord := f.newOrder(t, memberID, 2000)
+	svc := newTestService(f)
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+
+	otherShop := f.client.Shop.Create().SetName("Other Shop").SetStatus(1).SaveX(ctx)
+
+	if _, err := svc.HandleWebhook(ctx, "mock", otherShop.ID, &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
+	}); !errors.Is(err, payment.ErrNotFound) {
+		t.Fatalf("HandleWebhook with the wrong shop id = %v, want payment.ErrNotFound", err)
+	}
+
+	// The correct shop id still works — the check above did not corrupt
+	// anything, it simply refused to advance under the wrong shop id.
+	updated, err := svc.HandleWebhook(ctx, "mock", f.shopID, &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded,
+	})
+	if err != nil {
+		t.Fatalf("HandleWebhook with the correct shop id: %v", err)
+	}
+	if updated.Status != payment.StatusSucceeded {
+		t.Fatalf("expected succeeded status, got %d", updated.Status)
 	}
 }
 

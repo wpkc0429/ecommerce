@@ -47,6 +47,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/config"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
@@ -83,6 +84,8 @@ var requiredSchemas = []string{
 	"EffectiveTimezone", "ShopSettings",
 	"ReportAmounts", "SalesBucket", "SalesReport", "SalesReportCurrency",
 	"ProductSalesReport", "ProductSalesCurrency", "ProductSalesRow",
+	// change ecpay-per-shop-credentials.
+	"ECPayCredentials",
 }
 
 // ── 契約驅動的回應驗證 ────────────────────────────────────────────────
@@ -259,6 +262,18 @@ type conformanceEnv struct {
 	webhookSecret string
 }
 
+// conformanceCredentialsBox (change ecpay-per-shop-credentials) is an
+// arbitrary valid 32-byte key — this env only needs the encryption to work,
+// not to match any particular value.
+func conformanceCredentialsBox(t *testing.T) *cryptbox.Box {
+	t.Helper()
+	box, err := cryptbox.ParseKey("e4c51748bcf463bfadf08fda0e67109fd002227d6719cb78e531052da402375b")
+	if err != nil {
+		t.Fatalf("ParseKey: %v", err)
+	}
+	return box
+}
+
 func newConformanceEnv(t *testing.T) *conformanceEnv {
 	t.Helper()
 	client := testutil.OpenDB(t)
@@ -306,9 +321,13 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	// report and settings routes are guarded by.
 	reportPerm := client.Permission.Create().SetName("report.view").SaveX(ctx).ID
 	updatePerm := client.Permission.Create().SetName("shop.update").SaveX(ctx).ID
+	// change ecpay-per-shop-credentials: same owner also holds the one node
+	// the credentials endpoint is guarded by.
+	credentialPerm := client.Permission.Create().SetName("payment_credential.manage").SaveX(ctx).ID
 	ownerRole := client.Role.Create().SetName("merchant_owner").SetScope("merchant").SaveX(ctx)
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(reportPerm).SaveX(ctx)
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(updatePerm).SaveX(ctx)
+	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(credentialPerm).SaveX(ctx)
 	adminHash, err := auth.HashPassword("conformance-admin-1")
 	if err != nil {
 		t.Fatal(err)
@@ -344,7 +363,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	}, nil)
 	paymentSvc := &payment.Service{
 		Client: client, Orders: orderSvc, Dispatcher: dispatcher, Log: log,
-		Providers: map[string]payment.Provider{
+		Providers: map[string]any{
 			mock.Name(): mock, ecpayProv.Name(): ecpayProv,
 		},
 		DefaultProvider: mock.Name(),
@@ -365,6 +384,10 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		},
 		ShopSettings: &ShopSettingsHandler{
 			Client: client, Authz: authz, Log: log, DefaultTimezone: "Asia/Taipei",
+		},
+		// change ecpay-per-shop-credentials.
+		PaymentCredentials: &PaymentCredentialsHandler{
+			Client: client, Authz: authz, Log: log, Box: conformanceCredentialsBox(t),
 		},
 		TenantMW:      NewTenantMiddleware(resolver),
 		MemberMW:      NewMemberMiddleware(issuer),
@@ -742,6 +765,21 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 		map[string]any{"timezone": "Asia/Taipei"})
 	requireStatus(t, code, http.StatusOK, body)
 	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/settings", http.MethodPut, http.StatusOK, body)
+
+	// change ecpay-per-shop-credentials: PUT (first-time setup) then GET, so
+	// both the "just written" and "read back later" shapes of ECPayCredentials
+	// are the same validated response — the secret fields never appear either
+	// way, which additionalProperties: false on the schema would catch if they
+	// ever did.
+	code, body = e.do(t, http.MethodPut, shopPrefix+"/ecpay-credentials", adminTok, map[string]any{
+		"merchant_id": "3002607", "hash_key": "pwFHCqoQZGmho4w6", "hash_iv": "EkRm7iFT261dpevs",
+	})
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/ecpay-credentials", http.MethodPut, http.StatusOK, body)
+
+	code, body = e.do(t, http.MethodGet, shopPrefix+"/ecpay-credentials", adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/ecpay-credentials", http.MethodGet, http.StatusOK, body)
 
 	// ── 規則 2：共用 schema 覆蓋 ──────────────────────────────────────
 	var uncovered []string

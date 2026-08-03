@@ -35,9 +35,10 @@ func main() {
 	defer func() { _ = client.Close() }()
 
 	opts := seed.Options{
-		AdminEmail:    os.Getenv("SEED_ADMIN_EMAIL"),
-		AdminPassword: os.Getenv("SEED_ADMIN_PASSWORD"),
-		Demo:          *demo,
+		AdminEmail:                      os.Getenv("SEED_ADMIN_EMAIL"),
+		AdminPassword:                   os.Getenv("SEED_ADMIN_PASSWORD"),
+		Demo:                            *demo,
+		PaymentCredentialsEncryptionKey: cfg.PaymentCredentialsEncryptionKey,
 	}
 	if err := seed.Run(ctx, client, opts); err != nil {
 		log.Fatalf("seed: %v", err)

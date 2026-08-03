@@ -87,13 +87,14 @@ const maxTradeDescRunes = 200
 
 // Config carries the credentials and endpoints one 綠界 merchant account needs.
 //
-// **Known limitation, stated rather than hidden (design Risks):** this is
-// platform-level configuration, not per-shop. With two shops on one platform
-// deployment, both merchants' money lands in the same 綠界 account. The data
-// layer is already safe (MerchantTradeNo is unique across shops), but this MUST
-// be solved before a second merchant goes live — the fix is encrypted per-shop
-// credentials resolved from InitiateRequest.ShopID, which needs a key management
-// story this system does not yet have.
+// One Config always represents exactly ONE shop's account (design D1 no
+// longer holds a platform-wide singleton — change ecpay-per-shop-credentials).
+// `Provider` itself stays exactly as pure and DB-free as it always was: it has
+// no idea whether its Config came from an environment variable or a decrypted
+// database row. The per-shop resolution — looking up the shop's stored
+// credentials, decrypting HashKey/HashIV, and constructing a Config — lives in
+// ShopResolver (resolver.go), which is the only file in this package that
+// touches ent/DB.
 type Config struct {
 	MerchantID string
 	HashKey    string

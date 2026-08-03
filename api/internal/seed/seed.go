@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
 	entmember "ksdevworks/ecommerce/api/internal/ent/member"
@@ -28,12 +29,14 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	entpaymentcredential "ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/site"
 	"ksdevworks/ecommerce/api/internal/ent/siteshop"
 	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
+	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 )
 
 //go:embed schemas/starter/config_schema.json
@@ -47,6 +50,12 @@ type Options struct {
 	AdminEmail    string
 	AdminPassword string
 	Demo          bool // additionally create a demo shop bound to demo.localhost
+
+	// PaymentCredentialsEncryptionKey encrypts the demo shop's seeded ecpay
+	// credentials (change ecpay-per-shop-credentials, design D9). Only used
+	// when Demo is true. Callers pass config.Config.PaymentCredentialsEncryptionKey
+	// so a seeded database is always readable by the server it seeds for.
+	PaymentCredentialsEncryptionKey string
 }
 
 // PermissionCatalog is the Phase 1 permission node catalog (shop.*, page.*,
@@ -115,6 +124,12 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	// The shop's time zone is edited through the EXISTING `shop.update` node
 	// (design D7), because it is a shop setting, not a report.
 	{"report.view", "檢視營運報表（營業額與商品銷售排行）"},
+	// change ecpay-per-shop-credentials (design D6): exactly one node. There is
+	// no `payment_credential.view`/`.manage` split — the secret fields are
+	// write-only at the API level regardless of who holds this node (GET never
+	// returns HashKey/HashIV plaintext to anyone), so a separate view-only node
+	// would gate nothing a holder of .manage doesn't already see less of.
+	{"payment_credential.manage", "設定商家自己的金流商憑證（如綠界 MerchantID/HashKey/HashIV）"},
 }
 
 // roleDefs maps seeded roles to their scope and granted permissions.
@@ -143,6 +158,13 @@ var roleDefs = []struct {
 		// operational rhythm. Deliberately not granted to `editor` — minting a
 		// client identity is an integration action, not content editing.
 		"publishable_key.view", "publishable_key.create", "publishable_key.revoke",
+		// change ecpay-per-shop-credentials: same reasoning as
+		// publishable_key.* above, one order of magnitude more sensitive —
+		// `editor` has no path today that lets it see or infer a payment
+		// provider's HashKey/HashIV, so unlike member.view/report.view this
+		// boundary is real and worth keeping. Deliberately not granted to
+		// `editor`.
+		"payment_credential.manage",
 	}},
 	{"editor", "merchant", []string{
 		"shop.view", "page.view", "page.create", "page.edit", "theme.view",
@@ -218,7 +240,11 @@ func Run(ctx context.Context, client *ent.Client, opts Options) (err error) {
 		return err
 	}
 	if opts.Demo {
-		if err = seedDemoShop(ctx, tx, starterID, roles["merchant_owner"]); err != nil {
+		box, berr := cryptbox.ParseKey(opts.PaymentCredentialsEncryptionKey)
+		if berr != nil {
+			return fmt.Errorf("seed: PaymentCredentialsEncryptionKey: %w", berr)
+		}
+		if err = seedDemoShop(ctx, tx, starterID, roles["merchant_owner"], box); err != nil {
 			return err
 		}
 	}
@@ -423,7 +449,7 @@ func seedStarterTheme(ctx context.Context, tx *ent.Tx) (int, error) {
 	return t.ID, nil
 }
 
-func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID int) error {
+func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID int, box *cryptbox.Box) error {
 	const demoDomain = "demo.localhost"
 
 	s, err := tx.Site.Query().Where(site.DomainEQ(demoDomain)).Only(ctx)
@@ -524,6 +550,9 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 		return err
 	}
 	if err := seedDemoCustomer(ctx, tx, shopID); err != nil {
+		return err
+	}
+	if err := seedDemoPaymentCredentials(ctx, tx, shopID, box); err != nil {
 		return err
 	}
 
@@ -1020,6 +1049,42 @@ func seedDemoCustomer(ctx context.Context, tx *ent.Tx, shopID int) error {
 		SetStatus(1).
 		Save(ctx); err != nil {
 		return fmt.Errorf("seed: demo customer: %w", err)
+	}
+	return nil
+}
+
+// seedDemoPaymentCredentials gives the demo shop its own ecpay credentials
+// (change ecpay-per-shop-credentials, design D9): the values used are 綠界's
+// own published AIO test-store sample (the same ones that used to be the
+// ECPAY_* platform-wide defaults before this change), so make seed-demo /
+// e2e's ecpay flow behaves exactly as it did before per-shop credentials
+// existed. Idempotent: `(shop_id, provider)` is a natural key.
+func seedDemoPaymentCredentials(ctx context.Context, tx *ent.Tx, shopID int, box *cryptbox.Box) error {
+	exists, err := tx.ShopPaymentProviderCredential.Query().
+		Where(entpaymentcredential.ShopIDEQ(shopID), entpaymentcredential.ProviderEQ(ecpay.ProviderName)).
+		Exist(ctx)
+	if err != nil {
+		return fmt.Errorf("seed: query demo ecpay credentials: %w", err)
+	}
+	if exists {
+		return nil
+	}
+	hashKeyCT, err := box.Encrypt("pwFHCqoQZGmho4w6")
+	if err != nil {
+		return fmt.Errorf("seed: encrypt demo ecpay hash key: %w", err)
+	}
+	hashIVCT, err := box.Encrypt("EkRm7iFT261dpevs")
+	if err != nil {
+		return fmt.Errorf("seed: encrypt demo ecpay hash iv: %w", err)
+	}
+	if _, err := tx.ShopPaymentProviderCredential.Create().
+		SetShopID(shopID).
+		SetProvider(ecpay.ProviderName).
+		SetMerchantID("3002607").
+		SetHashKeyCiphertext(hashKeyCT).
+		SetHashIvCiphertext(hashIVCT).
+		Save(ctx); err != nil {
+		return fmt.Errorf("seed: demo ecpay credentials: %w", err)
 	}
 	return nil
 }

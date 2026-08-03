@@ -1415,6 +1415,30 @@ components:
           examples: ["Asia/Taipei"]
         effective_timezone: { $ref: '#/components/schemas/EffectiveTimezone' }
 
+    # ── 每商家金流憑證 (change ecpay-per-shop-credentials) ────
+    ECPayCredentials:
+      type: object
+      additionalProperties: false
+      required: [shop_id, provider, configured]
+      description: |
+        商家自己的 ECPay（綠界）憑證狀態。**`hash_key`／`hash_iv` 從不出現在這裡**
+        （設計 D3/D6）——它們是真正的密鑰，只寫不讀；本物件只回報「是否已設定」。
+      properties:
+        shop_id: { type: integer }
+        provider: { type: string, enum: [ecpay] }
+        configured:
+          type: boolean
+          description: 此商家是否已設定過 ecpay 憑證。為 `false` 時以下欄位不存在。
+        merchant_id:
+          type: string
+          description: 綠界商店代號——識別碼而非密鑰，可明文顯示（同 publishable key 的區分）。
+        choose_payment:
+          oneOf: [{ type: string }, { type: 'null' }]
+          description: 綠界 `ChoosePayment`。`null` 表示沿用 provider 內建的 `Credit` 預設。
+        hash_key_configured: { type: boolean, description: 是否已設定 HashKey（從不回傳其值）。 }
+        hash_iv_configured: { type: boolean, description: 是否已設定 HashIV（從不回傳其值）。 }
+        updated_at: { type: string, format: date-time }
+
     # ── 營運報表 (change merchant-reports) ────────────────────
     ReportAmounts:
       type: object
@@ -2727,6 +2751,70 @@ paths:
             已受理。JSON 形式（`mock` 等沒有自訂協定的服務商）：`ok` 表示狀態已
             更新，`ignored` 表示認不出這筆交易。純文字形式（`ecpay`）：`1|OK` 表示
             已受理，`0|…` 表示未受理。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ok, ignored] }
+            text/plain:
+              schema:
+                type: string
+                description: 服務商自訂的確認字串。
+                examples: ["1|OK", "0|CheckMacValue Error"]
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/webhooks/payments/{provider}/{shopID}:
+    post:
+      tags: [webhooks]
+      operationId: paymentWebhookPerShop
+      summary: 金流服務商回呼（憑證逐商家解析）
+      description: |
+        與 `POST /api/v1/webhooks/payments/{provider}` 完全相同的協定與回應形狀
+        （見該端點），差別只在於本端點供**憑證逐商家解析**的服務商使用（目前只有
+        `ecpay`）——驗簽前必須先知道要用哪個商家的密鑰，而這個值就是答案。
+
+        **`{shopID}` 在驗簽通過之前不被信任**（change ecpay-per-shop-credentials，
+        design D2）：它只決定「嘗試用哪個商家的密鑰驗證」，不是身分依據。用不屬於
+        這筆通知的商家 id 呼叫本端點，後果是拿錯的密鑰去驗一個用別把密鑰算出來的
+        簽章——**必然驗證失敗**，不會有任何資料因此被信任或外洩。真正的身分驗證
+        仍然完全由服務商的簽章機制決定，與不帶 `{shopID}` 的端點逐字相同。
+
+        `{shopID}` 由本 API 自己組進發起付款時提供給服務商的回呼位址——服務商只是
+        原樣回傳，因此不需要服務商任何額外配合。
+      security: [{ providerSignature: [] }]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          description: 服務商代號。未註冊的服務商回 404。
+          schema: { type: string }
+          examples:
+            ecpay: { value: "ecpay" }
+        - name: shopID
+          in: path
+          required: true
+          description: |
+            供選擇驗簽密鑰用的商家 id——**驗簽通過前不被信任**，不是授權依據
+            （見上方說明）。
+          schema: { type: integer, minimum: 1 }
+      requestBody:
+        required: true
+        description: 服務商自訂的酬載（原始位元組，上限 64 KiB）。
+        content:
+          application/json:
+            schema:
+              type: object
+              description: 形狀由各服務商決定。
+      responses:
+        "200":
+          description: |
+            已受理，回應形狀同 `POST /api/v1/webhooks/payments/{provider}`
+            （依 `{provider}` 決定 JSON 或純文字）。
           content:
             application/json:
               schema:
@@ -5417,6 +5505,72 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/ecpay-credentials:
+    get:
+      tags: [admin-commerce]
+      operationId: getECPayCredentials
+      summary: 檢視商家自己的 ECPay 憑證（遮罩）
+      description: |
+        需要商家層 `payment_credential.manage`（change ecpay-per-shop-credentials 唯一的
+        新權限節點；只授予 `merchant_owner`，`editor` 沒有這個節點）。
+
+        **`hash_key`／`hash_iv` 從不出現在回應裡**——只回報是否已設定。這與
+        `password_hash` 從不序列化是同一條規則。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 憑證狀態（`configured` 為 `false` 時只有 `shop_id`／`provider`／`configured`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ECPayCredentials' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+    put:
+      tags: [admin-commerce]
+      operationId: putECPayCredentials
+      summary: 設定或更新商家自己的 ECPay 憑證
+      description: |
+        需要商家層 `payment_credential.manage`。
+
+        `hash_key`／`hash_iv` 省略或空字串＝**沿用既有值**——沒有任何方式能讀出已存
+        的密鑰，因此「留空＝不變更」是唯一合理的語意。**首次設定時兩者皆為必填**
+        （沒有既有值可以沿用）。`merchant_id` 每次都會覆蓋。`choose_payment` 為
+        `null` 或空字串會清除設定，回到 provider 內建的 `Credit` 預設。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [merchant_id]
+              properties:
+                merchant_id: { type: string, description: 綠界商店代號。 }
+                hash_key:
+                  type: string
+                  description: 省略或空字串＝沿用既有值；首次設定為必填。
+                hash_iv:
+                  type: string
+                  description: 省略或空字串＝沿用既有值；首次設定為必填。
+                choose_payment:
+                  oneOf: [{ type: string }, { type: 'null' }]
+                  description: 省略＝不變更；`null` 或空字串＝清除，回到 `Credit` 預設。
+      responses:
+        "200":
+          description: 更新後的憑證狀態（遮罩）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ECPayCredentials' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
   /api/v1/admin/shops/{shopID}/reports/sales:

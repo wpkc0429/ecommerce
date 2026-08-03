@@ -2,8 +2,10 @@ package seed_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entmember "ksdevworks/ecommerce/api/internal/ent/member"
 	entmembertier "ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -15,6 +17,7 @@ import (
 	entrolepermission "ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	entpaymentcredential "ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/seed"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
@@ -25,12 +28,21 @@ import (
 // implementation by construction.
 const pointsPerMinorUnit = 100
 
+// testEncryptionKey is an arbitrary valid 32-byte key, hex-encoded (change
+// ecpay-per-shop-credentials, design D4) — any test that seeds a demo shop
+// needs one, since seedDemoPaymentCredentials encrypts the shop's sample
+// ecpay credentials with it. strings.Repeat, not a hand-counted literal: a
+// hex key one character short of 64 fails ParseKey, and miscounting zeroes by
+// eye is exactly the kind of mistake that does not announce itself.
+var testEncryptionKey = strings.Repeat("00", 32)
+
 func runDemoSeed(t *testing.T, client *ent.Client) {
 	t.Helper()
 	if err := seed.Run(context.Background(), client, seed.Options{
-		AdminEmail:    "admin@example.com",
-		AdminPassword: "admin-change-me",
-		Demo:          true,
+		AdminEmail:                      "admin@example.com",
+		AdminPassword:                   "admin-change-me",
+		Demo:                            true,
+		PaymentCredentialsEncryptionKey: testEncryptionKey,
 	}); err != nil {
 		t.Fatalf("seed run: %v", err)
 	}
@@ -343,5 +355,114 @@ func TestSeedGrantsMemberViewToMerchantRoles(t *testing.T) {
 	if exists {
 		t.Error("member.edit must not exist: the platform has no back-office write path to `members`, " +
 			"and a node with no consumer misleads whoever grants it (design D4)")
+	}
+}
+
+// Scenario: payment_credential.manage 只授予 merchant_owner (spec
+// shop-payment-credentials/design D6): unlike member.view/report.view, editor
+// has no other path to a payment provider's HashKey/HashIV, so this boundary
+// is real and worth pinning both directions — granted to merchant_owner,
+// absent from editor.
+func TestSeedGrantsPaymentCredentialManageOnlyToMerchantOwner(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	node, err := client.Permission.Query().Where(entpermission.NameEQ("payment_credential.manage")).Only(ctx)
+	if err != nil {
+		t.Fatalf("payment_credential.manage must be in the permission catalog: %v", err)
+	}
+
+	owner, err := client.Role.Query().Where(entrole.NameEQ("merchant_owner"), entrole.ScopeEQ("merchant")).Only(ctx)
+	if err != nil {
+		t.Fatalf("role merchant_owner: %v", err)
+	}
+	granted, err := client.RolePermission.Query().
+		Where(entrolepermission.RoleIDEQ(owner.ID), entrolepermission.PermissionIDEQ(node.ID)).Exist(ctx)
+	if err != nil {
+		t.Fatalf("role_permission merchant_owner: %v", err)
+	}
+	if !granted {
+		t.Error("merchant_owner must be granted payment_credential.manage")
+	}
+
+	editor, err := client.Role.Query().Where(entrole.NameEQ("editor"), entrole.ScopeEQ("merchant")).Only(ctx)
+	if err != nil {
+		t.Fatalf("role editor: %v", err)
+	}
+	editorGranted, err := client.RolePermission.Query().
+		Where(entrolepermission.RoleIDEQ(editor.ID), entrolepermission.PermissionIDEQ(node.ID)).Exist(ctx)
+	if err != nil {
+		t.Fatalf("role_permission editor: %v", err)
+	}
+	if editorGranted {
+		t.Error("editor must NOT be granted payment_credential.manage — it has no other path to a payment " +
+			"provider's secret (design D6), unlike member.view/report.view")
+	}
+}
+
+// Scenario: demo 商家的 ecpay 憑證已種入且可解密還原 (design D9): the values
+// must round-trip back to 綠界's published sandbox sample, the same ones the
+// platform-wide ECPAY_* defaults used before this change.
+func TestDemoSeedPaymentCredentialsDecryptToTheSandboxSample(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	shopID, err := client.Shop.Query().OnlyID(ctx)
+	if err != nil {
+		t.Fatalf("demo shop: %v", err)
+	}
+	row, err := client.ShopPaymentProviderCredential.Query().
+		Where(entpaymentcredential.ShopIDEQ(shopID), entpaymentcredential.ProviderEQ("ecpay")).
+		Only(ctx)
+	if err != nil {
+		t.Fatalf("demo ecpay credentials: %v", err)
+	}
+	if row.MerchantID != "3002607" {
+		t.Errorf("MerchantID = %q, want 3002607", row.MerchantID)
+	}
+
+	box, err := cryptbox.ParseKey(testEncryptionKey)
+	if err != nil {
+		t.Fatalf("ParseKey: %v", err)
+	}
+	hashKey, err := box.Decrypt(row.HashKeyCiphertext)
+	if err != nil {
+		t.Fatalf("decrypt hash key: %v", err)
+	}
+	if hashKey != "pwFHCqoQZGmho4w6" {
+		t.Errorf("hash key = %q, want the 綠界 sandbox sample", hashKey)
+	}
+	hashIV, err := box.Decrypt(row.HashIvCiphertext)
+	if err != nil {
+		t.Fatalf("decrypt hash iv: %v", err)
+	}
+	if hashIV != "EkRm7iFT261dpevs" {
+		t.Errorf("hash iv = %q, want the 綠界 sandbox sample", hashIV)
+	}
+}
+
+// Scenario: 重新執行 demo seed 不會建立第二筆憑證 (design D9's idempotency
+// convention — natural key `(shop_id, provider)`, same guard shape as every
+// other seedDemo* helper).
+func TestDemoSeedPaymentCredentialsAreIdempotent(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+	runDemoSeed(t, client)
+
+	shopID, err := client.Shop.Query().OnlyID(ctx)
+	if err != nil {
+		t.Fatalf("demo shop: %v", err)
+	}
+	n, err := client.ShopPaymentProviderCredential.Query().
+		Where(entpaymentcredential.ShopIDEQ(shopID), entpaymentcredential.ProviderEQ("ecpay")).
+		Count(ctx)
+	if err != nil {
+		t.Fatalf("count ecpay credentials: %v", err)
+	}
+	if n != 1 {
+		t.Errorf("re-running demo seed produced %d ecpay credential rows for the demo shop, want 1", n)
 	}
 }

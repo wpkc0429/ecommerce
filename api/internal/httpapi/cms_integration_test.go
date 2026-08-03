@@ -46,9 +46,10 @@ func newCMSEnv(t *testing.T) *cmsEnv {
 	ctx := context.Background()
 
 	if err := seed.Run(ctx, client, seed.Options{
-		AdminEmail:    "root@test.dev",
-		AdminPassword: "root-password-123",
-		Demo:          true,
+		AdminEmail:                      "root@test.dev",
+		AdminPassword:                   "root-password-123",
+		Demo:                            true,
+		PaymentCredentialsEncryptionKey: "6c76bd2c42674027079b01abf197bd1b01ee454e2bcbdd96ebf3a4e5c87296a9",
 	}); err != nil {
 		t.Fatalf("seed: %v", err)
 	}

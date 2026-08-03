@@ -701,7 +701,7 @@ async function commercePath() {
   // design D6: 綠界's back-office 模擬付款 button sends RtnCode=1 / RtnMsg=交易成功
   // and settles nothing. Reading only RtnCode marks the order paid, awards
   // points and queues it for shipping, with nothing in the bank.
-  const ecSim = await deliverECPayCallback(ecPay.json.provider_reference, ecOrder.total_amount, "simulate");
+  const ecSim = await deliverECPayCallback(shopID, ecPay.json.provider_reference, ecOrder.total_amount, "simulate");
   check("a simulated-payment notification is still acknowledged with exactly 1|OK",
     ecSim.status === 200 && (ecSim.text ?? "").trim() === "1|OK", brief(ecSim));
   const ecAfterSim = await req("GET", `/api/v1/shop/orders/${ecOrder.id}`, { token: member, pk: PK });
@@ -715,7 +715,7 @@ async function commercePath() {
   // And the row is still claimable — that is the whole reason Outcome has a
   // third value: mapping the above to "failed" would make this delivery lose
   // the CAS, and the order would never become paid.
-  const ecReal = await deliverECPayCallback(ecPay.json.provider_reference, ecOrder.total_amount, "success");
+  const ecReal = await deliverECPayCallback(shopID, ecPay.json.provider_reference, ecOrder.total_amount, "success");
   check("the real notification is acknowledged with exactly 1|OK (no JSON envelope)",
     ecReal.status === 200 && (ecReal.text ?? "").trim() === "1|OK", brief(ecReal));
   const ecAfterPay = await req("GET", `/api/v1/shop/orders/${ecOrder.id}`, { token: member, pk: PK });
@@ -772,7 +772,7 @@ async function commercePath() {
   check("cancelling returns the stock the pending payment was holding",
     (await skuStock(BOUQUET_SKU)) === orphanStockBefore + 1, String(orphanStockBefore));
 
-  const orphanHook = await deliverECPayCallback(orphanPay.json.provider_reference, orphanOrder.total_amount, "success");
+  const orphanHook = await deliverECPayCallback(shopID, orphanPay.json.provider_reference, orphanOrder.total_amount, "success");
   check("a payment that lands after cancellation is still acknowledged with 1|OK",
     orphanHook.status === 200 && (orphanHook.text ?? "").trim() === "1|OK", brief(orphanHook));
   const orphanAfter = await req("GET", `/api/v1/shop/orders/${orphanOrder.id}`, { token: member, pk: PK });

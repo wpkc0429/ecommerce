@@ -524,6 +524,24 @@
             <tbody id="allowed-origins-tbody"></tbody>
           </table>
         </div>
+
+        <div id="ecpay-credentials-block" hidden>
+          <div class="toolbar">
+            <h2>ECPay（綠界）金流設定</h2>
+            <span id="ecpay-credentials-status" class="badge"></span>
+          </div>
+          <p class="hint">
+            HashKey／HashIV 是<strong>真正的密鑰</strong>，只寫不讀：留空即沿用既有值，本頁永遠不會顯示已設定的值。
+          </p>
+          <p id="ecpay-credentials-error" class="error" hidden></p>
+          <form id="ecpay-credentials-form" class="inline-form">
+            <label class="inline">MerchantID <input type="text" id="ecpay-merchant-id" required /></label>
+            <label class="inline">HashKey <input type="password" id="ecpay-hash-key" placeholder="留空＝不變更" autocomplete="off" /></label>
+            <label class="inline">HashIV <input type="password" id="ecpay-hash-iv" placeholder="留空＝不變更" autocomplete="off" /></label>
+            <label class="inline">ChoosePayment <input type="text" id="ecpay-choose-payment" placeholder="預設 Credit" /></label>
+            <button type="submit" class="primary">儲存</button>
+          </form>
+        </div>
       </div>
     </section>
   </div>

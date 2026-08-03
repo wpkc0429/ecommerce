@@ -43,6 +43,9 @@ type Deps struct {
 	// merchant-scoped settings endpoint that gives them a time zone to cut days by.
 	Reports      *ReportsHandler
 	ShopSettings *ShopSettingsHandler
+	// PaymentCredentials: change ecpay-per-shop-credentials (merchant-scoped
+	// management of its own ecpay MerchantID/HashKey/HashIV/ChoosePayment).
+	PaymentCredentials *PaymentCredentialsHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
@@ -149,6 +152,9 @@ func New(d Deps) http.Handler {
 						if d.ShopSettings != nil {
 							d.ShopSettings.MountShopAdmin(sh)
 						}
+						if d.PaymentCredentials != nil {
+							d.PaymentCredentials.MountShopAdmin(sh)
+						}
 					})
 					// Platform-level resources.
 					if d.Roles != nil {
@@ -251,6 +257,12 @@ func New(d Deps) http.Handler {
 		// domain.
 		if d.Payments != nil {
 			v1.Post("/webhooks/payments/{provider}", d.Payments.Webhook)
+			// change ecpay-per-shop-credentials (design D2): additive route for
+			// providers whose credentials are resolved per shop — {shopID} is
+			// unverified until the provider's own signature check succeeds; it
+			// only selects which shop's secret to try. mock keeps using the
+			// route above, unchanged.
+			v1.Post("/webhooks/payments/{provider}/{shopID}", d.Payments.Webhook)
 		}
 
 		// ── Render bundle API (SSR / native apps) ──────────────

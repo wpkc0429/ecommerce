@@ -132,7 +132,7 @@ func newGuestEnv(t *testing.T) *guestEnv {
 		Client:          client,
 		Orders:          e.orderSvc,
 		Dispatcher:      dispatcher,
-		Providers:       map[string]payment.Provider{mock.Name(): mock},
+		Providers:       map[string]any{mock.Name(): mock},
 		DefaultProvider: mock.Name(),
 	}
 	e.shippingSvc = &shipping.Service{Client: client, Orders: e.orderSvc, Dispatcher: dispatcher}
