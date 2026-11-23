@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"ksdevworks/ecommerce/api/internal/payment"
 )
@@ -193,20 +195,92 @@ func (p *Provider) InitiatePayment(_ context.Context, req payment.InitiateReques
 	}, nil
 }
 
-// itemName renders the order lines into 綠界's ItemName format: entries joined
-// by '#', each "名稱 NT$單價 x 數量".
+// itemName renders the order into 綠界's ItemName format: entries joined by
+// '#' (綠界 shows each as its own line), each item "名稱 NT$單價 x 數量",
+// followed by the order-level adjustments so the listed lines reconcile with
+// TotalAmount (sum of items − discount + shipping = total):
+//
+//	玫瑰花束 NT$3400 x 1#會員折扣 -NT$170#運費 NT$200
+//
+// Length: 綠界 caps ItemName at 400 characters (see maxItemNameRunes). The
+// adjustment lines are never dropped — they are what makes the page add up —
+// so when the whole string would overflow, trailing ITEM entries are dropped
+// whole and replaced by a "…等共 N 項" marker; only a single item that alone
+// exceeds the budget is cut, on a rune boundary.
 func itemName(req payment.InitiateRequest) string {
-	if len(req.Items) == 0 {
+	var tail []string
+	if req.DiscountAmount > 0 {
+		tail = append(tail, fmt.Sprintf("會員折扣 -NT$%d", req.DiscountAmount))
+	}
+	if req.ShippingFee > 0 {
+		tail = append(tail, fmt.Sprintf("運費 NT$%d", req.ShippingFee))
+	}
+
+	items := make([]string, 0, len(req.Items))
+	for _, it := range req.Items {
+		items = append(items, fmt.Sprintf("%s NT$%d x %d", sanitizeItemText(it.Name), it.UnitAmount, it.Quantity))
+	}
+	if len(items) == 0 {
 		// ItemName is required; an order with no line snapshot still has to buy
 		// something as far as 綠界 is concerned.
-		return truncateRunes(fmt.Sprintf("訂單 %d", req.OrderID), maxItemNameRunes)
+		items = []string{fmt.Sprintf("訂單 %d", req.OrderID)}
 	}
-	parts := make([]string, 0, len(req.Items))
-	for _, it := range req.Items {
-		parts = append(parts, fmt.Sprintf("%s NT$%d x %d", it.Name, it.UnitAmount, it.Quantity))
+
+	tailStr := strings.Join(tail, "#")
+	budget := maxItemNameRunes // runes available for the item part
+	if tailStr != "" {
+		budget -= runeLen(tailStr) + 1 // + the '#' joining items and tail
 	}
-	return truncateRunes(strings.Join(parts, "#"), maxItemNameRunes)
+	join := func(itemPart string) string {
+		if tailStr == "" {
+			return itemPart
+		}
+		return itemPart + "#" + tailStr
+	}
+
+	if all := strings.Join(items, "#"); runeLen(all) <= budget {
+		return join(all)
+	}
+	if len(items) == 1 {
+		return join(truncateRunes(items[0], budget))
+	}
+	// Overflow: keep as many whole items as fit next to a "…等共 N 項" marker.
+	marker := fmt.Sprintf("…等共 %d 項", len(items))
+	kept := ""
+	for _, it := range items {
+		cand := it
+		if kept != "" {
+			cand = kept + "#" + it
+		}
+		if runeLen(cand)+1+runeLen(marker) > budget {
+			break
+		}
+		kept = cand
+	}
+	if kept == "" {
+		// Even the first item alone does not fit next to the marker: cut it.
+		kept = truncateRunes(items[0], budget-1-runeLen(marker))
+	}
+	return join(kept + "#" + marker)
 }
+
+// sanitizeItemText keeps a product title from breaking ItemName's format: '#'
+// is 綠界's line separator (a title containing it would split into two bogus
+// lines), so it becomes the full-width '＃'; control characters (newlines,
+// tabs) are replaced by a space.
+func sanitizeItemText(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r == '#':
+			return '＃'
+		case unicode.IsControl(r):
+			return ' '
+		}
+		return r
+	}, s)
+}
+
+func runeLen(s string) int { return utf8.RuneCountInString(s) }
 
 func truncateRunes(s string, max int) string {
 	r := []rune(s)

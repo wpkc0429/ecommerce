@@ -83,6 +83,13 @@ type InitiateRequest struct {
 	// Items is the order's own line snapshot. May be empty — nothing in this
 	// package requires a provider to use it.
 	Items []InitiateItem
+	// ShippingFee and DiscountAmount are the order's own snapshots (orders.
+	// shipping_fee / discount_amount, both >= 0), so a provider that lists line
+	// items can make them reconcile with Amount:
+	//   sum(Items) - DiscountAmount + ShippingFee == Amount.
+	// Without them a cashier page shows items that do not add up to the charge.
+	ShippingFee    int64
+	DiscountAmount int64
 }
 
 // RedirectForm describes "POST these fields to this address" — the shape a real

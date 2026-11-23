@@ -143,7 +143,9 @@ func (s *Service) InitiatePayment(ctx context.Context, shopID, memberID, orderID
 		// change ecpay-payment-provider: a real cashier shows the customer what
 		// they are paying for (綠界's ItemName is a required field). These are the
 		// order's own frozen line snapshots, never a live SKU re-query.
-		Items: initiateItems(ord),
+		Items:          initiateItems(ord),
+		ShippingFee:    ord.ShippingFee,
+		DiscountAmount: ord.DiscountAmount,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("payment: initiate with provider %s: %w", providerName, err)

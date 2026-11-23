@@ -171,6 +171,84 @@ func TestInitiateItemNameTruncatesOnRuneBoundary(t *testing.T) {
 	}
 }
 
+// TestInitiateItemNameReconcilesWithTotal — the cashier page lists ItemName
+// lines; without the shipping (and discount) lines they do not add up to
+// TotalAmount, which is exactly what a customer saw in the stage test
+// (3400 listed, 3600 charged).
+func TestInitiateItemNameReconcilesWithTotal(t *testing.T) {
+	res := initiate(t, payment.InitiateRequest{
+		ShopID: 1, OrderID: 9, Amount: 3430, Currency: "TWD",
+		Items:       []payment.InitiateItem{{Name: "玫瑰花束", Quantity: 1, UnitAmount: 3400}},
+		ShippingFee: 200, DiscountAmount: 170,
+	})
+	f := res.RedirectForm.Fields
+	want := "玫瑰花束 NT$3400 x 1#會員折扣 -NT$170#運費 NT$200"
+	if f["ItemName"] != want {
+		t.Fatalf("ItemName = %q, want %q", f["ItemName"], want)
+	}
+	if f["TotalAmount"] != "3430" {
+		t.Fatalf("TotalAmount = %q", f["TotalAmount"])
+	}
+}
+
+func TestInitiateItemNameOmitsZeroAdjustments(t *testing.T) {
+	res := initiate(t, payment.InitiateRequest{
+		ShopID: 1, OrderID: 9, Amount: 3400, Currency: "TWD",
+		Items: []payment.InitiateItem{{Name: "玫瑰花束", Quantity: 1, UnitAmount: 3400}},
+	})
+	if got := res.RedirectForm.Fields["ItemName"]; got != "玫瑰花束 NT$3400 x 1" {
+		t.Fatalf("ItemName = %q, want no shipping/discount lines", got)
+	}
+}
+
+// A '#' in a product title would split it into two bogus cashier lines.
+func TestInitiateItemNameSanitizesSeparator(t *testing.T) {
+	res := initiate(t, payment.InitiateRequest{
+		ShopID: 1, OrderID: 9, Amount: 1000, Currency: "TWD",
+		Items: []payment.InitiateItem{{Name: "花束#1\n限定", Quantity: 1, UnitAmount: 1000}},
+	})
+	if got := res.RedirectForm.Fields["ItemName"]; got != "花束＃1 限定 NT$1000 x 1" {
+		t.Fatalf("ItemName = %q", got)
+	}
+}
+
+// When the items overflow 400 runes, whole trailing items are dropped for a
+// "等共 N 項" marker and the shipping line survives.
+func TestInitiateItemNameOverflowKeepsShippingLine(t *testing.T) {
+	items := make([]payment.InitiateItem, 0, 40)
+	for i := 0; i < 40; i++ {
+		items = append(items, payment.InitiateItem{Name: strings.Repeat("繡球花", 10), Quantity: 1, UnitAmount: 100})
+	}
+	res := initiate(t, payment.InitiateRequest{ShopID: 1, OrderID: 9, Amount: 4200, Currency: "TWD", Items: items, ShippingFee: 200})
+	got := res.RedirectForm.Fields["ItemName"]
+	if n := len([]rune(got)); n > 400 {
+		t.Fatalf("ItemName is %d runes, 綠界 allows 400", n)
+	}
+	if !strings.HasSuffix(got, "#…等共 40 項#運費 NT$200") {
+		t.Fatalf("overflow did not keep marker + shipping line: …%q", string([]rune(got)[len([]rune(got))-30:]))
+	}
+	for _, line := range strings.Split(strings.TrimSuffix(got, "#…等共 40 項#運費 NT$200"), "#") {
+		if line != strings.Repeat("繡球花", 10)+" NT$100 x 1" {
+			t.Fatalf("an item line was cut instead of dropped whole: %q", line)
+		}
+	}
+}
+
+// A single item longer than the budget is cut on a rune boundary, and the
+// shipping line still fits.
+func TestInitiateItemNameSingleHugeItem(t *testing.T) {
+	res := initiate(t, payment.InitiateRequest{ShopID: 1, OrderID: 9, Amount: 1200, Currency: "TWD",
+		Items:       []payment.InitiateItem{{Name: strings.Repeat("蘭", 500), Quantity: 1, UnitAmount: 1000}},
+		ShippingFee: 200})
+	got := res.RedirectForm.Fields["ItemName"]
+	if n := len([]rune(got)); n != 400 {
+		t.Fatalf("ItemName is %d runes, want exactly the 400 budget", n)
+	}
+	if !strings.HasSuffix(got, "#運費 NT$200") || strings.ContainsRune(got, '�') {
+		t.Fatalf("ItemName = …%q", string([]rune(got)[380:]))
+	}
+}
+
 // ── MerchantTradeNo ────────────────────────────────────────────────────
 
 func TestMerchantTradeNoWithinECPayLimits(t *testing.T) {
