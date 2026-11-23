@@ -1,0 +1,4 @@
+# Shell scripts run inside Linux containers (docker-entrypoint-initdb.d):
+# CRLF breaks the shebang ("/bin/sh^M: bad interpreter") and the script is
+# silently skipped, so ecommerce_dev / ecommerce_test never get created.
+*.sh text eol=lf

@@ -54,7 +54,7 @@ func OpenDB(t *testing.T) *ent.Client {
 		t.Fatal("TEST_DATABASE_URL is required for integration tests")
 	}
 
-	m, err := migrate.New("file://"+migrationsDir(t), url)
+	m, err := migrate.New("file://"+filepath.ToSlash(migrationsDir(t)), url) // ToSlash: a Windows path (C:\...) is not a valid URL
 	if err != nil {
 		t.Fatalf("migrate init: %v", err)
 	}
