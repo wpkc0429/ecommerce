@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -69,20 +68,6 @@ func orPassthrough(mw func(http.Handler) http.Handler) func(http.Handler) http.H
 		return passthroughMW
 	}
 	return mw
-}
-
-// clientIP extracts the request's source IP, stripping the port. Falls back
-// to the raw RemoteAddr string if it isn't in host:port form. The service
-// does not sit behind a documented reverse proxy yet, so X-Forwarded-For is
-// deliberately not trusted here (design Open Questions): trusting a
-// client-controlled header without a fixed proxy allowlist would let a
-// client forge its own rate-limit key and bypass the limiter entirely.
-func clientIP(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return host
 }
 
 // peekEmail extracts the "email" field from a JSON request body without

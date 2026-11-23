@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"strconv"
 	"strings"
@@ -15,7 +16,10 @@ import (
 
 // Config carries every runtime setting for the API service.
 type Config struct {
-	Env      string // development | test | production
+	// Env is development | test | production. Unset means production
+	// (fail closed): only an explicit development/test may boot with the
+	// built-in dev secrets — see validateSecrets.
+	Env      string
 	Addr     string
 	LogLevel string
 
@@ -52,11 +56,10 @@ type Config struct {
 	CheckoutIdempotencyTTL time.Duration
 
 	// PaymentMockWebhookSecret keys the mock payment provider's HMAC-SHA256
-	// webhook signature (change payment-integration, design D2/D9). Unlike
-	// the JWT secrets, this is NOT required to be set in production — the
-	// mock provider is a demo/reference implementation, not meant to carry
-	// real production payment traffic; a real provider's own credentials
-	// would get their own config + validation when that change lands.
+	// webhook signature (change payment-integration, design D2/D9). The mock
+	// provider is a demo/reference implementation, but its webhook route is
+	// always mounted, so outside development/test validateSecrets refuses the
+	// public default (it would let anyone forge "payment succeeded").
 	PaymentMockWebhookSecret string
 
 	// PaymentDefaultProvider names the provider used when a checkout request
@@ -110,6 +113,13 @@ type Config struct {
 	// Unset behaves exactly as the default value, and since no report existed
 	// before this change, "unchanged from before" is automatic.
 	ReportDefaultTimezone string
+
+	// TrustedProxies are the peers (CIDRs) whose CF-Connecting-IP header is
+	// believed when deriving the client IP (TRUSTED_PROXIES, comma-separated
+	// IPs or CIDRs). Empty = trust nobody: the client IP is always the TCP
+	// peer. For a Cloudflare Tunnel whose cloudflared runs on this host, set
+	// 127.0.0.1/32,::1/128. X-Forwarded-For is never consulted.
+	TrustedProxies []netip.Prefix
 
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
@@ -239,7 +249,7 @@ func Load() (*Config, error) {
 	loadDotEnv()
 
 	cfg := &Config{
-		Env:             getenv("APP_ENV", "development"),
+		Env:             getenv("APP_ENV", EnvProduction),
 		Addr:            getenv("API_ADDR", ":8080"),
 		LogLevel:        getenv("LOG_LEVEL", "info"),
 		DatabaseURL:     getenv("DATABASE_URL", ""),
@@ -265,7 +275,7 @@ func Load() (*Config, error) {
 		// development and CI, MUST be overridden with a private value before
 		// any real credential is stored.
 		PaymentCredentialsEncryptionKey: getenv("PAYMENT_CREDENTIALS_ENCRYPTION_KEY",
-			"87cdc594ad8dada3e6447ee26c8e6ac18842eadaf7170f4820d53057acb78ae4"),
+			devPaymentCredentialsEncryptionKey),
 
 		SMTP: SMTPConfig{
 			Host:     getenv("SMTP_HOST", "smtp.gmail.com"),
@@ -283,7 +293,16 @@ func Load() (*Config, error) {
 		}
 	}
 
+	switch cfg.Env {
+	case EnvDevelopment, EnvTest, EnvProduction:
+	default:
+		return nil, fmt.Errorf("config: APP_ENV must be %q, %q or %q", EnvDevelopment, EnvTest, EnvProduction)
+	}
+
 	var err error
+	if cfg.TrustedProxies, err = parsePrefixes("TRUSTED_PROXIES"); err != nil {
+		return nil, err
+	}
 	if cfg.AccessTokenTTL, err = parseDuration("ACCESS_TOKEN_TTL", 15*time.Minute); err != nil {
 		return nil, err
 	}
@@ -379,12 +398,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: PAYMENT_CREDENTIALS_ENCRYPTION_KEY: %w", err)
 	}
 
-	if cfg.Env == "production" {
-		if cfg.AdminJWTSecret == "" || cfg.MemberJWTSecret == "" {
-			return nil, fmt.Errorf("config: ADMIN_JWT_SECRET and MEMBER_JWT_SECRET are required in production")
-		}
-		if cfg.AdminJWTSecret == cfg.MemberJWTSecret {
-			return nil, fmt.Errorf("config: admin and member JWT secrets must differ (design D9)")
+	// Default-key guard: outside development/test, refuse to boot with any
+	// empty, known-default or placeholder secret (names only, never values).
+	if !cfg.IsDevOrTest() {
+		if err := cfg.validateSecrets(); err != nil {
+			return nil, err
 		}
 	}
 	// Development fallbacks keep local bootstrapping friction-free.
@@ -414,6 +432,33 @@ func parseDuration(key string, fallback time.Duration) (time.Duration, error) {
 		return 0, fmt.Errorf("config: %s: %w", key, err)
 	}
 	return d, nil
+}
+
+// parsePrefixes reads a comma-separated list of IPs or CIDRs. A bare IP
+// becomes a single-address prefix.
+func parsePrefixes(key string) ([]netip.Prefix, error) {
+	var out []netip.Prefix
+	for _, part := range strings.Split(os.Getenv(key), ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		if strings.Contains(part, "/") {
+			p, err := netip.ParsePrefix(part)
+			if err != nil {
+				return nil, fmt.Errorf("config: %s: %w", key, err)
+			}
+			out = append(out, p.Masked())
+			continue
+		}
+		a, err := netip.ParseAddr(part)
+		if err != nil {
+			return nil, fmt.Errorf("config: %s: %w", key, err)
+		}
+		a = a.Unmap()
+		out = append(out, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return out, nil
 }
 
 func parseInt(key string, fallback int) (int, error) {

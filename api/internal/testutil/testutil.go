@@ -30,6 +30,13 @@ func RequireIntegration(t *testing.T) {
 	if os.Getenv("INTEGRATION") != "1" {
 		t.Skip("integration test: set INTEGRATION=1 and run `make test-int`")
 	}
+	// config.Load fails closed (unset APP_ENV = production + default-key
+	// guard). Integration tests use throwaway infra and the dev secrets, so
+	// default to test mode unless APP_ENV is exported explicitly (a .env that
+	// says production must not make the test suite refuse to run).
+	if os.Getenv("APP_ENV") == "" {
+		_ = os.Setenv("APP_ENV", "test")
+	}
 }
 
 // OpenDB returns an ent client on TEST_DATABASE_URL with migrations applied

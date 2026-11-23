@@ -23,6 +23,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("config: %v", err)
 	}
+	// Default-key guard (see config.validateSecrets): outside development/test
+	// the initial super admin must not get a public default/placeholder password.
+	if !cfg.IsDevOrTest() && config.IsWeakSecret(os.Getenv("SEED_ADMIN_PASSWORD")) {
+		log.Fatalf("SEED_ADMIN_PASSWORD is empty, a known default, or an unfilled placeholder (APP_ENV=%q)", cfg.Env)
+	}
+	// -demo creates accounts with public, documented passwords (demo-owner /
+	// demo-customer) and ECPay sandbox credentials: never outside dev/test.
+	if *demo && !cfg.IsDevOrTest() {
+		log.Fatalf("-demo is only allowed with APP_ENV=development or test (APP_ENV=%q)", cfg.Env)
+	}
 	if cfg.DatabaseURL == "" {
 		log.Fatal("DATABASE_URL is required")
 	}

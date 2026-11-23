@@ -5,6 +5,7 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
+	"net/netip"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -72,6 +73,13 @@ type Deps struct {
 func New(d Deps) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
+	// Client IP before anything that logs or rate-limits by it. Only
+	// CF-Connecting-IP from Cfg.TrustedProxies is believed (see clientip.go).
+	var trustedProxies []netip.Prefix
+	if d.Cfg != nil {
+		trustedProxies = d.Cfg.TrustedProxies
+	}
+	r.Use(NewClientIPMiddleware(trustedProxies))
 	r.Use(requestLogger(d.Log))
 	r.Use(recoverer(d.Log))
 	// CORS is mounted whenever either source of allowed origins is wired: a

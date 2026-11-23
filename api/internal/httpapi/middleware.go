@@ -182,6 +182,7 @@ func requestLogger(log *slog.Logger) func(http.Handler) http.Handler {
 				"bytes", ww.BytesWritten(),
 				"duration_ms", time.Since(start).Milliseconds(),
 				"request_id", middleware.GetReqID(r.Context()),
+				"client_ip", clientIP(r),
 				"remote", r.RemoteAddr,
 			)
 		})
