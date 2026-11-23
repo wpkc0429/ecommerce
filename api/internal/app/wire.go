@@ -51,6 +51,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         cfg.RedisAddr,
 		Password:     cfg.RedisPassword,
+		DB:           cfg.RedisDB,
 		DialTimeout:  2 * time.Second,
 		ReadTimeout:  time.Second,
 		WriteTimeout: time.Second,

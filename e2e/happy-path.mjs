@@ -13,7 +13,7 @@
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { chromium } from "playwright";
 
-import { brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
+import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
 // Same source `make seed` used: E2E_* override → env → repo .env → old default.
@@ -25,14 +25,28 @@ const ADMIN_PASSWORD =
   dotEnvValue("SEED_ADMIN_PASSWORD") ||
   "admin-change-me";
 
+// Base URLs are overridable so the suite can run against a second stack
+// (e.g. web on another port, an API on a fresh database) without touching the
+// developer's running one. Defaults are the documented :3000/:3001/:8080.
+const WEB = (process.env.E2E_WEB_BASE_URL ?? "http://demo.localhost:3000").replace(/\/+$/, "");
+const ADMIN = (process.env.E2E_ADMIN_BASE_URL ?? "http://localhost:3001").replace(/\/+$/, "");
+
 const browser = await chromium.launch();
 const page = await browser.newPage();
+// The admin SPA reads its API/web base from localStorage at runtime
+// (admin/lib/api.js); point it at the same API this run uses.
+await page.addInitScript(([api, web]) => {
+  try {
+    localStorage.setItem("apiBase", api);
+    localStorage.setItem("webBase", web);
+  } catch {}
+}, [API, WEB.replace("://demo.localhost", "://localhost")]);
 page.on("pageerror", (err) => fail(`page JS error: ${err.message}`));
 
 try {
   // ── 9.1 登入 ──
   console.log("① Admin login");
-  await page.goto("http://localhost:3001/");
+  await page.goto(`${ADMIN}/`);
   await page.fill("#login-email", ADMIN_EMAIL);
   await page.fill("#login-password", ADMIN_PASSWORD);
   await page.click("#login-form button[type=submit]");
@@ -84,7 +98,7 @@ try {
 
   // ── 前台渲染 ──
   console.log("⑤ Storefront renders the published home");
-  await page.goto("http://demo.localhost:3000/");
+  await page.goto(`${WEB}/`);
   await page.waitForSelector("h1");
   const h1 = await page.textContent("h1");
   check("storefront shows the edited hero title", h1?.includes("E2E 全新首頁標題"), h1 ?? "");
@@ -93,7 +107,7 @@ try {
 
   // ── 9.3 全域內容編輯 → 立即生效 ──
   console.log("⑥ Shop global content update");
-  await page.goto("http://localhost:3001/");
+  await page.goto(`${ADMIN}/`);
   await page.waitForSelector("#view-main:not([hidden])");
   await page.click('.tab[data-tab="content"]');
   await page.waitForSelector("#content-form fieldset");
@@ -102,7 +116,7 @@ try {
   page.once("dialog", (d) => d.accept());
   await page.click("#content-save");
   await page.waitForTimeout(400);
-  await page.goto("http://demo.localhost:3000/");
+  await page.goto(`${WEB}/`);
   const headerText = await page.textContent("header");
   check("storefront header shows updated site title", headerText?.includes("E2E 招牌"), headerText ?? "");
 
@@ -181,7 +195,7 @@ try {
     bundle.shop?.content?.header?.site_title === "E2E 招牌",
     JSON.stringify(bundle.shop?.content?.header));
 
-  await page.goto("http://demo.localhost:3000/");
+  await page.goto(`${WEB}/`);
   const heroStill = await page.textContent("h1");
   check("page payload renders after the switch (hydrated against v2 schema)",
     heroStill?.includes("E2E 全新首頁標題"), heroStill ?? "");
@@ -201,7 +215,7 @@ try {
   const skuB = `E2E-${runID}-B`;
 
   console.log("⑧ Category CRUD in the admin UI");
-  await page.goto("http://localhost:3001/");
+  await page.goto(`${ADMIN}/`);
   await page.waitForSelector("#view-main:not([hidden])", { timeout: 8000 });
   await page.click('.tab[data-tab="categories"]');
   await page.waitForSelector("#tab-categories:not([hidden])");
@@ -356,7 +370,7 @@ try {
   const opsToken = placed.json?.order_access_token;
 
   console.log("⑮ 後台以深層連結 #/orders/{id} 開啟詳情");
-  await page.goto(`http://localhost:3001/#/orders/${opsOrder.id}`);
+  await page.goto(`${ADMIN}/#/orders/${opsOrder.id}`);
   await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#order-amounts");
   check("deep link opens the order detail directly (no list navigation)",
@@ -433,7 +447,7 @@ try {
   const partLines = partOrder.items ?? [];
   const lineOf = (code) => partLines.find((i) => i.sku_code === code);
 
-  await page.goto(`http://localhost:3001/#/orders/${partOrder.id}`);
+  await page.goto(`${ADMIN}/#/orders/${partOrder.id}`);
   await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#shipment-lines", { timeout: 8000 });
 
@@ -497,7 +511,7 @@ try {
   // section's own (different) customer displayed would send ⑱ to look up a
   // brand-new guest with no points and no ledger — a failure that looks exactly
   // like a broken points chain and has nothing to do with points.
-  await page.goto(`http://localhost:3001/#/orders/${opsOrder.id}`);
+  await page.goto(`${ADMIN}/#/orders/${opsOrder.id}`);
   await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#order-amounts", { timeout: 8000 });
 
@@ -545,7 +559,7 @@ try {
       repeatOrder.total_amount === 3380,
     JSON.stringify([repeatOrder.discount_amount, repeatOrder.discount_percent, repeatOrder.total_amount]));
 
-  await page.goto(`http://localhost:3001/#/orders/${repeatOrder.id}`);
+  await page.goto(`${ADMIN}/#/orders/${repeatOrder.id}`);
   await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#order-discount", { timeout: 8000 });
   const dDiscount = (await page.textContent("#order-discount")).trim();
@@ -685,7 +699,7 @@ try {
   console.log("㉓ 營運報表：口徑揭露、時區來源、金額組合、筆數不是金額（change merchant-reports）");
   // 零佈置：⑯ 已付了一筆訂單、⑱.5 又下了一筆，兩筆都是今天建立的，所以報表
   // 的預設期間（本月一日 → 今天）一定不是空的。
-  await page.goto("http://localhost:3001/#/reports");
+  await page.goto(`${ADMIN}/#/reports`);
   await page.waitForSelector("#tab-reports:not([hidden])", { timeout: 8000 });
   await page.waitForSelector('#report-currencies [data-currency="TWD"]', { timeout: 8000 });
 

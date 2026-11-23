@@ -29,6 +29,10 @@ type Config struct {
 	// Empty means no AUTH — CI's throwaway Redis service has no password; the
 	// local docker-compose Redis requires one (REDIS_PASSWORD in .env).
 	RedisPassword string
+	// RedisDB selects the logical Redis database (REDIS_DB, default 0). Lets a
+	// second local stack (e.g. an e2e run on a fresh Postgres database) keep its
+	// caches and rate-limit buckets apart from the main one on the same Redis.
+	RedisDB int
 
 	AdminJWTSecret  string
 	MemberJWTSecret string
@@ -301,6 +305,9 @@ func Load() (*Config, error) {
 
 	var err error
 	if cfg.TrustedProxies, err = parsePrefixes("TRUSTED_PROXIES"); err != nil {
+		return nil, err
+	}
+	if cfg.RedisDB, err = parseInt("REDIS_DB", 0); err != nil {
 		return nil, err
 	}
 	if cfg.AccessTokenTTL, err = parseDuration("ACCESS_TOKEN_TTL", 15*time.Minute); err != nil {

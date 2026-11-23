@@ -43,6 +43,8 @@ cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API�
 
 單一整合測試：`cd api && INTEGRATION=1 go test ./internal/httpapi/ -run TestDraftPublish -count=1`
 
+**在另一組 port／乾淨資料庫上跑 happy-path**（不動開發中的 DB 與服務，例如 :3000 被佔用或主 DB 已有測試資料時）：`CREATE DATABASE ecommerce_e2e` 後以覆寫的 `DATABASE_URL` 跑 `go run ./cmd/migrate` 與 `go run ./cmd/seed -demo`；第二個 API 以 `API_ADDR=127.0.0.1:8180 REDIS_DB=1 PAYMENT_DEFAULT_PROVIDER=mock`（加同一個 `DATABASE_URL`）啟動——**`REDIS_DB` 必須與主 API 不同**，否則兩邊的 shop 1 會共用渲染快取、`pkey:` 與限流 key；web 用 `API_BASE_URL=http://127.0.0.1:8180 npx next dev -p 3100`；最後 `E2E_API_BASE_URL=http://127.0.0.1:8180 E2E_WEB_BASE_URL=http://demo.localhost:3100 E2E_ADMIN_BASE_URL=http://localhost:3001 node happy-path.mjs`（admin 的 API 位址由 e2e 寫進 localStorage）。三個 `E2E_*` 皆未設定時行為與預設 :8080／:3000／:3001 相同。
+
 ## Architecture notes（與 openspec 對應）
 
 - **設計權威**：`openspec/changes/phase1-multitenant-cms-foundation/design.md`（D1–D13）；行為驗收：同目錄 `specs/*/spec.md`。
