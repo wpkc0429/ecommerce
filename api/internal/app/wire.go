@@ -50,6 +50,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// instead of stalling render requests.
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         cfg.RedisAddr,
+		Password:     cfg.RedisPassword,
 		DialTimeout:  2 * time.Second,
 		ReadTimeout:  time.Second,
 		WriteTimeout: time.Second,

@@ -21,6 +21,10 @@ type Config struct {
 
 	DatabaseURL string
 	RedisAddr   string
+	// RedisPassword is sent as AUTH on every connection (Redis requirepass).
+	// Empty means no AUTH — CI's throwaway Redis service has no password; the
+	// local docker-compose Redis requires one (REDIS_PASSWORD in .env).
+	RedisPassword string
 
 	AdminJWTSecret  string
 	MemberJWTSecret string
@@ -240,6 +244,7 @@ func Load() (*Config, error) {
 		LogLevel:        getenv("LOG_LEVEL", "info"),
 		DatabaseURL:     getenv("DATABASE_URL", ""),
 		RedisAddr:       getenv("REDIS_ADDR", "localhost:6379"),
+		RedisPassword:   getenv("REDIS_PASSWORD", ""),
 		AdminJWTSecret:  getenv("ADMIN_JWT_SECRET", ""),
 		MemberJWTSecret: getenv("MEMBER_JWT_SECRET", ""),
 		JWTIssuer:       getenv("JWT_ISSUER", "ecommerce-api"),

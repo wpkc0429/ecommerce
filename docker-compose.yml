@@ -6,10 +6,13 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-ecommerce}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecommerce}
+      # No fallback on purpose: a missing password fails `docker compose` loudly
+      # instead of silently starting with a guessable one. Set it in .env.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (see .env.example)}
       POSTGRES_DB: ${POSTGRES_DB:-ecommerce}
+    # Loopback only: reachable from this machine, not from the LAN.
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
@@ -23,10 +26,18 @@ services:
   redis:
     image: redis:7-alpine
     restart: unless-stopped
+    # requirepass: the API's caches and the Lua sliding-window rate limiter live
+    # here, so an unauthenticated Redis lets anyone who can reach it reset rate
+    # limits or poison caches. The password is passed via the environment and
+    # expanded by the container's shell ($$ = literal $ for compose).
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env (see .env.example)}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    # Loopback only: reachable from this machine, not from the LAN.
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 12

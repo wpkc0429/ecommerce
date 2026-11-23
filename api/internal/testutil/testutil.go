@@ -99,7 +99,8 @@ func OpenRedis(t *testing.T) *redis.Client {
 	if addr == "" {
 		addr = "localhost:6379"
 	}
-	rdb := redis.NewClient(&redis.Options{Addr: addr, DB: 15})
+	// REDIS_PASSWORD is hydrated from .env by config.Load above; empty = no AUTH.
+	rdb := redis.NewClient(&redis.Options{Addr: addr, Password: os.Getenv("REDIS_PASSWORD"), DB: 15})
 	if err := rdb.FlushDB(context.Background()).Err(); err != nil {
 		t.Fatalf("redis flush: %v", err)
 	}

@@ -16,7 +16,7 @@ docs/    交付文件
 需要 Docker、Go 1.26、Node 20。
 
 ```bash
-cp .env.example .env     # 首次
+cp .env.example .env     # 首次；把 <generate: …> 佔位值換成自己產生的隨機值（見檔內說明）
 make up                  # PostgreSQL 16 + Redis 7
 make migrate             # 套用 migrations
 make seed-demo           # 權限、角色、super admin、starter 主題 + demo 商家
@@ -24,6 +24,8 @@ make dev                 # API      :8080
 make web-dev             # 前台 SSR :3000
 make admin-dev           # 後台 SPA :3001
 ```
+
+本機基礎設施只綁 `127.0.0.1`；Postgres 與 Redis 的密碼都來自 `.env`（`POSTGRES_PASSWORD`、`REDIS_PASSWORD`），未設定時 `docker compose` 會直接拒絕啟動。super admin 的密碼是 `.env` 裡的 `SEED_ADMIN_PASSWORD`（只在帳號尚不存在時寫入）。
 
 `make seed-demo` 之後 demo 商家綁在 `demo.localhost`，帳號密碼與固定識別值見 `CLAUDE.md`。
 

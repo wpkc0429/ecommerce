@@ -13,11 +13,17 @@
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { chromium } from "playwright";
 
-import { brief, check, deliverWebhook, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
+import { brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
-const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? "admin@example.com";
-const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? "admin-change-me";
+// Same source `make seed` used: E2E_* override → env → repo .env → old default.
+const ADMIN_EMAIL =
+  process.env.E2E_ADMIN_EMAIL || process.env.SEED_ADMIN_EMAIL || dotEnvValue("SEED_ADMIN_EMAIL") || "admin@example.com";
+const ADMIN_PASSWORD =
+  process.env.E2E_ADMIN_PASSWORD ||
+  process.env.SEED_ADMIN_PASSWORD ||
+  dotEnvValue("SEED_ADMIN_PASSWORD") ||
+  "admin-change-me";
 
 const browser = await chromium.launch();
 const page = await browser.newPage();

@@ -79,7 +79,7 @@ export function brief(r) {
 // while every other assertion looked fine.
 const CONFIG_DEFAULT_WEBHOOK_SECRET = "dev-only-mock-payment-webhook-secret";
 
-function dotEnvValue(key) {
+export function dotEnvValue(key) {
   try {
     const path = fileURLToPath(new URL("../.env", import.meta.url));
     for (const line of readFileSync(path, "utf8").split("\n")) {

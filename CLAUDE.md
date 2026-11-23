@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-前置：`cp .env.example .env`（首次），Docker 需可用。
+前置：`cp .env.example .env`（首次）並把 `<generate: …>` 佔位值換成自己產生的隨機值，Docker 需可用。`docker-compose.yml` 只綁 `127.0.0.1`，且**沒有密碼預設值**：`POSTGRES_PASSWORD`／`REDIS_PASSWORD` 未設定即拒絕啟動；Redis 開 `requirepass`，API 與整合測試以 `REDIS_PASSWORD` 認證（空值＝不送 AUTH，CI 的 Redis 沒有密碼）。`.env` 已 gitignore，真實值只放那裡。
 
 ```bash
 make up            # 啟動 PostgreSQL 16 + Redis 7（等待健康檢查）
