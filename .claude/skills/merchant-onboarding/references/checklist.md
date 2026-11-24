@@ -4,7 +4,7 @@ Tick items in a run log (a scratch file outside the repos, no secrets). Mark eac
 
 ## Intake (step 0)
 
-- [ ] Shop display name; owner email (kept out of files); storefront kind: headless storefront from the bouquet template, or platform-hosted theme (`web/`, needs `theme_id` and a `domain`).
+- [ ] Shop display name; owner email (kept out of files); the storefront is always headless, created from the merchant template (ADR 0001: there is no platform-hosted option; planned intake from the platform website application form is not built yet).
 - [ ] Hostnames decided: storefront (`shop.example.com`), the merchant's admin (`admin.shop.example.com`), whether images share the platform image domain.
 - [ ] ECPay: merchant has an account; stage credentials first; who enters them (the owner).
 - [ ] Target API: local throwaway, staging or production; who holds the platform token and through which route (platform admin domain behind Access).
@@ -13,12 +13,12 @@ Tick items in a run log (a scratch file outside the repos, no secrets). Mark eac
 
 ## Storefront site from the template (step 11)
 
-Agent, in the new merchant repo (a copy of the bouquet template; a dedicated template repo is planned):
+A human (or the agent with the operator's go-ahead) creates the merchant repo from the template checkout: `node scripts/new-merchant.mjs <dir> --name "<Shop name>" --slug <slug> [--api-base <url>] [--publishable-key <pk_...>] [--site-url <storefront origin>] [--admin-origin <admin origin>]`. It sets the brand in the storefront and admin metadata and copy, writes `config.js` when the values are given, re-locks the hash manifests and makes the initial commit (no remote, no push). Then, in the new repo:
 
 - [ ] Replace brand content only in the design layer: `public/content.js` (copy), `public/assets/**`, `public/styles.css`, `public/index.html` (title, og tags with the merchant's absolute URLs).
-- [ ] Connect to the platform: set `apiBase` and `publishableKey` in `public/config.js`. **Conflict to resolve with the operator first:** `scripts/check-layers.mjs` fails when `public/config.js` no longer contains the `REPLACE_WITH_*` placeholders and when its hash differs from `scripts/commerce.manifest.json`. A real deployment therefore needs a reviewed, deliberate locked-layer change (edit `config.js`, relax the placeholder rule in the merchant repo, then `node scripts/check-layers.mjs --update`) or a deploy-time config step. Do not silently disable the guard. For local work use the gitignored `public/config.local.js` (loaded only on localhost) with `Object.assign(window.ONDO_CONFIG, { apiBase, publishableKey })`.
+- [ ] Connect to the platform: `public/config.js` holds `apiBase` and `publishableKey`. It is LOCKED against AI edits and hash-protected, but merchant-owned: `new-merchant.mjs --api-base --publishable-key` writes it, or a HUMAN edits it and then runs `node scripts/check-layers.mjs --update`. In the template `isTemplate` is true and the guard demands placeholders; in a merchant repo `template.json` has `isTemplate: false`, only the manifest hash matters, and leftover `REPLACE_WITH_*` values are a warning. `sync-core.mjs` never overwrites it. For local work use the gitignored `public/config.local.js` (copy `public/config.local.js.example`; loaded only on localhost) with `Object.assign(window.SHOP_CONFIG, { apiBase, publishableKey })`.
 - [ ] Preview locally: `python3 -m http.server 8080 --directory public` (the `--directory public` is required). Backend: the platform's `make openapi-mock` (port 4010, no DB) or a throwaway API.
-- [ ] Seed or import the catalogue with a fork of `scripts/seed-test-shop.mjs` (real data in its constants; env `SEED_API_BASE`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_SHOP_ID`, `SEED_ORIGIN`; no `SEED_PRUNE` on real data).
+- [ ] Import the catalogue: copy `catalog/catalog.sample.json` to `catalog/catalog.json`, replace the sample data, run `node scripts/import-catalog.mjs catalog/catalog.json --dry-run`, then without `--dry-run` (env `IMPORT_API_BASE`, `IMPORT_ADMIN_EMAIL`, `IMPORT_ADMIN_PASSWORD`, `IMPORT_SHOP_ID`, `IMPORT_ORIGIN`; it never deletes; the sample data is placeholder data and must not reach a real shop).
 - [ ] Guards: `node scripts/check-layers.mjs --check` and `node scripts/check-scope.mjs storefront --base <ref>`.
 - [ ] H: Cloudflare Workers Git integration, custom domain; `wrangler.jsonc` `assets.directory` stays `./public`.
 
@@ -27,9 +27,9 @@ Agent, in the new merchant repo (a copy of the bouquet template; a dedicated tem
 Agent: the admin ships inside the same repo (`admin/`), static, no build.
 
 - [ ] Design only in `admin/design/**` (see the repo's `admin-design` skill). Do not edit the locked core.
-- [ ] Local run: `cd admin && node scripts/serve.mjs --proxy http://127.0.0.1:8080` and gitignored `admin/config.local.js` (`window.BQA_CONFIG.apiBase = location.origin;`).
+- [ ] Local run: `cd admin && node scripts/serve.mjs --proxy http://127.0.0.1:8080` and gitignored `admin/config.local.js` (copy `admin/config.local.js.example`: `window.ADMIN_CONFIG.apiBase = location.origin;`).
 - [ ] Guards from `admin/`: `node scripts/check-design.mjs --base <ref>`, `node scripts/check-layers.mjs`, `node scripts/test-guard.mjs`; from the repo root `node scripts/check-scope.mjs admin --base <ref>`.
-- [ ] H: static hosting on the local port the tunnel points at, with the CSP from `admin/README.md`; tunnel, Access, DNS (`cloudflare-steps.md`); admin origin registered `purpose:"admin"` (cookbook 5) and added to R2 CORS.
+- [ ] H: static hosting on the local port the tunnel points at (`admin/deploy/`: nginx config with the strict CSP, Dockerfile, ingress example); tunnel, Access, DNS (`cloudflare-steps.md`); admin origin registered `purpose:"admin"` (cookbook 5) and added to R2 CORS.
 - [ ] The admin must handle `#/set-password/{token}` and `#/accept-invite/{token}` at its root (the template does).
 
 ## Verification (step 15)
@@ -37,7 +37,7 @@ Agent: the admin ships inside the same repo (`admin/`), static, no build.
 Platform side (agent, against local/throwaway stack unless the operator authorises production reads):
 
 - [ ] `make openapi` (contract checks; no infra) and `make test` pass if the platform code was touched (it should not be).
-- [ ] `GET .../setup-status`: `owner_assigned`, `owner_password_set`, `shipping_method_active`, `payment_credentials_set`, `publishable_key_active` all true (plus `theme_applied`, `domain_bound`, `home_published` for a platform-hosted shop).
+- [ ] `GET .../setup-status`: `owner_assigned`, `owner_password_set`, `shipping_method_active`, `payment_credentials_set`, `publishable_key_active` all true (`theme_applied`, `domain_bound`, `home_published` are deprecated hosted-storefront flags and stay false for a headless shop: ignore them).
 - [ ] Storefront read-back with the key: `curl -s -H "X-Publishable-Key: $PK" "$API/api/v1/shop/products"`, `/categories`, `/shipping-methods` return the expected catalogue; images present.
 - [ ] CORS: from the browser at the storefront origin the three calls above succeed. If `curl` works but the browser fails, the origin is not registered (or has the wrong purpose).
 - [ ] Guest checkout end to end on stage: place an order, follow the ECPay stage redirect, confirm the payment webhook turns the order paid (`ECPAY_RETURN_URL` reachable), check the order in the admin. (`cd e2e && node commerce-path.mjs` is the platform regression chain: it needs a throwaway stack with `make seed-demo` data and tests the demo shop, not the new merchant; run it only if platform code changed, never against production or the main database.)

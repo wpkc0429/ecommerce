@@ -54,8 +54,8 @@ Optional: `R2_ENDPOINT` (MinIO only), `IMAGE_EXTRA_ALLOWED_ORIGINS`, `MEDIA_MAX_
 
 `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (`make seed` creates the platform super admin). Not used for merchants.
 
-## Bouquet template variables (not platform env)
+## Merchant template variables (not platform env)
 
-- Storefront `public/config.js`: `apiBase`, `publishableKey`, `showPrices`, `featuredCategory`. Local overrides only in the gitignored `public/config.local.js`.
-- Storefront seed script `scripts/seed-test-shop.mjs`: `SEED_API_BASE`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (required), `SEED_SHOP_ID`, `SEED_ORIGIN`, `SEED_PRUNE`, `SEED_ASSETS_DIR`.
-- Admin: gitignored `admin/config.local.js` sets `BQA_CONFIG.apiBase` on localhost only; off localhost the base is always `location.origin`.
+- Storefront `public/config.js` (`SHOP_CONFIG`): `apiBase`, `publishableKey`, `showPrices`, `featuredCategory`. Local overrides only in the gitignored `public/config.local.js`.
+- Catalogue importer `scripts/import-catalog.mjs`: `IMPORT_API_BASE`, `IMPORT_ADMIN_EMAIL`, `IMPORT_ADMIN_PASSWORD` (required for a real run), `IMPORT_SHOP_ID`, `IMPORT_ORIGIN`. Admin container (`admin/deploy/Dockerfile`): `ADMIN_IMG_ORIGIN`, `ADMIN_UPLOAD_ORIGIN`.
+- Admin: gitignored `admin/config.local.js` sets `ADMIN_CONFIG.apiBase` on localhost only; off localhost the base is always `location.origin`.

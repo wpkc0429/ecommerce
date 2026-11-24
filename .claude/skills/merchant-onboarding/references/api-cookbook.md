@@ -22,20 +22,19 @@ curl -s "${auth[@]}" "$API/api/v1/admin/me"          # shows platform_permission
 
 ## 2. Provision the shop [provisionShop]
 
-Needs platform `shop.create` + `account.manage`; `domain` also needs `shop.manage_domains`; `storefront_origins` also needs `shop.manage_client_origins`. One transaction: shop (with an automatic home page), theme, optional domain binding, owner, origins. Any failure rolls everything back (409 on a conflict).
+Needs platform `shop.create` + `account.manage`; `domain` also needs `shop.manage_domains`; `storefront_origins` also needs `shop.manage_client_origins`. One transaction: shop, owner, origins (headless; the request also still accepts the deprecated `theme_id`, `domain` and `path_prefix`, which this playbook never sends). Any failure rolls everything back (409 on a conflict).
 
 ```bash
 curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
   "name": "<Shop Name>",
   "owner_email": "owner@example.com",
-  "theme_id": 1,
   "status": 1,
   "storefront_origins": ["https://shop.example.com"]
 }'
 ```
 
-- `theme_id`, `status`, `domain`, `path_prefix`, `storefront_origins` are optional. `status`: 0 disabled (storefront 503), 1 active, 2 under review (storefront 404). Use `status: 2` while the shop is being built if you do not want it reachable, then set 1 at go-live.
-- `domain` (+ optional `path_prefix`) is only for a platform-hosted (Next.js `web/`) storefront. A headless storefront (the bouquet template) does not need it; it identifies itself with a publishable key.
+- `status` and `storefront_origins` are optional. `status`: 0 disabled (storefront 503), 1 active, 2 under review (storefront 404). Use `status: 2` while the shop is being built if you do not want it reachable, then set 1 at go-live.
+- Do not send `theme_id`, `domain` or `path_prefix`: they belong to the deprecated platform-hosted storefront. A headless storefront (the merchant template) identifies itself with a publishable key.
 - A new owner email creates a password-less account and returns `owner.setup_url` and `owner.expires_at` (`delivery:"manual"`). An existing email is added as `merchant_owner` and its password is left alone (`owner.created:false`, no link).
 - Response also has `shop.id` (use as `$SHOP`), `binding`, `storefront_origins`. The `setup_url` is shown once: hand it to the operator without logging it.
 - Origins registered here are `purpose: storefront`. Register the admin origin separately (step 5).
@@ -46,7 +45,7 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
 curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/setup-status"
 ```
 
-Returns booleans derived from live data (nothing stored): `theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. A headless shop will not need `domain_bound` or a published CMS home; the others are the real onboarding gates. Re-read after every step.
+Returns booleans derived from live data (nothing stored): `theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `theme_applied`, `domain_bound` and `home_published` belong to the deprecated hosted storefront and stay false for every headless shop: ignore them. The other five are the real onboarding gates. Re-read after every step.
 
 ## 4. Owner password link
 
@@ -64,14 +63,14 @@ Find `$OWNER_USER_ID` from `owner.user_id` in the step 2 response (or `GET /api/
 Platform `shop.manage_client_origins`. Origin = `scheme://host[:port]`, no path, no wildcard, globally unique across shops, and one origin has exactly one purpose.
 
 ```bash
-# storefront (CORS for /api/v1/shop/*, /api/v1/render/*; none for /api/v1/admin/*)
+# storefront (CORS for /api/v1/shop/*; none for /api/v1/admin/*)
 curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/allowed-origins" -d '{"origin":"https://shop.example.com","purpose":"storefront"}'
 # the merchant's own admin site (binds that host to this shop server-side; invitation/password links point at it)
 curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/allowed-origins" -d '{"origin":"https://admin.shop.example.com","purpose":"admin"}'
 curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/allowed-origins"        # list to confirm
 ```
 
-Do not register the shared merchant admin domain (`ADMIN_PUBLIC_URL`) or the platform admin domain under any shop. Fixed preview domains need their own entry; random-hash preview domains cannot be covered. For local admin testing over http also register `https://localhost:3001` (see `admin/README.md` in the bouquet repo).
+Do not register the shared merchant admin domain (`ADMIN_PUBLIC_URL`) or the platform admin domain under any shop. Fixed preview domains need their own entry; random-hash preview domains cannot be covered. For local admin testing over http also register `https://localhost:3001` (see `admin/README.md` in the merchant template).
 
 ## 6. Publishable key [createPublishableKey]
 
@@ -97,7 +96,7 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/shipping-methods" \
 curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/categories" -d '{"name":"<Name>","slug":"<slug>","parent_id":null,"position":0}'
 ```
 
-The bouquet storefront reads the category slug in `ONDO_CONFIG.featuredCategory` (default `new-arrivals`) for its home-page featured block; create that category if the template is used unchanged, or change that setting (a locked-layer change).
+The merchant-template storefront reads the category slug in `SHOP_CONFIG.featuredCategory` (default `new-arrivals`) for its home-page featured block; create that category if the template is used unchanged, or change that setting (a locked-layer change).
 
 ## 9. Member tiers [createMemberTier]
 
@@ -129,7 +128,7 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/products" -d '{
 }'
 ```
 
-Updating a product with PUT replaces its SKU list wholesale; never drop an existing SKU (set `is_active:false` instead). For a real catalogue there is no generic importer in the platform; fork `scripts/seed-test-shop.mjs` from the bouquet template (see its header: edit the `CATEGORIES`/`PRODUCTS`/`SHIPPING` constants, set `SEED_API_BASE`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_SHOP_ID`; it is idempotent; never use `SEED_PRUNE=1` on real data).
+Updating a product with PUT replaces its SKU list wholesale; never drop an existing SKU (set `is_active:false` instead). The platform has no generic importer; use the template's `scripts/import-catalog.mjs` (idempotent upsert by slug / sku_code, images through the presign, PUT, attach flow, `--dry-run`; input format `catalog/catalog.sample.json`; credentials only from the env vars `IMPORT_API_BASE`, `IMPORT_ADMIN_EMAIL`, `IMPORT_ADMIN_PASSWORD`, `IMPORT_SHOP_ID`, `IMPORT_ORIGIN`; it never deletes).
 
 ## 12. Product images (needs R2 configured) [createMediaUpload, createProductImage]
 

@@ -17,11 +17,11 @@ Placeholders: `shop.example.com` storefront, `admin.shop.example.com` the mercha
 6. Set the five variables (see `env-reference.md`), restart the API.
 7. Verify: `GET /api/v1/admin/media/config` returns `{"enabled": true, ...}`; upload one product image in the admin; the public `images[0].urls.large` opens as `image/webp` with `Cache-Control: public, max-age=31536000, immutable`; no leftover under `incoming/`.
 
-If the merchant's admin or storefront uses a strict CSP, `img-src` needs the image domain and `connect-src` the R2 direct-upload origin (`docs/admin-frontend-integration.md` section 7, `admin/docs/AI-EDIT-SERVICE-NOTES.md` CSP block in the bouquet repo).
+If the merchant's admin or storefront uses a strict CSP, `img-src` needs the image domain and `connect-src` the R2 direct-upload origin (`docs/admin-frontend-integration.md` section 7, `admin/docs/AI-EDIT-SERVICE-NOTES.md` CSP block of the merchant template).
 
 ## B. Static hosting for the merchant admin (origin server)
 
-The admin is a build-less static folder (`admin/` of the bouquet template; publish only `index.html app.js styles.css config.js config-loader.js lib/ core/ ui/ design/ design-defaults/ vendor/`; never `config.local.js`). Serve it on a local port (the example config uses `127.0.0.1:3001`) with the CSP from the bouquet `admin/README.md`. There is no ready-made Dockerfile or nginx config for the bouquet-style admin in the bouquet repo (the platform repo's own shared admin has `admin/Dockerfile` and `admin/nginx.conf`). Each distinct admin build needs its own port or directory; do not point two different merchants' tunnel hostnames at one folder unless they are meant to share the same design.
+The admin is a build-less static folder (`admin/` of the merchant template; publish only `index.html app.js styles.css config.js config-loader.js lib/ core/ ui/ design/ design-defaults/ vendor/`; never `config.local.js`). The template ships the hosting files: `admin/deploy/nginx.conf.template` (strict CSP, origins from `ADMIN_IMG_ORIGIN` / `ADMIN_UPLOAD_ORIGIN`), `admin/deploy/Dockerfile` (build from `admin/`) and `admin/deploy/cloudflared-ingress.example.yml`. Serve it on a local port (the example config uses `127.0.0.1:3001`). Each distinct admin build needs its own port or directory; do not point two different merchants' tunnel hostnames at one folder unless they are meant to share the same design.
 
 ## C. Tunnel ingress (your tunnel config file, outside the repos)
 
@@ -35,7 +35,7 @@ Merge by hand from `docs/deploy/cloudflared-admin.example.yml`. For every admin 
     service: http://127.0.0.1:3001        # the static admin
 ```
 
-Leave the public API hostname rule (`^/api/v1/admin` to `http_status:404`) untouched. Create a DNS CNAME to the tunnel for each new hostname (`cloudflared tunnel route dns <tunnel> <hostname>` or the dashboard), then restart cloudflared. The storefront needs none of this: the bouquet template storefront is a Cloudflare Workers static-assets deployment, with its custom domain attached in the Workers dashboard.
+Leave the public API hostname rule (`^/api/v1/admin` to `http_status:404`) untouched. Create a DNS CNAME to the tunnel for each new hostname (`cloudflared tunnel route dns <tunnel> <hostname>` or the dashboard), then restart cloudflared. The storefront needs none of this: the merchant template storefront is a Cloudflare Workers static-assets deployment, with its custom domain attached in the Workers dashboard.
 
 ## D. Cloudflare Access (Zero Trust, dashboard)
 
@@ -46,6 +46,6 @@ Two Self-hosted applications; the dashboard is the only place for emails.
 - Team domain `<team>.cloudflareaccess.com`.
 - Then set on the API: `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD=AUD_MERCHANT,AUD_PLATFORM`, `PLATFORM_ADMIN_HOSTS`, `ADMIN_PUBLIC_URL` (shared merchant domain) and restart. Access verification is fail-closed (403 if the JWKS cannot be fetched).
 
-## E. Storefront hosting (bouquet template)
+## E. Storefront hosting (merchant template)
 
 Workers static assets via Git integration: production branch `main`, build command empty, deploy command `npx wrangler deploy`, publish boundary `public/` (`wrangler.jsonc`). **A push to `main` is a production deploy: only the operator approves it.** Attach the custom domain in the Cloudflare dashboard. `og:url` and `og:image` in `public/index.html` are absolute URLs and must be changed to the merchant's domain. Register the final storefront origin with the platform (cookbook 5) before testing in a browser.
