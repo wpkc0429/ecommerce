@@ -214,3 +214,8 @@ h4 { margin: 1rem 0 0.4rem; font-size: 0.9rem; color: #374151; }
 .image-upload { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 .file-button { display: inline-block; padding: 0.35rem 0.7rem; border: 1px solid #9ca3af; border-radius: 6px; cursor: pointer; background: #fff; }
 .file-button input[type="file"] { display: none; }
+
+/* change platform-account-provisioning */
+.link-once { width: 100%; font-family: monospace; margin: 0.4rem 0; }
+.checklist { list-style: none; padding: 0; }
+.checklist li { padding: 0.25rem 0; }

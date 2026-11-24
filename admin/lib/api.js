@@ -64,6 +64,16 @@ export async function api(method, path, body) {
       throw new ApiError(401, { error: { message: "session expired" } });
     }
   }
+  // 403 之後確認身分（change platform-account-provisioning）：被停用的帳號，其未過期的
+  // access token 在伺服器端會被 RBAC 拒絕（403），而 /admin/me 對它回 401。這時它
+  // 該回登入頁，而不是看著一堆 403 錯誤。refresh 已被撤銷，所以走既有的 401 路徑。
+  if (res.status === 403 && path !== "/admin/me") {
+    const probe = await fetch(`${API_BASE}/api/v1/admin/me`, { headers: { Authorization: `Bearer ${tokens.access}` } });
+    if (probe.status === 401) {
+      unauthorizedHandler();
+      throw new ApiError(401, { error: { message: "account disabled or session expired" } });
+    }
+  }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) throw new ApiError(res.status, data);

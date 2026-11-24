@@ -12,7 +12,7 @@
 // （「現在在哪個分頁」與「網址說在哪個分頁」）會立刻漂移，所以只留一份。
 import { api, tokens, API_BASE, onUnauthorized } from "./lib/api.js";
 import { $, el } from "./lib/dom.js";
-import { loadPermissions, can, permissionError } from "./lib/rbac.js";
+import { loadPermissions, can, canPlatform, setPlatformPermissions, permissionError } from "./lib/rbac.js";
 import { loadMediaConfig, setShopIDSource } from "./lib/upload.js";
 import { parseHash, navigate, onRoute } from "./lib/router.js";
 import { createPagesView } from "./views/pages.js";
@@ -26,6 +26,9 @@ import { createMembersView } from "./views/members.js";
 import { createPointsView } from "./views/points.js";
 import { createReportsView } from "./views/reports.js";
 import { createStorefrontClientsView } from "./views/storefront-clients.js";
+import { createPlatformShopsView } from "./views/platform-shops.js";
+import { createPlatformAccountsView } from "./views/platform-accounts.js";
+import { createSetPasswordView } from "./views/set-password.js";
 
 const state = { me: null, shopID: null };
 
@@ -74,10 +77,39 @@ const views = {
     perms: ["publishable_key.view", "shop.manage_client_origins", "payment_credential.manage"],
     view: createStorefrontClientsView(ctx),
   },
+  // 平台視圖（change platform-account-provisioning）：不屬於任何商家，可見性來源是
+  // /admin/me 的 platform_permissions（platformPerm），不是 /shops/{id}/me。
+  "platform-shops": {
+    label: "商家（平台）", panel: "tab-platform-shops", nav: true,
+    platformPerm: "shop.list", view: createPlatformShopsView(),
+  },
+  "platform-accounts": {
+    label: "帳號（平台）", panel: "tab-platform-accounts", nav: true,
+    platformPerm: "account.view", view: createPlatformAccountsView(),
+  },
 };
+
+// 密碼設定頁（#/set-password/{token}）不在註冊表：它無需登入，也不屬於任何分頁。
+// 連結形狀是給所有 admin 前端的契約（docs/admin-frontend-integration.md）。
+const setPasswordView = createSetPasswordView({
+  toLogin(email) {
+    // 設定完成：清掉網址上的 token，回登入頁並預填 email。
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    show("view-login");
+    $("#login-email").value = email || "";
+    $("#login-password").value = "";
+    $(email ? "#login-password" : "#login-email").focus();
+  },
+});
+
+function openSetPassword(token) {
+  show("view-set-password");
+  setPasswordView.load(token);
+}
 
 function allowed(def) {
   if (!def) return false;
+  if (def.platformPerm) return canPlatform(def.platformPerm);
   if (def.perms) return def.perms.some((p) => can(p));
   return !def.perm || can(def.perm);
 }
@@ -97,6 +129,7 @@ function showTab(name, ...params) {
 
 /** 唯一的畫面切換入口——hashchange 與「hash 未變」的直接呼叫都走這裡。 */
 function renderRoute({ name, params }) {
+  if (name === "set-password") return openSetPassword(params[0]);
   const def = views[name];
   if (!def || !allowed(def)) {
     // 過期的書籤、無權限的連結、拼錯的 hash——一律安靜地回落到一個進得去的
@@ -175,6 +208,7 @@ async function refreshShopContext(honorHash) {
 }
 
 function enterMain() {
+  setPlatformPermissions(state.me.platform_permissions);
   show("view-main");
   $("#whoami").textContent = state.me.email;
   const sel = $("#shop-select");
@@ -200,6 +234,8 @@ onRoute(renderRoute);
 setShopIDSource(() => state.shopID);
 
 async function boot() {
+  const route = parseHash();
+  if (route.name === "set-password") return openSetPassword(route.params[0]);
   if (tokens.access) {
     try {
       state.me = await api("GET", "/admin/me");

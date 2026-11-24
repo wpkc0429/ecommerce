@@ -28,6 +28,12 @@ export async function loadPermissions(shopID) {
 
 export function can(node) { return permissions.has(node); }
 
+// 平台層權限（change platform-account-provisioning, design D9）：來源是
+// GET /admin/me 的 platform_permissions，與商家無關。同樣只是體驗層。
+let platformPermissions = new Set();
+export function setPlatformPermissions(list) { platformPermissions = new Set(list || []); }
+export function canPlatform(node) { return platformPermissions.has(node); }
+
 export function permissionError() { return loadError; }
 
 /** 有權限才產生這個節點；沒有就回傳 ""（el() 會忽略空字串以外的 falsy，

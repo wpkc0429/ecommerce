@@ -21,6 +21,22 @@
       </div>
     </section>
 
+    <!-- 密碼設定頁：未登入可進入（#/set-password/{token}，change platform-account-provisioning） -->
+    <section id="view-set-password" class="view" hidden>
+      <div class="card login-card">
+        <h1>設定密碼</h1>
+        <p id="sp-invalid" class="error" hidden>連結無效或已過期，請聯絡管理員重新產生。</p>
+        <form id="sp-form" hidden>
+          <p>帳號：<strong id="sp-email"></strong></p>
+          <label>新密碼（至少 12 個字元） <input type="password" id="sp-password" required minlength="12" autocomplete="new-password" /></label>
+          <label>再輸入一次 <input type="password" id="sp-password2" required minlength="12" autocomplete="new-password" /></label>
+          <button type="submit" class="primary">設定密碼</button>
+          <p id="sp-error" class="error" hidden></p>
+        </form>
+        <p><a href="#/" id="sp-to-login">回登入頁</a></p>
+      </div>
+    </section>
+
     <!-- 主畫面 -->
     <section id="view-main" class="view" hidden>
       <header class="topbar">
@@ -556,6 +572,86 @@
             <button type="submit" class="primary">儲存</button>
           </form>
         </div>
+      </div>
+
+      <!-- 平台：商家（change platform-account-provisioning） -->
+      <div id="tab-platform-shops" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>商家</h2>
+          <button id="platform-shop-new-btn" class="primary">開店精靈</button>
+        </div>
+        <p class="hint">平台層視圖：列出所有商家、一次開好一家新店，並查看每家店的開店檢查清單（由資料推導，不另外儲存進度）。</p>
+        <p id="platform-shops-error" class="error" hidden></p>
+        <div id="platform-shop-result" class="card" hidden></div>
+        <table class="table">
+          <thead><tr><th>ID</th><th>名稱</th><th>狀態</th><th>動作</th></tr></thead>
+          <tbody id="platform-shops-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="platform-shops-prev">← 上一頁</button>
+          <span id="platform-shops-pageinfo"></span>
+          <button id="platform-shops-next">下一頁 →</button>
+        </div>
+        <div id="platform-shop-checklist" class="card" hidden></div>
+
+        <dialog id="platform-shop-dialog">
+          <form id="platform-shop-form" method="dialog">
+            <h3>開店精靈</h3>
+            <label>商家名稱 <input type="text" id="platform-shop-name" required /></label>
+            <label id="platform-shop-theme-label">主題
+              <select id="platform-shop-theme"></select>
+            </label>
+            <label>網域（選填） <input type="text" id="platform-shop-domain" placeholder="shop.example.com" /></label>
+            <label>路徑前綴（選填，需要網域） <input type="text" id="platform-shop-prefix" placeholder="/shop" /></label>
+            <label>Storefront origin（選填） <input type="text" id="platform-shop-origin" placeholder="https://shop.example.com" /></label>
+            <label>Owner email <input type="email" id="platform-shop-owner" required autocomplete="off" /></label>
+            <p class="hint">Owner 的密碼由本人透過一次性連結設定；管理員不會知道也不能代填。</p>
+            <p id="platform-shop-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="platform-shop-cancel">取消</button>
+              <button type="submit" class="primary">開店</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
+
+      <!-- 平台：帳號（change platform-account-provisioning） -->
+      <div id="tab-platform-accounts" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>帳號</h2>
+          <div class="filters">
+            <input type="search" id="platform-account-q" placeholder="搜尋 email" />
+            <button id="platform-account-search">搜尋</button>
+            <button id="platform-account-new-btn" class="primary">建立帳號</button>
+          </div>
+        </div>
+        <p id="platform-accounts-error" class="error" hidden></p>
+        <div id="platform-account-link" class="card" hidden></div>
+        <table class="table">
+          <thead><tr><th>ID</th><th>Email</th><th>狀態</th><th>密碼</th><th>動作</th></tr></thead>
+          <tbody id="platform-accounts-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="platform-accounts-prev">← 上一頁</button>
+          <span id="platform-accounts-pageinfo"></span>
+          <button id="platform-accounts-next">下一頁 →</button>
+        </div>
+        <div id="platform-account-detail" class="card" hidden></div>
+
+        <dialog id="platform-account-dialog">
+          <form id="platform-account-form" method="dialog">
+            <h3>建立帳號</h3>
+            <label>Email <input type="email" id="platform-account-email" required autocomplete="off" /></label>
+            <label>商家 ID（選填，與角色一起給） <input type="number" id="platform-account-shop" min="1" /></label>
+            <label>商家角色 <select id="platform-account-role"></select></label>
+            <p class="hint">帳號建立時<strong>沒有密碼</strong>。完成後會產生一次性的密碼設定連結，請以安全管道交給本人。</p>
+            <p id="platform-account-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="platform-account-cancel">取消</button>
+              <button type="submit" class="primary">建立</button>
+            </div>
+          </form>
+        </dialog>
       </div>
     </section>
   </div>
