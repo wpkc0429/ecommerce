@@ -111,6 +111,7 @@ func (h *TeamHandler) listInvitations(w http.ResponseWriter, r *http.Request) {
 	for _, i := range items {
 		out = append(out, map[string]any{
 			"id": i.ID, "email": i.Email, "role_id": i.RoleID, "role_name": i.RoleName,
+			"status":     i.Status,
 			"expires_at": i.ExpiresAt, "created_at": i.CreatedAt,
 		})
 	}

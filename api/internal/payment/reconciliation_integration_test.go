@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	entpayment "ksdevworks/ecommerce/api/internal/ent/payment"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
@@ -210,10 +211,11 @@ func TestHandleWebhookRecordsProviderTransactionIDAndPaidAt(t *testing.T) {
 	}
 }
 
-// TestHandleWebhookLeavesProviderFactsNullWhenNotReported — NULL is the honest
-// answer for a provider that has only one identifier and reports no time, and
-// for every row that predates this change.
-func TestHandleWebhookLeavesProviderFactsNullWhenNotReported(t *testing.T) {
+// TestHandleWebhookLeavesProviderTransactionIDNullWhenNotReported — NULL is the
+// honest answer for a provider that has only one identifier. paid_at is NOT
+// null any more (change order-and-invitation-polish, design D3): a succeeded
+// payment without a provider timestamp is stamped with the processing time.
+func TestHandleWebhookLeavesProviderTransactionIDNullWhenNotReported(t *testing.T) {
 	f := setupPaymentFixtures(t)
 	memberID := f.newMember(t, "no-facts@t.dev")
 	ord := f.newOrder(t, memberID, 3400)
@@ -230,9 +232,74 @@ func TestHandleWebhookLeavesProviderFactsNullWhenNotReported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("HandleWebhook: %v", err)
 	}
-	if p.ProviderTransactionID != nil || p.PaidAt != nil {
-		t.Fatalf("want both NULL for a provider that reports neither, got %v / %v",
-			p.ProviderTransactionID, p.PaidAt)
+	if p.ProviderTransactionID != nil {
+		t.Fatalf("provider_transaction_id = %v, want NULL for a provider that reports none", *p.ProviderTransactionID)
+	}
+	if p.PaidAt == nil || time.Since(*p.PaidAt) > time.Minute || time.Until(*p.PaidAt) > time.Minute {
+		t.Fatalf("paid_at = %v, want roughly now for a succeeded payment", p.PaidAt)
+	}
+}
+
+// A failed or still-pending delivery is not a payment: paid_at stays NULL.
+func TestHandleWebhookDoesNotStampPaidAtUnlessSucceeded(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	memberID := f.newMember(t, "no-paid-at@t.dev")
+	ord := f.newOrder(t, memberID, 3400)
+	svc := newTestService(f)
+	ctx := context.Background()
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	for _, o := range []payment.Outcome{payment.OutcomePending, payment.OutcomeFailed} {
+		p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{ProviderReference: res.ProviderReference, Outcome: o})
+		if err != nil {
+			t.Fatalf("HandleWebhook(%v): %v", o, err)
+		}
+		if p.PaidAt != nil {
+			t.Fatalf("outcome %v stamped paid_at = %v", o, p.PaidAt)
+		}
+	}
+}
+
+// A row that already succeeded without a timestamp (written before this change)
+// heals on the next delivery, and an existing timestamp is never overwritten.
+func TestHandleWebhookRedeliveryHealsMissingPaidAtButKeepsExisting(t *testing.T) {
+	f := setupPaymentFixtures(t)
+	memberID := f.newMember(t, "heal@t.dev")
+	ord := f.newOrder(t, memberID, 3400)
+	svc := newTestService(f)
+	ctx := context.Background()
+
+	_, res, err := svc.InitiatePayment(ctx, f.shopID, memberID, ord.ID, "")
+	if err != nil {
+		t.Fatalf("InitiatePayment: %v", err)
+	}
+	if _, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded}); err != nil {
+		t.Fatalf("HandleWebhook: %v", err)
+	}
+	// Simulate the legacy row: succeeded, paid_at NULL.
+	if err := f.client.Payment.Update().Where(entpayment.OrderIDEQ(ord.ID)).ClearPaidAt().Exec(ctx); err != nil {
+		t.Fatalf("clear paid_at: %v", err)
+	}
+	p, err := svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded})
+	if err != nil {
+		t.Fatalf("redelivery: %v", err)
+	}
+	if p.PaidAt == nil {
+		t.Fatal("redelivery did not heal the missing paid_at")
+	}
+	first := *p.PaidAt
+	p, err = svc.HandleWebhook(ctx, "mock", 0, &payment.WebhookResult{
+		ProviderReference: res.ProviderReference, Outcome: payment.OutcomeSucceeded})
+	if err != nil {
+		t.Fatalf("second redelivery: %v", err)
+	}
+	if p.PaidAt == nil || !p.PaidAt.Equal(first) {
+		t.Errorf("paid_at changed on redelivery: %v -> %v", first, p.PaidAt)
 	}
 }
 

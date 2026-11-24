@@ -587,6 +587,10 @@ func TestOrderAccessTokenScope(t *testing.T) {
 	})
 
 	t.Run("reads its own shipment", func(t *testing.T) {
+		// Shipments require a paid order (change order-and-invitation-polish).
+		if _, err := e.client.Order.UpdateOneID(orderID).SetPaymentStatus(1).Save(ctx); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := e.shippingSvc.CreateShipment(ctx, e.shopA, orderID, "黑貓", nil, nil); err != nil {
 			t.Fatal(err)
 		}

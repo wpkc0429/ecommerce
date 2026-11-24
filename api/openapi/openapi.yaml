@@ -820,7 +820,7 @@ components:
     OrderItem:
       type: object
       additionalProperties: false
-      required: [id, product_id, product_title, sku_id, sku_code, quantity, price_amount, currency, line_total, gift_message, shipped_quantity]
+      required: [id, product_id, product_title, sku_id, sku_code, options, quantity, price_amount, currency, line_total, gift_message, shipped_quantity]
       description: |
         訂單品項是**永久快照**：商品改名、改價、下架、刪除，都不會改變已成立訂單的顯示內容。
         唯一的例外是 `shipped_quantity`，它是狀態而不是快照。
@@ -838,6 +838,17 @@ components:
           oneOf: [{ type: integer }, { type: 'null' }]
           description: 同 `product_id`，資訊性、無外鍵、可能無法解析。
         sku_code: { type: string }
+        options:
+          oneOf:
+            - type: object
+              additionalProperties: { type: string }
+            - type: 'null'
+          description: |
+            下單當下該 SKU 的規格選項快照（例如 `{"size":"M","color":"red"}`），與 `sku_code`
+            同樣不受日後 SKU 編輯或刪除影響——客戶端不必再從 `sku_code` 尾碼猜尺寸。
+            SKU 沒有任何選項時是 `{}`。**只有在此欄位出現之前成立的舊訂單可能是 `null`**
+            （migration 已盡力以該 SKU 目前的選項回填；SKU 已刪除者維持 `null`），
+            呼叫端 MUST 容許 `null`。
         quantity: { type: integer, format: int32, minimum: 1 }
         price_amount:
           allOf: [{ $ref: '#/components/schemas/MinorUnitAmount' }]
@@ -1123,8 +1134,11 @@ components:
         paid_at:
           oneOf: [{ type: string, format: date-time }, { type: 'null' }]
           description: |
-            **服務商所宣告的付款時間**（綠界的 `PaymentDate`，也就是出現在對帳單上
-            的那個時間）。服務商不回報時為 `null`。
+            付款成功的時間。**付款成功（`status = 1`）的列一定有值**（change
+            order-and-invitation-polish）：服務商有宣告就用它（綠界的 `PaymentDate`，
+            也就是出現在對帳單上的那個時間）；沒有宣告（mock、或綠界略去 `PaymentDate`）
+            則是平台記錄這次成功的時間。待付款與失敗的列為 `null`。此變更之前成功、
+            卻沒有值的歷史列由 migration 以 `updated_at` 近似回填。
 
             這與 `updated_at` 不同且**不可互相替代**：`updated_at` 的定義是
             「這一列最後一次被寫入」，任何未來的寫入都會蓋掉它。
@@ -1547,12 +1561,16 @@ components:
     Invitation:
       type: object
       additionalProperties: false
-      required: [id, email, role_id, role_name, expires_at, created_at]
+      required: [id, email, role_id, role_name, status, expires_at, created_at]
       properties:
         id: { type: integer }
         email: { type: string }
         role_id: { type: integer }
         role_name: { type: string }
+        status:
+          type: string
+          enum: [pending, expired]
+          description: '`pending` 尚可接受；`expired` 已過期（連結失效），仍可撤回。'
         expires_at: { type: string, format: date-time }
         created_at: { type: string, format: date-time }
 
@@ -3699,16 +3717,20 @@ paths:
     get:
       tags: [admin-rbac]
       operationId: listShopInvitations
-      summary: 列出待接受的邀請
+      summary: 列出未接受的邀請（含已過期）
       description: |
-        需要商家層 `user.manage_members`。只列本店未接受、未過期、未撤回者，依建立時間遞減。
+        需要商家層 `user.manage_members`。列出本店**未接受、未撤回**的邀請，依建立時間遞減；
+        每筆帶 `status`：`pending`（未過期）或 `expired`（已過期，連結已失效）。
+        已過期者仍可用 `DELETE .../invitations/{invitationID}` 撤回（從清單移除）。
+        舊版此端點只回未過期者；現在多回已過期的列，所有原有欄位不變，
+        只新增 `status`——只認原有欄位的呼叫端必須改為依 `status` 過濾才能維持原本顯示。
         **不含 token 或連結。**
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
       responses:
         "200":
-          description: 待接受的邀請。
+          description: 未接受的邀請（`status` 為 `pending` 或 `expired`）。
           content:
             application/json:
               schema:
@@ -3726,8 +3748,8 @@ paths:
     delete:
       tags: [admin-rbac]
       operationId: revokeShopInvitation
-      summary: 撤回邀請
-      description: 需要商家層 `user.manage_members`。撤回後該連結視同無效（inspect 回 404）。不是本店待接受的邀請回 404。
+      summary: 撤回邀請（含已過期）
+      description: 需要商家層 `user.manage_members`。撤回後該連結視同無效（inspect 回 404），並從清單移除。待接受與已過期的邀請都可撤回；不是本店、已被接受或已撤回的邀請回 404。
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
@@ -6166,8 +6188,10 @@ paths:
         `items` 的請求與本能力引入品項概念之前逐位元組相同——既有呼叫端一個字都不用改。
         帶了 `items` 就是部分出貨。
 
-        409 的三種情形：訂單已取消、訂單已無未出貨數量、訂單已有出貨被標記為退貨
-        （已退貨的訂單不再接受新的出貨）。
+        409 的四種情形：訂單已取消、**訂單尚未付款**（`payment_status` 不是已付款；
+        未付款、已退款、部分退款皆不可出貨——change order-and-invitation-polish）、訂單已無未出貨數量、
+        訂單已有出貨被標記為退貨（已退貨的訂單不再接受新的出貨）。資料模型目前沒有
+        貨到付款／付款方式旗標，所以規則是嚴格的「已付款才能出貨」。
       security: [{ adminJWT: [] }]
       requestBody:
         required: true

@@ -180,7 +180,26 @@ func shippingValidAddr() map[string]any {
 // checkoutOrder mirrors paymentEnv's helper of the same shape: seeds a SKU,
 // adds it to memberID's cart via the real cart.Service, then checks out via
 // the real HTTP endpoint.
+//
+// Since change order-and-invitation-polish shipments require a paid order, so
+// this helper marks the order paid; checkoutUnpaidOrder is the raw checkout.
 func (e *shippingEnv) checkoutOrder(t *testing.T, shopID, memberID int, domain string, price int64) int {
+	t.Helper()
+	id := e.checkoutUnpaidOrder(t, shopID, memberID, domain, price)
+	e.markPaid(t, id)
+	return id
+}
+
+// markPaid sets payment_status to paid directly (the payment flow has its own
+// tests; this package only needs a payable-to-ship order).
+func (e *shippingEnv) markPaid(t *testing.T, orderID int) {
+	t.Helper()
+	if _, err := e.client.Order.UpdateOneID(orderID).SetPaymentStatus(1).Save(context.Background()); err != nil {
+		t.Fatalf("mark order paid: %v", err)
+	}
+}
+
+func (e *shippingEnv) checkoutUnpaidOrder(t *testing.T, shopID, memberID int, domain string, price int64) int {
 	t.Helper()
 	skuID := e.newSKU(t, shopID, price, "TWD", 10)
 	if _, err := e.cartSvc.AddItem(context.Background(), shopID, memberID, skuID, 1, ""); err != nil {
@@ -493,9 +512,33 @@ func TestStaffCanDeliverButNotReturn(t *testing.T) {
 
 // ── 6.4: illegal transitions ─────────────────────────────────────────────
 
+func TestShipmentCreateRejectedForUnpaidOrder(t *testing.T) {
+	e := newShippingEnv(t)
+	orderID := e.checkoutUnpaidOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
+	path := e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID))
+
+	code, resp := e.adminCallJSON(t, e.ownerA, "POST", path, map[string]any{"carrier": "黑貓宅急便"})
+	if code != http.StatusConflict {
+		t.Fatalf("create shipment on unpaid order: want 409, got %d: %+v", code, resp)
+	}
+	if n := e.client.Shipment.Query().Where(entshipment.OrderIDEQ(orderID)).CountX(context.Background()); n != 0 {
+		t.Fatalf("%d shipment rows written for an unpaid order", n)
+	}
+	if fs := e.client.Order.GetX(context.Background(), orderID).FulfillmentStatus; fs != 0 {
+		t.Fatalf("fulfillment_status = %d, want 0", fs)
+	}
+
+	// Once paid it goes through.
+	e.markPaid(t, orderID)
+	code, resp = e.adminCallJSON(t, e.ownerA, "POST", path, map[string]any{"carrier": "黑貓宅急便"})
+	if code != http.StatusCreated {
+		t.Fatalf("create shipment on paid order: want 201, got %d: %+v", code, resp)
+	}
+}
+
 func TestShipmentCreateRejectedForCancelledOrder(t *testing.T) {
 	e := newShippingEnv(t)
-	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
+	orderID := e.checkoutUnpaidOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
 
 	code, _ := e.memberCall(t, e.memberA1, e.shopA, e.shopADomain, "POST", fmt.Sprintf("/api/v1/shop/orders/%d/cancel", orderID), nil)
 	if code != http.StatusOK {
@@ -688,6 +731,7 @@ func (e *shippingEnv) checkoutTwoLineOrder(t *testing.T, shopID, memberID int, d
 	if code != http.StatusCreated {
 		t.Fatalf("checkout: want 201, got %d: %+v", code, created)
 	}
+	e.markPaid(t, int(created["id"].(float64)))
 	raw := created["items"].([]any)
 	items := make([]map[string]any, 0, len(raw))
 	for _, it := range raw {
@@ -889,6 +933,7 @@ func (e *shippingEnv) checkoutSingleLineOrder(t *testing.T, shopID, memberID int
 	if code != http.StatusCreated {
 		t.Fatalf("checkout: want 201, got %d: %+v", code, created)
 	}
+	e.markPaid(t, int(created["id"].(float64)))
 	items := created["items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("expected a single-line order, got %d lines", len(items))

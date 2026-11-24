@@ -73,6 +73,13 @@ func (Payment) Fields() []ent.Field {
 		// 今天它碰巧接近付款時間，但任何未來的寫入都會蓋掉它，而那一天不會有人
 		// 記得它曾經被當成付款時間用。用一個定義不同、只是暫時碰巧相等的欄位去
 		// 回答對帳問題，是那種寫錯不會噴錯的錯誤。
+		//
+		// change order-and-invitation-polish, design D3 補充：**成功的付款一定有
+		// paid_at**。provider 回報了時間（綠界 PaymentDate）就用它；沒回報（mock、
+		// 或綠界略去 PaymentDate）就由 payment.Service.HandleWebhook 在記錄成功的
+		// 那一刻寫入「我們處理的時間」——這是明確的 fallback，不是把 updated_at 當
+		// 付款時間用。失敗／待處理的付款仍是 NULL。上面那句警告仍然成立，只有
+		// 該 change 的 migration 為歷史列做了一次性的 updated_at 近似回填。
 		field.Time("paid_at").Optional().Nillable(),
 		// Money: integer minor units, BIGINT/int64 (product-catalog design
 		// D1 convention). Always equals the order's total_amount at the time

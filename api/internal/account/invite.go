@@ -178,26 +178,36 @@ func (s *Service) inviteTx(ctx context.Context, tx *ent.Tx, in InviteInput, emai
 	return &Invited{ID: row.ID, Email: email}, &Issued{Kind: KindInvite, ShopID: in.ShopID, Email: email, Token: plain, ExpiresAt: expires}, nil
 }
 
-// Invitation is a pending invitation as listed to the shop's owner. It never
-// carries the token or the link.
+// Invitation statuses reported by ListInvitations (change
+// order-and-invitation-polish, design D2). Accepted, revoked and superseded
+// invitations all carry used_at and are not listed at all.
+const (
+	InvitationPending = "pending"
+	InvitationExpired = "expired"
+)
+
+// Invitation is an outstanding invitation as listed to the shop's owner. It
+// never carries the token or the link.
 type Invitation struct {
 	ID        int
 	Email     string
 	RoleID    int
 	RoleName  string
+	Status    string // InvitationPending or InvitationExpired
 	ExpiresAt time.Time
 	CreatedAt time.Time
 }
 
-// ListInvitations returns the shop's pending (unused, unexpired) invitations,
-// newest first.
+// ListInvitations returns the shop's unused, unrevoked invitations — pending
+// and expired — newest first. Expired ones stay listed so the owner can see
+// and revoke them (RevokeInvitation accepts any unused invitation).
 func (s *Service) ListInvitations(ctx context.Context, shopID int) ([]Invitation, error) {
+	now := time.Now()
 	rows, err := s.Client.AdminCredentialToken.Query().
 		Where(
 			admincredentialtoken.KindEQ(KindInvite),
 			admincredentialtoken.ShopIDEQ(shopID),
 			admincredentialtoken.UsedAtIsNil(),
-			admincredentialtoken.ExpiresAtGT(time.Now()),
 		).
 		WithRole().
 		Order(ent.Desc(admincredentialtoken.FieldCreatedAt), ent.Desc(admincredentialtoken.FieldID)).
@@ -207,7 +217,10 @@ func (s *Service) ListInvitations(ctx context.Context, shopID int) ([]Invitation
 	}
 	out := make([]Invitation, 0, len(rows))
 	for _, r := range rows {
-		inv := Invitation{ID: r.ID, ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt}
+		inv := Invitation{ID: r.ID, Status: InvitationPending, ExpiresAt: r.ExpiresAt, CreatedAt: r.CreatedAt}
+		if !r.ExpiresAt.After(now) {
+			inv.Status = InvitationExpired
+		}
 		if r.Email != nil {
 			inv.Email = *r.Email
 		}
@@ -222,8 +235,9 @@ func (s *Service) ListInvitations(ctx context.Context, shopID int) ([]Invitation
 	return out, nil
 }
 
-// RevokeInvitation retires a pending invitation of this shop; its link is
-// invalid afterwards. ErrNotFound if it is not pending in this shop.
+// RevokeInvitation retires an unused invitation of this shop, pending or
+// expired; its link is invalid afterwards and it leaves the list. ErrNotFound if
+// it is already used or revoked, or belongs to another shop.
 func (s *Service) RevokeInvitation(ctx context.Context, shopID, id int) error {
 	n, err := s.Client.AdminCredentialToken.Update().
 		Where(

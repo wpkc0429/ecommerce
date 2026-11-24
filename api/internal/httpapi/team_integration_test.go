@@ -156,6 +156,9 @@ func TestTeamInviteSupersedeListRevoke(t *testing.T) {
 	if code != http.StatusOK || len(items) != 1 {
 		t.Fatalf("list: %d %s", code, raw)
 	}
+	if st := items[0].(map[string]any)["status"]; st != "pending" {
+		t.Fatalf("live invitation status = %v, want pending", st)
+	}
 	if strings.Contains(raw, tok2) || strings.Contains(raw, "invite_url") || strings.Contains(raw, "token") {
 		t.Fatalf("listing leaks a credential: %s", raw)
 	}
@@ -180,6 +183,59 @@ func TestTeamInviteSupersedeListRevoke(t *testing.T) {
 	_, list2, _ := e.do(t, "GET", e.invitePath(e.shopA, ""), ownerTok, nil)
 	if n := len(list2["invitations"].([]any)); n != 0 {
 		t.Fatalf("revoked invitation still listed (%d)", n)
+	}
+}
+
+// change order-and-invitation-polish, design D2: an expired invitation is listed
+// with status "expired" next to the pending ones, and the owner can revoke it.
+func TestTeamExpiredInvitationIsListedAndRevocable(t *testing.T) {
+	e := newAcctEnv(t)
+	ctx := context.Background()
+	owner := e.mkMember(t, "owner-a@t.dev", e.shopA, "merchant_owner")
+	ownerTok := e.tokenFor(t, owner)
+	staff := e.roleID(t, "staff")
+
+	_, expired, expiredTok := e.invite(t, ownerTok, e.shopA, "old@bouquet.test", staff)
+	_, live, _ := e.invite(t, ownerTok, e.shopA, "new@bouquet.test", staff)
+	expiredID := int(expired["invitation_id"].(float64))
+	liveID := int(live["invitation_id"].(float64))
+	e.client.AdminCredentialToken.UpdateOneID(expiredID).SetExpiresAt(time.Now().Add(-time.Hour)).ExecX(ctx)
+
+	// The expired link is dead...
+	if c, _, _ := e.do(t, "POST", "/api/v1/admin/auth/invitations/inspect", "", map[string]string{"token": expiredTok}); c != http.StatusNotFound {
+		t.Fatalf("expired invitation: inspect want 404, got %d", c)
+	}
+	// ...but the owner can still see it.
+	statuses := func() map[int]string {
+		code, list, raw := e.do(t, "GET", e.invitePath(e.shopA, ""), ownerTok, nil)
+		if code != http.StatusOK {
+			t.Fatalf("list: %d %s", code, raw)
+		}
+		if strings.Contains(raw, expiredTok) || strings.Contains(raw, "invite_url") {
+			t.Fatalf("listing leaks a credential: %s", raw)
+		}
+		out := map[int]string{}
+		for _, it := range list["invitations"].([]any) {
+			m := it.(map[string]any)
+			out[int(m["id"].(float64))], _ = m["status"].(string)
+		}
+		return out
+	}
+	got := statuses()
+	if len(got) != 2 || got[expiredID] != "expired" || got[liveID] != "pending" {
+		t.Fatalf("statuses = %v, want {%d: expired, %d: pending}", got, expiredID, liveID)
+	}
+
+	// Revoking an expired invitation works once, then it is gone.
+	if c, _, _ := e.do(t, "DELETE", e.invitePath(e.shopA, fmt.Sprintf("/%d", expiredID)), ownerTok, nil); c != http.StatusNoContent {
+		t.Fatalf("revoke expired: want 204, got %d", c)
+	}
+	got = statuses()
+	if len(got) != 1 || got[liveID] != "pending" {
+		t.Fatalf("after revoke statuses = %v, want only the pending one", got)
+	}
+	if c, _, _ := e.do(t, "DELETE", e.invitePath(e.shopA, fmt.Sprintf("/%d", expiredID)), ownerTok, nil); c != http.StatusNotFound {
+		t.Fatalf("second revoke: want 404, got %d", c)
 	}
 }
 

@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/order"
@@ -14,6 +15,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 )
 
@@ -165,6 +167,24 @@ func (_u *OrderItemUpdate) SetNillableQuantity(v *int32) *OrderItemUpdate {
 // AddQuantity adds value to the "quantity" field.
 func (_u *OrderItemUpdate) AddQuantity(v int32) *OrderItemUpdate {
 	_u.mutation.AddQuantity(v)
+	return _u
+}
+
+// SetOptions sets the "options" field.
+func (_u *OrderItemUpdate) SetOptions(v json.RawMessage) *OrderItemUpdate {
+	_u.mutation.SetOptions(v)
+	return _u
+}
+
+// AppendOptions appends value to the "options" field.
+func (_u *OrderItemUpdate) AppendOptions(v json.RawMessage) *OrderItemUpdate {
+	_u.mutation.AppendOptions(v)
+	return _u
+}
+
+// ClearOptions clears the value of the "options" field.
+func (_u *OrderItemUpdate) ClearOptions() *OrderItemUpdate {
+	_u.mutation.ClearOptions()
 	return _u
 }
 
@@ -377,6 +397,17 @@ func (_u *OrderItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedQuantity(); ok {
 		_spec.AddField(orderitem.FieldQuantity, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.Options(); ok {
+		_spec.SetField(orderitem.FieldOptions, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedOptions(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, orderitem.FieldOptions, value)
+		})
+	}
+	if _u.mutation.OptionsCleared() {
+		_spec.ClearField(orderitem.FieldOptions, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PriceAmount(); ok {
 		_spec.SetField(orderitem.FieldPriceAmount, field.TypeInt64, value)
@@ -610,6 +641,24 @@ func (_u *OrderItemUpdateOne) SetNillableQuantity(v *int32) *OrderItemUpdateOne 
 // AddQuantity adds value to the "quantity" field.
 func (_u *OrderItemUpdateOne) AddQuantity(v int32) *OrderItemUpdateOne {
 	_u.mutation.AddQuantity(v)
+	return _u
+}
+
+// SetOptions sets the "options" field.
+func (_u *OrderItemUpdateOne) SetOptions(v json.RawMessage) *OrderItemUpdateOne {
+	_u.mutation.SetOptions(v)
+	return _u
+}
+
+// AppendOptions appends value to the "options" field.
+func (_u *OrderItemUpdateOne) AppendOptions(v json.RawMessage) *OrderItemUpdateOne {
+	_u.mutation.AppendOptions(v)
+	return _u
+}
+
+// ClearOptions clears the value of the "options" field.
+func (_u *OrderItemUpdateOne) ClearOptions() *OrderItemUpdateOne {
+	_u.mutation.ClearOptions()
 	return _u
 }
 
@@ -852,6 +901,17 @@ func (_u *OrderItemUpdateOne) sqlSave(ctx context.Context) (_node *OrderItem, er
 	}
 	if value, ok := _u.mutation.AddedQuantity(); ok {
 		_spec.AddField(orderitem.FieldQuantity, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.Options(); ok {
+		_spec.SetField(orderitem.FieldOptions, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedOptions(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, orderitem.FieldOptions, value)
+		})
+	}
+	if _u.mutation.OptionsCleared() {
+		_spec.ClearField(orderitem.FieldOptions, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.PriceAmount(); ok {
 		_spec.SetField(orderitem.FieldPriceAmount, field.TypeInt64, value)

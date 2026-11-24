@@ -18,6 +18,7 @@ import (
 	entshipmentitem "ksdevworks/ecommerce/api/internal/ent/shipmentitem"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
+	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/points"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -74,8 +75,21 @@ func (f *shippingFixtures) newOrder(t *testing.T, memberID int) *ent.Order {
 	return f.newOrderWithLines(t, memberID, 1)
 }
 
-// newOrderWithLines creates an order with one order item per given quantity.
+// newOrderWithLines creates a PAID order with one order item per given
+// quantity. Since change order-and-invitation-polish shipments require a paid
+// order, so the default fixture is paid; newUnpaidOrder is the exception.
 func (f *shippingFixtures) newOrderWithLines(t *testing.T, memberID int, quantities ...int32) *ent.Order {
+	t.Helper()
+	return f.newOrderWithPayment(t, memberID, payment.OrderPaymentStatusPaid, quantities...)
+}
+
+// newUnpaidOrder creates an unpaid one-line order.
+func (f *shippingFixtures) newUnpaidOrder(t *testing.T, memberID int) *ent.Order {
+	t.Helper()
+	return f.newOrderWithPayment(t, memberID, order.PaymentStatusUnpaid, 1)
+}
+
+func (f *shippingFixtures) newOrderWithPayment(t *testing.T, memberID int, paymentStatus int16, quantities ...int32) *ent.Order {
 	t.Helper()
 	ctx := context.Background()
 	var subtotal int64
@@ -85,7 +99,7 @@ func (f *shippingFixtures) newOrderWithLines(t *testing.T, memberID int, quantit
 	ord := f.client.Order.Create().
 		SetShopID(f.shopID).SetMemberID(memberID).
 		SetStatus(order.StatusCreated).
-		SetPaymentStatus(order.PaymentStatusUnpaid).
+		SetPaymentStatus(paymentStatus).
 		SetFulfillmentStatus(order.FulfillmentStatusUnfulfilled).
 		SetCurrency("TWD").
 		SetSubtotalAmount(subtotal).
@@ -175,6 +189,44 @@ func TestServiceCreateShipmentRejectsCancelledOrder(t *testing.T) {
 	}
 	if sc != 0 {
 		t.Fatalf("expected no shipment created, got %d", sc)
+	}
+}
+
+func TestServiceCreateShipmentRejectsUnpaidOrder(t *testing.T) {
+	f := setupShippingFixtures(t)
+	memberID := f.newMember(t, "unpaid@t.dev")
+	ctx := context.Background()
+
+	for name, status := range map[string]int16{
+		"unpaid":             order.PaymentStatusUnpaid,
+		"refunded":           payment.OrderPaymentStatusRefunded,
+		"partially refunded": payment.OrderPaymentStatusPartiallyRefunded,
+	} {
+		ord := f.newOrderWithPayment(t, memberID, status, 1)
+		_, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil, nil)
+		var ce *shipping.ConflictError
+		if !asConflict(err, &ce) {
+			t.Fatalf("%s: err = %v, want *ConflictError", name, err)
+		}
+		if f.fulfillment(t, ord.ID) != order.FulfillmentStatusUnfulfilled {
+			t.Errorf("%s: fulfillment_status moved despite the refusal", name)
+		}
+		n := f.client.Shipment.Query().Where(entshipment.OrderIDEQ(ord.ID)).CountX(ctx)
+		if n != 0 {
+			t.Errorf("%s: %d shipment rows written despite the refusal", name, n)
+		}
+	}
+
+	// Becoming paid is what unlocks it.
+	ord := f.newUnpaidOrder(t, memberID)
+	if _, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil, nil); err == nil {
+		t.Fatal("unpaid order shipped")
+	}
+	if _, err := f.orders.UpdatePaymentStatus(ctx, f.shopID, ord.ID, payment.OrderPaymentStatusPaid); err != nil {
+		t.Fatalf("mark paid: %v", err)
+	}
+	if _, err := f.svc.CreateShipment(ctx, f.shopID, ord.ID, "黑貓宅急便", nil, nil); err != nil {
+		t.Fatalf("paid order refused: %v", err)
 	}
 }
 

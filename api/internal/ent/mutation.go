@@ -10428,6 +10428,8 @@ type OrderItemMutation struct {
 	sku_code            *string
 	quantity            *int32
 	addquantity         *int32
+	options             *json.RawMessage
+	appendoptions       json.RawMessage
 	price_amount        *int64
 	addprice_amount     *int64
 	currency            *string
@@ -10954,6 +10956,71 @@ func (m *OrderItemMutation) ResetQuantity() {
 	m.addquantity = nil
 }
 
+// SetOptions sets the "options" field.
+func (m *OrderItemMutation) SetOptions(jm json.RawMessage) {
+	m.options = &jm
+	m.appendoptions = nil
+}
+
+// Options returns the value of the "options" field in the mutation.
+func (m *OrderItemMutation) Options() (r json.RawMessage, exists bool) {
+	v := m.options
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOptions returns the old "options" field's value of the OrderItem entity.
+// If the OrderItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OrderItemMutation) OldOptions(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOptions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOptions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOptions: %w", err)
+	}
+	return oldValue.Options, nil
+}
+
+// AppendOptions adds jm to the "options" field.
+func (m *OrderItemMutation) AppendOptions(jm json.RawMessage) {
+	m.appendoptions = append(m.appendoptions, jm...)
+}
+
+// AppendedOptions returns the list of values that were appended to the "options" field in this mutation.
+func (m *OrderItemMutation) AppendedOptions() (json.RawMessage, bool) {
+	if len(m.appendoptions) == 0 {
+		return nil, false
+	}
+	return m.appendoptions, true
+}
+
+// ClearOptions clears the value of the "options" field.
+func (m *OrderItemMutation) ClearOptions() {
+	m.options = nil
+	m.appendoptions = nil
+	m.clearedFields[orderitem.FieldOptions] = struct{}{}
+}
+
+// OptionsCleared returns if the "options" field was cleared in this mutation.
+func (m *OrderItemMutation) OptionsCleared() bool {
+	_, ok := m.clearedFields[orderitem.FieldOptions]
+	return ok
+}
+
+// ResetOptions resets all changes to the "options" field.
+func (m *OrderItemMutation) ResetOptions() {
+	m.options = nil
+	m.appendoptions = nil
+	delete(m.clearedFields, orderitem.FieldOptions)
+}
+
 // SetPriceAmount sets the "price_amount" field.
 func (m *OrderItemMutation) SetPriceAmount(i int64) {
 	m.price_amount = &i
@@ -11226,7 +11293,7 @@ func (m *OrderItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OrderItemMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.created_at != nil {
 		fields = append(fields, orderitem.FieldCreatedAt)
 	}
@@ -11253,6 +11320,9 @@ func (m *OrderItemMutation) Fields() []string {
 	}
 	if m.quantity != nil {
 		fields = append(fields, orderitem.FieldQuantity)
+	}
+	if m.options != nil {
+		fields = append(fields, orderitem.FieldOptions)
 	}
 	if m.price_amount != nil {
 		fields = append(fields, orderitem.FieldPriceAmount)
@@ -11292,6 +11362,8 @@ func (m *OrderItemMutation) Field(name string) (ent.Value, bool) {
 		return m.SkuCode()
 	case orderitem.FieldQuantity:
 		return m.Quantity()
+	case orderitem.FieldOptions:
+		return m.Options()
 	case orderitem.FieldPriceAmount:
 		return m.PriceAmount()
 	case orderitem.FieldCurrency:
@@ -11327,6 +11399,8 @@ func (m *OrderItemMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldSkuCode(ctx)
 	case orderitem.FieldQuantity:
 		return m.OldQuantity(ctx)
+	case orderitem.FieldOptions:
+		return m.OldOptions(ctx)
 	case orderitem.FieldPriceAmount:
 		return m.OldPriceAmount(ctx)
 	case orderitem.FieldCurrency:
@@ -11406,6 +11480,13 @@ func (m *OrderItemMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetQuantity(v)
+		return nil
+	case orderitem.FieldOptions:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOptions(v)
 		return nil
 	case orderitem.FieldPriceAmount:
 		v, ok := value.(int64)
@@ -11534,6 +11615,9 @@ func (m *OrderItemMutation) ClearedFields() []string {
 	if m.FieldCleared(orderitem.FieldSkuID) {
 		fields = append(fields, orderitem.FieldSkuID)
 	}
+	if m.FieldCleared(orderitem.FieldOptions) {
+		fields = append(fields, orderitem.FieldOptions)
+	}
 	return fields
 }
 
@@ -11553,6 +11637,9 @@ func (m *OrderItemMutation) ClearField(name string) error {
 		return nil
 	case orderitem.FieldSkuID:
 		m.ClearSkuID()
+		return nil
+	case orderitem.FieldOptions:
+		m.ClearOptions()
 		return nil
 	}
 	return fmt.Errorf("unknown OrderItem nullable field %s", name)
@@ -11588,6 +11675,9 @@ func (m *OrderItemMutation) ResetField(name string) error {
 		return nil
 	case orderitem.FieldQuantity:
 		m.ResetQuantity()
+		return nil
+	case orderitem.FieldOptions:
+		m.ResetOptions()
 		return nil
 	case orderitem.FieldPriceAmount:
 		m.ResetPriceAmount()

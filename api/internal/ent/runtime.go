@@ -556,7 +556,7 @@ func init() {
 		}
 	}()
 	// orderitemDescCurrency is the schema descriptor for currency field.
-	orderitemDescCurrency := orderitemFields[8].Descriptor()
+	orderitemDescCurrency := orderitemFields[9].Descriptor()
 	// orderitem.CurrencyValidator is a validator for the "currency" field. It is called by the builders before save.
 	orderitem.CurrencyValidator = func() func(string) error {
 		validators := orderitemDescCurrency.Validators
@@ -574,11 +574,11 @@ func init() {
 		}
 	}()
 	// orderitemDescGiftMessage is the schema descriptor for gift_message field.
-	orderitemDescGiftMessage := orderitemFields[9].Descriptor()
+	orderitemDescGiftMessage := orderitemFields[10].Descriptor()
 	// orderitem.DefaultGiftMessage holds the default value on creation for the gift_message field.
 	orderitem.DefaultGiftMessage = orderitemDescGiftMessage.Default.(string)
 	// orderitemDescShippedQuantity is the schema descriptor for shipped_quantity field.
-	orderitemDescShippedQuantity := orderitemFields[10].Descriptor()
+	orderitemDescShippedQuantity := orderitemFields[11].Descriptor()
 	// orderitem.DefaultShippedQuantity holds the default value on creation for the shipped_quantity field.
 	orderitem.DefaultShippedQuantity = orderitemDescShippedQuantity.Default.(int32)
 	ordernotificationMixin := schema.OrderNotification{}.Mixin()

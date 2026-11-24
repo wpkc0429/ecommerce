@@ -510,6 +510,16 @@ func QuantityLTE(v int32) predicate.OrderItem {
 	return predicate.OrderItem(sql.FieldLTE(FieldQuantity, v))
 }
 
+// OptionsIsNil applies the IsNil predicate on the "options" field.
+func OptionsIsNil() predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldIsNull(FieldOptions))
+}
+
+// OptionsNotNil applies the NotNil predicate on the "options" field.
+func OptionsNotNil() predicate.OrderItem {
+	return predicate.OrderItem(sql.FieldNotNull(FieldOptions))
+}
+
 // PriceAmountEQ applies the EQ predicate on the "price_amount" field.
 func PriceAmountEQ(v int64) predicate.OrderItem {
 	return predicate.OrderItem(sql.FieldEQ(FieldPriceAmount, v))

@@ -43,6 +43,7 @@ import (
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/order"
+	"ksdevworks/ecommerce/api/internal/payment"
 )
 
 // ErrNotFound marks missing resources (handler → 404). Also returned when an
@@ -338,8 +339,8 @@ func (s *Service) DeleteShippingMethod(ctx context.Context, shopID, id int) erro
 // non-nil slice is a contradiction ("ship nothing") and is rejected.
 //
 // Rejects with ErrNotFound if the order doesn't exist in this shop, with
-// ConflictError if the order is cancelled, is fully shipped, or already has a
-// returned shipment, and with ValidationError if carrier is blank, an
+// ConflictError if the order is cancelled, is not paid, is fully shipped, or
+// already has a returned shipment, and with ValidationError if carrier is blank, an
 // order_item_id is foreign or repeated, a quantity is non-positive, or a
 // quantity would push a line past what was ordered.
 //
@@ -383,6 +384,15 @@ func (s *Service) CreateShipment(
 	if ord.Status == order.StatusCancelled {
 		_ = tx.Rollback()
 		return nil, &ConflictError{Message: "order is cancelled"}
+	}
+	// change order-and-invitation-polish, design D1: shipping is a post-payment
+	// step. The rule is deliberately strict (paid only) because the data model
+	// has no payment-method or cash-on-delivery marker to key an exception on.
+	// Checked under the order row lock, so a payment landing concurrently is
+	// seen consistently.
+	if !isPaidForShipping(ord) {
+		_ = tx.Rollback()
+		return nil, &ConflictError{Message: "order is not paid"}
 	}
 
 	existing, err := tx.Shipment.Query().
@@ -439,6 +449,14 @@ func (s *Service) CreateShipment(
 		return nil, fmt.Errorf("shipping: commit shipment: %w", err)
 	}
 	return s.loadShipment(ctx, sh.ID)
+}
+
+// isPaidForShipping reports whether the order may have shipments created
+// (change order-and-invitation-polish, design D1). Refunded and partially
+// refunded orders are not "paid" here either. This is the single place a future
+// cash-on-delivery exception would be added.
+func isPaidForShipping(o *ent.Order) bool {
+	return o.PaymentStatus == payment.OrderPaymentStatusPaid
 }
 
 // lockOrder takes the row lock the derived status depends on, scoped by shop.

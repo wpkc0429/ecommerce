@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/order"
 	"ksdevworks/ecommerce/api/internal/ent/orderitem"
@@ -37,6 +38,8 @@ type OrderItem struct {
 	SkuCode string `json:"sku_code,omitempty"`
 	// Quantity holds the value of the "quantity" field.
 	Quantity int32 `json:"quantity,omitempty"`
+	// Options holds the value of the "options" field.
+	Options json.RawMessage `json:"options,omitempty"`
 	// PriceAmount holds the value of the "price_amount" field.
 	PriceAmount int64 `json:"price_amount,omitempty"`
 	// Currency holds the value of the "currency" field.
@@ -89,6 +92,8 @@ func (*OrderItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case orderitem.FieldOptions:
+			values[i] = new([]byte)
 		case orderitem.FieldID, orderitem.FieldShopID, orderitem.FieldOrderID, orderitem.FieldProductID, orderitem.FieldSkuID, orderitem.FieldQuantity, orderitem.FieldPriceAmount, orderitem.FieldShippedQuantity:
 			values[i] = new(sql.NullInt64)
 		case orderitem.FieldProductTitle, orderitem.FieldSkuCode, orderitem.FieldCurrency, orderitem.FieldGiftMessage:
@@ -171,6 +176,14 @@ func (_m *OrderItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field quantity", values[i])
 			} else if value.Valid {
 				_m.Quantity = int32(value.Int64)
+			}
+		case orderitem.FieldOptions:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field options", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Options); err != nil {
+					return fmt.Errorf("unmarshal field options: %w", err)
+				}
 			}
 		case orderitem.FieldPriceAmount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -272,6 +285,9 @@ func (_m *OrderItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Quantity))
+	builder.WriteString(", ")
+	builder.WriteString("options=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Options))
 	builder.WriteString(", ")
 	builder.WriteString("price_amount=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PriceAmount))

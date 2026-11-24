@@ -32,6 +32,8 @@ const (
 	FieldSkuCode = "sku_code"
 	// FieldQuantity holds the string denoting the quantity field in the database.
 	FieldQuantity = "quantity"
+	// FieldOptions holds the string denoting the options field in the database.
+	FieldOptions = "options"
 	// FieldPriceAmount holds the string denoting the price_amount field in the database.
 	FieldPriceAmount = "price_amount"
 	// FieldCurrency holds the string denoting the currency field in the database.
@@ -74,6 +76,7 @@ var Columns = []string{
 	FieldSkuID,
 	FieldSkuCode,
 	FieldQuantity,
+	FieldOptions,
 	FieldPriceAmount,
 	FieldCurrency,
 	FieldGiftMessage,

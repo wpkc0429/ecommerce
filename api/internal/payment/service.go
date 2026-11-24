@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
+	"time"
 
 	entsql "entgo.io/ent/dialect/sql"
 
@@ -271,6 +272,19 @@ func (s *Service) HandleWebhook(ctx context.Context, providerName string, shopID
 		}
 	}
 
+	// change order-and-invitation-polish, design D3: a succeeded payment always
+	// has a paid_at. The mock provider reports no timestamp and 綠界 can omit
+	// PaymentDate, which left paid_at NULL on a row whose status says paid —
+	// the merchant's reconciliation view could not say WHEN. The provider's own
+	// stamp (recordProviderFacts above) wins when there is one; otherwise this
+	// is the moment we processed the confirmation. Also runs on redelivery, so a
+	// row that already succeeded without a stamp heals on its next delivery.
+	if p.Status == StatusSucceeded && p.PaidAt == nil {
+		if p, err = s.stampPaidAt(ctx, p); err != nil {
+			return nil, err
+		}
+	}
+
 	// Only a "succeeded" outcome ever advances orders.payment_status
 	// (design D6) — a "failed" attempt leaves the order unpaid so the
 	// member can retry. Re-asserting on every delivery where the payment's
@@ -365,6 +379,23 @@ func (s *Service) recordProviderFacts(ctx context.Context, p *ent.Payment, res *
 	out, err := upd.Save(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("payment: record provider transaction facts: %w", err)
+	}
+	return out, nil
+}
+
+// stampPaidAt sets paid_at to now on a payment that has none, and only then (a
+// provider's value, or a concurrent writer's, is never overwritten). It returns
+// the row as stored.
+func (s *Service) stampPaidAt(ctx context.Context, p *ent.Payment) (*ent.Payment, error) {
+	if _, err := s.Client.Payment.Update().
+		Where(entpayment.IDEQ(p.ID), entpayment.PaidAtIsNil()).
+		SetPaidAt(time.Now()).
+		Save(ctx); err != nil {
+		return nil, fmt.Errorf("payment: stamp paid_at: %w", err)
+	}
+	out, err := s.Client.Payment.Get(ctx, p.ID)
+	if err != nil {
+		return nil, fmt.Errorf("payment: reload payment: %w", err)
 	}
 	return out, nil
 }

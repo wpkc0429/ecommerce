@@ -242,6 +242,13 @@ func (OrderItem) Fields() []ent.Field {
 		field.Int("sku_id").Optional().Nillable(),
 		field.String("sku_code").MaxLen(64).SchemaType(map[string]string{dialect.Postgres: "varchar(64)"}).NotEmpty(),
 		field.Int32("quantity"),
+		// options (change order-and-invitation-polish, design D4): the SKU's
+		// option values (e.g. {"size":"M","color":"red"}) as they were when the
+		// order was created — a snapshot like sku_code, so a later SKU edit or
+		// deletion never changes what the customer ordered. NULL only for rows
+		// created before this column existed (the migration back-fills those
+		// with the SKU's then-current options where the SKU still exists).
+		field.JSON("options", json.RawMessage{}).Optional(),
 		// Money: integer minor units, BIGINT/int64. Snapshot copied straight
 		// from the source cart_item's own snapshot (shopping-cart design D2)
 		// — never a live SKU re-query.

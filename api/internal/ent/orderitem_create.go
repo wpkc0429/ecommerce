@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/order"
@@ -107,6 +108,12 @@ func (_c *OrderItemCreate) SetSkuCode(v string) *OrderItemCreate {
 // SetQuantity sets the "quantity" field.
 func (_c *OrderItemCreate) SetQuantity(v int32) *OrderItemCreate {
 	_c.mutation.SetQuantity(v)
+	return _c
+}
+
+// SetOptions sets the "options" field.
+func (_c *OrderItemCreate) SetOptions(v json.RawMessage) *OrderItemCreate {
+	_c.mutation.SetOptions(v)
 	return _c
 }
 
@@ -323,6 +330,10 @@ func (_c *OrderItemCreate) createSpec() (*OrderItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Quantity(); ok {
 		_spec.SetField(orderitem.FieldQuantity, field.TypeInt32, value)
 		_node.Quantity = value
+	}
+	if value, ok := _c.mutation.Options(); ok {
+		_spec.SetField(orderitem.FieldOptions, field.TypeJSON, value)
+		_node.Options = value
 	}
 	if value, ok := _c.mutation.PriceAmount(); ok {
 		_spec.SetField(orderitem.FieldPriceAmount, field.TypeInt64, value)
@@ -549,6 +560,24 @@ func (u *OrderItemUpsert) UpdateQuantity() *OrderItemUpsert {
 // AddQuantity adds v to the "quantity" field.
 func (u *OrderItemUpsert) AddQuantity(v int32) *OrderItemUpsert {
 	u.Add(orderitem.FieldQuantity, v)
+	return u
+}
+
+// SetOptions sets the "options" field.
+func (u *OrderItemUpsert) SetOptions(v json.RawMessage) *OrderItemUpsert {
+	u.Set(orderitem.FieldOptions, v)
+	return u
+}
+
+// UpdateOptions sets the "options" field to the value that was provided on create.
+func (u *OrderItemUpsert) UpdateOptions() *OrderItemUpsert {
+	u.SetExcluded(orderitem.FieldOptions)
+	return u
+}
+
+// ClearOptions clears the value of the "options" field.
+func (u *OrderItemUpsert) ClearOptions() *OrderItemUpsert {
+	u.SetNull(orderitem.FieldOptions)
 	return u
 }
 
@@ -801,6 +830,27 @@ func (u *OrderItemUpsertOne) AddQuantity(v int32) *OrderItemUpsertOne {
 func (u *OrderItemUpsertOne) UpdateQuantity() *OrderItemUpsertOne {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateQuantity()
+	})
+}
+
+// SetOptions sets the "options" field.
+func (u *OrderItemUpsertOne) SetOptions(v json.RawMessage) *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetOptions(v)
+	})
+}
+
+// UpdateOptions sets the "options" field to the value that was provided on create.
+func (u *OrderItemUpsertOne) UpdateOptions() *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateOptions()
+	})
+}
+
+// ClearOptions clears the value of the "options" field.
+func (u *OrderItemUpsertOne) ClearOptions() *OrderItemUpsertOne {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.ClearOptions()
 	})
 }
 
@@ -1229,6 +1279,27 @@ func (u *OrderItemUpsertBulk) AddQuantity(v int32) *OrderItemUpsertBulk {
 func (u *OrderItemUpsertBulk) UpdateQuantity() *OrderItemUpsertBulk {
 	return u.Update(func(s *OrderItemUpsert) {
 		s.UpdateQuantity()
+	})
+}
+
+// SetOptions sets the "options" field.
+func (u *OrderItemUpsertBulk) SetOptions(v json.RawMessage) *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.SetOptions(v)
+	})
+}
+
+// UpdateOptions sets the "options" field to the value that was provided on create.
+func (u *OrderItemUpsertBulk) UpdateOptions() *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.UpdateOptions()
+	})
+}
+
+// ClearOptions clears the value of the "options" field.
+func (u *OrderItemUpsertBulk) ClearOptions() *OrderItemUpsertBulk {
+	return u.Update(func(s *OrderItemUpsert) {
+		s.ClearOptions()
 	})
 }
 

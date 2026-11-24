@@ -75,6 +75,10 @@ func orderItemJSON(it *ent.OrderItem) map[string]any {
 	return map[string]any{
 		"id": it.ID, "product_id": it.ProductID, "product_title": it.ProductTitle,
 		"sku_id": it.SkuID, "sku_code": it.SkuCode,
+		// change order-and-invitation-polish: the SKU's options as snapshotted
+		// at checkout (an object, {} when the SKU had none); null only for
+		// orders created before the snapshot existed and not back-filled.
+		"options":  orderItemOptions(it),
 		"quantity": it.Quantity, "price_amount": it.PriceAmount, "currency": it.Currency,
 		"line_total": it.PriceAmount * int64(it.Quantity),
 		// change order-extras: always a string, never null.
@@ -87,6 +91,15 @@ func orderItemJSON(it *ent.OrderItem) map[string]any {
 		// shipments.
 		"shipped_quantity": it.ShippedQuantity,
 	}
+}
+
+// orderItemOptions renders order_items.options: the stored object, or nil
+// (JSON null) when the row has none.
+func orderItemOptions(it *ent.OrderItem) any {
+	if len(it.Options) == 0 {
+		return nil
+	}
+	return it.Options
 }
 
 // deliveryDateJSON renders a requested delivery date as a bare YYYY-MM-DD

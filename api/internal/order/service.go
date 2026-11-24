@@ -61,6 +61,17 @@ type ValidationError struct {
 
 func (e *ValidationError) Error() string { return e.Message }
 
+// snapshotOptions copies a SKU's options for order_items.options (change
+// order-and-invitation-polish, design D4). A SKU without options snapshots as
+// the empty object, never NULL: NULL is reserved for orders that predate the
+// column, so a client can tell "no options" from "unknown".
+func snapshotOptions(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 || string(raw) == "null" {
+		return json.RawMessage("{}")
+	}
+	return append(json.RawMessage(nil), raw...)
+}
+
 func validationErr(pointer, msg string) *ValidationError {
 	return &ValidationError{Message: msg, Details: []Detail{{Pointer: pointer, Message: msg}}}
 }
@@ -506,7 +517,7 @@ func (s *Service) Checkout(ctx context.Context, shopID, memberID int, in Checkou
 		if _, err := tx.OrderItem.Create().
 			SetShopID(shopID).SetOrderID(o.ID).
 			SetProductID(product.ID).SetProductTitle(product.Title).
-			SetSkuID(*it.SkuID).SetSkuCode(sku.SkuCode).
+			SetSkuID(*it.SkuID).SetSkuCode(sku.SkuCode).SetOptions(snapshotOptions(sku.Options)).
 			SetQuantity(it.Quantity).SetPriceAmount(it.PriceAmount).SetCurrency(it.Currency).
 			SetGiftMessage(it.GiftMessage).
 			Save(ctx); err != nil {

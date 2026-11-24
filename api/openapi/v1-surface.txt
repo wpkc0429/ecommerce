@@ -421,6 +421,7 @@ Invitation.expires_at
 Invitation.id
 Invitation.role_id
 Invitation.role_name
+Invitation.status
 InvitationCreated.delivery
 InvitationCreated.expires_at
 InvitationCreated.invitation_id
@@ -499,6 +500,7 @@ OrderItem.currency
 OrderItem.gift_message
 OrderItem.id
 OrderItem.line_total
+OrderItem.options
 OrderItem.price_amount
 OrderItem.product_id
 OrderItem.product_title

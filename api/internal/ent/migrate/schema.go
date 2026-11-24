@@ -446,6 +446,7 @@ var (
 		{Name: "sku_id", Type: field.TypeInt, Nullable: true},
 		{Name: "sku_code", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
 		{Name: "quantity", Type: field.TypeInt32},
+		{Name: "options", Type: field.TypeJSON, Nullable: true},
 		{Name: "price_amount", Type: field.TypeInt64},
 		{Name: "currency", Type: field.TypeString, Size: 3, SchemaType: map[string]string{"postgres": "varchar(3)"}},
 		{Name: "gift_message", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(500)"}},
@@ -461,13 +462,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "order_items_orders_items",
-				Columns:    []*schema.Column{OrderItemsColumns[12]},
+				Columns:    []*schema.Column{OrderItemsColumns[13]},
 				RefColumns: []*schema.Column{OrdersColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "order_items_shops_shop",
-				Columns:    []*schema.Column{OrderItemsColumns[13]},
+				Columns:    []*schema.Column{OrderItemsColumns[14]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -476,12 +477,12 @@ var (
 			{
 				Name:    "orderitem_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[12]},
+				Columns: []*schema.Column{OrderItemsColumns[13]},
 			},
 			{
 				Name:    "orderitem_shop_id",
 				Unique:  false,
-				Columns: []*schema.Column{OrderItemsColumns[13]},
+				Columns: []*schema.Column{OrderItemsColumns[14]},
 			},
 		},
 	}

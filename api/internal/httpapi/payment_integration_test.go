@@ -346,6 +346,31 @@ func TestPaymentSuccessEndToEnd(t *testing.T) {
 	if int16(first["status"].(float64)) != payment.StatusSucceeded {
 		t.Fatalf("expected succeeded status in admin view, got %+v", first)
 	}
+	// change order-and-invitation-polish, design D3: the mock provider reports
+	// no timestamp, yet a succeeded payment must still say when.
+	paidAt, _ := first["paid_at"].(string)
+	if paidAt == "" {
+		t.Fatalf("succeeded mock payment has paid_at = %v, want a timestamp", first["paid_at"])
+	}
+	if ts, err := time.Parse(time.RFC3339, paidAt); err != nil || time.Since(ts) > time.Minute || time.Until(ts) > time.Minute {
+		t.Errorf("paid_at = %q, want roughly now (err %v)", paidAt, err)
+	}
+}
+
+// A failed payment is not a payment: no paid_at.
+func TestPaymentFailedWebhookLeavesPaidAtNull(t *testing.T) {
+	e := newPaymentEnv(t)
+	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
+	_, first := e.memberCallJSON(t, e.memberA1, e.shopA, e.shopADomain, "POST",
+		fmt.Sprintf("/api/v1/shop/orders/%d/payments", orderID), nil)
+	if code, resp := e.sendSignedWebhook(webhookBody(t, first["provider_reference"].(string), "failed")); code != http.StatusOK {
+		t.Fatalf("failed webhook: %d %+v", code, resp)
+	}
+	_, list := e.adminCallJSON(t, e.ownerA, "GET", e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/payments", orderID)), nil)
+	row := list["payments"].([]any)[0].(map[string]any)
+	if row["paid_at"] != nil {
+		t.Errorf("failed payment has paid_at = %v, want null", row["paid_at"])
+	}
 }
 
 // ── 7.3: signature verification failure ──────────────────────────────

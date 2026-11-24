@@ -230,6 +230,64 @@ func TestECPayCallbackRecordsBothIdentifiers(t *testing.T) {
 	}
 }
 
+// TestECPayCallbackKeepsProvidersPaymentDate — when 綠界 reports PaymentDate it
+// is authoritative and the "now" fallback (change order-and-invitation-polish,
+// design D3) must not overwrite it.
+func TestECPayCallbackKeepsProvidersPaymentDate(t *testing.T) {
+	e := newPaymentEnv(t)
+	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 3400)
+	ref := e.initiateECPay(t, e.memberA1, e.shopA, e.shopADomain, orderID)["provider_reference"].(string)
+
+	fields := ecpayCallbackFields(ref, 3400, "1", "0")
+	fields["PaymentDate"] = "2026/01/02 03:04:05" // Taipei-local, UTC+8
+	if _, raw, _ := e.deliverECPayCallback(fields); raw != "1|OK" {
+		t.Fatalf("callback rejected: %q", raw)
+	}
+	row := e.firstPayment(t, orderID)
+	got, err := time.Parse(time.RFC3339, fmt.Sprint(row["paid_at"]))
+	if err != nil || !got.Equal(time.Date(2026, 1, 1, 19, 4, 5, 0, time.UTC)) {
+		t.Errorf("paid_at = %v, want the provider's 2026-01-01T19:04:05Z (err %v)", row["paid_at"], err)
+	}
+}
+
+// TestECPayCallbackWithoutPaymentDateStillSetsPaidAt — 綠界 can omit
+// PaymentDate; a succeeded payment still gets a paid_at (the processing time).
+func TestECPayCallbackWithoutPaymentDateStillSetsPaidAt(t *testing.T) {
+	e := newPaymentEnv(t)
+	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 3400)
+	ref := e.initiateECPay(t, e.memberA1, e.shopA, e.shopADomain, orderID)["provider_reference"].(string)
+
+	fields := ecpayCallbackFields(ref, 3400, "1", "0")
+	delete(fields, "PaymentDate")
+	if _, raw, _ := e.deliverECPayCallback(fields); raw != "1|OK" {
+		t.Fatalf("callback rejected: %q", raw)
+	}
+	row := e.firstPayment(t, orderID)
+	paidAt, _ := row["paid_at"].(string)
+	ts, err := time.Parse(time.RFC3339, paidAt)
+	if err != nil {
+		t.Fatalf("paid_at = %v, want a timestamp (%v)", row["paid_at"], err)
+	}
+	if d := time.Since(ts); d < -time.Minute || d > time.Minute {
+		t.Errorf("paid_at = %s, want roughly now", paidAt)
+	}
+}
+
+// firstPayment returns the merchant-visible payment row of an order.
+func (e *paymentEnv) firstPayment(t *testing.T, orderID int) map[string]any {
+	t.Helper()
+	code, listed := e.adminCallJSON(t, e.ownerA, "GET",
+		e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/payments", orderID)), nil)
+	if code != http.StatusOK {
+		t.Fatalf("list payments: %d", code)
+	}
+	rows := listed["payments"].([]any)
+	if len(rows) != 1 {
+		t.Fatalf("payments = %d, want 1", len(rows))
+	}
+	return rows[0].(map[string]any)
+}
+
 // TestECPayCallbackRejectsABadChecksum — 綠界's own instruction is to recompute
 // the checksum and only then answer 1|OK.
 func TestECPayCallbackRejectsABadChecksum(t *testing.T) {

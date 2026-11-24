@@ -120,12 +120,12 @@ export function createTeamView(ctx) {
     rows($("#team-invites-tbody"), list, (i) => el("tr", { "data-email": i.email },
       el("td", {}, i.email),
       el("td", {}, i.role_name),
-      el("td", {}, formatTime(i.expires_at)),
+      el("td", { "data-status": i.status }, formatTime(i.expires_at) + (i.status === "expired" ? "（已過期）" : "")),
       el("td", {}, el("button", { class: "danger", "data-act": "revoke", onclick: () => act(async () => {
         await api("DELETE", shopPath(`/invitations/${i.id}`));
         await load();
       }) }, "撤回"))),
-    { empty: "沒有待接受的邀請。", colspan: 4 });
+    { empty: "沒有待接受或已過期的邀請。", colspan: 4 });
   }
 
   $("#team-invite-form").addEventListener("submit", (e) => {
