@@ -87,7 +87,8 @@ export function createProductsView(ctx) {
       const stock = skus.reduce((sum, s) => sum + (Number(s.stock_qty) || 0), 0);
       return el("tr", { "data-slug": p.slug },
         el("td", {}, p.id),
-        el("td", {}, p.title),
+        el("td", {}, p.title,
+          p.subtitle ? el("div", { class: "hint product-subtitle" }, p.subtitle) : ""),
         el("td", { class: "mono" }, p.slug),
         el("td", {}, (p.category_ids || []).map(categoryName).join("、") || "—"),
         el("td", {}, skus.length),
@@ -212,6 +213,7 @@ export function createProductsView(ctx) {
     };
 
     const title = el("input", { type: "text", id: "product-title", value: product?.title ?? "" });
+    const subtitle = el("input", { type: "text", id: "product-subtitle", maxlength: "200", value: product?.subtitle ?? "" });
     const slug = el("input", { type: "text", id: "product-slug", value: product?.slug ?? "", placeholder: "my-product" });
     const description = el("textarea", { id: "product-description", rows: "4" });
     description.value = product?.description ?? "";
@@ -220,6 +222,7 @@ export function createProductsView(ctx) {
 
     const basics = el("fieldset", { class: "obj" }, el("legend", {}, "基本資料"),
       field("標題", title, "/title"),
+      field("副標", subtitle, "/subtitle", "選填，顯示在商品卡片第二行（例如英文品名），最多 200 字"),
       field("Slug", slug, "/slug", "小寫英數與連字號，商家內唯一"),
       field("描述", description, "/description"),
       field("狀態", status, "/status", "「已發佈」後才會出現在前台公開端點"));
@@ -259,7 +262,7 @@ export function createProductsView(ctx) {
         "價格是最小貨幣單位的整數：TWD 的 3400 就是 NT$3,400。儲存時會送出上表的完整內容，被移除的列即為刪除。"),
       el("span", { class: "field-error" })));
 
-    state.fields = { title, slug, description, status };
+    state.fields = { title, subtitle, slug, description, status };
     if (!editable) readOnlyUnless("product.edit", form);
     $("#product-save").hidden = !editable;
     $("#product-delete").hidden = product === null || !can("product.delete");
@@ -281,9 +284,10 @@ export function createProductsView(ctx) {
   }
 
   function collectBody() {
-    const { title, slug, description, status } = state.fields;
+    const { title, subtitle, slug, description, status } = state.fields;
     const body = {
       title: title.value.trim(),
+      subtitle: subtitle.value.trim(),
       slug: slug.value.trim(),
       description: description.value,
       status: Number(status.value),

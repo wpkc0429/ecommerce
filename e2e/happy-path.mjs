@@ -276,6 +276,8 @@ try {
   await page.waitForSelector("#tab-product-editor:not([hidden])");
   await page.fill("#product-title", `E2E 康乃馨花束 ${runID}`);
   await page.fill("#product-slug", prodSlug);
+  const prodSubtitle = `E2E Carnation Bouquet ${runID}`;
+  await page.fill("#product-subtitle", prodSubtitle);
   await page.fill("#product-description", "E2E 建立的商品");
   // 多對多分類：勾選剛建立的分類（其 id 就是分類表格第一欄）。
   await page.check(`#product-form .category-box[value="${newCategoryID}"]`);
@@ -361,6 +363,45 @@ try {
     JSON.stringify(published?.skus));
   check("public endpoint reports the unscaled price", publicA?.price_amount === 3400,
     JSON.stringify(publicA));
+  check("subtitle saved in the admin editor is on the public product (change product-subtitle-public-categories)",
+    published?.subtitle === prodSubtitle, String(published?.subtitle));
+  check("public product carries its category summary",
+    (published?.categories ?? []).some((c) => c.slug === catSlug && c.id === Number(newCategoryID)),
+    JSON.stringify(published?.categories));
+
+  console.log("⑫b 分類視圖調整「本季新品」商品排序 → 公開列表順序一致，結束時還原");
+  const PK_ORDER = "pk_demoseedstorefrontkeynotsecret";
+  const orderOf = async () => {
+    const r = await req("GET", "/api/v1/shop/products?category=new-arrivals", { pk: PK_ORDER });
+    return (r.json?.products ?? []).map((p) => p.slug);
+  };
+  const catsPublic = await req("GET", "/api/v1/shop/categories", { pk: PK_ORDER });
+  check("public category tree lists new-arrivals",
+    (catsPublic.json?.categories ?? []).some((c) => c.slug === "new-arrivals"), brief(catsPublic));
+  const originalOrder = await orderOf();
+  check("new-arrivals holds at least two published products", originalOrder.length >= 2, JSON.stringify(originalOrder));
+
+  const moveLastUp = async () => {
+    await page.click('.tab[data-tab="categories"]');
+    await page.waitForSelector("#tab-categories:not([hidden])");
+    await page.click('#categories-tbody tr:has-text("new-arrivals") .category-order-btn');
+    await page.waitForSelector("#category-order-dialog[open]");
+    await page.waitForSelector("#category-order-list li[data-product-id]");
+    await page.locator("#category-order-list li[data-product-id]").last().locator(".order-up").click();
+    await page.click("#category-order-save");
+    await page.waitForSelector("#category-order-dialog[open]", { state: "hidden", timeout: 8000 });
+  };
+  await moveLastUp();
+  const reordered = await orderOf();
+  const expectedMoved = [...originalOrder];
+  const lastItem = expectedMoved.length - 1;
+  [expectedMoved[lastItem - 1], expectedMoved[lastItem]] = [expectedMoved[lastItem], expectedMoved[lastItem - 1]];
+  check("public list order follows the order saved in the category view",
+    JSON.stringify(reordered) === JSON.stringify(expectedMoved),
+    `${JSON.stringify(reordered)} vs ${JSON.stringify(expectedMoved)}`);
+  await moveLastUp();
+  check("moving the same pair back restores the original order (repeatable)",
+    JSON.stringify(await orderOf()) === JSON.stringify(originalOrder), JSON.stringify(await orderOf()));
 
   // ══ 商家營運後台（change admin-commerce-operations, design D11）══
   //

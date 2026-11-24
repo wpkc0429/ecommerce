@@ -72,6 +72,20 @@ func (_c *ProductCreate) SetSlug(v string) *ProductCreate {
 	return _c
 }
 
+// SetSubtitle sets the "subtitle" field.
+func (_c *ProductCreate) SetSubtitle(v string) *ProductCreate {
+	_c.mutation.SetSubtitle(v)
+	return _c
+}
+
+// SetNillableSubtitle sets the "subtitle" field if the given value is not nil.
+func (_c *ProductCreate) SetNillableSubtitle(v *string) *ProductCreate {
+	if v != nil {
+		_c.SetSubtitle(*v)
+	}
+	return _c
+}
+
 // SetDescription sets the "description" field.
 func (_c *ProductCreate) SetDescription(v string) *ProductCreate {
 	_c.mutation.SetDescription(v)
@@ -184,6 +198,10 @@ func (_c *ProductCreate) defaults() {
 		v := product.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.Subtitle(); !ok {
+		v := product.DefaultSubtitle
+		_c.mutation.SetSubtitle(v)
+	}
 	if _, ok := _c.mutation.Description(); !ok {
 		v := product.DefaultDescription
 		_c.mutation.SetDescription(v)
@@ -224,6 +242,9 @@ func (_c *ProductCreate) check() error {
 		if err := product.SlugValidator(v); err != nil {
 			return &ValidationError{Name: "slug", err: fmt.Errorf(`ent: validator failed for field "Product.slug": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.Subtitle(); !ok {
+		return &ValidationError{Name: "subtitle", err: errors.New(`ent: missing required field "Product.subtitle"`)}
 	}
 	if _, ok := _c.mutation.Description(); !ok {
 		return &ValidationError{Name: "description", err: errors.New(`ent: missing required field "Product.description"`)}
@@ -279,6 +300,10 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Slug(); ok {
 		_spec.SetField(product.FieldSlug, field.TypeString, value)
 		_node.Slug = value
+	}
+	if value, ok := _c.mutation.Subtitle(); ok {
+		_spec.SetField(product.FieldSubtitle, field.TypeString, value)
+		_node.Subtitle = value
 	}
 	if value, ok := _c.mutation.Description(); ok {
 		_spec.SetField(product.FieldDescription, field.TypeString, value)
@@ -339,6 +364,10 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		createE := &ProductCategoryCreate{config: _c.config, mutation: newProductCategoryMutation(_c.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -438,6 +467,18 @@ func (u *ProductUpsert) SetSlug(v string) *ProductUpsert {
 // UpdateSlug sets the "slug" field to the value that was provided on create.
 func (u *ProductUpsert) UpdateSlug() *ProductUpsert {
 	u.SetExcluded(product.FieldSlug)
+	return u
+}
+
+// SetSubtitle sets the "subtitle" field.
+func (u *ProductUpsert) SetSubtitle(v string) *ProductUpsert {
+	u.Set(product.FieldSubtitle, v)
+	return u
+}
+
+// UpdateSubtitle sets the "subtitle" field to the value that was provided on create.
+func (u *ProductUpsert) UpdateSubtitle() *ProductUpsert {
+	u.SetExcluded(product.FieldSubtitle)
 	return u
 }
 
@@ -581,6 +622,20 @@ func (u *ProductUpsertOne) SetSlug(v string) *ProductUpsertOne {
 func (u *ProductUpsertOne) UpdateSlug() *ProductUpsertOne {
 	return u.Update(func(s *ProductUpsert) {
 		s.UpdateSlug()
+	})
+}
+
+// SetSubtitle sets the "subtitle" field.
+func (u *ProductUpsertOne) SetSubtitle(v string) *ProductUpsertOne {
+	return u.Update(func(s *ProductUpsert) {
+		s.SetSubtitle(v)
+	})
+}
+
+// UpdateSubtitle sets the "subtitle" field to the value that was provided on create.
+func (u *ProductUpsertOne) UpdateSubtitle() *ProductUpsertOne {
+	return u.Update(func(s *ProductUpsert) {
+		s.UpdateSubtitle()
 	})
 }
 
@@ -897,6 +952,20 @@ func (u *ProductUpsertBulk) SetSlug(v string) *ProductUpsertBulk {
 func (u *ProductUpsertBulk) UpdateSlug() *ProductUpsertBulk {
 	return u.Update(func(s *ProductUpsert) {
 		s.UpdateSlug()
+	})
+}
+
+// SetSubtitle sets the "subtitle" field.
+func (u *ProductUpsertBulk) SetSubtitle(v string) *ProductUpsertBulk {
+	return u.Update(func(s *ProductUpsert) {
+		s.SetSubtitle(v)
+	})
+}
+
+// UpdateSubtitle sets the "subtitle" field to the value that was provided on create.
+func (u *ProductUpsertBulk) UpdateSubtitle() *ProductUpsertBulk {
+	return u.Update(func(s *ProductUpsert) {
+		s.UpdateSubtitle()
 	})
 }
 

@@ -24,6 +24,11 @@ func CategoryID(v int) predicate.ProductCategory {
 	return predicate.ProductCategory(sql.FieldEQ(FieldCategoryID, v))
 }
 
+// Position applies equality check predicate on the "position" field. It's identical to PositionEQ.
+func Position(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldEQ(FieldPosition, v))
+}
+
 // ShopIDEQ applies the EQ predicate on the "shop_id" field.
 func ShopIDEQ(v int) predicate.ProductCategory {
 	return predicate.ProductCategory(sql.FieldEQ(FieldShopID, v))
@@ -82,6 +87,46 @@ func CategoryIDIn(vs ...int) predicate.ProductCategory {
 // CategoryIDNotIn applies the NotIn predicate on the "category_id" field.
 func CategoryIDNotIn(vs ...int) predicate.ProductCategory {
 	return predicate.ProductCategory(sql.FieldNotIn(FieldCategoryID, vs...))
+}
+
+// PositionEQ applies the EQ predicate on the "position" field.
+func PositionEQ(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldEQ(FieldPosition, v))
+}
+
+// PositionNEQ applies the NEQ predicate on the "position" field.
+func PositionNEQ(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldNEQ(FieldPosition, v))
+}
+
+// PositionIn applies the In predicate on the "position" field.
+func PositionIn(vs ...int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldIn(FieldPosition, vs...))
+}
+
+// PositionNotIn applies the NotIn predicate on the "position" field.
+func PositionNotIn(vs ...int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldNotIn(FieldPosition, vs...))
+}
+
+// PositionGT applies the GT predicate on the "position" field.
+func PositionGT(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldGT(FieldPosition, v))
+}
+
+// PositionGTE applies the GTE predicate on the "position" field.
+func PositionGTE(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldGTE(FieldPosition, v))
+}
+
+// PositionLT applies the LT predicate on the "position" field.
+func PositionLT(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldLT(FieldPosition, v))
+}
+
+// PositionLTE applies the LTE predicate on the "position" field.
+func PositionLTE(v int32) predicate.ProductCategory {
+	return predicate.ProductCategory(sql.FieldLTE(FieldPosition, v))
 }
 
 // HasShop applies the HasEdge predicate on the "shop" edge.

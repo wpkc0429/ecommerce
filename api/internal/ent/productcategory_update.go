@@ -73,6 +73,27 @@ func (_u *ProductCategoryUpdate) SetNillableCategoryID(v *int) *ProductCategoryU
 	return _u
 }
 
+// SetPosition sets the "position" field.
+func (_u *ProductCategoryUpdate) SetPosition(v int32) *ProductCategoryUpdate {
+	_u.mutation.ResetPosition()
+	_u.mutation.SetPosition(v)
+	return _u
+}
+
+// SetNillablePosition sets the "position" field if the given value is not nil.
+func (_u *ProductCategoryUpdate) SetNillablePosition(v *int32) *ProductCategoryUpdate {
+	if v != nil {
+		_u.SetPosition(*v)
+	}
+	return _u
+}
+
+// AddPosition adds value to the "position" field.
+func (_u *ProductCategoryUpdate) AddPosition(v int32) *ProductCategoryUpdate {
+	_u.mutation.AddPosition(v)
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ProductCategoryUpdate) SetShop(v *Shop) *ProductCategoryUpdate {
 	return _u.SetShopID(v.ID)
@@ -169,6 +190,12 @@ func (_u *ProductCategoryUpdate) sqlSave(ctx context.Context) (_node int, err er
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.Position(); ok {
+		_spec.SetField(productcategory.FieldPosition, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedPosition(); ok {
+		_spec.AddField(productcategory.FieldPosition, field.TypeInt32, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -321,6 +348,27 @@ func (_u *ProductCategoryUpdateOne) SetNillableCategoryID(v *int) *ProductCatego
 	return _u
 }
 
+// SetPosition sets the "position" field.
+func (_u *ProductCategoryUpdateOne) SetPosition(v int32) *ProductCategoryUpdateOne {
+	_u.mutation.ResetPosition()
+	_u.mutation.SetPosition(v)
+	return _u
+}
+
+// SetNillablePosition sets the "position" field if the given value is not nil.
+func (_u *ProductCategoryUpdateOne) SetNillablePosition(v *int32) *ProductCategoryUpdateOne {
+	if v != nil {
+		_u.SetPosition(*v)
+	}
+	return _u
+}
+
+// AddPosition adds value to the "position" field.
+func (_u *ProductCategoryUpdateOne) AddPosition(v int32) *ProductCategoryUpdateOne {
+	_u.mutation.AddPosition(v)
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ProductCategoryUpdateOne) SetShop(v *Shop) *ProductCategoryUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -449,6 +497,12 @@ func (_u *ProductCategoryUpdateOne) sqlSave(ctx context.Context) (_node *Product
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.Position(); ok {
+		_spec.SetField(productcategory.FieldPosition, field.TypeInt32, value)
+	}
+	if value, ok := _u.mutation.AddedPosition(); ok {
+		_spec.AddField(productcategory.FieldPosition, field.TypeInt32, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

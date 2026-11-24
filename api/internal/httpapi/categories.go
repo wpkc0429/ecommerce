@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
 // CategoriesHandler implements merchant-scoped category CRUD (change
@@ -45,6 +46,37 @@ func (h *CategoriesHandler) MountShop(r chi.Router) {
 	r.With(h.Authz.RequireShopPermission("category.view")).Get("/categories/{categoryID}", h.get)
 	r.With(h.Authz.RequireShopPermission("category.edit")).Put("/categories/{categoryID}", h.update)
 	r.With(h.Authz.RequireShopPermission("category.delete")).Delete("/categories/{categoryID}", h.delete)
+	r.With(h.Authz.RequireShopPermission("category.view")).Get("/categories/{categoryID}/product-order", h.getProductOrder)
+	r.With(h.Authz.RequireShopPermission("category.edit")).Put("/categories/{categoryID}/product-order", h.putProductOrder)
+}
+
+// MountPublic: routes under the tenant-resolved /shop group (no
+// authentication). Returns the whole category tree for storefront navigation.
+func (h *CategoriesHandler) MountPublic(r chi.Router) {
+	r.Get("/categories", h.publicList)
+}
+
+func (h *CategoriesHandler) publicList(w http.ResponseWriter, r *http.Request) {
+	shopID, ok := tenant.ShopID(r.Context())
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	tree, err := h.Service.ListCategoriesPublic(r.Context(), shopID)
+	if err != nil {
+		h.Log.Error("list public categories", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"categories": categoryNodesJSON(tree)})
+}
+
+func categoryNodesJSON(nodes []*catalog.CategoryNode) []map[string]any {
+	out := make([]map[string]any, 0, len(nodes))
+	for _, n := range nodes {
+		out = append(out, categoryNodeJSON(n))
+	}
+	return out
 }
 
 func categoryJSON(c *ent.Category) map[string]any {
@@ -85,12 +117,7 @@ func (h *CategoriesHandler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.WriteJSON(w, http.StatusOK, map[string]any{"categories": out})
 		return
 	}
-	tree := catalog.BuildCategoryTree(cats)
-	out := make([]map[string]any, 0, len(tree))
-	for _, n := range tree {
-		out = append(out, categoryNodeJSON(n))
-	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"categories": out})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"categories": categoryNodesJSON(catalog.BuildCategoryTree(cats))})
 }
 
 func (h *CategoriesHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -153,4 +180,54 @@ func (h *CategoriesHandler) delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── manual product order inside a category (design D6) ──
+
+func productOrderJSON(items []catalog.CategoryProductOrderItem) map[string]any {
+	out := make([]map[string]any, 0, len(items))
+	for _, it := range items {
+		out = append(out, map[string]any{"product_id": it.ProductID, "title": it.Title, "status": it.Status})
+	}
+	return map[string]any{"products": out}
+}
+
+func (h *CategoriesHandler) getProductOrder(w http.ResponseWriter, r *http.Request) {
+	shopID, _ := shopIDParam(r)
+	categoryID, ok := intParam(r, "categoryID")
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	items, err := h.Service.GetCategoryProductOrder(r.Context(), shopID, categoryID)
+	if err != nil {
+		writeCatalogError(w, h.Log, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, productOrderJSON(items))
+}
+
+func (h *CategoriesHandler) putProductOrder(w http.ResponseWriter, r *http.Request) {
+	shopID, _ := shopIDParam(r)
+	categoryID, ok := intParam(r, "categoryID")
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	var in struct {
+		ProductIDs []int `json:"product_ids"`
+	}
+	if !decodeJSON(w, r, &in) {
+		return
+	}
+	if err := h.Service.SetCategoryProductOrder(r.Context(), shopID, categoryID, in.ProductIDs); err != nil {
+		writeCatalogError(w, h.Log, err)
+		return
+	}
+	items, err := h.Service.GetCategoryProductOrder(r.Context(), shopID, categoryID)
+	if err != nil {
+		writeCatalogError(w, h.Log, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, productOrderJSON(items))
 }

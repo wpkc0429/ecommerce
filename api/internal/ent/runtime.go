@@ -19,6 +19,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productcategory"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -762,18 +763,28 @@ func init() {
 			return nil
 		}
 	}()
+	// productDescSubtitle is the schema descriptor for subtitle field.
+	productDescSubtitle := productFields[3].Descriptor()
+	// product.DefaultSubtitle holds the default value on creation for the subtitle field.
+	product.DefaultSubtitle = productDescSubtitle.Default.(string)
 	// productDescDescription is the schema descriptor for description field.
-	productDescDescription := productFields[3].Descriptor()
+	productDescDescription := productFields[4].Descriptor()
 	// product.DefaultDescription holds the default value on creation for the description field.
 	product.DefaultDescription = productDescDescription.Default.(string)
 	// productDescStatus is the schema descriptor for status field.
-	productDescStatus := productFields[4].Descriptor()
+	productDescStatus := productFields[5].Descriptor()
 	// product.DefaultStatus holds the default value on creation for the status field.
 	product.DefaultStatus = productDescStatus.Default.(int16)
 	// productDescMeta is the schema descriptor for meta field.
-	productDescMeta := productFields[5].Descriptor()
+	productDescMeta := productFields[6].Descriptor()
 	// product.DefaultMeta holds the default value on creation for the meta field.
 	product.DefaultMeta = productDescMeta.Default.(json.RawMessage)
+	productcategoryFields := schema.ProductCategory{}.Fields()
+	_ = productcategoryFields
+	// productcategoryDescPosition is the schema descriptor for position field.
+	productcategoryDescPosition := productcategoryFields[3].Descriptor()
+	// productcategory.DefaultPosition holds the default value on creation for the position field.
+	productcategory.DefaultPosition = productcategoryDescPosition.Default.(int32)
 	productskuMixin := schema.ProductSKU{}.Mixin()
 	productskuMixinFields0 := productskuMixin[0].Fields()
 	_ = productskuMixinFields0

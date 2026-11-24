@@ -82,6 +82,20 @@ func (_u *ProductUpdate) SetNillableSlug(v *string) *ProductUpdate {
 	return _u
 }
 
+// SetSubtitle sets the "subtitle" field.
+func (_u *ProductUpdate) SetSubtitle(v string) *ProductUpdate {
+	_u.mutation.SetSubtitle(v)
+	return _u
+}
+
+// SetNillableSubtitle sets the "subtitle" field if the given value is not nil.
+func (_u *ProductUpdate) SetNillableSubtitle(v *string) *ProductUpdate {
+	if v != nil {
+		_u.SetSubtitle(*v)
+	}
+	return _u
+}
+
 // SetDescription sets the "description" field.
 func (_u *ProductUpdate) SetDescription(v string) *ProductUpdate {
 	_u.mutation.SetDescription(v)
@@ -298,6 +312,9 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Slug(); ok {
 		_spec.SetField(product.FieldSlug, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Subtitle(); ok {
+		_spec.SetField(product.FieldSubtitle, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(product.FieldDescription, field.TypeString, value)
 	}
@@ -400,6 +417,10 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 				IDSpec: sqlgraph.NewFieldSpec(category.FieldID, field.TypeInt),
 			},
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.RemovedCategoriesIDs(); len(nodes) > 0 && !_u.mutation.CategoriesCleared() {
@@ -416,6 +437,10 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.CategoriesIDs(); len(nodes) > 0 {
@@ -432,6 +457,10 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(_u.modifiers...)
@@ -500,6 +529,20 @@ func (_u *ProductUpdateOne) SetSlug(v string) *ProductUpdateOne {
 func (_u *ProductUpdateOne) SetNillableSlug(v *string) *ProductUpdateOne {
 	if v != nil {
 		_u.SetSlug(*v)
+	}
+	return _u
+}
+
+// SetSubtitle sets the "subtitle" field.
+func (_u *ProductUpdateOne) SetSubtitle(v string) *ProductUpdateOne {
+	_u.mutation.SetSubtitle(v)
+	return _u
+}
+
+// SetNillableSubtitle sets the "subtitle" field if the given value is not nil.
+func (_u *ProductUpdateOne) SetNillableSubtitle(v *string) *ProductUpdateOne {
+	if v != nil {
+		_u.SetSubtitle(*v)
 	}
 	return _u
 }
@@ -750,6 +793,9 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 	if value, ok := _u.mutation.Slug(); ok {
 		_spec.SetField(product.FieldSlug, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.Subtitle(); ok {
+		_spec.SetField(product.FieldSubtitle, field.TypeString, value)
+	}
 	if value, ok := _u.mutation.Description(); ok {
 		_spec.SetField(product.FieldDescription, field.TypeString, value)
 	}
@@ -852,6 +898,10 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 				IDSpec: sqlgraph.NewFieldSpec(category.FieldID, field.TypeInt),
 			},
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.RemovedCategoriesIDs(); len(nodes) > 0 && !_u.mutation.CategoriesCleared() {
@@ -868,6 +918,10 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
 	}
 	if nodes := _u.mutation.CategoriesIDs(); len(nodes) > 0 {
@@ -884,6 +938,10 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		createE := &ProductCategoryCreate{config: _u.config, mutation: newProductCategoryMutation(_u.config, OpCreate)}
+		createE.defaults()
+		_, specE := createE.createSpec()
+		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(_u.modifiers...)

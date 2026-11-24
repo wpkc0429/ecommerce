@@ -42,6 +42,20 @@ func (_c *ProductCategoryCreate) SetCategoryID(v int) *ProductCategoryCreate {
 	return _c
 }
 
+// SetPosition sets the "position" field.
+func (_c *ProductCategoryCreate) SetPosition(v int32) *ProductCategoryCreate {
+	_c.mutation.SetPosition(v)
+	return _c
+}
+
+// SetNillablePosition sets the "position" field if the given value is not nil.
+func (_c *ProductCategoryCreate) SetNillablePosition(v *int32) *ProductCategoryCreate {
+	if v != nil {
+		_c.SetPosition(*v)
+	}
+	return _c
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_c *ProductCategoryCreate) SetShop(v *Shop) *ProductCategoryCreate {
 	return _c.SetShopID(v.ID)
@@ -64,6 +78,7 @@ func (_c *ProductCategoryCreate) Mutation() *ProductCategoryMutation {
 
 // Save creates the ProductCategory in the database.
 func (_c *ProductCategoryCreate) Save(ctx context.Context) (*ProductCategory, error) {
+	_c.defaults()
 	return withHooks(ctx, _c.sqlSave, _c.mutation, _c.hooks)
 }
 
@@ -89,6 +104,14 @@ func (_c *ProductCategoryCreate) ExecX(ctx context.Context) {
 	}
 }
 
+// defaults sets the default values of the builder before save.
+func (_c *ProductCategoryCreate) defaults() {
+	if _, ok := _c.mutation.Position(); !ok {
+		v := productcategory.DefaultPosition
+		_c.mutation.SetPosition(v)
+	}
+}
+
 // check runs all checks and user-defined validators on the builder.
 func (_c *ProductCategoryCreate) check() error {
 	if _, ok := _c.mutation.ShopID(); !ok {
@@ -99,6 +122,9 @@ func (_c *ProductCategoryCreate) check() error {
 	}
 	if _, ok := _c.mutation.CategoryID(); !ok {
 		return &ValidationError{Name: "category_id", err: errors.New(`ent: missing required field "ProductCategory.category_id"`)}
+	}
+	if _, ok := _c.mutation.Position(); !ok {
+		return &ValidationError{Name: "position", err: errors.New(`ent: missing required field "ProductCategory.position"`)}
 	}
 	if len(_c.mutation.ShopIDs()) == 0 {
 		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "ProductCategory.shop"`)}
@@ -132,6 +158,10 @@ func (_c *ProductCategoryCreate) createSpec() (*ProductCategory, *sqlgraph.Creat
 		_spec = sqlgraph.NewCreateSpec(productcategory.Table, nil)
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.Position(); ok {
+		_spec.SetField(productcategory.FieldPosition, field.TypeInt32, value)
+		_node.Position = value
+	}
 	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2O,
@@ -271,6 +301,24 @@ func (u *ProductCategoryUpsert) UpdateCategoryID() *ProductCategoryUpsert {
 	return u
 }
 
+// SetPosition sets the "position" field.
+func (u *ProductCategoryUpsert) SetPosition(v int32) *ProductCategoryUpsert {
+	u.Set(productcategory.FieldPosition, v)
+	return u
+}
+
+// UpdatePosition sets the "position" field to the value that was provided on create.
+func (u *ProductCategoryUpsert) UpdatePosition() *ProductCategoryUpsert {
+	u.SetExcluded(productcategory.FieldPosition)
+	return u
+}
+
+// AddPosition adds v to the "position" field.
+func (u *ProductCategoryUpsert) AddPosition(v int32) *ProductCategoryUpsert {
+	u.Add(productcategory.FieldPosition, v)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -353,6 +401,27 @@ func (u *ProductCategoryUpsertOne) UpdateCategoryID() *ProductCategoryUpsertOne 
 	})
 }
 
+// SetPosition sets the "position" field.
+func (u *ProductCategoryUpsertOne) SetPosition(v int32) *ProductCategoryUpsertOne {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.SetPosition(v)
+	})
+}
+
+// AddPosition adds v to the "position" field.
+func (u *ProductCategoryUpsertOne) AddPosition(v int32) *ProductCategoryUpsertOne {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.AddPosition(v)
+	})
+}
+
+// UpdatePosition sets the "position" field to the value that was provided on create.
+func (u *ProductCategoryUpsertOne) UpdatePosition() *ProductCategoryUpsertOne {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.UpdatePosition()
+	})
+}
+
 // Exec executes the query.
 func (u *ProductCategoryUpsertOne) Exec(ctx context.Context) error {
 	if len(u.create.conflict) == 0 {
@@ -387,6 +456,7 @@ func (_c *ProductCategoryCreateBulk) Save(ctx context.Context) ([]*ProductCatego
 	for i := range _c.builders {
 		func(i int, root context.Context) {
 			builder := _c.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 				mutation, ok := m.(*ProductCategoryMutation)
 				if !ok {
@@ -572,6 +642,27 @@ func (u *ProductCategoryUpsertBulk) SetCategoryID(v int) *ProductCategoryUpsertB
 func (u *ProductCategoryUpsertBulk) UpdateCategoryID() *ProductCategoryUpsertBulk {
 	return u.Update(func(s *ProductCategoryUpsert) {
 		s.UpdateCategoryID()
+	})
+}
+
+// SetPosition sets the "position" field.
+func (u *ProductCategoryUpsertBulk) SetPosition(v int32) *ProductCategoryUpsertBulk {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.SetPosition(v)
+	})
+}
+
+// AddPosition adds v to the "position" field.
+func (u *ProductCategoryUpsertBulk) AddPosition(v int32) *ProductCategoryUpsertBulk {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.AddPosition(v)
+	})
+}
+
+// UpdatePosition sets the "position" field to the value that was provided on create.
+func (u *ProductCategoryUpsertBulk) UpdatePosition() *ProductCategoryUpsertBulk {
+	return u.Update(func(s *ProductCategoryUpsert) {
+		s.UpdatePosition()
 	})
 }
 

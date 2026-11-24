@@ -23,6 +23,8 @@ type ProductCategory struct {
 	ProductID int `json:"product_id,omitempty"`
 	// CategoryID holds the value of the "category_id" field.
 	CategoryID int `json:"category_id,omitempty"`
+	// Position holds the value of the "position" field.
+	Position int32 `json:"position,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ProductCategoryQuery when eager-loading is set.
 	Edges        ProductCategoryEdges `json:"edges"`
@@ -80,7 +82,7 @@ func (*ProductCategory) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case productcategory.FieldShopID, productcategory.FieldProductID, productcategory.FieldCategoryID:
+		case productcategory.FieldShopID, productcategory.FieldProductID, productcategory.FieldCategoryID, productcategory.FieldPosition:
 			values[i] = new(sql.NullInt64)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -114,6 +116,12 @@ func (_m *ProductCategory) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field category_id", values[i])
 			} else if value.Valid {
 				_m.CategoryID = int(value.Int64)
+			}
+		case productcategory.FieldPosition:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field position", values[i])
+			} else if value.Valid {
+				_m.Position = int32(value.Int64)
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -173,6 +181,9 @@ func (_m *ProductCategory) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("category_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CategoryID))
+	builder.WriteString(", ")
+	builder.WriteString("position=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Position))
 	builder.WriteByte(')')
 	return builder.String()
 }

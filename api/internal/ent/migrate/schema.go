@@ -606,6 +606,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "title", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
 		{Name: "slug", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "subtitle", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(200)"}},
 		{Name: "description", Type: field.TypeString, Size: 2147483647, Default: ""},
 		{Name: "status", Type: field.TypeInt16, Default: 0},
 		{Name: "meta", Type: field.TypeJSON},
@@ -619,7 +620,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "products_shops_shop",
-				Columns:    []*schema.Column{ProductsColumns[8]},
+				Columns:    []*schema.Column{ProductsColumns[9]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -628,17 +629,18 @@ var (
 			{
 				Name:    "product_shop_id_slug",
 				Unique:  true,
-				Columns: []*schema.Column{ProductsColumns[8], ProductsColumns[4]},
+				Columns: []*schema.Column{ProductsColumns[9], ProductsColumns[4]},
 			},
 			{
 				Name:    "product_shop_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{ProductsColumns[8], ProductsColumns[6]},
+				Columns: []*schema.Column{ProductsColumns[9], ProductsColumns[7]},
 			},
 		},
 	}
 	// ProductCategoryColumns holds the columns for the "product_category" table.
 	ProductCategoryColumns = []*schema.Column{
+		{Name: "position", Type: field.TypeInt32, Default: 0},
 		{Name: "shop_id", Type: field.TypeInt},
 		{Name: "product_id", Type: field.TypeInt},
 		{Name: "category_id", Type: field.TypeInt},
@@ -647,32 +649,32 @@ var (
 	ProductCategoryTable = &schema.Table{
 		Name:       "product_category",
 		Columns:    ProductCategoryColumns,
-		PrimaryKey: []*schema.Column{ProductCategoryColumns[1], ProductCategoryColumns[2]},
+		PrimaryKey: []*schema.Column{ProductCategoryColumns[2], ProductCategoryColumns[3]},
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "product_category_shops_shop",
-				Columns:    []*schema.Column{ProductCategoryColumns[0]},
+				Columns:    []*schema.Column{ProductCategoryColumns[1]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "product_category_products_product",
-				Columns:    []*schema.Column{ProductCategoryColumns[1]},
+				Columns:    []*schema.Column{ProductCategoryColumns[2]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
 			{
 				Symbol:     "product_category_categories_category",
-				Columns:    []*schema.Column{ProductCategoryColumns[2]},
+				Columns:    []*schema.Column{ProductCategoryColumns[3]},
 				RefColumns: []*schema.Column{CategoriesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
 		Indexes: []*schema.Index{
 			{
-				Name:    "productcategory_category_id",
+				Name:    "productcategory_category_id_position_product_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProductCategoryColumns[2]},
+				Columns: []*schema.Column{ProductCategoryColumns[3], ProductCategoryColumns[0], ProductCategoryColumns[2]},
 			},
 		},
 	}
@@ -1452,6 +1454,9 @@ func init() {
 	ProductCategoryTable.ForeignKeys[2].RefTable = CategoriesTable
 	ProductCategoryTable.Annotation = &entsql.Annotation{
 		Table: "product_category",
+	}
+	ProductCategoryTable.Annotation.Checks = map[string]string{
+		"product_category_position_check": "position >= 0",
 	}
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = ShopsTable

@@ -51,7 +51,7 @@ func skuJSON(s *ent.ProductSKU) map[string]any {
 func productJSON(p *ent.Product) map[string]any {
 	out := map[string]any{
 		"id": p.ID, "shop_id": p.ShopID, "title": p.Title, "slug": p.Slug,
-		"description": p.Description, "status": p.Status, "meta": p.Meta,
+		"subtitle": p.Subtitle, "description": p.Description, "status": p.Status, "meta": p.Meta,
 		"updated_at": p.UpdatedAt,
 	}
 	if p.Edges.Skus != nil {
@@ -62,11 +62,16 @@ func productJSON(p *ent.Product) map[string]any {
 		out["skus"] = skus
 	}
 	if p.Edges.Categories != nil {
+		// category_ids and categories come from the same edge, so they are
+		// always the same set in the same (position, id) order.
 		catIDs := make([]int, 0, len(p.Edges.Categories))
+		cats := make([]map[string]any, 0, len(p.Edges.Categories))
 		for _, c := range p.Edges.Categories {
 			catIDs = append(catIDs, c.ID)
+			cats = append(cats, map[string]any{"id": c.ID, "slug": c.Slug, "name": c.Name})
 		}
 		out["category_ids"] = catIDs
+		out["categories"] = cats
 	}
 	return out
 }
@@ -199,6 +204,8 @@ func (h *ProductsHandler) publicList(w http.ResponseWriter, r *http.Request) {
 	params := catalog.PublicListParams{
 		Page:     paginationParam(r, "page"),
 		PageSize: paginationParam(r, "page_size"),
+		// Slug of a category; includes its subcategories (design D7).
+		CategorySlug: r.URL.Query().Get("category"),
 	}
 	pp, err := h.Service.ListPublishedProducts(r.Context(), shopID, params)
 	if err != nil {

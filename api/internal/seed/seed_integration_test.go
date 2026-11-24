@@ -7,10 +7,12 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
+	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
 	entmember "ksdevworks/ecommerce/api/internal/ent/member"
 	entmembertier "ksdevworks/ecommerce/api/internal/ent/membertier"
 	entpermission "ksdevworks/ecommerce/api/internal/ent/permission"
 	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
+	entproductcategory "ksdevworks/ecommerce/api/internal/ent/productcategory"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
 	entpublishablekey "ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	entrole "ksdevworks/ecommerce/api/internal/ent/role"
@@ -464,5 +466,47 @@ func TestDemoSeedPaymentCredentialsAreIdempotent(t *testing.T) {
 	}
 	if n != 1 {
 		t.Errorf("re-running demo seed produced %d ecpay credential rows for the demo shop, want 1", n)
+	}
+}
+
+// Scenario: demo 目錄含「本季新品」分類，且重跑不重複 (spec demo-seed:
+// demo 目錄含「本季新品」分類).
+func TestDemoSeedProvisionsNewArrivalsCategory(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	count := func() (cats, links int) {
+		cs, err := client.Category.Query().Where(entcategory.SlugEQ("new-arrivals")).All(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(cs) == 1 {
+			links, err = client.ProductCategory.Query().Where(entproductcategory.CategoryIDEQ(cs[0].ID)).Count(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cs[0].Name != "本季新品" {
+				t.Errorf("category name = %q", cs[0].Name)
+			}
+		}
+		return len(cs), links
+	}
+	cats, links := count()
+	if cats != 1 || links < 2 {
+		t.Fatalf("want 1 new-arrivals category with >=2 products, got %d categories, %d links", cats, links)
+	}
+
+	runDemoSeed(t, client)
+	if c2, l2 := count(); c2 != cats || l2 != links {
+		t.Fatalf("re-seed changed new-arrivals: %d/%d -> %d/%d", cats, links, c2, l2)
+	}
+
+	// Floral demo products carry a non-empty subtitle.
+	n, err := client.Product.Query().
+		Where(entproduct.SlugIn("anniversary-bouquet", "daisy-day-bouquet"), entproduct.SubtitleNEQ("")).
+		Count(ctx)
+	if err != nil || n != 2 {
+		t.Fatalf("floral subtitles: n=%d err=%v", n, err)
 	}
 }

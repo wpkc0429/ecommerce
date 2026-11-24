@@ -16,6 +16,8 @@ const (
 	FieldProductID = "product_id"
 	// FieldCategoryID holds the string denoting the category_id field in the database.
 	FieldCategoryID = "category_id"
+	// FieldPosition holds the string denoting the position field in the database.
+	FieldPosition = "position"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
 	EdgeShop = "shop"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
@@ -58,6 +60,7 @@ var Columns = []string{
 	FieldShopID,
 	FieldProductID,
 	FieldCategoryID,
+	FieldPosition,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -69,6 +72,11 @@ func ValidColumn(column string) bool {
 	}
 	return false
 }
+
+var (
+	// DefaultPosition holds the default value on creation for the "position" field.
+	DefaultPosition int32
+)
 
 // OrderOption defines the ordering options for the ProductCategory queries.
 type OrderOption func(*sql.Selector)
@@ -86,6 +94,11 @@ func ByProductID(opts ...sql.OrderTermOption) OrderOption {
 // ByCategoryID orders the results by the category_id field.
 func ByCategoryID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCategoryID, opts...).ToFunc()
+}
+
+// ByPosition orders the results by the position field.
+func ByPosition(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPosition, opts...).ToFunc()
 }
 
 // ByShopField orders the results by shop field.

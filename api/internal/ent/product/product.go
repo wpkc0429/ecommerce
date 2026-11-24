@@ -25,6 +25,8 @@ const (
 	FieldTitle = "title"
 	// FieldSlug holds the string denoting the slug field in the database.
 	FieldSlug = "slug"
+	// FieldSubtitle holds the string denoting the subtitle field in the database.
+	FieldSubtitle = "subtitle"
 	// FieldDescription holds the string denoting the description field in the database.
 	FieldDescription = "description"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -77,6 +79,7 @@ var Columns = []string{
 	FieldShopID,
 	FieldTitle,
 	FieldSlug,
+	FieldSubtitle,
 	FieldDescription,
 	FieldStatus,
 	FieldMeta,
@@ -109,6 +112,8 @@ var (
 	TitleValidator func(string) error
 	// SlugValidator is a validator for the "slug" field. It is called by the builders before save.
 	SlugValidator func(string) error
+	// DefaultSubtitle holds the default value on creation for the "subtitle" field.
+	DefaultSubtitle string
 	// DefaultDescription holds the default value on creation for the "description" field.
 	DefaultDescription string
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -148,6 +153,11 @@ func ByTitle(opts ...sql.OrderTermOption) OrderOption {
 // BySlug orders the results by the slug field.
 func BySlug(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSlug, opts...).ToFunc()
+}
+
+// BySubtitle orders the results by the subtitle field.
+func BySubtitle(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSubtitle, opts...).ToFunc()
 }
 
 // ByDescription orders the results by the description field.

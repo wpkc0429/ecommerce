@@ -29,6 +29,8 @@ type Product struct {
 	Title string `json:"title,omitempty"`
 	// Slug holds the value of the "slug" field.
 	Slug string `json:"slug,omitempty"`
+	// Subtitle holds the value of the "subtitle" field.
+	Subtitle string `json:"subtitle,omitempty"`
 	// Description holds the value of the "description" field.
 	Description string `json:"description,omitempty"`
 	// Status holds the value of the "status" field.
@@ -103,7 +105,7 @@ func (*Product) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case product.FieldID, product.FieldShopID, product.FieldStatus:
 			values[i] = new(sql.NullInt64)
-		case product.FieldTitle, product.FieldSlug, product.FieldDescription:
+		case product.FieldTitle, product.FieldSlug, product.FieldSubtitle, product.FieldDescription:
 			values[i] = new(sql.NullString)
 		case product.FieldCreatedAt, product.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -157,6 +159,12 @@ func (_m *Product) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field slug", values[i])
 			} else if value.Valid {
 				_m.Slug = value.String
+			}
+		case product.FieldSubtitle:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field subtitle", values[i])
+			} else if value.Valid {
+				_m.Subtitle = value.String
 			}
 		case product.FieldDescription:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -248,6 +256,9 @@ func (_m *Product) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("slug=")
 	builder.WriteString(_m.Slug)
+	builder.WriteString(", ")
+	builder.WriteString("subtitle=")
+	builder.WriteString(_m.Subtitle)
 	builder.WriteString(", ")
 	builder.WriteString("description=")
 	builder.WriteString(_m.Description)

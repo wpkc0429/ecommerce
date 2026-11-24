@@ -17,6 +17,9 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode/utf8"
+
+	"entgo.io/ent/dialect/sql"
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
@@ -339,6 +342,7 @@ func validateSKUInput(in SKUInput) error {
 type ProductInput struct {
 	Title       string          `json:"title"`
 	Slug        string          `json:"slug"`
+	Subtitle    string          `json:"subtitle"`
 	Description string          `json:"description"`
 	Status      *int16          `json:"status"`
 	Meta        json.RawMessage `json:"meta"`
@@ -347,6 +351,23 @@ type ProductInput struct {
 }
 
 func validProductStatus(v int16) bool { return v == 0 || v == 1 }
+
+// maxSubtitleRunes is the subtitle length limit. Counted in runes, not bytes:
+// the column is varchar(200) (characters) and ent's MaxLen counts bytes, which
+// would reject 67 CJK characters.
+const maxSubtitleRunes = 200
+
+// normalizeSubtitle trims and length-checks a product subtitle.
+func normalizeSubtitle(v string) (string, error) {
+	v = strings.TrimSpace(v)
+	if utf8.RuneCountInString(v) > maxSubtitleRunes {
+		return "", &ValidationError{
+			Message: "subtitle is too long",
+			Details: []Detail{{Pointer: "/subtitle", Message: "must be at most 200 characters"}},
+		}
+	}
+	return v, nil
+}
 
 func (s *Service) validateCategoryIDs(ctx context.Context, shopID int, ids []int) error {
 	if len(ids) == 0 {
@@ -390,6 +411,10 @@ func (s *Service) CreateProduct(ctx context.Context, shopID int, in ProductInput
 		}
 		status = *in.Status
 	}
+	subtitle, err := normalizeSubtitle(in.Subtitle)
+	if err != nil {
+		return nil, err
+	}
 	meta := in.Meta
 	if len(meta) == 0 {
 		meta = json.RawMessage("{}")
@@ -411,6 +436,7 @@ func (s *Service) CreateProduct(ctx context.Context, shopID int, in ProductInput
 		SetShopID(shopID).
 		SetTitle(title).
 		SetSlug(slug).
+		SetSubtitle(subtitle).
 		SetDescription(in.Description).
 		SetStatus(status).
 		SetMeta(meta).
@@ -422,11 +448,9 @@ func (s *Service) CreateProduct(ctx context.Context, shopID int, in ProductInput
 		}
 		return nil, err
 	}
-	for _, catID := range in.CategoryIDs {
-		if _, err := tx.ProductCategory.Create().SetShopID(shopID).SetProductID(p.ID).SetCategoryID(catID).Save(ctx); err != nil {
-			_ = tx.Rollback()
-			return nil, fmt.Errorf("catalog: link category: %w", err)
-		}
+	if err := linkCategories(ctx, tx, shopID, p.ID, in.CategoryIDs); err != nil {
+		_ = tx.Rollback()
+		return nil, err
 	}
 	for _, sku := range in.SKUs {
 		if err := createSKU(ctx, tx, shopID, p.ID, sku); err != nil {
@@ -438,6 +462,77 @@ func (s *Service) CreateProduct(ctx context.Context, shopID int, in ProductInput
 		return nil, fmt.Errorf("catalog: commit product creation: %w", err)
 	}
 	return s.GetProduct(ctx, shopID, p.ID)
+}
+
+// linkCategories associates the product with each (distinct) category, placing
+// it LAST in that category's manual order (position = current max + 1, design
+// D6).
+func linkCategories(ctx context.Context, tx *ent.Tx, shopID, productID int, catIDs []int) error {
+	seen := make(map[int]bool, len(catIDs))
+	for _, catID := range catIDs {
+		if seen[catID] {
+			continue
+		}
+		seen[catID] = true
+		var next int32
+		last, err := tx.ProductCategory.Query().
+			Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.CategoryIDEQ(catID)).
+			Order(entproductcategory.ByPosition(sql.OrderDesc())).
+			First(ctx)
+		switch {
+		case err == nil:
+			next = last.Position + 1
+		case ent.IsNotFound(err):
+		default:
+			return fmt.Errorf("catalog: read category order: %w", err)
+		}
+		if _, err := tx.ProductCategory.Create().
+			SetShopID(shopID).SetProductID(productID).SetCategoryID(catID).SetPosition(next).
+			Save(ctx); err != nil {
+			return fmt.Errorf("catalog: link category: %w", err)
+		}
+	}
+	return nil
+}
+
+// syncCategories makes the product's category set equal to want WITHOUT
+// touching associations that stay: only removed categories are unlinked and
+// only new ones are linked. A delete-all-then-recreate would silently reset
+// every manual product order the merchant set (design D6).
+func syncCategories(ctx context.Context, tx *ent.Tx, shopID, productID int, want []int) error {
+	current, err := tx.ProductCategory.Query().
+		Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.ProductIDEQ(productID)).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("catalog: load category associations: %w", err)
+	}
+	wantSet := make(map[int]bool, len(want))
+	for _, id := range want {
+		wantSet[id] = true
+	}
+	have := make(map[int]bool, len(current))
+	var remove []int
+	for _, pc := range current {
+		have[pc.CategoryID] = true
+		if !wantSet[pc.CategoryID] {
+			remove = append(remove, pc.CategoryID)
+		}
+	}
+	if len(remove) > 0 {
+		if _, err := tx.ProductCategory.Delete().
+			Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.ProductIDEQ(productID), entproductcategory.CategoryIDIn(remove...)).
+			Exec(ctx); err != nil {
+			return fmt.Errorf("catalog: unlink categories: %w", err)
+		}
+	}
+	var add []int
+	for _, id := range want {
+		if !have[id] {
+			add = append(add, id)
+			have[id] = true
+		}
+	}
+	return linkCategories(ctx, tx, shopID, productID, add)
 }
 
 func createSKU(ctx context.Context, tx *ent.Tx, shopID, productID int, in SKUInput) error {
@@ -478,6 +573,7 @@ func createSKU(ctx context.Context, tx *ent.Tx, shopID, productID int, in SKUInp
 type ProductUpdate struct {
 	Title       *string         `json:"title"`
 	Slug        *string         `json:"slug"`
+	Subtitle    *string         `json:"subtitle"`
 	Description *string         `json:"description"`
 	Status      *int16          `json:"status"`
 	Meta        json.RawMessage `json:"meta"`
@@ -485,8 +581,9 @@ type ProductUpdate struct {
 	SKUs        *[]SKUInput     `json:"skus"`
 }
 
-// UpdateProduct applies a partial update, replacing category associations
-// wholesale when category_ids is present (spec: 全量取代語意) and upserting
+// UpdateProduct applies a partial update, replacing the category set when
+// category_ids is present (spec: 全量取代語意 — implemented as a set diff so
+// surviving associations keep their manual position) and upserting
 // SKUs when skus is present (spec: 巢狀建立與更新 — id'd items update,
 // id-less items are created, existing ids missing from the payload are
 // removed). Everything happens in one transaction.
@@ -508,6 +605,14 @@ func (s *Service) UpdateProduct(ctx context.Context, shopID, productID int, in P
 	}
 	if in.Status != nil && !validProductStatus(*in.Status) {
 		return nil, &ValidationError{Message: "invalid status", Details: []Detail{{Pointer: "/status", Message: "must be 0 or 1"}}}
+	}
+	var subtitle string
+	if in.Subtitle != nil {
+		var err error
+		subtitle, err = normalizeSubtitle(*in.Subtitle)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if in.CategoryIDs != nil {
 		if err := s.validateCategoryIDs(ctx, shopID, *in.CategoryIDs); err != nil {
@@ -538,6 +643,9 @@ func (s *Service) UpdateProduct(ctx context.Context, shopID, productID int, in P
 	if in.Slug != nil {
 		upd.SetSlug(slug)
 	}
+	if in.Subtitle != nil {
+		upd.SetSubtitle(subtitle)
+	}
 	if in.Description != nil {
 		upd.SetDescription(*in.Description)
 	}
@@ -556,17 +664,9 @@ func (s *Service) UpdateProduct(ctx context.Context, shopID, productID int, in P
 	}
 
 	if in.CategoryIDs != nil {
-		if _, err := tx.ProductCategory.Delete().
-			Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.ProductIDEQ(productID)).
-			Exec(ctx); err != nil {
+		if err := syncCategories(ctx, tx, shopID, productID, *in.CategoryIDs); err != nil {
 			_ = tx.Rollback()
-			return nil, fmt.Errorf("catalog: clear category associations: %w", err)
-		}
-		for _, catID := range *in.CategoryIDs {
-			if _, err := tx.ProductCategory.Create().SetShopID(shopID).SetProductID(productID).SetCategoryID(catID).Save(ctx); err != nil {
-				_ = tx.Rollback()
-				return nil, fmt.Errorf("catalog: link category: %w", err)
-			}
+			return nil, err
 		}
 	}
 
@@ -682,11 +782,15 @@ func (s *Service) DeleteProduct(ctx context.Context, shopID, productID int) erro
 // leaves it to the database.
 func orderSkusByID(q *ent.ProductSKUQuery) { q.Order(entproductsku.ByID()) }
 
+// orderCategories pins eager-loaded category collections to (position, id) so
+// `categories` / `category_ids` have a defined order (design D2).
+func orderCategories(q *ent.CategoryQuery) { q.Order(entcategory.ByPosition(), entcategory.ByID()) }
+
 func (s *Service) GetProduct(ctx context.Context, shopID, productID int) (*ent.Product, error) {
 	p, err := s.Client.Product.Query().
 		Where(entproduct.IDEQ(productID), entproduct.ShopIDEQ(shopID)).
 		WithSkus(orderSkusByID).
-		WithCategories().
+		WithCategories(orderCategories).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
@@ -758,7 +862,7 @@ func (s *Service) ListProducts(ctx context.Context, shopID int, params ProductLi
 	}
 	products, err := q.
 		WithSkus(orderSkusByID).
-		WithCategories().
+		WithCategories(orderCategories).
 		Order(entproduct.ByID()).
 		Limit(pageSize).
 		Offset((page - 1) * pageSize).
@@ -771,30 +875,98 @@ func (s *Service) ListProducts(ctx context.Context, shopID int, params ProductLi
 
 // ── public (published-only) reads, spec product-catalog/Published-only public catalog endpoint ──
 
-// PublicListParams are the (page, page_size) inputs of the storefront list.
+// PublicListParams are the inputs of the storefront list.
 type PublicListParams struct {
 	Page     int
 	PageSize int
+	// CategorySlug optionally restricts the list to products in that category
+	// or any descendant category (design D7). Unknown slug -> empty page.
+	CategorySlug string
+}
+
+// descendantIDs returns rootID plus the ids of every descendant category in
+// cats (a flat list of one shop's categories). Pure and cycle-safe: a node is
+// visited at most once, so corrupt parent links cannot loop it.
+func descendantIDs(cats []*ent.Category, rootID int) []int {
+	children := make(map[int][]int, len(cats))
+	for _, c := range cats {
+		if c.ParentID != nil {
+			children[*c.ParentID] = append(children[*c.ParentID], c.ID)
+		}
+	}
+	seen := map[int]bool{rootID: true}
+	out := []int{rootID}
+	for queue := []int{rootID}; len(queue) > 0; {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, ch := range children[cur] {
+			if !seen[ch] {
+				seen[ch] = true
+				out = append(out, ch)
+				queue = append(queue, ch)
+			}
+		}
+	}
+	return out
 }
 
 // ListPublishedProducts returns only status=1 products for the given shop
-// (spec: published-only public endpoint).
+// (spec: published-only public endpoint), optionally filtered by category
+// (including subcategories).
 func (s *Service) ListPublishedProducts(ctx context.Context, shopID int, params PublicListParams) (*ProductPage, error) {
 	page, pageSize := normalizePage(params.Page, params.PageSize)
 	statusPublished := int16(1)
 
 	q := s.Client.Product.Query().Where(entproduct.ShopIDEQ(shopID), entproduct.StatusEQ(statusPublished))
+
+	slug := strings.ToLower(strings.TrimSpace(params.CategorySlug))
+	requestedCat := 0
+	if slug != "" {
+		cats, err := s.ListCategories(ctx, shopID)
+		if err != nil {
+			return nil, err
+		}
+		for _, c := range cats {
+			if c.Slug == slug {
+				requestedCat = c.ID
+				break
+			}
+		}
+		if requestedCat == 0 {
+			// Collection query, not a resource lookup (design D5).
+			return &ProductPage{Products: []*ent.Product{}, Total: 0, Page: page, PageSize: pageSize}, nil
+		}
+		q = q.Where(entproduct.HasCategoriesWith(entcategory.IDIn(descendantIDs(cats, requestedCat)...)))
+	}
+
 	total, err := q.Clone().Count(ctx)
 	if err != nil {
 		return nil, err
 	}
-	products, err := q.
-		WithSkus(orderSkusByID).
-		WithCategories().
-		Order(entproduct.ByID()).
-		Limit(pageSize).
-		Offset((page - 1) * pageSize).
-		All(ctx)
+	q = q.WithSkus(orderSkusByID).WithCategories(orderCategories).Limit(pageSize).Offset((page - 1) * pageSize)
+	if requestedCat == 0 {
+		q = q.Order(entproduct.ByID())
+	} else {
+		// Direct members first by their position in THIS category, then the
+		// products reached only through descendants by id (design D7). The
+		// join matches at most one product_category row per product (its PK
+		// is (product_id, category_id)), so no row is duplicated. shop_id is
+		// spelled out rather than left to the tenant interceptor, which does
+		// not see a hand-built join.
+		q = q.Order(func(sel *sql.Selector) {
+			pc := sql.Table(entproductcategory.Table)
+			sel.LeftJoin(pc).OnP(sql.And(
+				sql.ColumnsEQ(pc.C(entproductcategory.FieldProductID), sel.C(entproduct.FieldID)),
+				sql.EQ(pc.C(entproductcategory.FieldCategoryID), requestedCat),
+				sql.EQ(pc.C(entproductcategory.FieldShopID), shopID),
+			))
+			sel.OrderExpr(
+				sql.Expr(pc.C(entproductcategory.FieldPosition)+" ASC NULLS LAST"),
+				sql.Expr(sel.C(entproduct.FieldID)+" ASC"),
+			)
+		})
+	}
+	products, err := q.All(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -807,10 +979,127 @@ func (s *Service) GetPublishedProductBySlug(ctx context.Context, shopID int, slu
 	p, err := s.Client.Product.Query().
 		Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ(strings.ToLower(strings.TrimSpace(slug))), entproduct.StatusEQ(1)).
 		WithSkus(orderSkusByID).
-		WithCategories().
+		WithCategories(orderCategories).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
 	}
 	return p, nil
+}
+
+// ── public category tree ───────────────────────────────────────────
+
+// ListCategoriesPublic returns the shop's whole category tree (design D4):
+// the same BuildCategoryTree the admin endpoint serializes, ordered by
+// position then id at every level.
+func (s *Service) ListCategoriesPublic(ctx context.Context, shopID int) ([]*CategoryNode, error) {
+	cats, err := s.ListCategories(ctx, shopID)
+	if err != nil {
+		return nil, err
+	}
+	return BuildCategoryTree(cats), nil
+}
+
+// ── manual product order inside a category (design D6) ─────────────
+
+// CategoryProductOrderItem is one direct member of a category, in order.
+type CategoryProductOrderItem struct {
+	ProductID int
+	Title     string
+	Status    int16
+}
+
+// GetCategoryProductOrder lists the category's DIRECT products by
+// (position, product_id).
+func (s *Service) GetCategoryProductOrder(ctx context.Context, shopID, categoryID int) ([]CategoryProductOrderItem, error) {
+	if _, err := s.GetCategory(ctx, shopID, categoryID); err != nil {
+		return nil, err
+	}
+	links, err := s.Client.ProductCategory.Query().
+		Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.CategoryIDEQ(categoryID)).
+		Order(entproductcategory.ByPosition(), entproductcategory.ByProductID()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]int, 0, len(links))
+	for _, l := range links {
+		ids = append(ids, l.ProductID)
+	}
+	products := map[int]*ent.Product{}
+	if len(ids) > 0 {
+		ps, err := s.Client.Product.Query().
+			Where(entproduct.ShopIDEQ(shopID), entproduct.IDIn(ids...)).
+			Select(entproduct.FieldID, entproduct.FieldTitle, entproduct.FieldStatus).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range ps {
+			products[p.ID] = p
+		}
+	}
+	out := make([]CategoryProductOrderItem, 0, len(links))
+	for _, l := range links {
+		p := products[l.ProductID]
+		if p == nil {
+			continue
+		}
+		out = append(out, CategoryProductOrderItem{ProductID: p.ID, Title: p.Title, Status: p.Status})
+	}
+	return out, nil
+}
+
+// SetCategoryProductOrder rewrites the order of the category's direct
+// products. productIDs MUST be exactly the current direct members (a
+// permutation): a partial list would leave the missing products' positions
+// ambiguous relative to the listed ones.
+func (s *Service) SetCategoryProductOrder(ctx context.Context, shopID, categoryID int, productIDs []int) error {
+	if _, err := s.GetCategory(ctx, shopID, categoryID); err != nil {
+		return err
+	}
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("catalog: begin tx: %w", err)
+	}
+	links, err := tx.ProductCategory.Query().
+		Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.CategoryIDEQ(categoryID)).
+		All(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	member := make(map[int]bool, len(links))
+	for _, l := range links {
+		member[l.ProductID] = true
+	}
+	seen := make(map[int]bool, len(productIDs))
+	valid := len(productIDs) == len(links)
+	for _, id := range productIDs {
+		if !member[id] || seen[id] {
+			valid = false
+			break
+		}
+		seen[id] = true
+	}
+	if !valid {
+		_ = tx.Rollback()
+		return &ValidationError{
+			Message: "product_ids must be exactly the products directly in this category, each once",
+			Details: []Detail{{Pointer: "/product_ids", Message: "must be a permutation of the category's current products"}},
+		}
+	}
+	for i, id := range productIDs {
+		if _, err := tx.ProductCategory.Update().
+			Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.CategoryIDEQ(categoryID), entproductcategory.ProductIDEQ(id)).
+			SetPosition(int32(i)).
+			Save(ctx); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("catalog: set product position: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("catalog: commit product order: %w", err)
+	}
+	return nil
 }

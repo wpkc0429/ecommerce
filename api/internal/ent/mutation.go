@@ -14205,6 +14205,7 @@ type ProductMutation struct {
 	updated_at        *time.Time
 	title             *string
 	slug              *string
+	subtitle          *string
 	description       *string
 	status            *int16
 	addstatus         *int16
@@ -14500,6 +14501,42 @@ func (m *ProductMutation) OldSlug(ctx context.Context) (v string, err error) {
 // ResetSlug resets all changes to the "slug" field.
 func (m *ProductMutation) ResetSlug() {
 	m.slug = nil
+}
+
+// SetSubtitle sets the "subtitle" field.
+func (m *ProductMutation) SetSubtitle(s string) {
+	m.subtitle = &s
+}
+
+// Subtitle returns the value of the "subtitle" field in the mutation.
+func (m *ProductMutation) Subtitle() (r string, exists bool) {
+	v := m.subtitle
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubtitle returns the old "subtitle" field's value of the Product entity.
+// If the Product object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductMutation) OldSubtitle(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubtitle is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubtitle requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubtitle: %w", err)
+	}
+	return oldValue.Subtitle, nil
+}
+
+// ResetSubtitle resets all changes to the "subtitle" field.
+func (m *ProductMutation) ResetSubtitle() {
+	m.subtitle = nil
 }
 
 // SetDescription sets the "description" field.
@@ -14814,7 +14851,7 @@ func (m *ProductMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, product.FieldCreatedAt)
 	}
@@ -14829,6 +14866,9 @@ func (m *ProductMutation) Fields() []string {
 	}
 	if m.slug != nil {
 		fields = append(fields, product.FieldSlug)
+	}
+	if m.subtitle != nil {
+		fields = append(fields, product.FieldSubtitle)
 	}
 	if m.description != nil {
 		fields = append(fields, product.FieldDescription)
@@ -14857,6 +14897,8 @@ func (m *ProductMutation) Field(name string) (ent.Value, bool) {
 		return m.Title()
 	case product.FieldSlug:
 		return m.Slug()
+	case product.FieldSubtitle:
+		return m.Subtitle()
 	case product.FieldDescription:
 		return m.Description()
 	case product.FieldStatus:
@@ -14882,6 +14924,8 @@ func (m *ProductMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldTitle(ctx)
 	case product.FieldSlug:
 		return m.OldSlug(ctx)
+	case product.FieldSubtitle:
+		return m.OldSubtitle(ctx)
 	case product.FieldDescription:
 		return m.OldDescription(ctx)
 	case product.FieldStatus:
@@ -14931,6 +14975,13 @@ func (m *ProductMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSlug(v)
+		return nil
+	case product.FieldSubtitle:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubtitle(v)
 		return nil
 	case product.FieldDescription:
 		v, ok := value.(string)
@@ -15031,6 +15082,9 @@ func (m *ProductMutation) ResetField(name string) error {
 		return nil
 	case product.FieldSlug:
 		m.ResetSlug()
+		return nil
+	case product.FieldSubtitle:
+		m.ResetSubtitle()
 		return nil
 	case product.FieldDescription:
 		m.ResetDescription()
@@ -15178,6 +15232,8 @@ type ProductCategoryMutation struct {
 	config
 	op              Op
 	typ             string
+	position        *int32
+	addposition     *int32
 	clearedFields   map[string]struct{}
 	shop            *int
 	clearedshop     bool
@@ -15283,6 +15339,45 @@ func (m *ProductCategoryMutation) CategoryID() (r int, exists bool) {
 // ResetCategoryID resets all changes to the "category_id" field.
 func (m *ProductCategoryMutation) ResetCategoryID() {
 	m.category = nil
+}
+
+// SetPosition sets the "position" field.
+func (m *ProductCategoryMutation) SetPosition(i int32) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *ProductCategoryMutation) Position() (r int32, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// AddPosition adds i to the "position" field.
+func (m *ProductCategoryMutation) AddPosition(i int32) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *ProductCategoryMutation) AddedPosition() (r int32, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *ProductCategoryMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
 }
 
 // ClearShop clears the "shop" edge to the Shop entity.
@@ -15400,7 +15495,7 @@ func (m *ProductCategoryMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductCategoryMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.shop != nil {
 		fields = append(fields, productcategory.FieldShopID)
 	}
@@ -15409,6 +15504,9 @@ func (m *ProductCategoryMutation) Fields() []string {
 	}
 	if m.category != nil {
 		fields = append(fields, productcategory.FieldCategoryID)
+	}
+	if m.position != nil {
+		fields = append(fields, productcategory.FieldPosition)
 	}
 	return fields
 }
@@ -15424,6 +15522,8 @@ func (m *ProductCategoryMutation) Field(name string) (ent.Value, bool) {
 		return m.ProductID()
 	case productcategory.FieldCategoryID:
 		return m.CategoryID()
+	case productcategory.FieldPosition:
+		return m.Position()
 	}
 	return nil, false
 }
@@ -15461,6 +15561,13 @@ func (m *ProductCategoryMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCategoryID(v)
 		return nil
+	case productcategory.FieldPosition:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProductCategory field %s", name)
 }
@@ -15469,6 +15576,9 @@ func (m *ProductCategoryMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ProductCategoryMutation) AddedFields() []string {
 	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, productcategory.FieldPosition)
+	}
 	return fields
 }
 
@@ -15477,6 +15587,8 @@ func (m *ProductCategoryMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ProductCategoryMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case productcategory.FieldPosition:
+		return m.AddedPosition()
 	}
 	return nil, false
 }
@@ -15486,6 +15598,13 @@ func (m *ProductCategoryMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ProductCategoryMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case productcategory.FieldPosition:
+		v, ok := value.(int32)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProductCategory numeric field %s", name)
 }
@@ -15521,6 +15640,9 @@ func (m *ProductCategoryMutation) ResetField(name string) error {
 		return nil
 	case productcategory.FieldCategoryID:
 		m.ResetCategoryID()
+		return nil
+	case productcategory.FieldPosition:
+		m.ResetPosition()
 		return nil
 	}
 	return fmt.Errorf("unknown ProductCategory field %s", name)

@@ -106,6 +106,26 @@ const { products, page, page_size, total } = await res.json();
 - 每個商品帶 `skus`（**依 `id` 遞增排序**，公開與後台一致）。
   **下單要用的是 `products[].skus[].id`**，不是商品 id，也不是你自己前端的購物車 key。
 - 單一商品：`GET /api/v1/shop/products/{slug}`。
+- `subtitle`：商品卡片的第二行（例如英文品名），沒有時是空字串 `""`。語言由商家決定，平台不解讀。
+- `categories`：`[{id, slug, name}]`，依分類 `position`、`id` 排序；`category_ids` 是同一個集合的 id 版本。
+
+### 3.1 分類與「依分類列商品」
+
+```js
+// 整棵分類樹（無需認證、不分頁）：{ categories: [{ id, name, slug, parent_id, position, children: [...] }] }
+const tree = await (await fetch(`${API}/api/v1/shop/categories`, { headers })).json();
+
+// 某分類的商品（含它的所有子分類）
+const res2 = await fetch(`${API}/api/v1/shop/products?category=new-arrivals`, { headers });
+```
+
+- `category` 的值是分類的 **slug**。回傳屬於該分類**或其任何子孫分類**的已發佈商品，每個商品只出現一次；
+  `total` 與分頁都是篩選後的數字。
+- **排序**：先列直接屬於該分類的商品（依商家在後台「商品排序」設定的順序），再列只經由子分類到達的商品（依 `id`）。
+  不帶 `category` 時照舊依 `id`。
+- slug 不存在（或拼錯）**不是錯誤**：回 200 與空列表，建置時拼錯 slug 會得到空頁而不是失敗。
+- **「本季新品」「母親節限定」這類區塊就是分類**，不是商品上的旗標：商家建一個分類、把商品掛上去，
+  你用 `?category=<slug>` 取用即可；換季時商家把商品移出分類。
 
 ---
 

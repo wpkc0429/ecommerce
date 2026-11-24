@@ -497,7 +497,7 @@ components:
     Product:
       type: object
       additionalProperties: false
-      required: [id, shop_id, title, slug, description, status, meta, updated_at]
+      required: [id, shop_id, title, slug, subtitle, description, status, meta, updated_at]
       description: |
         商品。公開端點與後台端點回傳**同一個形狀**，差別只在公開端點僅回傳
         `status = 1`（已發佈）的商品。
@@ -509,6 +509,12 @@ components:
           type: string
           description: 商家內唯一的網址片段，公開端點以它查詢單一商品。
           examples: ["greenhouse-rose-bouquet"]
+        subtitle:
+          type: string
+          maxLength: 200
+          description: |
+            副標（商品卡片的第二行，例如英文品名）。語言中立；上限 200 字元，預設空字串。
+          examples: ["Greenhouse Rose Bouquet"]
         description: { type: string }
         status:
           type: integer
@@ -526,8 +532,14 @@ components:
           items: { $ref: '#/components/schemas/ProductSKU' }
         category_ids:
           type: array
-          description: 所屬分類。後台端點才會帶。
+          description: 所屬分類 id，依分類 `position`、`id` 遞增。與 `categories` 是同一個集合。
           items: { type: integer }
+        categories:
+          type: array
+          description: |
+            `category_ids` 的展開（`{id, slug, name}`），同樣依分類 `position`、`id` 遞增。
+            前台用它顯示分類名稱與連結，不必另外查分類樹。
+          items: { $ref: '#/components/schemas/CategorySummary' }
 
     ProductPage:
       type: object
@@ -557,6 +569,33 @@ components:
         slug: { type: string }
         position: { type: integer, format: int32 }
         updated_at: { type: string, format: date-time }
+
+    CategorySummary:
+      type: object
+      additionalProperties: false
+      required: [id, slug, name]
+      description: 商品回應中的分類摘要（刻意不含 `parent_id`／`children`，那是分類端點的事）。
+      properties:
+        id: { type: integer }
+        slug: { type: string }
+        name: { type: string }
+
+    CategoryProductOrder:
+      type: object
+      additionalProperties: false
+      required: [products]
+      description: 分類**直接**關聯的商品，依手動排序（`position`、`product_id`）。
+      properties:
+        products:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [product_id, title, status]
+            properties:
+              product_id: { type: integer }
+              title: { type: string }
+              status: { type: integer, enum: [0, 1], description: "`0` 草稿／`1` 已發佈。" }
 
     CategoryNode:
       type: object
@@ -1912,17 +1951,58 @@ paths:
       description: |
         **無需任何認證**，只需租戶解析（`X-Publishable-Key` 或 `Host`）。
         只回傳 `status = 1` 的商品；每個商品都帶 `skus`（依 `id` 遞增）。
+
+        帶 `category`（分類 slug）時只回傳屬於該分類**或其任一子孫分類**的商品，每個商品至多一次，
+        `total` 為篩選後筆數。排序：先列**直接**屬於該分類的商品（依商家在後台設定的手動順序，
+        再依 `id`），再列只經由子分類到達的商品（依 `id`）。slug 不存在（或屬於他店）回 200 與空列表。
+        不帶 `category` 時依 `id` 排序，行為不變。
       security: []
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/PageSize'
+        - name: category
+          in: query
+          required: false
+          description: 分類 slug（含子分類）。
+          schema: { type: string }
+          examples:
+            newArrivals:
+              value: new-arrivals
       responses:
         "200":
           description: 已發佈商品的一頁。
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ProductPage' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/categories:
+    get:
+      tags: [storefront-catalog]
+      operationId: listPublicCategories
+      summary: 取得商家的分類樹
+      description: |
+        **無需任何認證**，只需租戶解析（`X-Publishable-Key` 或 `Host`）。回傳整棵分類樹
+        （不分頁，單一商家的分類是數十級），同層依 `position`、`id` 遞增。
+        與後台 `GET .../categories` 的預設輸出同形狀。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+      responses:
+        "200":
+          description: 分類樹。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: '#/components/schemas/CategoryNode' }
         "404": { $ref: '#/components/responses/NotFound' }
         "503": { $ref: '#/components/responses/ShopDisabled' }
 
@@ -4403,6 +4483,62 @@ paths:
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
+  /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: categoryID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-catalog]
+      operationId: getCategoryProductOrder
+      summary: 取得分類內的商品手動排序
+      description: |
+        需要商家層 `category.view`。回傳**直接**關聯於此分類的商品（含草稿），依 `position`、`product_id`。
+        子分類的商品不在此列。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 排序。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryProductOrder' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-catalog]
+      operationId: setCategoryProductOrder
+      summary: 設定分類內的商品手動排序
+      description: |
+        需要商家層 `category.edit`。`product_ids` 必須**恰好是**目前直接關聯商品的一個排列
+        （不得缺、不得多、不得重複），否則 422 且順序不變。回傳新的排序。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product_ids]
+              properties:
+                product_ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200":
+          description: 已設定。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CategoryProductOrder' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
   /api/v1/admin/shops/{shopID}/products:
     parameters:
       - $ref: '#/components/parameters/ShopIDPath'
@@ -4463,6 +4599,7 @@ paths:
               properties:
                 title: { type: string }
                 slug: { type: string }
+                subtitle: { type: string, maxLength: 200, description: 副標；上限 200 字元。 }
                 description: { type: string }
                 status: { type: integer, enum: [0, 1] }
                 meta: { type: object }
@@ -4523,7 +4660,9 @@ paths:
       description: |
         需要商家層 `product.edit`。
 
-        - 送出 `category_ids` 即**全量取代**分類關聯。
+        - 送出 `category_ids` 即**全量取代**分類關聯（以差集實作：保留下來的關聯不會被重設手動排序，
+          新加入的排在該分類最後）。
+        - 未送 `subtitle` 保持原值；送 `""` 清空。
         - 送出 `skus` 即 upsert：帶 `id` 的更新、不帶 `id` 的新建、
           **既有但未出現在酬載中的會被刪除**。
       security: [{ adminJWT: [] }]
@@ -4537,6 +4676,7 @@ paths:
               properties:
                 title: { type: string }
                 slug: { type: string }
+                subtitle: { type: string, maxLength: 200, description: 副標；上限 200 字元。 }
                 description: { type: string }
                 status: { type: integer, enum: [0, 1] }
                 meta: { type: object }

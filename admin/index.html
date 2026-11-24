@@ -124,6 +124,20 @@
             </div>
           </form>
         </dialog>
+
+        <!-- 分類內的商品手動排序（change product-subtitle-public-categories, design D6） -->
+        <dialog id="category-order-dialog">
+          <form id="category-order-form" method="dialog">
+            <h3 id="category-order-title">商品排序</h3>
+            <p class="hint">只列出直接屬於此分類的商品；子分類的商品會排在直接成員之後，依建立順序。前台依此順序顯示。</p>
+            <ol id="category-order-list" class="order-list"></ol>
+            <p id="category-order-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="category-order-cancel">取消</button>
+              <button type="submit" id="category-order-save" class="primary">儲存排序</button>
+            </div>
+          </form>
+        </dialog>
       </div>
 
       <!-- 商品清單 -->

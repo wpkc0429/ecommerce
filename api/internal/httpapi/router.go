@@ -247,6 +247,9 @@ func New(d Deps) http.Handler {
 				if d.Products != nil {
 					d.Products.MountPublic(sr)
 				}
+				if d.Categories != nil {
+					d.Categories.MountPublic(sr)
+				}
 				// change order-extras: the storefront needs the shop's
 				// selectable shipping methods (and their fees) before any
 				// identity exists — a guest sees the checkout total before

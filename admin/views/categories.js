@@ -41,6 +41,7 @@ export function createCategoriesView(ctx) {
       el("td", {}, c.position ?? 0),
       el("td", {},
         whenCan("category.edit", () => el("button", { onclick: () => openDialog(c) }, "編輯")),
+        whenCan("category.edit", () => el("button", { class: "category-order-btn", onclick: () => openOrder(c) }, "商品排序")),
         whenCan("category.delete", () =>
           el("button", { class: "danger", onclick: () => remove(c) }, "刪除")))),
     { empty: "尚未建立任何分類。", colspan: 6 });
@@ -105,6 +106,68 @@ export function createCategoriesView(ctx) {
       err.hidden = false;
     }
   }
+
+  // ── 分類內商品排序（design D6）：載入直接成員、上下移動、送出完整排列 ──
+  const orderState = { category: null, items: [] };
+
+  function renderOrder() {
+    const list = $("#category-order-list");
+    list.replaceChildren();
+    if (orderState.items.length === 0) {
+      list.append(el("li", { class: "hint" }, "此分類目前沒有直接關聯的商品。"));
+    }
+    orderState.items.forEach((it, i) => {
+      const move = (delta) => {
+        const j = i + delta;
+        [orderState.items[i], orderState.items[j]] = [orderState.items[j], orderState.items[i]];
+        renderOrder();
+      };
+      // el() 對非 null 值一律 setAttribute，disabled:false 仍會停用——故先建再設屬性。
+      const up = el("button", { type: "button", class: "order-up", onclick: () => move(-1) }, "↑");
+      const down = el("button", { type: "button", class: "order-down", onclick: () => move(1) }, "↓");
+      up.disabled = i === 0;
+      down.disabled = i === orderState.items.length - 1;
+      list.append(el("li", { "data-product-id": it.product_id },
+        el("span", {}, it.title),
+        it.status === 1 ? "" : el("span", { class: "badge" }, "草稿"),
+        up, down));
+    });
+    $("#category-order-save").disabled = orderState.items.length === 0;
+  }
+
+  async function openOrder(category) {
+    orderState.category = category;
+    $("#category-order-title").textContent = `商品排序：${category.name}`;
+    const box = $("#category-order-error");
+    box.hidden = true;
+    try {
+      const data = await api("GET", `/admin/shops/${ctx.getShopID()}/categories/${category.id}/product-order`);
+      orderState.items = data.products || [];
+    } catch (e) {
+      box.textContent = e.message;
+      box.hidden = false;
+      orderState.items = [];
+    }
+    renderOrder();
+    $("#category-order-dialog").showModal();
+  }
+
+  async function submitOrder(e) {
+    e.preventDefault();
+    const box = $("#category-order-error");
+    box.hidden = true;
+    try {
+      await api("PUT", `/admin/shops/${ctx.getShopID()}/categories/${orderState.category.id}/product-order`,
+        { product_ids: orderState.items.map((it) => it.product_id) });
+      $("#category-order-dialog").close();
+    } catch (err) {
+      box.textContent = err.message;
+      box.hidden = false;
+    }
+  }
+
+  $("#category-order-cancel").addEventListener("click", () => $("#category-order-dialog").close());
+  $("#category-order-form").addEventListener("submit", submitOrder);
 
   $("#new-category-btn").addEventListener("click", () => openDialog(null));
   $("#category-cancel").addEventListener("click", () => $("#category-dialog").close());

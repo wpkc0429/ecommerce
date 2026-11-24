@@ -81,6 +81,10 @@ func (Product) Fields() []ent.Field {
 		field.Int("shop_id"),
 		field.String("title").MaxLen(200).SchemaType(map[string]string{dialect.Postgres: "varchar(200)"}).NotEmpty(),
 		field.String("slug").MaxLen(200).SchemaType(map[string]string{dialect.Postgres: "varchar(200)"}).NotEmpty(),
+		// subtitle is the language-neutral second line of a product card
+		// (change product-subtitle-public-categories, D1). The 200-rune limit
+		// is enforced in the service layer (ent MaxLen counts bytes).
+		field.String("subtitle").SchemaType(map[string]string{dialect.Postgres: "varchar(200)"}).Default(""),
 		field.Text("description").Default(""),
 		field.Int16("status").Default(0),
 		field.JSON("meta", json.RawMessage{}).Default(json.RawMessage("{}")),
@@ -194,7 +198,12 @@ type ProductCategory struct {
 func (ProductCategory) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		field.ID("product_id", "category_id"),
-		entsql.Annotation{Table: "product_category"},
+		entsql.Annotation{
+			Table: "product_category",
+			Checks: map[string]string{
+				"product_category_position_check": "position >= 0",
+			},
+		},
 	}
 }
 
@@ -203,6 +212,8 @@ func (ProductCategory) Fields() []ent.Field {
 		field.Int("shop_id"),
 		field.Int("product_id"),
 		field.Int("category_id"),
+		// position orders the product inside THIS category (design D6).
+		field.Int32("position").Default(0),
 	}
 }
 
@@ -222,6 +233,6 @@ func (ProductCategory) Edges() []ent.Edge {
 
 func (ProductCategory) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("category_id"),
+		index.Fields("category_id", "position", "product_id"),
 	}
 }

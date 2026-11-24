@@ -80,6 +80,11 @@ func Slug(v string) predicate.Product {
 	return predicate.Product(sql.FieldEQ(FieldSlug, v))
 }
 
+// Subtitle applies equality check predicate on the "subtitle" field. It's identical to SubtitleEQ.
+func Subtitle(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldSubtitle, v))
+}
+
 // Description applies equality check predicate on the "description" field. It's identical to DescriptionEQ.
 func Description(v string) predicate.Product {
 	return predicate.Product(sql.FieldEQ(FieldDescription, v))
@@ -318,6 +323,71 @@ func SlugEqualFold(v string) predicate.Product {
 // SlugContainsFold applies the ContainsFold predicate on the "slug" field.
 func SlugContainsFold(v string) predicate.Product {
 	return predicate.Product(sql.FieldContainsFold(FieldSlug, v))
+}
+
+// SubtitleEQ applies the EQ predicate on the "subtitle" field.
+func SubtitleEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldEQ(FieldSubtitle, v))
+}
+
+// SubtitleNEQ applies the NEQ predicate on the "subtitle" field.
+func SubtitleNEQ(v string) predicate.Product {
+	return predicate.Product(sql.FieldNEQ(FieldSubtitle, v))
+}
+
+// SubtitleIn applies the In predicate on the "subtitle" field.
+func SubtitleIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldIn(FieldSubtitle, vs...))
+}
+
+// SubtitleNotIn applies the NotIn predicate on the "subtitle" field.
+func SubtitleNotIn(vs ...string) predicate.Product {
+	return predicate.Product(sql.FieldNotIn(FieldSubtitle, vs...))
+}
+
+// SubtitleGT applies the GT predicate on the "subtitle" field.
+func SubtitleGT(v string) predicate.Product {
+	return predicate.Product(sql.FieldGT(FieldSubtitle, v))
+}
+
+// SubtitleGTE applies the GTE predicate on the "subtitle" field.
+func SubtitleGTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldGTE(FieldSubtitle, v))
+}
+
+// SubtitleLT applies the LT predicate on the "subtitle" field.
+func SubtitleLT(v string) predicate.Product {
+	return predicate.Product(sql.FieldLT(FieldSubtitle, v))
+}
+
+// SubtitleLTE applies the LTE predicate on the "subtitle" field.
+func SubtitleLTE(v string) predicate.Product {
+	return predicate.Product(sql.FieldLTE(FieldSubtitle, v))
+}
+
+// SubtitleContains applies the Contains predicate on the "subtitle" field.
+func SubtitleContains(v string) predicate.Product {
+	return predicate.Product(sql.FieldContains(FieldSubtitle, v))
+}
+
+// SubtitleHasPrefix applies the HasPrefix predicate on the "subtitle" field.
+func SubtitleHasPrefix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasPrefix(FieldSubtitle, v))
+}
+
+// SubtitleHasSuffix applies the HasSuffix predicate on the "subtitle" field.
+func SubtitleHasSuffix(v string) predicate.Product {
+	return predicate.Product(sql.FieldHasSuffix(FieldSubtitle, v))
+}
+
+// SubtitleEqualFold applies the EqualFold predicate on the "subtitle" field.
+func SubtitleEqualFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldEqualFold(FieldSubtitle, v))
+}
+
+// SubtitleContainsFold applies the ContainsFold predicate on the "subtitle" field.
+func SubtitleContainsFold(v string) predicate.Product {
+	return predicate.Product(sql.FieldContainsFold(FieldSubtitle, v))
 }
 
 // DescriptionEQ applies the EQ predicate on the "description" field.

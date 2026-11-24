@@ -23,6 +23,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
+	entproductcategory "ksdevworks/ecommerce/api/internal/ent/productcategory"
 	entpublishablekey "ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
@@ -540,6 +541,9 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 	if err := seedDemoFloral(ctx, tx, shopID); err != nil {
 		return err
 	}
+	if err := seedDemoNewArrivals(ctx, tx, shopID); err != nil {
+		return err
+	}
 	if err := seedDemoShipping(ctx, tx, shopID); err != nil {
 		return err
 	}
@@ -732,13 +736,14 @@ func seedDemoCatalog(ctx context.Context, tx *ent.Tx, shopID int) error {
 // Keep these in step with demoTiers: changing one without the other silently
 // removes the only reason either exists.
 var demoFloralProducts = []struct {
-	Title, Slug, Description string
-	SKUPrefix                string
-	BasePrice                int64
+	Title, Slug, Subtitle, Description string
+	SKUPrefix                          string
+	BasePrice                          int64
 }{
 	{
 		Title:       "深紅｜週年束",
 		Slug:        "anniversary-bouquet",
+		Subtitle:    "Anniversary Bouquet",
 		Description: "深紅玫瑰與酒紅葉材，為紀念日而生。可附手寫卡片。",
 		SKUPrefix:   "BQ-ANNI",
 		BasePrice:   3800,
@@ -746,6 +751,7 @@ var demoFloralProducts = []struct {
 	{
 		Title:       "白日｜洋甘菊",
 		Slug:        "daisy-day-bouquet",
+		Subtitle:    "Daisy Day Bouquet",
 		Description: "洋甘菊與小花的組合，像午後的窗邊。可附手寫卡片。",
 		SKUPrefix:   "BQ-DAISY",
 		BasePrice:   3600,
@@ -808,6 +814,7 @@ func seedDemoFloral(ctx context.Context, tx *ent.Tx, shopID int) error {
 			SetShopID(shopID).
 			SetTitle(p.Title).
 			SetSlug(p.Slug).
+			SetSubtitle(p.Subtitle).
 			SetDescription(p.Description).
 			SetStatus(1).
 			Save(ctx)
@@ -835,6 +842,58 @@ func seedDemoFloral(ctx context.Context, tx *ent.Tx, shopID int) error {
 				Save(ctx); err != nil {
 				return fmt.Errorf("seed: demo sku %s: %w", code, err)
 			}
+		}
+	}
+	return nil
+}
+
+// seedDemoNewArrivals provisions the 「本季新品」 category (change
+// product-subtitle-public-categories, design D3 — a collection is a category,
+// not a flag) and puts the two floral products in it. It also backfills the
+// floral products' subtitle on databases seeded before the subtitle column
+// existed, but only where the subtitle is still empty: a value a merchant has
+// typed is theirs.
+//
+// Idempotent on its own natural keys (category slug; the (product, category)
+// pair), so a database seeded before this change picks it up on the next run.
+func seedDemoNewArrivals(ctx context.Context, tx *ent.Tx, shopID int) error {
+	const slug = "new-arrivals"
+	cat, err := tx.Category.Query().
+		Where(entcategory.ShopIDEQ(shopID), entcategory.SlugEQ(slug)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		cat, err = tx.Category.Create().SetShopID(shopID).SetName("本季新品").SetSlug(slug).Save(ctx)
+	}
+	if err != nil {
+		return fmt.Errorf("seed: demo category %s: %w", slug, err)
+	}
+	for i, p := range demoFloralProducts {
+		prod, err := tx.Product.Query().
+			Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ(p.Slug)).
+			Only(ctx)
+		if ent.IsNotFound(err) {
+			continue // floral block absent (hand-edited dev DB): nothing to link
+		}
+		if err != nil {
+			return fmt.Errorf("seed: query demo product %s: %w", p.Slug, err)
+		}
+		if prod.Subtitle == "" {
+			if _, err := prod.Update().SetSubtitle(p.Subtitle).Save(ctx); err != nil {
+				return fmt.Errorf("seed: demo subtitle %s: %w", p.Slug, err)
+			}
+		}
+		linked, err := tx.ProductCategory.Query().
+			Where(entproductcategory.ShopIDEQ(shopID), entproductcategory.ProductIDEQ(prod.ID), entproductcategory.CategoryIDEQ(cat.ID)).
+			Exist(ctx)
+		if err != nil {
+			return fmt.Errorf("seed: query demo %s link: %w", slug, err)
+		}
+		if linked {
+			continue
+		}
+		if _, err := tx.ProductCategory.Create().
+			SetShopID(shopID).SetProductID(prod.ID).SetCategoryID(cat.ID).SetPosition(int32(i)).Save(ctx); err != nil {
+			return fmt.Errorf("seed: demo %s link %s: %w", slug, p.Slug, err)
 		}
 	}
 	return nil

@@ -58,6 +58,10 @@ CategoryNode.name
 CategoryNode.parent_id
 CategoryNode.position
 CategoryNode.slug
+CategoryProductOrder.products
+CategorySummary.id
+CategorySummary.name
+CategorySummary.slug
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID}
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path originID
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
@@ -131,6 +135,9 @@ GET /api/v1/admin/shops/{shopID}/categories query flat optional
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID}
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path categoryID
+GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials
@@ -270,6 +277,9 @@ GET /api/v1/render/preview query token
 GET /api/v1/shop/cart
 GET /api/v1/shop/cart header X-Publishable-Key
 GET /api/v1/shop/cart header X-Publishable-Key optional
+GET /api/v1/shop/categories
+GET /api/v1/shop/categories header X-Publishable-Key
+GET /api/v1/shop/categories header X-Publishable-Key optional
 GET /api/v1/shop/guest/order
 GET /api/v1/shop/guest/order header X-Publishable-Key
 GET /api/v1/shop/guest/order header X-Publishable-Key optional
@@ -314,6 +324,8 @@ GET /api/v1/shop/points/transactions query page_size optional
 GET /api/v1/shop/products
 GET /api/v1/shop/products header X-Publishable-Key
 GET /api/v1/shop/products header X-Publishable-Key optional
+GET /api/v1/shop/products query category
+GET /api/v1/shop/products query category optional
 GET /api/v1/shop/products query page
 GET /api/v1/shop/products query page optional
 GET /api/v1/shop/products query page_size
@@ -514,6 +526,9 @@ PUT /api/v1/admin/shops/{shopID} path shopID
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path categoryID
+PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 PUT /api/v1/admin/shops/{shopID}/content
 PUT /api/v1/admin/shops/{shopID}/content path shopID
 PUT /api/v1/admin/shops/{shopID}/ecpay-credentials
@@ -611,6 +626,7 @@ PointTransactionPage.page
 PointTransactionPage.page_size
 PointTransactionPage.total
 PointTransactionPage.transactions
+Product.categories
 Product.category_ids
 Product.description
 Product.id
@@ -619,6 +635,7 @@ Product.shop_id
 Product.skus
 Product.slug
 Product.status
+Product.subtitle
 Product.title
 Product.updated_at
 ProductPage.page

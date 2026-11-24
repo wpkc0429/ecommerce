@@ -193,6 +193,27 @@ async function commercePath() {
   check("public list hides the deactivated method", !publicIDs.includes(inactiveMethod.id), JSON.stringify(publicIDs));
   check("public list exposes every active method", activeMethods.every((m) => publicIDs.includes(m.id)));
 
+  // change product-subtitle-public-categories: public category tree + filter.
+  const catTree = await req("GET", "/api/v1/shop/categories", { pk: PK });
+  const flatten = (nodes) => nodes.flatMap((n) => [n, ...flatten(n.children ?? [])]);
+  const treeNodes = flatten(catTree.json?.categories ?? []);
+  const newArrivals = treeNodes.find((c) => c.slug === "new-arrivals");
+  check("public category tree needs no credential and includes new-arrivals (本季新品)",
+    catTree.status === 200 && newArrivals?.name === "本季新品", brief(catTree));
+  const naList = await req("GET", "/api/v1/shop/products?category=new-arrivals", { pk: PK });
+  const naProducts = naList.json?.products ?? [];
+  check("category filter returns only products in that category",
+    naList.status === 200 && naProducts.length >= 2 &&
+      naProducts.every((p) => (p.categories ?? []).some((c) => c.slug === "new-arrivals")) &&
+      naList.json.total === naProducts.length,
+    brief(naList));
+  check("seeded floral products carry a subtitle", naProducts.every((p) => p.subtitle !== ""),
+    JSON.stringify(naProducts.map((p) => p.subtitle)));
+  const noneList = await req("GET", "/api/v1/shop/products?category=no-such-category", { pk: PK });
+  check("unknown category slug is 200 with an empty list",
+    noneList.status === 200 && (noneList.json?.products ?? []).length === 0 && noneList.json?.total === 0,
+    brief(noneList));
+
   // ── ③ 訪客路徑：結帳 → 付款 → 點數 ──
   section("③ Guest path: checkout → pay → points awarded");
   const guestEmail = `e2e-guest-${runID}@example.com`;

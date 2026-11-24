@@ -295,8 +295,16 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	// exists to prevent (design D9).
 	product := client.Product.Create().
 		SetShopID(e.shopID).SetTitle("溫室玫瑰花束").SetSlug(e.slug).
+		SetSubtitle("Greenhouse Rose Bouquet").
 		SetDescription("conformance fixture").SetStatus(1).
 		SaveX(ctx)
+	// change product-subtitle-public-categories: a category with the product in
+	// it, so the sampled product carries `categories` and the public category
+	// endpoints return a non-empty tree.
+	conformanceCat := client.Category.Create().
+		SetShopID(e.shopID).SetName("本季新品").SetSlug("new-arrivals").SaveX(ctx)
+	client.ProductCategory.Create().
+		SetShopID(e.shopID).SetProductID(product.ID).SetCategoryID(conformanceCat.ID).SaveX(ctx)
 	e.skuID = client.ProductSKU.Create().
 		SetShopID(e.shopID).SetProductID(product.ID).SetSkuCode("CONF-M").
 		SetPriceAmount(3400).SetCurrency("TWD").SetStockQty(50).SetIsActive(true).
@@ -394,6 +402,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		OrderAccessMW: NewOrderAccessMiddleware(issuer),
 		MemberAuth:    &MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: log},
 		Products:      &ProductsHandler{Client: client, Service: &catalog.Service{Client: client}, Log: log},
+		Categories:    &CategoriesHandler{Client: client, Service: &catalog.Service{Client: client}, Authz: authz, Log: log},
 		Cart:          &CartHandler{Client: client, Service: cartSvc, Log: log},
 		Orders:        &OrderHandler{Client: client, Service: orderSvc, Log: log},
 		Payments:      &PaymentHandler{Client: client, Service: paymentSvc, Log: log},
@@ -464,6 +473,17 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	code, body := e.do(t, http.MethodGet, "/api/v1/shop/products", "", nil)
 	requireStatus(t, code, http.StatusOK, body)
 	v.assertResponse(t, "/api/v1/shop/products", http.MethodGet, http.StatusOK, body)
+
+	// 依分類篩選與公開分類樹（change product-subtitle-public-categories）。
+	code, body = e.do(t, http.MethodGet, "/api/v1/shop/products?category=new-arrivals", "", nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/shop/products", http.MethodGet, http.StatusOK, body)
+	if !strings.Contains(string(body), `"categories":[{`) {
+		t.Fatalf("filtered product list should carry category summaries: %s", truncate(body))
+	}
+	code, body = e.do(t, http.MethodGet, "/api/v1/shop/categories", "", nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/shop/categories", http.MethodGet, http.StatusOK, body)
 
 	// ── ONDO 路徑 ②：單一商品 ──────────────────────────────────────────
 	code, body = e.do(t, http.MethodGet, "/api/v1/shop/products/"+e.slug, "", nil)
