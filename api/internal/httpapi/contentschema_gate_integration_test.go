@@ -63,7 +63,7 @@ func TestContentSchemaBackfillMigrationEquivalence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	for i := 0; i < 2; i++ { // second run proves idempotency
 		if _, err := db.Exec(backfill); err != nil {
 			t.Fatalf("backfill run %d: %v", i+1, err)
@@ -176,8 +176,7 @@ func TestContentSurvivesDeletingThemePages(t *testing.T) {
 	}
 
 	// Listing flags nothing as incompatible while the types are in the schema.
-	code, body, _ = e.admin1(t, "GET", e.shopPath("/pages"), nil)
-	if code != 200 {
+	if code, _, _ := e.admin1(t, "GET", e.shopPath("/pages"), nil); code != 200 {
 		t.Fatalf("list pages: %d", code)
 	}
 }
