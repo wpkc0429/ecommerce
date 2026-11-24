@@ -41,6 +41,10 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplication"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationevent"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationmessage"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationtoken"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -121,6 +125,14 @@ type Client struct {
 	Shop *ShopClient
 	// ShopAllowedOrigin is the client for interacting with the ShopAllowedOrigin builders.
 	ShopAllowedOrigin *ShopAllowedOriginClient
+	// ShopApplication is the client for interacting with the ShopApplication builders.
+	ShopApplication *ShopApplicationClient
+	// ShopApplicationEvent is the client for interacting with the ShopApplicationEvent builders.
+	ShopApplicationEvent *ShopApplicationEventClient
+	// ShopApplicationMessage is the client for interacting with the ShopApplicationMessage builders.
+	ShopApplicationMessage *ShopApplicationMessageClient
+	// ShopApplicationToken is the client for interacting with the ShopApplicationToken builders.
+	ShopApplicationToken *ShopApplicationTokenClient
 	// ShopPaymentProviderCredential is the client for interacting with the ShopPaymentProviderCredential builders.
 	ShopPaymentProviderCredential *ShopPaymentProviderCredentialClient
 	// ShopUser is the client for interacting with the ShopUser builders.
@@ -172,6 +184,10 @@ func (c *Client) init() {
 	c.ShippingMethod = NewShippingMethodClient(c.config)
 	c.Shop = NewShopClient(c.config)
 	c.ShopAllowedOrigin = NewShopAllowedOriginClient(c.config)
+	c.ShopApplication = NewShopApplicationClient(c.config)
+	c.ShopApplicationEvent = NewShopApplicationEventClient(c.config)
+	c.ShopApplicationMessage = NewShopApplicationMessageClient(c.config)
+	c.ShopApplicationToken = NewShopApplicationTokenClient(c.config)
 	c.ShopPaymentProviderCredential = NewShopPaymentProviderCredentialClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
 	c.User = NewUserClient(c.config)
@@ -299,6 +315,10 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ShippingMethod:                NewShippingMethodClient(cfg),
 		Shop:                          NewShopClient(cfg),
 		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
+		ShopApplication:               NewShopApplicationClient(cfg),
+		ShopApplicationEvent:          NewShopApplicationEventClient(cfg),
+		ShopApplicationMessage:        NewShopApplicationMessageClient(cfg),
+		ShopApplicationToken:          NewShopApplicationTokenClient(cfg),
 		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
 		ShopUser:                      NewShopUserClient(cfg),
 		User:                          NewUserClient(cfg),
@@ -353,6 +373,10 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ShippingMethod:                NewShippingMethodClient(cfg),
 		Shop:                          NewShopClient(cfg),
 		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
+		ShopApplication:               NewShopApplicationClient(cfg),
+		ShopApplicationEvent:          NewShopApplicationEventClient(cfg),
+		ShopApplicationMessage:        NewShopApplicationMessageClient(cfg),
+		ShopApplicationToken:          NewShopApplicationTokenClient(cfg),
 		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
 		ShopUser:                      NewShopUserClient(cfg),
 		User:                          NewUserClient(cfg),
@@ -393,8 +417,10 @@ func (c *Client) Use(hooks ...Hook) {
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
 		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
-		c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser,
-		c.User, c.UserPermission, c.UserRefreshToken,
+		c.Shop, c.ShopAllowedOrigin, c.ShopApplication, c.ShopApplicationEvent,
+		c.ShopApplicationMessage, c.ShopApplicationToken,
+		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -410,8 +436,10 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
 		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
-		c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser,
-		c.User, c.UserPermission, c.UserRefreshToken,
+		c.Shop, c.ShopAllowedOrigin, c.ShopApplication, c.ShopApplicationEvent,
+		c.ShopApplicationMessage, c.ShopApplicationToken,
+		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -480,6 +508,14 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Shop.mutate(ctx, m)
 	case *ShopAllowedOriginMutation:
 		return c.ShopAllowedOrigin.mutate(ctx, m)
+	case *ShopApplicationMutation:
+		return c.ShopApplication.mutate(ctx, m)
+	case *ShopApplicationEventMutation:
+		return c.ShopApplicationEvent.mutate(ctx, m)
+	case *ShopApplicationMessageMutation:
+		return c.ShopApplicationMessage.mutate(ctx, m)
+	case *ShopApplicationTokenMutation:
+		return c.ShopApplicationToken.mutate(ctx, m)
 	case *ShopPaymentProviderCredentialMutation:
 		return c.ShopPaymentProviderCredential.mutate(ctx, m)
 	case *ShopUserMutation:
@@ -5466,6 +5502,570 @@ func (c *ShopAllowedOriginClient) mutate(ctx context.Context, m *ShopAllowedOrig
 	}
 }
 
+// ShopApplicationClient is a client for the ShopApplication schema.
+type ShopApplicationClient struct {
+	config
+}
+
+// NewShopApplicationClient returns a client for the ShopApplication from the given config.
+func NewShopApplicationClient(c config) *ShopApplicationClient {
+	return &ShopApplicationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shopapplication.Hooks(f(g(h())))`.
+func (c *ShopApplicationClient) Use(hooks ...Hook) {
+	c.hooks.ShopApplication = append(c.hooks.ShopApplication, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shopapplication.Intercept(f(g(h())))`.
+func (c *ShopApplicationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopApplication = append(c.inters.ShopApplication, interceptors...)
+}
+
+// Create returns a builder for creating a ShopApplication entity.
+func (c *ShopApplicationClient) Create() *ShopApplicationCreate {
+	mutation := newShopApplicationMutation(c.config, OpCreate)
+	return &ShopApplicationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopApplication entities.
+func (c *ShopApplicationClient) CreateBulk(builders ...*ShopApplicationCreate) *ShopApplicationCreateBulk {
+	return &ShopApplicationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopApplicationClient) MapCreateBulk(slice any, setFunc func(*ShopApplicationCreate, int)) *ShopApplicationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopApplicationCreateBulk{err: fmt.Errorf("calling to ShopApplicationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopApplicationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopApplicationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopApplication.
+func (c *ShopApplicationClient) Update() *ShopApplicationUpdate {
+	mutation := newShopApplicationMutation(c.config, OpUpdate)
+	return &ShopApplicationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopApplicationClient) UpdateOne(_m *ShopApplication) *ShopApplicationUpdateOne {
+	mutation := newShopApplicationMutation(c.config, OpUpdateOne, withShopApplication(_m))
+	return &ShopApplicationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopApplicationClient) UpdateOneID(id int) *ShopApplicationUpdateOne {
+	mutation := newShopApplicationMutation(c.config, OpUpdateOne, withShopApplicationID(id))
+	return &ShopApplicationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopApplication.
+func (c *ShopApplicationClient) Delete() *ShopApplicationDelete {
+	mutation := newShopApplicationMutation(c.config, OpDelete)
+	return &ShopApplicationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopApplicationClient) DeleteOne(_m *ShopApplication) *ShopApplicationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopApplicationClient) DeleteOneID(id int) *ShopApplicationDeleteOne {
+	builder := c.Delete().Where(shopapplication.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopApplicationDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopApplication.
+func (c *ShopApplicationClient) Query() *ShopApplicationQuery {
+	return &ShopApplicationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopApplication},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopApplication entity by its id.
+func (c *ShopApplicationClient) Get(ctx context.Context, id int) (*ShopApplication, error) {
+	return c.Query().Where(shopapplication.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopApplicationClient) GetX(ctx context.Context, id int) *ShopApplication {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ShopApplicationClient) Hooks() []Hook {
+	return c.hooks.ShopApplication
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopApplicationClient) Interceptors() []Interceptor {
+	return c.inters.ShopApplication
+}
+
+func (c *ShopApplicationClient) mutate(ctx context.Context, m *ShopApplicationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopApplicationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopApplicationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopApplicationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopApplicationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopApplication mutation op: %q", m.Op())
+	}
+}
+
+// ShopApplicationEventClient is a client for the ShopApplicationEvent schema.
+type ShopApplicationEventClient struct {
+	config
+}
+
+// NewShopApplicationEventClient returns a client for the ShopApplicationEvent from the given config.
+func NewShopApplicationEventClient(c config) *ShopApplicationEventClient {
+	return &ShopApplicationEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shopapplicationevent.Hooks(f(g(h())))`.
+func (c *ShopApplicationEventClient) Use(hooks ...Hook) {
+	c.hooks.ShopApplicationEvent = append(c.hooks.ShopApplicationEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shopapplicationevent.Intercept(f(g(h())))`.
+func (c *ShopApplicationEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopApplicationEvent = append(c.inters.ShopApplicationEvent, interceptors...)
+}
+
+// Create returns a builder for creating a ShopApplicationEvent entity.
+func (c *ShopApplicationEventClient) Create() *ShopApplicationEventCreate {
+	mutation := newShopApplicationEventMutation(c.config, OpCreate)
+	return &ShopApplicationEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopApplicationEvent entities.
+func (c *ShopApplicationEventClient) CreateBulk(builders ...*ShopApplicationEventCreate) *ShopApplicationEventCreateBulk {
+	return &ShopApplicationEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopApplicationEventClient) MapCreateBulk(slice any, setFunc func(*ShopApplicationEventCreate, int)) *ShopApplicationEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopApplicationEventCreateBulk{err: fmt.Errorf("calling to ShopApplicationEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopApplicationEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopApplicationEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopApplicationEvent.
+func (c *ShopApplicationEventClient) Update() *ShopApplicationEventUpdate {
+	mutation := newShopApplicationEventMutation(c.config, OpUpdate)
+	return &ShopApplicationEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopApplicationEventClient) UpdateOne(_m *ShopApplicationEvent) *ShopApplicationEventUpdateOne {
+	mutation := newShopApplicationEventMutation(c.config, OpUpdateOne, withShopApplicationEvent(_m))
+	return &ShopApplicationEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopApplicationEventClient) UpdateOneID(id int) *ShopApplicationEventUpdateOne {
+	mutation := newShopApplicationEventMutation(c.config, OpUpdateOne, withShopApplicationEventID(id))
+	return &ShopApplicationEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopApplicationEvent.
+func (c *ShopApplicationEventClient) Delete() *ShopApplicationEventDelete {
+	mutation := newShopApplicationEventMutation(c.config, OpDelete)
+	return &ShopApplicationEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopApplicationEventClient) DeleteOne(_m *ShopApplicationEvent) *ShopApplicationEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopApplicationEventClient) DeleteOneID(id int) *ShopApplicationEventDeleteOne {
+	builder := c.Delete().Where(shopapplicationevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopApplicationEventDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopApplicationEvent.
+func (c *ShopApplicationEventClient) Query() *ShopApplicationEventQuery {
+	return &ShopApplicationEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopApplicationEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopApplicationEvent entity by its id.
+func (c *ShopApplicationEventClient) Get(ctx context.Context, id int) (*ShopApplicationEvent, error) {
+	return c.Query().Where(shopapplicationevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopApplicationEventClient) GetX(ctx context.Context, id int) *ShopApplicationEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ShopApplicationEventClient) Hooks() []Hook {
+	return c.hooks.ShopApplicationEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopApplicationEventClient) Interceptors() []Interceptor {
+	return c.inters.ShopApplicationEvent
+}
+
+func (c *ShopApplicationEventClient) mutate(ctx context.Context, m *ShopApplicationEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopApplicationEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopApplicationEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopApplicationEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopApplicationEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopApplicationEvent mutation op: %q", m.Op())
+	}
+}
+
+// ShopApplicationMessageClient is a client for the ShopApplicationMessage schema.
+type ShopApplicationMessageClient struct {
+	config
+}
+
+// NewShopApplicationMessageClient returns a client for the ShopApplicationMessage from the given config.
+func NewShopApplicationMessageClient(c config) *ShopApplicationMessageClient {
+	return &ShopApplicationMessageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shopapplicationmessage.Hooks(f(g(h())))`.
+func (c *ShopApplicationMessageClient) Use(hooks ...Hook) {
+	c.hooks.ShopApplicationMessage = append(c.hooks.ShopApplicationMessage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shopapplicationmessage.Intercept(f(g(h())))`.
+func (c *ShopApplicationMessageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopApplicationMessage = append(c.inters.ShopApplicationMessage, interceptors...)
+}
+
+// Create returns a builder for creating a ShopApplicationMessage entity.
+func (c *ShopApplicationMessageClient) Create() *ShopApplicationMessageCreate {
+	mutation := newShopApplicationMessageMutation(c.config, OpCreate)
+	return &ShopApplicationMessageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopApplicationMessage entities.
+func (c *ShopApplicationMessageClient) CreateBulk(builders ...*ShopApplicationMessageCreate) *ShopApplicationMessageCreateBulk {
+	return &ShopApplicationMessageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopApplicationMessageClient) MapCreateBulk(slice any, setFunc func(*ShopApplicationMessageCreate, int)) *ShopApplicationMessageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopApplicationMessageCreateBulk{err: fmt.Errorf("calling to ShopApplicationMessageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopApplicationMessageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopApplicationMessageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopApplicationMessage.
+func (c *ShopApplicationMessageClient) Update() *ShopApplicationMessageUpdate {
+	mutation := newShopApplicationMessageMutation(c.config, OpUpdate)
+	return &ShopApplicationMessageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopApplicationMessageClient) UpdateOne(_m *ShopApplicationMessage) *ShopApplicationMessageUpdateOne {
+	mutation := newShopApplicationMessageMutation(c.config, OpUpdateOne, withShopApplicationMessage(_m))
+	return &ShopApplicationMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopApplicationMessageClient) UpdateOneID(id int) *ShopApplicationMessageUpdateOne {
+	mutation := newShopApplicationMessageMutation(c.config, OpUpdateOne, withShopApplicationMessageID(id))
+	return &ShopApplicationMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopApplicationMessage.
+func (c *ShopApplicationMessageClient) Delete() *ShopApplicationMessageDelete {
+	mutation := newShopApplicationMessageMutation(c.config, OpDelete)
+	return &ShopApplicationMessageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopApplicationMessageClient) DeleteOne(_m *ShopApplicationMessage) *ShopApplicationMessageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopApplicationMessageClient) DeleteOneID(id int) *ShopApplicationMessageDeleteOne {
+	builder := c.Delete().Where(shopapplicationmessage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopApplicationMessageDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopApplicationMessage.
+func (c *ShopApplicationMessageClient) Query() *ShopApplicationMessageQuery {
+	return &ShopApplicationMessageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopApplicationMessage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopApplicationMessage entity by its id.
+func (c *ShopApplicationMessageClient) Get(ctx context.Context, id int) (*ShopApplicationMessage, error) {
+	return c.Query().Where(shopapplicationmessage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopApplicationMessageClient) GetX(ctx context.Context, id int) *ShopApplicationMessage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryApplication queries the application edge of a ShopApplicationMessage.
+func (c *ShopApplicationMessageClient) QueryApplication(_m *ShopApplicationMessage) *ShopApplicationQuery {
+	query := (&ShopApplicationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shopapplicationmessage.Table, shopapplicationmessage.FieldID, id),
+			sqlgraph.To(shopapplication.Table, shopapplication.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shopapplicationmessage.ApplicationTable, shopapplicationmessage.ApplicationColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShopApplicationMessageClient) Hooks() []Hook {
+	return c.hooks.ShopApplicationMessage
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopApplicationMessageClient) Interceptors() []Interceptor {
+	return c.inters.ShopApplicationMessage
+}
+
+func (c *ShopApplicationMessageClient) mutate(ctx context.Context, m *ShopApplicationMessageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopApplicationMessageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopApplicationMessageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopApplicationMessageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopApplicationMessageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopApplicationMessage mutation op: %q", m.Op())
+	}
+}
+
+// ShopApplicationTokenClient is a client for the ShopApplicationToken schema.
+type ShopApplicationTokenClient struct {
+	config
+}
+
+// NewShopApplicationTokenClient returns a client for the ShopApplicationToken from the given config.
+func NewShopApplicationTokenClient(c config) *ShopApplicationTokenClient {
+	return &ShopApplicationTokenClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `shopapplicationtoken.Hooks(f(g(h())))`.
+func (c *ShopApplicationTokenClient) Use(hooks ...Hook) {
+	c.hooks.ShopApplicationToken = append(c.hooks.ShopApplicationToken, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `shopapplicationtoken.Intercept(f(g(h())))`.
+func (c *ShopApplicationTokenClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ShopApplicationToken = append(c.inters.ShopApplicationToken, interceptors...)
+}
+
+// Create returns a builder for creating a ShopApplicationToken entity.
+func (c *ShopApplicationTokenClient) Create() *ShopApplicationTokenCreate {
+	mutation := newShopApplicationTokenMutation(c.config, OpCreate)
+	return &ShopApplicationTokenCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ShopApplicationToken entities.
+func (c *ShopApplicationTokenClient) CreateBulk(builders ...*ShopApplicationTokenCreate) *ShopApplicationTokenCreateBulk {
+	return &ShopApplicationTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ShopApplicationTokenClient) MapCreateBulk(slice any, setFunc func(*ShopApplicationTokenCreate, int)) *ShopApplicationTokenCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ShopApplicationTokenCreateBulk{err: fmt.Errorf("calling to ShopApplicationTokenClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ShopApplicationTokenCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ShopApplicationTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ShopApplicationToken.
+func (c *ShopApplicationTokenClient) Update() *ShopApplicationTokenUpdate {
+	mutation := newShopApplicationTokenMutation(c.config, OpUpdate)
+	return &ShopApplicationTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ShopApplicationTokenClient) UpdateOne(_m *ShopApplicationToken) *ShopApplicationTokenUpdateOne {
+	mutation := newShopApplicationTokenMutation(c.config, OpUpdateOne, withShopApplicationToken(_m))
+	return &ShopApplicationTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ShopApplicationTokenClient) UpdateOneID(id int) *ShopApplicationTokenUpdateOne {
+	mutation := newShopApplicationTokenMutation(c.config, OpUpdateOne, withShopApplicationTokenID(id))
+	return &ShopApplicationTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ShopApplicationToken.
+func (c *ShopApplicationTokenClient) Delete() *ShopApplicationTokenDelete {
+	mutation := newShopApplicationTokenMutation(c.config, OpDelete)
+	return &ShopApplicationTokenDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ShopApplicationTokenClient) DeleteOne(_m *ShopApplicationToken) *ShopApplicationTokenDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ShopApplicationTokenClient) DeleteOneID(id int) *ShopApplicationTokenDeleteOne {
+	builder := c.Delete().Where(shopapplicationtoken.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ShopApplicationTokenDeleteOne{builder}
+}
+
+// Query returns a query builder for ShopApplicationToken.
+func (c *ShopApplicationTokenClient) Query() *ShopApplicationTokenQuery {
+	return &ShopApplicationTokenQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeShopApplicationToken},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ShopApplicationToken entity by its id.
+func (c *ShopApplicationTokenClient) Get(ctx context.Context, id int) (*ShopApplicationToken, error) {
+	return c.Query().Where(shopapplicationtoken.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ShopApplicationTokenClient) GetX(ctx context.Context, id int) *ShopApplicationToken {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryApplication queries the application edge of a ShopApplicationToken.
+func (c *ShopApplicationTokenClient) QueryApplication(_m *ShopApplicationToken) *ShopApplicationQuery {
+	query := (&ShopApplicationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(shopapplicationtoken.Table, shopapplicationtoken.FieldID, id),
+			sqlgraph.To(shopapplication.Table, shopapplication.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, shopapplicationtoken.ApplicationTable, shopapplicationtoken.ApplicationColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ShopApplicationTokenClient) Hooks() []Hook {
+	return c.hooks.ShopApplicationToken
+}
+
+// Interceptors returns the client interceptors.
+func (c *ShopApplicationTokenClient) Interceptors() []Interceptor {
+	return c.inters.ShopApplicationToken
+}
+
+func (c *ShopApplicationTokenClient) mutate(ctx context.Context, m *ShopApplicationTokenMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ShopApplicationTokenCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ShopApplicationTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ShopApplicationTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ShopApplicationTokenDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ShopApplicationToken mutation op: %q", m.Op())
+	}
+}
+
 // ShopPaymentProviderCredentialClient is a client for the ShopPaymentProviderCredential schema.
 type ShopPaymentProviderCredentialClient struct {
 	config
@@ -6331,8 +6931,9 @@ type (
 		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
 		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, User,
-		UserPermission, UserRefreshToken []ent.Hook
+		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
+		ShopUser, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
@@ -6340,8 +6941,9 @@ type (
 		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
 		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, User,
-		UserPermission, UserRefreshToken []ent.Interceptor
+		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
+		ShopUser, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

@@ -106,7 +106,11 @@ func classifyAdminPath(path string) (adminPathKind, int) {
 //
 // Credentials are not used (Bearer tokens travel in headers), so no
 // Access-Control-Allow-Credentials is emitted.
-func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(http.Handler) http.Handler {
+func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry, opts ...CORSOption) func(http.Handler) http.Handler {
+	var co corsOptions
+	for _, o := range opts {
+		o(&co)
+	}
 	allowed := make(map[string]bool, len(allowedOrigins))
 	for _, o := range allowedOrigins {
 		allowed[strings.TrimSuffix(strings.TrimSpace(o), "/")] = true
@@ -117,7 +121,7 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 			// The platform list short-circuits first: admin/web traffic never
 			// reaches the registry lookup, and server-to-server requests carry
 			// no Origin at all.
-			if origin != "" && (allowed[origin] || registryAllows(r, registry, origin)) {
+			if origin != "" && corsAllows(r, origin, allowed, registry, co) {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Vary", "Origin")
@@ -153,6 +157,31 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// CORSOption customizes NewCORSMiddleware.
+type CORSOption func(*corsOptions)
+
+type corsOptions struct{ websiteOrigin string }
+
+// WithWebsiteOrigin names the marketing website's origin (WEBSITE_URL). It is
+// the ONLY origin granted CORS on the public application API
+// (/api/v1/public/*), and it is granted nothing anywhere else (change
+// platform-website, design D7).
+func WithWebsiteOrigin(origin string) CORSOption {
+	return func(o *corsOptions) { o.websiteOrigin = strings.TrimSuffix(strings.TrimSpace(origin), "/") }
+}
+
+const publicPrefix = "/api/v1/public/"
+
+// corsAllows decides one request. The public application API is a closed
+// world of its own: the platform's front ends and merchants' registered
+// origins get nothing there, the website gets nothing elsewhere.
+func corsAllows(r *http.Request, origin string, allowed map[string]bool, registry OriginRegistry, co corsOptions) bool {
+	if strings.HasPrefix(r.URL.Path, publicPrefix) {
+		return co.websiteOrigin != "" && origin == co.websiteOrigin
+	}
+	return allowed[origin] || registryAllows(r, registry, origin)
 }
 
 // registryAllows decides a registered (non-platform) origin by path class.

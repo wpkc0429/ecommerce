@@ -379,6 +379,7 @@ var moneyExemptions = map[string]string{
 	"/components/schemas/MemberPage/properties/total":           "pagination count",
 	"/components/schemas/AccountPage/properties/total":          "pagination count",
 	"/components/schemas/PaymentPage/properties/total":          "pagination count",
+	"/components/schemas/ShopApplicationList/properties/total":   "pagination count",
 }
 
 // **A money field this check is known NOT to see** (change

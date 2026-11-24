@@ -368,6 +368,54 @@ func (f ShopAllowedOriginFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopAllowedOriginMutation", m)
 }
 
+// The ShopApplicationFunc type is an adapter to allow the use of ordinary
+// function as ShopApplication mutator.
+type ShopApplicationFunc func(context.Context, *ent.ShopApplicationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopApplicationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopApplicationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopApplicationMutation", m)
+}
+
+// The ShopApplicationEventFunc type is an adapter to allow the use of ordinary
+// function as ShopApplicationEvent mutator.
+type ShopApplicationEventFunc func(context.Context, *ent.ShopApplicationEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopApplicationEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopApplicationEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopApplicationEventMutation", m)
+}
+
+// The ShopApplicationMessageFunc type is an adapter to allow the use of ordinary
+// function as ShopApplicationMessage mutator.
+type ShopApplicationMessageFunc func(context.Context, *ent.ShopApplicationMessageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopApplicationMessageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopApplicationMessageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopApplicationMessageMutation", m)
+}
+
+// The ShopApplicationTokenFunc type is an adapter to allow the use of ordinary
+// function as ShopApplicationToken mutator.
+type ShopApplicationTokenFunc func(context.Context, *ent.ShopApplicationTokenMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ShopApplicationTokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ShopApplicationTokenMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopApplicationTokenMutation", m)
+}
+
 // The ShopPaymentProviderCredentialFunc type is an adapter to allow the use of ordinary
 // function as ShopPaymentProviderCredential mutator.
 type ShopPaymentProviderCredentialFunc func(context.Context, *ent.ShopPaymentProviderCredentialMutation) (ent.Value, error)

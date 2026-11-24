@@ -36,6 +36,10 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplication"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationevent"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationmessage"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationtoken"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -137,6 +141,10 @@ func checkColumn(t, c string) error {
 			shippingmethod.Table:                shippingmethod.ValidColumn,
 			shop.Table:                          shop.ValidColumn,
 			shopallowedorigin.Table:             shopallowedorigin.ValidColumn,
+			shopapplication.Table:               shopapplication.ValidColumn,
+			shopapplicationevent.Table:          shopapplicationevent.ValidColumn,
+			shopapplicationmessage.Table:        shopapplicationmessage.ValidColumn,
+			shopapplicationtoken.Table:          shopapplicationtoken.ValidColumn,
 			shoppaymentprovidercredential.Table: shoppaymentprovidercredential.ValidColumn,
 			shopuser.Table:                      shopuser.ValidColumn,
 			user.Table:                          user.ValidColumn,

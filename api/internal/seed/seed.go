@@ -70,6 +70,12 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	// only by super_admin (the "*" grant); never given to a merchant role.
 	{"account.view", "檢視後台帳號與其成員資格（平台層）"},
 	{"account.manage", "建立後台帳號、指派成員資格、停用與重設密碼（平台層）"},
+	// change platform-website (design D9): reviewing merchant applications is a
+	// platform-level action held only by super_admin; never given to a merchant
+	// role (pinned by a test). Approving additionally needs shop.create and
+	// account.manage, the same as POST /admin/shop-provisioning.
+	{"shop_application.view", "檢視商家開店申請（平台層）"},
+	{"shop_application.review", "核准或拒絕商家開店申請、人工確認聯絡方式、標記訊息已寄出（平台層）"},
 	// change storefront-client-auth (design D11): allowed origins are a
 	// contested global namespace like bound domains, hence platform-scoped;
 	// publishable keys are randomly generated per shop, hence merchant-scoped

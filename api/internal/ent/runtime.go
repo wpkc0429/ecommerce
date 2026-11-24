@@ -33,6 +33,10 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplication"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationevent"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationmessage"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationtoken"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -1287,6 +1291,151 @@ func init() {
 	shopallowedoriginDescCreatedAt := shopallowedoriginFields[3].Descriptor()
 	// shopallowedorigin.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shopallowedorigin.DefaultCreatedAt = shopallowedoriginDescCreatedAt.Default.(func() time.Time)
+	shopapplicationMixin := schema.ShopApplication{}.Mixin()
+	shopapplicationMixinFields0 := shopapplicationMixin[0].Fields()
+	_ = shopapplicationMixinFields0
+	shopapplicationFields := schema.ShopApplication{}.Fields()
+	_ = shopapplicationFields
+	// shopapplicationDescCreatedAt is the schema descriptor for created_at field.
+	shopapplicationDescCreatedAt := shopapplicationMixinFields0[0].Descriptor()
+	// shopapplication.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shopapplication.DefaultCreatedAt = shopapplicationDescCreatedAt.Default.(func() time.Time)
+	// shopapplicationDescUpdatedAt is the schema descriptor for updated_at field.
+	shopapplicationDescUpdatedAt := shopapplicationMixinFields0[1].Descriptor()
+	// shopapplication.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	shopapplication.DefaultUpdatedAt = shopapplicationDescUpdatedAt.Default.(func() time.Time)
+	// shopapplication.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	shopapplication.UpdateDefaultUpdatedAt = shopapplicationDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// shopapplicationDescStatus is the schema descriptor for status field.
+	shopapplicationDescStatus := shopapplicationFields[0].Descriptor()
+	// shopapplication.DefaultStatus holds the default value on creation for the status field.
+	shopapplication.DefaultStatus = shopapplicationDescStatus.Default.(string)
+	// shopapplication.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	shopapplication.StatusValidator = shopapplicationDescStatus.Validators[0].(func(string) error)
+	// shopapplicationDescEmail is the schema descriptor for email field.
+	shopapplicationDescEmail := shopapplicationFields[1].Descriptor()
+	// shopapplication.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	shopapplication.EmailValidator = shopapplicationDescEmail.Validators[0].(func(string) error)
+	// shopapplicationDescContactName is the schema descriptor for contact_name field.
+	shopapplicationDescContactName := shopapplicationFields[3].Descriptor()
+	// shopapplication.ContactNameValidator is a validator for the "contact_name" field. It is called by the builders before save.
+	shopapplication.ContactNameValidator = shopapplicationDescContactName.Validators[0].(func(string) error)
+	// shopapplicationDescPhone is the schema descriptor for phone field.
+	shopapplicationDescPhone := shopapplicationFields[4].Descriptor()
+	// shopapplication.DefaultPhone holds the default value on creation for the phone field.
+	shopapplication.DefaultPhone = shopapplicationDescPhone.Default.(string)
+	// shopapplication.PhoneValidator is a validator for the "phone" field. It is called by the builders before save.
+	shopapplication.PhoneValidator = shopapplicationDescPhone.Validators[0].(func(string) error)
+	// shopapplicationDescShopName is the schema descriptor for shop_name field.
+	shopapplicationDescShopName := shopapplicationFields[5].Descriptor()
+	// shopapplication.ShopNameValidator is a validator for the "shop_name" field. It is called by the builders before save.
+	shopapplication.ShopNameValidator = shopapplicationDescShopName.Validators[0].(func(string) error)
+	// shopapplicationDescConsentVersion is the schema descriptor for consent_version field.
+	shopapplicationDescConsentVersion := shopapplicationFields[7].Descriptor()
+	// shopapplication.ConsentVersionValidator is a validator for the "consent_version" field. It is called by the builders before save.
+	shopapplication.ConsentVersionValidator = shopapplicationDescConsentVersion.Validators[0].(func(string) error)
+	// shopapplicationDescRiskFlags is the schema descriptor for risk_flags field.
+	shopapplicationDescRiskFlags := shopapplicationFields[9].Descriptor()
+	// shopapplication.DefaultRiskFlags holds the default value on creation for the risk_flags field.
+	shopapplication.DefaultRiskFlags = shopapplicationDescRiskFlags.Default.(map[string]bool)
+	// shopapplicationDescSubmittedIPHmac is the schema descriptor for submitted_ip_hmac field.
+	shopapplicationDescSubmittedIPHmac := shopapplicationFields[10].Descriptor()
+	// shopapplication.DefaultSubmittedIPHmac holds the default value on creation for the submitted_ip_hmac field.
+	shopapplication.DefaultSubmittedIPHmac = shopapplicationDescSubmittedIPHmac.Default.(string)
+	// shopapplication.SubmittedIPHmacValidator is a validator for the "submitted_ip_hmac" field. It is called by the builders before save.
+	shopapplication.SubmittedIPHmacValidator = shopapplicationDescSubmittedIPHmac.Validators[0].(func(string) error)
+	// shopapplicationDescDecisionReason is the schema descriptor for decision_reason field.
+	shopapplicationDescDecisionReason := shopapplicationFields[13].Descriptor()
+	// shopapplication.DefaultDecisionReason holds the default value on creation for the decision_reason field.
+	shopapplication.DefaultDecisionReason = shopapplicationDescDecisionReason.Default.(string)
+	// shopapplicationDescInternalNote is the schema descriptor for internal_note field.
+	shopapplicationDescInternalNote := shopapplicationFields[14].Descriptor()
+	// shopapplication.DefaultInternalNote holds the default value on creation for the internal_note field.
+	shopapplication.DefaultInternalNote = shopapplicationDescInternalNote.Default.(string)
+	shopapplicationeventFields := schema.ShopApplicationEvent{}.Fields()
+	_ = shopapplicationeventFields
+	// shopapplicationeventDescEvent is the schema descriptor for event field.
+	shopapplicationeventDescEvent := shopapplicationeventFields[2].Descriptor()
+	// shopapplicationevent.EventValidator is a validator for the "event" field. It is called by the builders before save.
+	shopapplicationevent.EventValidator = func() func(string) error {
+		validators := shopapplicationeventDescEvent.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(event string) error {
+			for _, fn := range fns {
+				if err := fn(event); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shopapplicationeventDescDetail is the schema descriptor for detail field.
+	shopapplicationeventDescDetail := shopapplicationeventFields[3].Descriptor()
+	// shopapplicationevent.DefaultDetail holds the default value on creation for the detail field.
+	shopapplicationevent.DefaultDetail = shopapplicationeventDescDetail.Default.(map[string]interface{})
+	// shopapplicationeventDescCreatedAt is the schema descriptor for created_at field.
+	shopapplicationeventDescCreatedAt := shopapplicationeventFields[4].Descriptor()
+	// shopapplicationevent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shopapplicationevent.DefaultCreatedAt = shopapplicationeventDescCreatedAt.Default.(func() time.Time)
+	shopapplicationmessageFields := schema.ShopApplicationMessage{}.Fields()
+	_ = shopapplicationmessageFields
+	// shopapplicationmessageDescKind is the schema descriptor for kind field.
+	shopapplicationmessageDescKind := shopapplicationmessageFields[1].Descriptor()
+	// shopapplicationmessage.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	shopapplicationmessage.KindValidator = shopapplicationmessageDescKind.Validators[0].(func(string) error)
+	// shopapplicationmessageDescRecipientEmail is the schema descriptor for recipient_email field.
+	shopapplicationmessageDescRecipientEmail := shopapplicationmessageFields[2].Descriptor()
+	// shopapplicationmessage.RecipientEmailValidator is a validator for the "recipient_email" field. It is called by the builders before save.
+	shopapplicationmessage.RecipientEmailValidator = shopapplicationmessageDescRecipientEmail.Validators[0].(func(string) error)
+	// shopapplicationmessageDescSubject is the schema descriptor for subject field.
+	shopapplicationmessageDescSubject := shopapplicationmessageFields[3].Descriptor()
+	// shopapplicationmessage.SubjectValidator is a validator for the "subject" field. It is called by the builders before save.
+	shopapplicationmessage.SubjectValidator = shopapplicationmessageDescSubject.Validators[0].(func(string) error)
+	// shopapplicationmessageDescDelivery is the schema descriptor for delivery field.
+	shopapplicationmessageDescDelivery := shopapplicationmessageFields[5].Descriptor()
+	// shopapplicationmessage.DeliveryValidator is a validator for the "delivery" field. It is called by the builders before save.
+	shopapplicationmessage.DeliveryValidator = shopapplicationmessageDescDelivery.Validators[0].(func(string) error)
+	// shopapplicationmessageDescStatus is the schema descriptor for status field.
+	shopapplicationmessageDescStatus := shopapplicationmessageFields[6].Descriptor()
+	// shopapplicationmessage.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	shopapplicationmessage.StatusValidator = shopapplicationmessageDescStatus.Validators[0].(func(string) error)
+	// shopapplicationmessageDescErrorReason is the schema descriptor for error_reason field.
+	shopapplicationmessageDescErrorReason := shopapplicationmessageFields[7].Descriptor()
+	// shopapplicationmessage.DefaultErrorReason holds the default value on creation for the error_reason field.
+	shopapplicationmessage.DefaultErrorReason = shopapplicationmessageDescErrorReason.Default.(string)
+	// shopapplicationmessage.ErrorReasonValidator is a validator for the "error_reason" field. It is called by the builders before save.
+	shopapplicationmessage.ErrorReasonValidator = shopapplicationmessageDescErrorReason.Validators[0].(func(string) error)
+	// shopapplicationmessageDescCreatedAt is the schema descriptor for created_at field.
+	shopapplicationmessageDescCreatedAt := shopapplicationmessageFields[8].Descriptor()
+	// shopapplicationmessage.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shopapplicationmessage.DefaultCreatedAt = shopapplicationmessageDescCreatedAt.Default.(func() time.Time)
+	shopapplicationtokenFields := schema.ShopApplicationToken{}.Fields()
+	_ = shopapplicationtokenFields
+	// shopapplicationtokenDescTokenHash is the schema descriptor for token_hash field.
+	shopapplicationtokenDescTokenHash := shopapplicationtokenFields[1].Descriptor()
+	// shopapplicationtoken.TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
+	shopapplicationtoken.TokenHashValidator = func() func(string) error {
+		validators := shopapplicationtokenDescTokenHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(token_hash string) error {
+			for _, fn := range fns {
+				if err := fn(token_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shopapplicationtokenDescCreatedAt is the schema descriptor for created_at field.
+	shopapplicationtokenDescCreatedAt := shopapplicationtokenFields[4].Descriptor()
+	// shopapplicationtoken.DefaultCreatedAt holds the default value on creation for the created_at field.
+	shopapplicationtoken.DefaultCreatedAt = shopapplicationtokenDescCreatedAt.Default.(func() time.Time)
 	shoppaymentprovidercredentialMixin := schema.ShopPaymentProviderCredential{}.Mixin()
 	shoppaymentprovidercredentialMixinFields0 := shoppaymentprovidercredentialMixin[0].Fields()
 	_ = shoppaymentprovidercredentialMixinFields0

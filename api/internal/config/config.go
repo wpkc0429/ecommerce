@@ -164,6 +164,14 @@ type Config struct {
 	// RateLimit carries the auth-endpoint sliding-window thresholds (design
 	// auth-rate-limiting D2/D4).
 	RateLimit RateLimitConfig
+
+	// Turnstile / WebsiteURL / Application: the public merchant application
+	// endpoint (change platform-website). WebsiteURL is the marketing site's
+	// origin: the base of e-mail verification links and the ONLY browser origin
+	// allowed (CORS) on /api/v1/public/*.
+	Turnstile   TurnstileConfig
+	WebsiteURL  string
+	Application ApplicationConfig
 }
 
 // CFAccessConfig is the Cloudflare Access verification setup (design D2).
@@ -302,6 +310,16 @@ type RateLimitConfig struct {
 	// for the correct password until the window slides past.
 	LoginAccountFailures int
 	LoginAccountWindow   time.Duration
+
+	// Public merchant application (change platform-website, design D3): per-IP
+	// broad and tight, plus per-e-mail (no IP) so rotating addresses does not
+	// help someone mail-bombing one inbox.
+	ApplicationBroadLimit  int
+	ApplicationBroadWindow time.Duration
+	ApplicationTightLimit  int
+	ApplicationTightWindow time.Duration
+	ApplicationEmailLimit  int
+	ApplicationEmailWindow time.Duration
 }
 
 // Load reads configuration from the environment. A .env file (searched in the
@@ -479,6 +497,10 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	if err := loadApplication(cfg); err != nil {
+		return nil, err
+	}
+
 	// change merchant-reports (design D1): validated at boot, in every
 	// environment. A bad value here is not a degraded feature, it is a 500 on
 	// every report of every unconfigured shop — and it is free to catch now.
@@ -498,6 +520,9 @@ func Load() (*Config, error) {
 	if !cfg.IsDevOrTest() {
 		if err := cfg.validateSecrets(); err != nil {
 			return nil, err
+		}
+		if err := cfg.validateApplication(); err != nil {
+			return nil, fmt.Errorf("config: refusing to start with APP_ENV=%q: %w", cfg.Env, err)
 		}
 	}
 	// Development fallbacks keep local bootstrapping friction-free.

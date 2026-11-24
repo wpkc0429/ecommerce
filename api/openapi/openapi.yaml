@@ -140,6 +140,10 @@ tags:
     description: 商家層媒體（上傳意圖、商品圖片、CMS 內容圖片）。
   - name: admin-rbac
     description: 商家層使用者與角色指派。
+  - name: public-application
+    description: 平台官網的公開開店申請（無認證；Cloudflare Turnstile；CORS 只放行官網 origin）。
+  - name: admin-applications
+    description: 平台層開店申請審核（`shop_application.view`／`.review`，僅 super_admin）。
 
 security: []
 
@@ -258,6 +262,12 @@ components:
       in: path
       required: true
       description: 目標商家。後台的授權判定一律以這個值為準，不看任何 payload。
+      schema: { type: integer, minimum: 1 }
+    ShopApplicationIDPath:
+      name: id
+      in: path
+      required: true
+      description: 開店申請 id。
       schema: { type: integer, minimum: 1 }
     AccountUserIDPath:
       name: userID
@@ -420,6 +430,9 @@ components:
         | 422 | `validation_failed` | 業務規則驗證失敗，`details` 帶 JSON Pointer |
         | 422 | `registration_failed` | 註冊失敗（**刻意不說明原因**：不洩漏該 email 是否已是本店顧客） |
         | 422 | `checkout_unavailable` | 訪客結帳失敗（**刻意不說明原因**：該顧客已被商家停用） |
+        | 413 | `payload_too_large` | 公開申請端點的 body 超過 16 KiB |
+        | 503 | `verification_unavailable` | Turnstile 驗證服務暫時無法判定（**不放行**；稍後重試） |
+        | 409 | `confirm_existing_account_required` | 核准申請時 owner email 已是後台帳號，需帶 `confirm_existing_account: true` |
         | 422 | `invalid_idempotency_key` | `Idempotency-Key` 不符 8–255 個可見 ASCII 字元 |
         | 422 | `idempotency_key_reused` | 同一把 `Idempotency-Key` 配上**不同的**請求（改了主體，或換了顧客／端點） |
         | 409 | `idempotency_key_in_progress` | 帶同一把 `Idempotency-Key` 的另一個請求仍在處理中，結果尚未確定。**稍後重試是安全的**（不附 `Retry-After`：那是限流專屬的標頭） |
@@ -1700,6 +1713,154 @@ components:
         storefront_origins:
           type: array
           items: { type: string }
+
+    ShopApplicationSubmit:
+      type: object
+      description: 公開申請請求。未知欄位被忽略。
+      required: [email, contact_name, shop_name, business_summary, consent_version, turnstile_token]
+      properties:
+        email: { type: string, maxLength: 254 }
+        contact_name: { type: string, minLength: 1, maxLength: 100 }
+        shop_name: { type: string, minLength: 1, maxLength: 100 }
+        phone: { type: string, maxLength: 20, pattern: '^[0-9+() -]*$' }
+        business_summary: { type: string, minLength: 1, maxLength: 1000 }
+        consent_version: { type: string, maxLength: 32, description: 必須等於 API 目前的條款版本（`APPLICATION_CONSENT_VERSION`）。 }
+        turnstile_token: { type: string, maxLength: 2048 }
+        website: { type: string, maxLength: 0, description: honeypot：真人看不到，必須為空字串或省略。 }
+        elapsed_seconds: { type: number, minimum: 0, description: 表單載入到送出的秒數；低於 3 只加審核旗標。 }
+
+    ShopApplicationReceived:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [received] }
+
+    ShopApplicationVerified:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status: { type: string, enum: [verified] }
+
+    ShopApplicationApprove:
+      type: object
+      properties:
+        shop_name: { type: string, description: 覆寫申請者填的店名。 }
+        status: { type: integer, enum: [0, 1, 2], description: 新商家的狀態；省略＝2（審核中，店面不可達）。 }
+        confirm_existing_account: { type: boolean, description: owner email 已是後台帳號時必填 true。 }
+
+    ShopApplicationReject:
+      type: object
+      required: [decision_reason]
+      properties:
+        decision_reason: { type: string, minLength: 1, maxLength: 1000, description: 對申請者可見。 }
+        internal_note: { type: string, maxLength: 2000, description: 僅內部。 }
+
+    ShopApplication:
+      type: object
+      additionalProperties: false
+      required: [id, status, email, email_verified, email_verified_at, contact_name, shop_name, risk_flags, reviewed_by, reviewed_at, provisioned_shop_id, purged, created_at]
+      properties:
+        id: { type: integer }
+        status: { type: string, enum: [pending_verification, pending_review, approved, rejected, expired, withdrawn] }
+        email: { type: string, description: 個資清除後為空字串。 }
+        email_verified: { type: boolean }
+        email_verified_at: { type: [string, "null"], format: date-time }
+        contact_name: { type: string }
+        shop_name: { type: string }
+        risk_flags:
+          type: object
+          description: 不含個資的布林旗標：`filled_too_fast`、`email_has_account`、`manually_verified`。
+          additionalProperties: { type: boolean }
+        reviewed_by: { type: [integer, "null"] }
+        reviewed_at: { type: [string, "null"], format: date-time }
+        provisioned_shop_id: { type: [integer, "null"] }
+        purged: { type: boolean, description: 個資是否已被保存期限清除。 }
+        created_at: { type: string, format: date-time }
+        phone: { type: string }
+        business_summary: { type: string }
+        consent_version: { type: string }
+        consented_at: { type: string, format: date-time }
+        decision_reason: { type: string }
+        internal_note: { type: string }
+
+    ShopApplicationList:
+      type: object
+      additionalProperties: false
+      required: [items, total, counts, pending_messages]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ShopApplication' }
+        total: { type: integer }
+        counts:
+          type: object
+          description: 全表各狀態的筆數。
+          additionalProperties: { type: integer }
+        pending_messages: { type: integer, description: 待人工寄出（`pending_manual`）或失敗（`failed`）的 outbox 訊息數。 }
+
+    ShopApplicationEvent:
+      type: object
+      additionalProperties: false
+      required: [id, event, actor_user_id, detail, created_at]
+      properties:
+        id: { type: integer }
+        event: { type: string }
+        actor_user_id: { type: [integer, "null"] }
+        detail: { type: [object, "null"], description: 不含 email、姓名、電話。 }
+        created_at: { type: string, format: date-time }
+
+    ShopApplicationMessage:
+      type: object
+      additionalProperties: false
+      required: [id, kind, recipient_email, subject, body_text, delivery, status, error_reason, created_at, sent_at, marked_by]
+      properties:
+        id: { type: integer }
+        kind: { type: string, enum: [verify_email, approved, rejected] }
+        recipient_email: { type: string }
+        subject: { type: string }
+        body_text: { type: string }
+        delivery: { type: string, enum: [manual, email] }
+        status: { type: string, enum: [pending_manual, queued, sent, failed] }
+        error_reason: { type: string }
+        created_at: { type: string, format: date-time }
+        sent_at: { type: [string, "null"], format: date-time }
+        marked_by: { type: [integer, "null"] }
+
+    ShopApplicationDetail:
+      allOf:
+        - $ref: '#/components/schemas/ShopApplication'
+        - type: object
+          required: [email_has_account, events, messages]
+          properties:
+            email_has_account: { type: boolean }
+            events:
+              type: array
+              items: { $ref: '#/components/schemas/ShopApplicationEvent' }
+            messages:
+              type: array
+              items: { $ref: '#/components/schemas/ShopApplicationMessage' }
+
+    ShopApplicationApproved:
+      type: object
+      additionalProperties: false
+      required: [application, shop, owner]
+      properties:
+        application: { $ref: '#/components/schemas/ShopApplication' }
+        shop: { $ref: '#/components/schemas/Shop' }
+        owner:
+          type: object
+          description: |
+            `created` 為 false（既有帳號被加入）時沒有 `delivery`／`setup_url`／`expires_at`，且其密碼不變。
+          required: [user_id, email, created]
+          properties:
+            user_id: { type: integer }
+            email: { type: string }
+            created: { type: boolean }
+            delivery: { type: string, enum: [manual, email] }
+            setup_url: { type: string }
+            expires_at: { type: string, format: date-time }
 
     SetupStatus:
       type: object
@@ -4034,6 +4195,312 @@ paths:
         "403": { $ref: '#/components/responses/Forbidden' }
         "409": { $ref: '#/components/responses/Conflict' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 公開：商家開店申請（平台官網） ═══════════════════════
+  /api/v1/public/shop-applications:
+    post:
+      tags: [public-application]
+      operationId: submitShopApplication
+      summary: 送出開店申請（未認證）
+      description: |
+        平台官網（零建置靜態站，獨立 repo）的申請表單呼叫這一條。**無認證、無租戶解析**；
+        CORS 只放行 `WEBSITE_URL` 這一個 origin（其他 origin 與其他 API 面都拿不到）。
+
+        **通過驗證的請求一律回 `202 {"status":"received"}`，位元組逐一相同**——無論 email 是新的、
+        已有未完成申請、位於 30 天再申請冷卻期、或已是後台帳號；回應內容與狀態碼無法讓人分辨這些情況
+        （沒有使用者列舉）。差異只在伺服器內部：新的才建立申請並寄出（或寫入 outbox）驗證信。
+
+        **防濫用（依序）**：body ≤ 16 KiB（413）→ 每 IP 限流（429）→ honeypot `website` 必須為空（422）
+        → 欄位驗證（422）→ Cloudflare Turnstile（無效 422；服務故障 503，**不放行**）→ 每 email 限流
+        （不含 IP，429）→ 全站每日上限（429）。429 都附 `Retry-After`。
+
+        欄位驗證只取決於請求本身：`email` 必須是合法位址（≤ 254）；`contact_name`、`shop_name` 1–100 字；
+        `phone` 選填，只允許數字與 `+-() `，≤ 20；`business_summary` 1–1000 字；`consent_version` 必須等於
+        API 目前的條款版本；含換行等控制字元的 `contact_name` 被拒絕，`shop_name` 的控制字元被移除。
+        未知欄位忽略。`elapsed_seconds`（選填，表單載入到送出的秒數）低於 3 秒只會讓審核畫面多一個旗標，不拒絕。
+
+        Email 驗證：驗證連結為 `{WEBSITE_URL}/apply/verify#<token>`（token 在 fragment），官網頁面讀出後呼叫
+        `POST /api/v1/public/shop-applications/verify`。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShopApplicationSubmit' }
+            examples:
+              typical:
+                summary: 典型請求（Turnstile 測試金鑰產生的 token 是 `XXXX.DUMMY.TOKEN.XXXX`）
+                value:
+                  email: owner@example.com
+                  contact_name: 王小明
+                  phone: "0912-345-678"
+                  shop_name: 小明花坊
+                  business_summary: 我們販售手作乾燥花束與花藝課程。
+                  consent_version: placeholder-v0
+                  turnstile_token: XXXX.DUMMY.TOKEN.XXXX
+                  website: ""
+                  elapsed_seconds: 42.5
+      responses:
+        "202":
+          description: |
+            已收到。**所有通過驗證的請求（新的、重複、冷卻中、已是帳號）都是這個完全相同的回應**。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplicationReceived' }
+              examples:
+                received: { value: { status: received } }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "413":
+          description: body 超過 16 KiB。`code = payload_too_large`。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "422":
+          description: |
+            `code = validation_failed`；`details` 的 JSON Pointer 之一：`/email`、`/contact_name`、`/shop_name`、
+            `/phone`、`/business_summary`、`/consent_version`、`/website`（honeypot 被填）、
+            `/turnstile_token`（驗證失敗，可重新取得 token 再送）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                consent:
+                  summary: 條款版本不符
+                  value:
+                    error:
+                      code: validation_failed
+                      message: must equal the current terms version
+                      details: [{ pointer: /consent_version, message: must equal the current terms version }]
+                turnstile:
+                  summary: Turnstile 驗證失敗
+                  value:
+                    error:
+                      code: validation_failed
+                      message: verification failed
+                      details: [{ pointer: /turnstile_token, message: "verification failed, please retry" }]
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503":
+          description: Turnstile 驗證服務無法判定（逾時、5xx 或伺服器端設定錯誤）。`code = verification_unavailable`；不建立任何資料。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /api/v1/public/shop-applications/verify:
+    post:
+      tags: [public-application]
+      operationId: verifyShopApplication
+      summary: 以信中連結的 token 驗證申請信箱（未認證）
+      description: |
+        消費驗證 token（32 bytes 隨機、DB 只存 SHA-256、24 小時有效、單次、原子消費；同一申請重新簽發會使舊 token
+        失效）。成功把申請由 `pending_verification` 轉為 `pending_review`（才可被審核端核准）。
+
+        **無效、過期、已使用、未知一律回同一個 404**，無法分辨。token 在連結的 fragment 裡，官網頁面讀出後立刻
+        `history.replaceState` 清掉，再呼叫本端點。每 IP 限流。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, maxLength: 256 }
+            examples:
+              token: { value: { token: "k3xJ9...(43 chars)" } }
+      responses:
+        "200":
+          description: 已驗證。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplicationVerified' }
+              examples:
+                verified: { value: { status: verified } }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "413":
+          description: body 過大。`code = payload_too_large`。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  # ═══════════════════════ 平台層：開店申請審核 ═══════════════════════
+  /api/v1/admin/shop-applications:
+    get:
+      tags: [admin-applications]
+      operationId: listShopApplications
+      summary: 申請列表（新到舊）
+      description: |
+        需要平台層 `shop_application.view`。`status` 篩選（`pending_verification`｜`pending_review`｜`approved`｜
+        `rejected`｜`expired`｜`withdrawn`），`q` 對 email／店名／聯絡人做不分大小寫的子字串比對。
+        回應另帶全表的狀態計數 `counts` 與待人工處理的 outbox 訊息數 `pending_messages`（後台徽章用）。
+        列表列不含自由文字欄位（商業摘要等），詳情才有。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 申請列表。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplicationList' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shop-applications/{id}:
+    parameters:
+      - $ref: '#/components/parameters/ShopApplicationIDPath'
+    get:
+      tags: [admin-applications]
+      operationId: getShopApplication
+      summary: 申請詳情（含稽核時間線與 outbox 訊息）
+      description: |
+        需要平台層 `shop_application.view`。含 `email_has_account`（即時查詢：owner email 目前是否已是後台帳號）、
+        `events`（稽核時間線，`detail` 不含個資）、`messages`（outbox：待人工寄出的訊息含收件人與內文，可複製）。
+        不回傳來源 IP 的 HMAC。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 申請詳情。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplicationDetail' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shop-applications/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ShopApplicationIDPath'
+    post:
+      tags: [admin-applications]
+      operationId: approveShopApplication
+      summary: 核准並一次開店
+      description: |
+        需要平台層 `shop_application.review`，**另需**與 `POST /admin/shop-provisioning` 相同的 `shop.create` ＋
+        `account.manage`（缺任一 → 403）。
+
+        **單一資料庫交易**：條件式把申請由 `pending_review` 轉為 `approved`（且 email 已驗證）→ 開店服務建立商家
+        （預設 `status` 2＝審核中，店面不可達）、owner、**不帶主題與網域** → 寫入 `provisioned_shop_id` 與稽核事件。任何一步失敗整筆回滾，
+        申請維持 `pending_review` 並追記 `approve_failed` 事件。
+
+        - 未驗證 email、非 `pending_review`、重複核准 → **409**。
+        - owner email 已是後台帳號 → **409 `confirm_existing_account_required`**，須帶 `confirm_existing_account: true`；
+          確認後該帳號只會被**加入成員資格**，**密碼與憑證完全不動**，回應沒有 `setup_url`。
+        - 新帳號：`owner` 一次性帶回 `delivery: "manual"` 與 `setup_url`（72 小時有效）。**這個連結不寫入任何訊息列或稽核事件**，
+          也不會再顯示——操作員當場複製並以其他管道交給申請者。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShopApplicationApprove' }
+            examples:
+              default: { value: {} }
+              override: { value: { shop_name: 小明花坊, status: 2, confirm_existing_account: false } }
+      responses:
+        "201":
+          description: 已核准並開店。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplicationApproved' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shop-applications/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/ShopApplicationIDPath'
+    post:
+      tags: [admin-applications]
+      operationId: rejectShopApplication
+      summary: 拒絕（理由對申請者可見）
+      description: |
+        需要平台層 `shop_application.review`。`decision_reason` 必填（≤ 1000 字）並**對申請者可見**（寫入通知訊息）；
+        `internal_note` 僅內部。只能拒絕 `pending_verification`／`pending_review`；已核准或已拒絕 → 409。
+        被拒絕的 email 在 `APPLICATION_REAPPLY_COOLDOWN`（預設 30 天）內再申請，會得到相同的 202 但不建立新申請。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShopApplicationReject' }
+            examples:
+              reject: { value: { decision_reason: 商品說明不足，請補充後重新申請, internal_note: 疑似轉賣帳號 } }
+      responses:
+        "200":
+          description: 已拒絕。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplication' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shop-applications/{id}/verify-manually:
+    parameters:
+      - $ref: '#/components/parameters/ShopApplicationIDPath'
+    post:
+      tags: [admin-applications]
+      operationId: verifyShopApplicationManually
+      summary: 人工確認聯絡方式（信件無法送達時的後備）
+      description: |
+        需要平台層 `shop_application.review`。把 `pending_verification` 直接轉為 `pending_review`，記稽核事件
+        `verified_manually` 與風險旗標 `manually_verified`。其他狀態 → 409。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已確認。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ShopApplication' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shop-applications/{id}/messages/{mid}/mark-sent:
+    parameters:
+      - $ref: '#/components/parameters/ShopApplicationIDPath'
+      - name: mid
+        in: path
+        required: true
+        description: outbox 訊息 id。
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [admin-applications]
+      operationId: markShopApplicationMessageSent
+      summary: 標記 outbox 訊息已由人工寄出
+      description: |
+        需要平台層 `shop_application.review`。把 `pending_manual`／`queued`／`failed` 的訊息標為 `sent`
+        （記錄操作者與時間、寫入稽核事件）。已是 `sent` → 409；訊息不屬於該申請 → 404。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已標記。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, status]
+                properties:
+                  id: { type: integer }
+                  status: { type: string, enum: [sent] }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
 
   /api/v1/admin/shops/{shopID}/setup-status:
     parameters:

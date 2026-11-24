@@ -1172,6 +1172,148 @@ var (
 			},
 		},
 	}
+	// ShopApplicationsColumns holds the columns for the "shop_applications" table.
+	ShopApplicationsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeString, Size: 24, Default: "pending_verification", SchemaType: map[string]string{"postgres": "varchar(24)"}},
+		{Name: "email", Type: field.TypeString, Size: 254, SchemaType: map[string]string{"postgres": "varchar(254)"}},
+		{Name: "email_verified_at", Type: field.TypeTime, Nullable: true},
+		{Name: "contact_name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "phone", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "shop_name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "business_summary", Type: field.TypeString, Size: 2147483647},
+		{Name: "consent_version", Type: field.TypeString, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
+		{Name: "consented_at", Type: field.TypeTime},
+		{Name: "risk_flags", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "submitted_ip_hmac", Type: field.TypeString, Size: 64, Default: "", SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "reviewed_by", Type: field.TypeInt, Nullable: true},
+		{Name: "reviewed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "decision_reason", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "internal_note", Type: field.TypeString, Size: 2147483647, Default: ""},
+		{Name: "provisioned_shop_id", Type: field.TypeInt, Unique: true, Nullable: true},
+		{Name: "purged_at", Type: field.TypeTime, Nullable: true},
+	}
+	// ShopApplicationsTable holds the schema information for the "shop_applications" table.
+	ShopApplicationsTable = &schema.Table{
+		Name:       "shop_applications",
+		Columns:    ShopApplicationsColumns,
+		PrimaryKey: []*schema.Column{ShopApplicationsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shopapplication_email_open_key",
+				Unique:  true,
+				Columns: []*schema.Column{ShopApplicationsColumns[4]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('pending_verification', 'pending_review')",
+				},
+			},
+			{
+				Name:    "shopapplication_status_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationsColumns[3], ShopApplicationsColumns[1]},
+			},
+			{
+				Name:    "shopapplication_email_status",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationsColumns[4], ShopApplicationsColumns[3]},
+			},
+		},
+	}
+	// ShopApplicationEventsColumns holds the columns for the "shop_application_events" table.
+	ShopApplicationEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "application_id", Type: field.TypeInt},
+		{Name: "actor_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "event", Type: field.TypeString, Size: 32, SchemaType: map[string]string{"postgres": "varchar(32)"}},
+		{Name: "detail", Type: field.TypeJSON, Nullable: true, SchemaType: map[string]string{"postgres": "jsonb"}},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ShopApplicationEventsTable holds the schema information for the "shop_application_events" table.
+	ShopApplicationEventsTable = &schema.Table{
+		Name:       "shop_application_events",
+		Columns:    ShopApplicationEventsColumns,
+		PrimaryKey: []*schema.Column{ShopApplicationEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shopapplicationevent_application_id_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationEventsColumns[1], ShopApplicationEventsColumns[0]},
+			},
+		},
+	}
+	// ShopApplicationMessagesColumns holds the columns for the "shop_application_messages" table.
+	ShopApplicationMessagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "kind", Type: field.TypeString, Size: 24, SchemaType: map[string]string{"postgres": "varchar(24)"}},
+		{Name: "recipient_email", Type: field.TypeString, Size: 254, SchemaType: map[string]string{"postgres": "varchar(254)"}},
+		{Name: "subject", Type: field.TypeString, Size: 200, SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "body_text", Type: field.TypeString, Size: 2147483647},
+		{Name: "delivery", Type: field.TypeString, Size: 8, SchemaType: map[string]string{"postgres": "varchar(8)"}},
+		{Name: "status", Type: field.TypeString, Size: 16, SchemaType: map[string]string{"postgres": "varchar(16)"}},
+		{Name: "error_reason", Type: field.TypeString, Size: 200, Default: "", SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "sent_at", Type: field.TypeTime, Nullable: true},
+		{Name: "marked_by", Type: field.TypeInt, Nullable: true},
+		{Name: "application_id", Type: field.TypeInt},
+	}
+	// ShopApplicationMessagesTable holds the schema information for the "shop_application_messages" table.
+	ShopApplicationMessagesTable = &schema.Table{
+		Name:       "shop_application_messages",
+		Columns:    ShopApplicationMessagesColumns,
+		PrimaryKey: []*schema.Column{ShopApplicationMessagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shop_application_messages_shop_applications_application",
+				Columns:    []*schema.Column{ShopApplicationMessagesColumns[11]},
+				RefColumns: []*schema.Column{ShopApplicationsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shopapplicationmessage_status_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationMessagesColumns[6], ShopApplicationMessagesColumns[0]},
+			},
+			{
+				Name:    "shopapplicationmessage_application_id_id",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationMessagesColumns[11], ShopApplicationMessagesColumns[0]},
+			},
+		},
+	}
+	// ShopApplicationTokensColumns holds the columns for the "shop_application_tokens" table.
+	ShopApplicationTokensColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "token_hash", Type: field.TypeString, Unique: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "application_id", Type: field.TypeInt},
+	}
+	// ShopApplicationTokensTable holds the schema information for the "shop_application_tokens" table.
+	ShopApplicationTokensTable = &schema.Table{
+		Name:       "shop_application_tokens",
+		Columns:    ShopApplicationTokensColumns,
+		PrimaryKey: []*schema.Column{ShopApplicationTokensColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "shop_application_tokens_shop_applications_application",
+				Columns:    []*schema.Column{ShopApplicationTokensColumns[5]},
+				RefColumns: []*schema.Column{ShopApplicationsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "shopapplicationtoken_application_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ShopApplicationTokensColumns[5], ShopApplicationTokensColumns[4]},
+			},
+		},
+	}
 	// ShopPaymentProviderCredentialsColumns holds the columns for the "shop_payment_provider_credentials" table.
 	ShopPaymentProviderCredentialsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1365,6 +1507,10 @@ var (
 		ShippingMethodsTable,
 		ShopsTable,
 		ShopAllowedOriginsTable,
+		ShopApplicationsTable,
+		ShopApplicationEventsTable,
+		ShopApplicationMessagesTable,
+		ShopApplicationTokensTable,
 		ShopPaymentProviderCredentialsTable,
 		ShopUserTable,
 		UsersTable,
@@ -1575,6 +1721,31 @@ func init() {
 	}
 	ShopAllowedOriginsTable.Annotation.Checks = map[string]string{
 		"shop_allowed_origins_purpose_check": "purpose IN ('storefront', 'admin')",
+	}
+	ShopApplicationsTable.Annotation = &entsql.Annotation{
+		Table: "shop_applications",
+	}
+	ShopApplicationsTable.Annotation.Checks = map[string]string{
+		"shop_applications_status_check": "status IN ('pending_verification', 'pending_review', 'approved', 'rejected', 'expired', 'withdrawn')",
+	}
+	ShopApplicationEventsTable.Annotation = &entsql.Annotation{
+		Table: "shop_application_events",
+	}
+	ShopApplicationEventsTable.Annotation.Checks = map[string]string{
+		"shop_application_events_event_check": "event IN ('submitted', 'verification_sent', 'verified', 'verified_manually', 'approved', 'approve_failed', 'rejected', 'note', 'message_marked_sent', 'expired', 'purged')",
+	}
+	ShopApplicationMessagesTable.ForeignKeys[0].RefTable = ShopApplicationsTable
+	ShopApplicationMessagesTable.Annotation = &entsql.Annotation{
+		Table: "shop_application_messages",
+	}
+	ShopApplicationMessagesTable.Annotation.Checks = map[string]string{
+		"shop_application_messages_delivery_check": "delivery IN ('manual', 'email')",
+		"shop_application_messages_kind_check":     "kind IN ('verify_email', 'approved', 'rejected')",
+		"shop_application_messages_status_check":   "status IN ('pending_manual', 'queued', 'sent', 'failed')",
+	}
+	ShopApplicationTokensTable.ForeignKeys[0].RefTable = ShopApplicationsTable
+	ShopApplicationTokensTable.Annotation = &entsql.Annotation{
+		Table: "shop_application_tokens",
 	}
 	ShopPaymentProviderCredentialsTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopPaymentProviderCredentialsTable.Annotation = &entsql.Annotation{

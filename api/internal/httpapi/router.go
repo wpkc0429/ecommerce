@@ -95,6 +95,15 @@ type Deps struct {
 	// unauthenticated invitation endpoints reuse AdminPasswordSetupRateLimit
 	// (change merchant-staff-role).
 	AdminInviteRateLimit func(http.Handler) http.Handler
+
+	// change platform-website: the public (unauthenticated) merchant application
+	// intake, and its operator review in the platform admin.
+	ApplicationsPublic *ApplicationsPublicHandler
+	Applications       *ApplicationsHandler
+	// ApplicationRateLimit / ApplicationVerifyRateLimit: per-IP limits of the
+	// public submit and verify routes (design D3).
+	ApplicationRateLimit       func(http.Handler) http.Handler
+	ApplicationVerifyRateLimit func(http.Handler) http.Handler
 }
 
 // New assembles the full router.
@@ -117,8 +126,12 @@ func New(d Deps) http.Handler {
 	if d.Cfg != nil {
 		corsOrigins = d.Cfg.CORSAllowedOrigins
 	}
-	if len(corsOrigins) > 0 || d.CORSOrigins != nil {
-		r.Use(NewCORSMiddleware(corsOrigins, d.CORSOrigins))
+	var websiteURL string
+	if d.Cfg != nil {
+		websiteURL = d.Cfg.WebsiteURL
+	}
+	if len(corsOrigins) > 0 || d.CORSOrigins != nil || websiteURL != "" {
+		r.Use(NewCORSMiddleware(corsOrigins, d.CORSOrigins, WithWebsiteOrigin(websiteURL)))
 	}
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -237,9 +250,21 @@ func New(d Deps) http.Handler {
 					if d.Team != nil {
 						d.Team.MountAdmin(pr)
 					}
+					if d.Applications != nil {
+						d.Applications.MountPlatform(pr)
+					}
 				})
 			}
 		})
+
+		// ── Public, unauthenticated APIs (change platform-website) ──────
+		// No tenant, member or admin middleware: the caller is an anonymous
+		// browser on the marketing website. CORS is granted to that one origin.
+		if d.ApplicationsPublic != nil {
+			v1.Route("/public", func(pr chi.Router) {
+				d.ApplicationsPublic.MountPublic(pr, d.ApplicationRateLimit, d.ApplicationVerifyRateLimit)
+			})
+		}
 
 		// ── Storefront member APIs + public catalog (tenant context
 		// required) ─────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"ksdevworks/ecommerce/api/internal/account"
+	"ksdevworks/ecommerce/api/internal/application"
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/catalog"
@@ -37,6 +38,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/report"
 	"ksdevworks/ecommerce/api/internal/shipping"
 	"ksdevworks/ecommerce/api/internal/tenant"
+	"ksdevworks/ecommerce/api/internal/turnstile"
 )
 
 // wire connects infrastructure (PostgreSQL, Redis) and attaches domain
@@ -202,6 +204,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Service: &content.SchemaService{Client: client, Dispatcher: dispatcher, Log: a.log},
 		Authz:   authz, Limiter: limiter, Log: a.log,
 	}
+
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 
 	// Product catalog (change product-catalog): no cache/events involved
@@ -263,6 +266,51 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// Drains whatever the workers already accepted; a no-op when disabled.
 	a.closers = append(a.closers, notifier.Close)
 	dispatcher.Subscribe(notifier.Handle)
+
+	// Merchant applications (change platform-website). The public intake is
+	// unauthenticated and sits outside every tenant/admin middleware; the review
+	// side is platform-level behind RBAC. Both are always constructed (the route
+	// table never depends on settings): the Turnstile verifier is the real one
+	// when a secret is configured, the no-network dev verifier otherwise (config
+	// refuses a production boot without a secret), and the Notifier is the SMTP
+	// one only when SMTP credentials exist — the outbox is the always-available
+	// fallback an operator works by hand.
+	var turnstileVerifier turnstile.Verifier = turnstile.DevVerifier{}
+	if cfg.Turnstile.SecretKey != "" {
+		turnstileVerifier = turnstile.NewHTTPVerifier(cfg.Turnstile.SecretKey, cfg.Turnstile.VerifyURL)
+	} else {
+		a.log.Warn("TURNSTILE_SECRET_KEY not set - accepting only Cloudflare's dummy test token (development/test only)")
+	}
+	var appNotifier application.Notifier = application.OutboxNotifier{}
+	if cfg.SMTP.Enabled() {
+		smtpNotifier := &application.SMTPNotifier{
+			Client: client, Sender: mailSender, Log: a.log, Timeout: cfg.SMTP.Timeout,
+		}
+		smtpNotifier.Start()
+		a.closers = append(a.closers, func() error { smtpNotifier.Close(); return nil })
+		appNotifier = smtpNotifier
+	} else {
+		a.log.Info("SMTP not configured - merchant application messages go to the manual outbox (platform admin)")
+	}
+	ipKey := hmac.New(sha256.New, []byte(cfg.AdminJWTSecret))
+	_, _ = ipKey.Write([]byte("application-ip-hmac-v1"))
+	applicationService := &application.Service{
+		Client: client, Notifier: appNotifier, Log: a.log, Now: time.Now,
+		Provision: deps.Provisioning.Service,
+		Cfg: application.Config{
+			WebsiteURL: cfg.WebsiteURL, ConsentVersion: cfg.Application.ConsentVersion,
+			ReapplyCooldown: cfg.Application.ReapplyCooldown, DailyCap: cfg.Application.DailyCap,
+			RejectedRetention: cfg.Application.RejectedRetention, ApprovedRetention: cfg.Application.ApprovedRetention,
+			IPKey: ipKey.Sum(nil),
+		},
+	}
+	deps.ApplicationsPublic = &httpapi.ApplicationsPublicHandler{
+		Service: applicationService, Turnstile: turnstileVerifier, Limiter: limiter,
+		EmailLimit: cfg.RateLimit.ApplicationEmailLimit, EmailWindow: cfg.RateLimit.ApplicationEmailWindow, Log: a.log,
+	}
+	deps.ApplicationRateLimit = httpapi.NewApplicationRateLimit(limiter, cfg.RateLimit)
+	deps.ApplicationVerifyRateLimit = httpapi.NewApplicationVerifyRateLimit(limiter, cfg.RateLimit)
+	deps.Applications = &httpapi.ApplicationsHandler{Service: applicationService, Engine: engine, Authz: authz, Log: a.log}
 
 	// Order management (change order-management): checkout consumes the
 	// active cart directly via ent (design D9); member routes are RBAC-free

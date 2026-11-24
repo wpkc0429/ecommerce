@@ -521,7 +521,9 @@ func TestSeedAccountNodesBelongToSuperAdminOnly(t *testing.T) {
 	ctx := context.Background()
 	runDemoSeed(t, client)
 
-	for _, name := range []string{"account.view", "account.manage"} {
+	// change platform-website (design D9): the application review nodes follow
+	// the same rule.
+	for _, name := range []string{"account.view", "account.manage", "shop_application.view", "shop_application.review"} {
 		node, err := client.Permission.Query().Where(entpermission.NameEQ(name)).Only(ctx)
 		if err != nil {
 			t.Fatalf("%s must be in the permission catalog: %v", name, err)

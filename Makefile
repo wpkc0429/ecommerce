@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content admin-dev openapi openapi-mock openapi-ui
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -64,6 +64,9 @@ seed-demo: ## Seed everything plus a demo shop (publishable key pk_demoseedstore
 
 sanitize-content: ## DRY RUN: report CMS rich text that needs re-sanitizing (writes nothing; add -apply manually)
 	cd api && go run ./cmd/sanitize-content
+
+purge-applications: ## DRY RUN: report merchant applications past their retention (writes nothing; add -apply manually)
+	cd api && go run ./cmd/purge-applications
 
 admin-dev: ## Run the admin SPA dev server
 	cd admin && npm run dev

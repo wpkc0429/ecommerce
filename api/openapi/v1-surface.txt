@@ -194,6 +194,17 @@ GET /api/v1/admin/me
 GET /api/v1/admin/media/config
 GET /api/v1/admin/permissions
 GET /api/v1/admin/roles
+GET /api/v1/admin/shop-applications
+GET /api/v1/admin/shop-applications query page
+GET /api/v1/admin/shop-applications query page optional
+GET /api/v1/admin/shop-applications query page_size
+GET /api/v1/admin/shop-applications query page_size optional
+GET /api/v1/admin/shop-applications query q
+GET /api/v1/admin/shop-applications query q optional
+GET /api/v1/admin/shop-applications query status
+GET /api/v1/admin/shop-applications query status optional
+GET /api/v1/admin/shop-applications/{id}
+GET /api/v1/admin/shop-applications/{id} path id
 GET /api/v1/admin/shops
 GET /api/v1/admin/shops query page
 GET /api/v1/admin/shops query page optional
@@ -563,6 +574,15 @@ POST /api/v1/admin/auth/refresh response 429 Retry-After
 POST /api/v1/admin/invitations/accept
 POST /api/v1/admin/permissions
 POST /api/v1/admin/roles
+POST /api/v1/admin/shop-applications/{id}/approve
+POST /api/v1/admin/shop-applications/{id}/approve path id
+POST /api/v1/admin/shop-applications/{id}/messages/{mid}/mark-sent
+POST /api/v1/admin/shop-applications/{id}/messages/{mid}/mark-sent path id
+POST /api/v1/admin/shop-applications/{id}/messages/{mid}/mark-sent path mid
+POST /api/v1/admin/shop-applications/{id}/reject
+POST /api/v1/admin/shop-applications/{id}/reject path id
+POST /api/v1/admin/shop-applications/{id}/verify-manually
+POST /api/v1/admin/shop-applications/{id}/verify-manually path id
 POST /api/v1/admin/shop-provisioning
 POST /api/v1/admin/shops
 POST /api/v1/admin/shops/{shopID}/allowed-origins
@@ -615,6 +635,10 @@ POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path userID
 POST /api/v1/admin/users/{userID}/roles
 POST /api/v1/admin/users/{userID}/roles path userID
+POST /api/v1/public/shop-applications
+POST /api/v1/public/shop-applications response 429 Retry-After
+POST /api/v1/public/shop-applications/verify
+POST /api/v1/public/shop-applications/verify response 429 Retry-After
 POST /api/v1/shop/auth/login
 POST /api/v1/shop/auth/login header X-Publishable-Key
 POST /api/v1/shop/auth/login header X-Publishable-Key optional
@@ -920,6 +944,64 @@ Shop.meta
 Shop.name
 Shop.status
 Shop.updated_at
+ShopApplication.business_summary
+ShopApplication.consent_version
+ShopApplication.consented_at
+ShopApplication.contact_name
+ShopApplication.created_at
+ShopApplication.decision_reason
+ShopApplication.email
+ShopApplication.email_verified
+ShopApplication.email_verified_at
+ShopApplication.id
+ShopApplication.internal_note
+ShopApplication.phone
+ShopApplication.provisioned_shop_id
+ShopApplication.purged
+ShopApplication.reviewed_at
+ShopApplication.reviewed_by
+ShopApplication.risk_flags
+ShopApplication.shop_name
+ShopApplication.status
+ShopApplicationApprove.confirm_existing_account
+ShopApplicationApprove.shop_name
+ShopApplicationApprove.status
+ShopApplicationApproved.application
+ShopApplicationApproved.owner
+ShopApplicationApproved.shop
+ShopApplicationEvent.actor_user_id
+ShopApplicationEvent.created_at
+ShopApplicationEvent.detail
+ShopApplicationEvent.event
+ShopApplicationEvent.id
+ShopApplicationList.counts
+ShopApplicationList.items
+ShopApplicationList.pending_messages
+ShopApplicationList.total
+ShopApplicationMessage.body_text
+ShopApplicationMessage.created_at
+ShopApplicationMessage.delivery
+ShopApplicationMessage.error_reason
+ShopApplicationMessage.id
+ShopApplicationMessage.kind
+ShopApplicationMessage.marked_by
+ShopApplicationMessage.recipient_email
+ShopApplicationMessage.sent_at
+ShopApplicationMessage.status
+ShopApplicationMessage.subject
+ShopApplicationReceived.status
+ShopApplicationReject.decision_reason
+ShopApplicationReject.internal_note
+ShopApplicationSubmit.business_summary
+ShopApplicationSubmit.consent_version
+ShopApplicationSubmit.contact_name
+ShopApplicationSubmit.elapsed_seconds
+ShopApplicationSubmit.email
+ShopApplicationSubmit.phone
+ShopApplicationSubmit.shop_name
+ShopApplicationSubmit.turnstile_token
+ShopApplicationSubmit.website
+ShopApplicationVerified.status
 ShopPage.page
 ShopPage.page_size
 ShopPage.shops

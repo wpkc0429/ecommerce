@@ -38,6 +38,10 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplication"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationevent"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationmessage"
+	"ksdevworks/ecommerce/api/internal/ent/shopapplicationtoken"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -913,6 +917,114 @@ func (f TraverseShopAllowedOrigin) Traverse(ctx context.Context, q ent.Query) er
 	return fmt.Errorf("unexpected query type %T. expect *ent.ShopAllowedOriginQuery", q)
 }
 
+// The ShopApplicationFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShopApplicationFunc func(context.Context, *ent.ShopApplicationQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShopApplicationFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShopApplicationQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationQuery", q)
+}
+
+// The TraverseShopApplication type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShopApplication func(context.Context, *ent.ShopApplicationQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShopApplication) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShopApplication) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShopApplicationQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationQuery", q)
+}
+
+// The ShopApplicationEventFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShopApplicationEventFunc func(context.Context, *ent.ShopApplicationEventQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShopApplicationEventFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShopApplicationEventQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationEventQuery", q)
+}
+
+// The TraverseShopApplicationEvent type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShopApplicationEvent func(context.Context, *ent.ShopApplicationEventQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShopApplicationEvent) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShopApplicationEvent) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShopApplicationEventQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationEventQuery", q)
+}
+
+// The ShopApplicationMessageFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShopApplicationMessageFunc func(context.Context, *ent.ShopApplicationMessageQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShopApplicationMessageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShopApplicationMessageQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationMessageQuery", q)
+}
+
+// The TraverseShopApplicationMessage type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShopApplicationMessage func(context.Context, *ent.ShopApplicationMessageQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShopApplicationMessage) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShopApplicationMessage) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShopApplicationMessageQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationMessageQuery", q)
+}
+
+// The ShopApplicationTokenFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ShopApplicationTokenFunc func(context.Context, *ent.ShopApplicationTokenQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ShopApplicationTokenFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ShopApplicationTokenQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationTokenQuery", q)
+}
+
+// The TraverseShopApplicationToken type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseShopApplicationToken func(context.Context, *ent.ShopApplicationTokenQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseShopApplicationToken) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseShopApplicationToken) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ShopApplicationTokenQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ShopApplicationTokenQuery", q)
+}
+
 // The ShopPaymentProviderCredentialFunc type is an adapter to allow the use of ordinary function as a Querier.
 type ShopPaymentProviderCredentialFunc func(context.Context, *ent.ShopPaymentProviderCredentialQuery) (ent.Value, error)
 
@@ -1111,6 +1223,14 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ShopQuery, predicate.Shop, shop.OrderOption]{typ: ent.TypeShop, tq: q}, nil
 	case *ent.ShopAllowedOriginQuery:
 		return &query[*ent.ShopAllowedOriginQuery, predicate.ShopAllowedOrigin, shopallowedorigin.OrderOption]{typ: ent.TypeShopAllowedOrigin, tq: q}, nil
+	case *ent.ShopApplicationQuery:
+		return &query[*ent.ShopApplicationQuery, predicate.ShopApplication, shopapplication.OrderOption]{typ: ent.TypeShopApplication, tq: q}, nil
+	case *ent.ShopApplicationEventQuery:
+		return &query[*ent.ShopApplicationEventQuery, predicate.ShopApplicationEvent, shopapplicationevent.OrderOption]{typ: ent.TypeShopApplicationEvent, tq: q}, nil
+	case *ent.ShopApplicationMessageQuery:
+		return &query[*ent.ShopApplicationMessageQuery, predicate.ShopApplicationMessage, shopapplicationmessage.OrderOption]{typ: ent.TypeShopApplicationMessage, tq: q}, nil
+	case *ent.ShopApplicationTokenQuery:
+		return &query[*ent.ShopApplicationTokenQuery, predicate.ShopApplicationToken, shopapplicationtoken.OrderOption]{typ: ent.TypeShopApplicationToken, tq: q}, nil
 	case *ent.ShopPaymentProviderCredentialQuery:
 		return &query[*ent.ShopPaymentProviderCredentialQuery, predicate.ShopPaymentProviderCredential, shoppaymentprovidercredential.OrderOption]{typ: ent.TypeShopPaymentProviderCredential, tq: q}, nil
 	case *ent.ShopUserQuery:

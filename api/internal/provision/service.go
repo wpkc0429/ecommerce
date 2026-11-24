@@ -61,25 +61,16 @@ type Result struct {
 }
 
 // ProvisionShop does everything in one transaction; any failure rolls back
-// the whole thing, so there is never a shop without an owner.
+// the whole thing, so there is never a shop without an owner. It is
+// ProvisionShopTx + commit + AfterCommit; callers that must make other writes
+// atomic with the shop (shop application approval, change platform-website
+// D9) call those pieces themselves.
 func (s *Service) ProvisionShop(ctx context.Context, in Input) (*Result, error) {
-	origins := make([]string, 0, len(in.StorefrontOrigins))
-	for i, raw := range in.StorefrontOrigins {
-		o := tenant.NormalizeOrigin(raw)
-		if o == "" {
-			return nil, &account.ValidationError{
-				Pointer: fmt.Sprintf("/storefront_origins/%d", i),
-				Message: "must be a scheme://host[:port] http(s) origin without path or wildcard",
-			}
-		}
-		origins = append(origins, o)
-	}
-
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("provision: begin tx: %w", err)
 	}
-	res, issued, err := s.provisionTx(ctx, tx, in, origins)
+	res, issued, err := s.ProvisionShopTx(ctx, tx, in)
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, err
@@ -87,8 +78,34 @@ func (s *Service) ProvisionShop(ctx context.Context, in Input) (*Result, error) 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("provision: commit: %w", err)
 	}
+	if err := s.AfterCommit(ctx, res, issued); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
 
-	// After commit: cache invalidation through events, then link delivery.
+// ProvisionShopTx creates the shop, owner and origins inside the caller's
+// transaction. The caller commits (or rolls back) and then MUST call
+// AfterCommit with the returned values; nothing observable happens before that.
+func (s *Service) ProvisionShopTx(ctx context.Context, tx *ent.Tx, in Input) (*Result, *account.Issued, error) {
+	origins := make([]string, 0, len(in.StorefrontOrigins))
+	for i, raw := range in.StorefrontOrigins {
+		o := tenant.NormalizeOrigin(raw)
+		if o == "" {
+			return nil, nil, &account.ValidationError{
+				Pointer: fmt.Sprintf("/storefront_origins/%d", i),
+				Message: "must be a scheme://host[:port] http(s) origin without path or wildcard",
+			}
+		}
+		origins = append(origins, o)
+	}
+	return s.provisionTx(ctx, tx, in, origins)
+}
+
+// AfterCommit runs the effects that must only happen once the transaction is
+// durable: cache invalidation through events, then link delivery (which sets
+// res.Delivery when a new owner account was created).
+func (s *Service) AfterCommit(ctx context.Context, res *Result, issued *account.Issued) error {
 	s.Accounts.Invalidate(ctx, res.OwnerID)
 	if len(res.Origins) > 0 {
 		s.Dispatcher.Publish(ctx, events.StorefrontClientChanged{ShopID: res.Shop.ID, Origins: res.Origins})
@@ -96,11 +113,11 @@ func (s *Service) ProvisionShop(ctx context.Context, in Input) (*Result, error) 
 	if issued != nil {
 		d, err := s.Accounts.Deliver(ctx, issued)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		res.Delivery = &d
 	}
-	return res, nil
+	return nil
 }
 
 func (s *Service) provisionTx(ctx context.Context, tx *ent.Tx, in Input, origins []string) (*Result, *account.Issued, error) {

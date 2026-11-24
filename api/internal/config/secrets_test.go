@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestMain: Load fails closed (unset APP_ENV = production + default-key
@@ -35,6 +36,9 @@ func hermeticEnv(t *testing.T, appEnv string) {
 	for k, v := range strongSecrets {
 		t.Setenv(k, v)
 	}
+	t.Setenv("TURNSTILE_SECRET_KEY", "test-fixture-turnstile-secret-7c1e")
+	t.Setenv("TURNSTILE_VERIFY_URL", "")
+	t.Setenv("WEBSITE_URL", "https://www.example.test")
 	t.Setenv("SMTP_USERNAME", "")
 	t.Setenv("SMTP_PASSWORD", "")
 	t.Setenv("TRUSTED_PROXIES", "")
@@ -186,4 +190,64 @@ func values(m map[string]string) []string {
 		out = append(out, v)
 	}
 	return out
+}
+
+func TestProductionRefusesMissingOrUnsafeApplicationSettings(t *testing.T) {
+	cases := []struct {
+		name, key, value, want string
+	}{
+		{"turnstile secret missing", "TURNSTILE_SECRET_KEY", "", "TURNSTILE_SECRET_KEY is required"},
+		{"cloudflare always-pass test secret", "TURNSTILE_SECRET_KEY", "1x0000000000000000000000000000000AA", "published test secrets"},
+		{"placeholder secret", "TURNSTILE_SECRET_KEY", "<generate: turnstile>", "TURNSTILE_SECRET_KEY"},
+		{"website url missing", "WEBSITE_URL", "", "WEBSITE_URL is required"},
+		{"website url not https", "WEBSITE_URL", "http://www.example.test", "https"},
+		{"verify url overridden", "TURNSTILE_VERIFY_URL", "https://fake.example.test/verify", "must not be overridden"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			hermeticEnv(t, EnvProduction)
+			t.Setenv(c.key, c.value)
+			_, err := Load()
+			if err == nil || !strings.Contains(err.Error(), c.want) {
+				t.Fatalf("err = %v, want containing %q", err, c.want)
+			}
+		})
+	}
+}
+
+func TestApplicationDefaultsAndDevModeNeedNoTurnstile(t *testing.T) {
+	hermeticEnv(t, EnvDevelopment)
+	t.Setenv("TURNSTILE_SECRET_KEY", "")
+	t.Setenv("WEBSITE_URL", "")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	a := cfg.Application
+	if a.DailyCap != 200 || a.ReapplyCooldown != 30*24*time.Hour || a.RejectedRetention != 90*24*time.Hour ||
+		a.ApprovedRetention != 365*24*time.Hour || a.ConsentVersion != DefaultConsentVersion {
+		t.Errorf("defaults wrong: %+v", a)
+	}
+	rl := cfg.RateLimit
+	if rl.ApplicationBroadLimit != 20 || rl.ApplicationTightLimit != 5 || rl.ApplicationEmailLimit != 3 || rl.ApplicationEmailWindow != 24*time.Hour {
+		t.Errorf("rate limit defaults wrong: %+v", rl)
+	}
+	if cfg.WebsiteURL != "http://localhost:4000" {
+		t.Errorf("WebsiteURL = %q", cfg.WebsiteURL)
+	}
+}
+
+func TestApplicationRejectsBadValues(t *testing.T) {
+	for k, v := range map[string]string{
+		"WEBSITE_URL":                    "https://www.example.test/path",
+		"APPLICATION_DAILY_CAP":          "0",
+		"APPLICATION_CONSENT_VERSION":    strings.Repeat("v", 33),
+		"APPLICATION_REJECTED_RETENTION": "0s",
+	} {
+		hermeticEnv(t, EnvTest)
+		t.Setenv(k, v)
+		if _, err := Load(); err == nil {
+			t.Errorf("%s=%q accepted", k, v)
+		}
+	}
 }
