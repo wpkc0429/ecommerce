@@ -65,7 +65,7 @@ func (s *S3Store) Get(ctx context.Context, key string, maxBytes int64) ([]byte, 
 		}
 		return nil, fmt.Errorf("media: get %q: %w", key, err)
 	}
-	defer out.Body.Close()
+	defer func() { _ = out.Body.Close() }()
 	if out.ContentLength != nil && *out.ContentLength > maxBytes {
 		return nil, ErrObjectTooLarge
 	}

@@ -47,6 +47,6 @@ func conformanceUpload(t *testing.T, e *conformanceEnv, v *contractValidator, ad
 	if err != nil || resp.StatusCode != http.StatusOK {
 		t.Fatalf("PUT to presigned URL: err=%v resp=%v", err, resp)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	return up.UploadID
 }

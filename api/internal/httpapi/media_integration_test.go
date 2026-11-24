@@ -192,7 +192,7 @@ func (e *mediaEnv) upload(userID, shopID int, purpose, contentType string, data 
 	if err != nil {
 		e.t.Fatal(err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		b, _ := io.ReadAll(resp.Body)
 		e.t.Fatalf("PUT to presigned URL: %d %s", resp.StatusCode, b)
@@ -257,7 +257,7 @@ func TestMediaPresignedPutEnforcesSignedHeaders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("PUT with other Content-Type: %d, want 403", resp.StatusCode)
 	}

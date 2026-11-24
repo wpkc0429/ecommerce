@@ -85,7 +85,7 @@ func TestProcessAppliesExifOrientationAndDropsExif(t *testing.T) {
 	}
 	r1, _, b1, _ := img.At(100, 20).RGBA()
 	r2, _, b2, _ := img.At(100, 380).RGBA()
-	if !(r1 > b1) || !(b2 > r2) {
+	if r1 <= b1 || b2 <= r2 {
 		t.Errorf("orientation not applied: top (r=%d,b=%d) bottom (r=%d,b=%d)", r1>>8, b1>>8, r2>>8, b2>>8)
 	}
 	for _, v := range vs {
