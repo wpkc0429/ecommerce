@@ -83,6 +83,17 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"page.edit", "編輯頁面內容"},
 	{"page.delete", "刪除頁面"},
 	{"page.publish", "發佈與下架頁面"},
+	// change headless-content-store (design D5, Q1/Q4/Q5): the content store's
+	// own nodes. page.* stays as an equivalent alias during the compatibility
+	// period (the compatibility endpoints accept either; the migration and the
+	// role grants below copy page.* grants to content.*). content.manage is the
+	// ONE node that registers a content schema; it is an integration action
+	// held by a human: merchant_owner and the platform super_admin only, never
+	// editor, staff or any automation account.
+	{"content.view", "檢視內容 schema 與內容文件"},
+	{"content.edit", "編輯內容文件草稿"},
+	{"content.publish", "發佈與下架內容文件"},
+	{"content.manage", "註冊內容 schema（人工、整合動作）"},
 	{"user.view", "檢視商家成員"},
 	{"user.manage_roles", "指派與移除商家角色"},
 	{"category.view", "檢視商品分類"},
@@ -156,6 +167,7 @@ var roleDefs = []struct {
 	{"merchant_owner", "merchant", false, []string{
 		"shop.view", "shop.update",
 		"page.view", "page.create", "page.edit", "page.delete", "page.publish",
+		"content.view", "content.edit", "content.publish", "content.manage",
 		"user.view", "user.manage_roles",
 		"category.view", "category.create", "category.edit", "category.delete",
 		"product.view", "product.create", "product.edit", "product.delete",
@@ -191,6 +203,9 @@ var roleDefs = []struct {
 	}},
 	{"editor", "merchant", true, []string{
 		"shop.view", "page.view", "page.create", "page.edit",
+		// change headless-content-store (Q5): view and edit, never publish or
+		// manage - the same reach as page.view/create/edit above.
+		"content.view", "content.edit",
 		"category.view", "category.create", "category.edit",
 		"product.view", "product.create", "product.edit",
 		"order.view",

@@ -29,18 +29,18 @@ type PagesHandler struct {
 
 // MountShop: routes under /admin/shops/{shopID}.
 func (h *PagesHandler) MountShop(r chi.Router) {
-	r.With(h.Authz.RequireShopPermission("page.view")).Get("/pages", h.list)
-	r.With(h.Authz.RequireShopPermission("page.create")).Post("/pages", h.create)
-	r.With(h.Authz.RequireShopPermission("page.view")).Get("/pages/{pageID}", h.get)
-	r.With(h.Authz.RequireShopPermission("page.edit")).Put("/pages/{pageID}", h.update)
-	r.With(h.Authz.RequireShopPermission("page.delete")).Delete("/pages/{pageID}", h.delete)
-	r.With(h.Authz.RequireShopPermission("page.publish")).Post("/pages/{pageID}/publish", h.publish)
-	r.With(h.Authz.RequireShopPermission("page.publish")).Post("/pages/{pageID}/unpublish", h.unpublish)
-	r.With(h.Authz.RequireShopPermission("page.view")).Get("/pages/{pageID}/preview-token", h.previewToken)
+	r.With(h.Authz.RequireShopAnyPermission("page.view", "content.view")).Get("/pages", h.list)
+	r.With(h.Authz.RequireShopAnyPermission("page.create", "content.edit")).Post("/pages", h.create)
+	r.With(h.Authz.RequireShopAnyPermission("page.view", "content.view")).Get("/pages/{pageID}", h.get)
+	r.With(h.Authz.RequireShopAnyPermission("page.edit", "content.edit")).Put("/pages/{pageID}", h.update)
+	r.With(h.Authz.RequireShopAnyPermission("page.delete", "content.publish")).Delete("/pages/{pageID}", h.delete)
+	r.With(h.Authz.RequireShopAnyPermission("page.publish", "content.publish")).Post("/pages/{pageID}/publish", h.publish)
+	r.With(h.Authz.RequireShopAnyPermission("page.publish", "content.publish")).Post("/pages/{pageID}/unpublish", h.unpublish)
+	r.With(h.Authz.RequireShopAnyPermission("page.view", "content.view")).Get("/pages/{pageID}/preview-token", h.previewToken)
 
 	r.With(h.Authz.RequireShopPermission("shop.view")).Get("/content", h.getContent)
 	r.With(h.Authz.RequireShopPermission("shop.update")).Put("/content", h.updateContent)
-	r.With(h.Authz.RequireShopPermission("page.view")).Get("/page-types", h.pageTypes)
+	r.With(h.Authz.RequireShopAnyPermission("page.view", "content.view")).Get("/page-types", h.pageTypes)
 }
 
 // pageTypes lists the page types of the shop's content schema (admin
@@ -66,15 +66,16 @@ func (h *PagesHandler) pageTypes(w http.ResponseWriter, r *http.Request) {
 
 func pageJSON(p *ent.Page, extra map[string]any) map[string]any {
 	out := map[string]any{
-		"id":             p.ID,
-		"type_key":       p.TypeKey,
-		"title":          p.Title,
-		"slug":           p.Slug,
-		"status":         p.Status,
-		"content_json":   p.ContentJSON,
-		"published_json": p.PublishedJSON,
-		"meta":           p.Meta,
-		"updated_at":     p.UpdatedAt,
+		"id":              p.ID,
+		"type_key":        p.TypeKey,
+		"title":           p.Title,
+		"slug":            p.Slug,
+		"status":          p.Status,
+		"content_json":    p.ContentJSON,
+		"published_json":  p.PublishedJSON,
+		"meta":            p.Meta,
+		"needs_attention": p.NeedsAttention,
+		"updated_at":      p.UpdatedAt,
 	}
 	for k, v := range extra {
 		out[k] = v
@@ -93,7 +94,7 @@ func (h *PagesHandler) list(w http.ResponseWriter, r *http.Request) {
 	for _, e := range entries {
 		out = append(out, map[string]any{
 			"id": e.ID, "type_key": e.TypeKey, "title": e.Title, "slug": e.Slug,
-			"status": e.Status, "incompatible": e.Incompatible, "updated_at": e.UpdatedAt,
+			"status": e.Status, "incompatible": e.Incompatible, "needs_attention": e.NeedsAttention, "updated_at": e.UpdatedAt,
 		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"pages": out})

@@ -413,8 +413,10 @@ components:
         | 403 | `forbidden` | 已認證但權限不足，或跨商家存取 |
         | 404 | `not_found` | 資源不存在 |
         | 404 | `unknown_publishable_key` | publishable key 未提供、未知或已撤銷 |
+        | 404 | `content_schema_not_found` | 商家尚未註冊內容 schema（或指定的版本不存在）；訊息附註冊端點 |
         | 405 | `method_not_allowed` | 路徑存在但不支援該方法 |
         | 409 | `conflict` | 與資源當下狀態衝突 |
+        | 409 | `removals_require_confirmation` | 註冊的內容 schema 會丟棄既有內容的欄位或使文件失去 type；`details.report` 是相容性報告，確認後以 `confirm_removals=true` 重送 |
         | 422 | `validation_failed` | 業務規則驗證失敗，`details` 帶 JSON Pointer |
         | 422 | `registration_failed` | 註冊失敗（**刻意不說明原因**：不洩漏該 email 是否已是本店顧客） |
         | 422 | `checkout_unavailable` | 訪客結帳失敗（**刻意不說明原因**：該顧客已被商家停用） |
@@ -2020,7 +2022,7 @@ components:
     Page:
       type: object
       additionalProperties: false
-      required: [id, type_key, title, slug, status, content_json, published_json, meta, updated_at]
+      required: [id, type_key, title, slug, status, content_json, published_json, meta, needs_attention, updated_at]
       description: |
         CMS 頁面。**草稿與線上是兩個獨立欄位**：編輯只寫 `content_json`，
         發佈才把它複製進 `published_json`。前台渲染只讀 `published_json`。
@@ -2042,6 +2044,11 @@ components:
           oneOf: [{ type: object }, { type: 'null' }]
           description: 線上內容；從未發佈過為 `null`。
         meta: { type: object }
+        needs_attention:
+          type: boolean
+          description: |
+            內容 schema 註冊後，此頁的草稿（或已發佈快照）不再通過驗證（change headless-content-store）。
+            已發佈內容照常提供；草稿必須修到通過才能再儲存內容或發佈。以通過驗證的內容儲存、或發佈修正後的草稿即清除。
         updated_at: { type: string, format: date-time }
         page_schema:
           oneOf: [{ type: object }, { type: 'null' }]
@@ -2053,7 +2060,7 @@ components:
     PageListEntry:
       type: object
       additionalProperties: false
-      required: [id, type_key, title, slug, status, incompatible, updated_at]
+      required: [id, type_key, title, slug, status, incompatible, needs_attention, updated_at]
       properties:
         id: { type: integer }
         type_key: { type: string }
@@ -2061,7 +2068,113 @@ components:
         slug: { type: string }
         status: { type: integer, enum: [0, 1] }
         incompatible: { type: boolean }
+        needs_attention: { type: boolean }
         updated_at: { type: string, format: date-time }
+
+    # ── 後台：內容 schema 註冊（change headless-content-store 第一個切片）──
+    ContentSchemaVersionInfo:
+      type: object
+      additionalProperties: false
+      required: [version, format, sha256, source, created_by_user_id, created_at, has_snapshot]
+      properties:
+        version: { type: integer, minimum: 1 }
+        format:
+          type: integer
+          enum: [1, 2]
+          description: "`1`：由舊主題回填或 demo seed 寫入；`2`：由人註冊的 `content.schema.json`。"
+        sha256: { type: string }
+        source:
+          type: string
+          description: "`theme_backfill` 或 `registered`。"
+        created_by_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+          description: 註冊此版本的人（稽核）；回填與 seed 寫入的版本為 `null`。
+        created_at: { type: string, format: date-time }
+        has_snapshot:
+          type: boolean
+          description: 此版本註冊時是否為有風險的文件保存了內容快照。
+
+    ContentSchemaVersion:
+      type: object
+      additionalProperties: false
+      required: [version, format, sha256, source, created_by_user_id, created_at, has_snapshot, schema]
+      properties:
+        version: { type: integer, minimum: 1 }
+        format: { type: integer, enum: [1, 2] }
+        sha256: { type: string }
+        source: { type: string }
+        created_by_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        created_at: { type: string, format: date-time }
+        has_snapshot: { type: boolean }
+        schema:
+          type: object
+          description: 儲存的 schema 文件（format 1 或 2，見 `docs/content-schema.md`）。
+        snapshot:
+          type: object
+          description: 僅在 `include=snapshot` 且該版本有快照時出現：`{documents:[{kind,key,status,draft,published?}]}`。
+
+    ContentSchemaDocumentReport:
+      type: object
+      additionalProperties: false
+      required: [kind, key, status, removed_paths, invalid, published_invalid]
+      properties:
+        kind: { type: string, enum: [page, global] }
+        key:
+          type: string
+          description: 頁面的 slug；全域內容為 `global`。
+        status:
+          type: string
+          enum: [ok, needs_attention, orphaned]
+          description: |
+            `ok`：新 schema 下仍通過；`needs_attention`：草稿（或已發佈快照）不再通過驗證；
+            `orphaned`：此頁的 `type_key` 不在新 schema 內。
+        removed_paths:
+          type: array
+          items: { type: string }
+          description: 新 schema 會丟棄的有值欄位（JSON Pointer，最多 50 筆）；空值（`""`、`[]`、`{}`、`null`）不算。
+        invalid:
+          type: array
+          items: { $ref: '#/components/schemas/ValidationDetail' }
+          description: 草稿在新 schema 下的驗證問題（最多 10 筆）。
+        published_invalid:
+          type: boolean
+          description: 已發佈快照在新 schema 下不再通過驗證；它仍照常對外提供。
+
+    ContentSchemaReport:
+      type: object
+      additionalProperties: false
+      required: [documents]
+      properties:
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/ContentSchemaDocumentReport' }
+
+    ContentSchemaRegisterResult:
+      type: object
+      additionalProperties: false
+      required: [version, changed, dry_run, report]
+      properties:
+        version:
+          type: integer
+          description: 呼叫後生效的版本；dry run 時為目前生效的版本（尚無則 `0`）。
+        changed:
+          type: boolean
+          description: 送出的 schema 與生效版本不同。相同時為 `false` 且版本不增加。
+        dry_run: { type: boolean }
+        would_register_version:
+          type: integer
+          description: 僅 dry run：若正式註冊會得到的版本號（內容相同時為 `0`）。
+        report: { $ref: '#/components/schemas/ContentSchemaReport' }
+
+    ContentSchemaVersionList:
+      type: object
+      additionalProperties: false
+      required: [versions]
+      properties:
+        versions:
+          type: array
+          items: { $ref: '#/components/schemas/ContentSchemaVersionInfo' }
 
     # ── 後台：RBAC ────────────────────────────────────────────
     Permission:
@@ -4542,8 +4655,8 @@ paths:
     get:
       tags: [admin-cms]
       operationId: listPageTypes
-      summary: 列出當前主題支援的頁型
-      description: 需要商家層 `page.view`。商家尚未套用主題時回空陣列。
+      summary: 列出商家內容 schema 的頁型
+      description: 需要商家層 `page.view`（或等價的 `content.view`）。商家尚未註冊內容 schema 時回空陣列；全域內容的 `global` 型別不在其中。
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
@@ -4565,6 +4678,106 @@ paths:
                       required: [type_key]
                       properties:
                         type_key: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content/schema:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: getContentSchema
+      summary: 讀取商家的內容 schema（生效版本或指定版本）
+      description: |
+        需要商家層 `content.view`（`page.*` 不通過這條新路由）。預設回生效版本（最大 `version`）；
+        `?version=N` 回指定版本，加 `include=snapshot` 在該版本有快照時一併回傳註冊當下保存的內容。
+        商家尚未註冊任何 schema 回 404 `content_schema_not_found`，訊息附註冊端點。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: version
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1 }
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [snapshot] }
+      responses:
+        "200":
+          description: 版本與其 schema 文件。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchemaVersion' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-cms]
+      operationId: registerContentSchema
+      summary: 註冊（或 dry run）商家的內容 schema
+      description: |
+        需要商家層 `content.manage`——只有 `merchant_owner` 與平台 `super_admin` 持有。
+        **註冊是人工動作**：CI、AI 編輯服務、服務帳號都不得持有此節點，也不得自動呼叫（docs/content-schema.md）。
+
+        Body 是 `content.schema.json`（format 2，上限 128 KiB）。依序驗證：主體大小與 JSON（拒絕重複鍵）、
+        結構上限（深度 8、節點 2,000、每個 object 50 個屬性、`enum` 100 個值）、詞彙 allowlist（只允許本地 `#/$defs/…` 的
+        `$ref`、每個 object `additionalProperties: false`、每個 string `maxLength`、每個 array `maxItems ≤ 200`）、`$ref` 環與展開
+        節點數（≤ 5,000）、draft 2020-12 編譯、schema 必須接受自己的預設值（2 秒預算）、`documents`／`collections` 鍵名。
+        任何一步失敗回 422 並附 JSON Pointer，且不寫入。
+
+        - `?dry_run=true`：只驗證並回相容性報告，**不寫入**（每分鐘 10 次）。
+        - 內容與生效版本相同（sha256）：200、`changed: false`、版本不增加。
+        - 新 schema 會丟棄既有文件的有值欄位、或使文件失去 type：缺 `?confirm_removals=true` 回 409
+          `removals_require_confirmation`（`details.report` 為報告）；帶了則註冊，並在同一交易保存有風險文件的草稿／已發佈內容快照。
+        - 註冊從不改寫任何文件；不再通過驗證的頁面被標記 `needs_attention`，其已發佈內容照常提供。
+        - 每商家每呼叫者每小時 20 次；每次呼叫留下稽核紀錄（版本列的 `created_by_user_id` 與結構化日誌）。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema: { type: boolean }
+        - name: confirm_removals
+          in: query
+          required: false
+          schema: { type: boolean }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: "`content.schema.json`（format 2）：`{format:2, types:{key:{title,schema}}, documents?, collections?}`。"
+      responses:
+        "200":
+          description: 註冊結果（或 dry run 報告）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchemaRegisterResult' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/schema/versions:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: listContentSchemaVersions
+      summary: 列出商家內容 schema 的所有版本（新到舊）
+      description: 需要商家層 `content.view`。不含 schema 本文，讀單一版本用 `GET …/content/schema?version=N`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 版本清單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchemaVersionList' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }

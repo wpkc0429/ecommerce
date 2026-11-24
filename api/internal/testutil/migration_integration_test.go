@@ -100,7 +100,12 @@ func TestThemeAndSiteMigrationsOnPopulatedDatabase(t *testing.T) {
 	mustExec(`INSERT INTO role_permission (role_id, permission_id) SELECT 1, id FROM permissions`)
 
 	// Apply the removal.
-	if err := m.Up(); err != nil {
+	// Up to the removal itself, not "latest": later migrations (for example the
+	// content.* permission copy of headless-content-store) are not part of what
+	// this test pins, and the refusal check below needs the removal to be the
+	// current version.
+	const removal = 20261124173059
+	if err := m.Migrate(removal); err != nil {
 		t.Fatalf("migrate up over old data: %v", err)
 	}
 

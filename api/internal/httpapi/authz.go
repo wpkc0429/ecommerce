@@ -58,6 +58,44 @@ func (a *AuthzMW) RequireShopPermission(node string) func(http.Handler) http.Han
 	}
 }
 
+// RequireShopAnyPermission is RequireShopPermission for a route that accepts
+// any one of several equivalent nodes. It exists for the page.* / content.*
+// compatibility aliases (change headless-content-store, Q1): the compatibility
+// endpoints keep answering to page.* and now also to the matching content.*
+// node, so a role that holds either one passes.
+func (a *AuthzMW) RequireShopAnyPermission(nodes ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			id, ok := auth.AdminFrom(r.Context())
+			if !ok {
+				httpx.Unauthorized(w)
+				return
+			}
+			shopID, ok := shopIDParam(r)
+			if !ok {
+				httpx.NotFound(w)
+				return
+			}
+			snap, err := a.Engine.Snapshot(r.Context(), id.UserID, shopID)
+			if err != nil {
+				httpx.Internal(w)
+				return
+			}
+			if !snap.CanAccessShop() {
+				httpx.Forbidden(w)
+				return
+			}
+			for _, n := range nodes {
+				if snap.Allows(n) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			httpx.Forbidden(w)
+		})
+	}
+}
+
 // RequireShopAccess authenticates the admin identity and applies only the
 // cross-shop membership guard — no permission node is required (change
 // admin-commerce-catalog, design D5).

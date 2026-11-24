@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/config"
+	"ksdevworks/ecommerce/api/internal/content"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
@@ -196,6 +197,10 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.Provisioning = &httpapi.ProvisioningHandler{
 		Service: &provision.Service{Client: client, CMS: cmsService, Accounts: accountService, Dispatcher: dispatcher},
 		Engine:  engine, Authz: authz, Log: a.log,
+	}
+	deps.ContentSchema = &httpapi.ContentSchemaHandler{
+		Service: &content.SchemaService{Client: client, Dispatcher: dispatcher, Log: a.log},
+		Authz:   authz, Limiter: limiter, Log: a.log,
 	}
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 

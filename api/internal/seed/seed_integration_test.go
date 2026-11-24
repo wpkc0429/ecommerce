@@ -698,3 +698,71 @@ func TestDemoSeedWritesContentSchemaOnce(t *testing.T) {
 		t.Fatalf("want exactly one content schema version for the demo shop, got %d", n)
 	}
 }
+
+// Scenario: content.* 權限節點的授予 (change headless-content-store, design D5,
+// Q4/Q5). EQUALITY on the content.* subset: staff holds none; editor holds
+// exactly view+edit; merchant_owner and super_admin hold all four. In
+// particular content.manage - the node that registers a content schema - is
+// held by exactly merchant_owner and super_admin, so no other seeded role (and
+// therefore no automation account created from one) can register a schema.
+func TestSeedContentPermissionGrants(t *testing.T) {
+	client := testutil.OpenDB(t)
+	runDemoSeed(t, client)
+	ctx := context.Background()
+
+	contentOf := func(nodes map[string]bool) map[string]bool {
+		out := map[string]bool{}
+		for n := range nodes {
+			if strings.HasPrefix(n, "content.") {
+				out[n] = true
+			}
+		}
+		return out
+	}
+	equal := func(name string, got map[string]bool, want ...string) {
+		t.Helper()
+		if len(got) != len(want) {
+			t.Fatalf("%s content.* nodes = %v, want exactly %v", name, got, want)
+		}
+		for _, w := range want {
+			if !got[w] {
+				t.Errorf("%s must hold %s (has %v)", name, w, got)
+			}
+		}
+	}
+	equal("staff", contentOf(roleNodes(t, client, "staff")))
+	equal("editor", contentOf(roleNodes(t, client, "editor")), "content.view", "content.edit")
+	equal("merchant_owner", contentOf(roleNodes(t, client, "merchant_owner")),
+		"content.view", "content.edit", "content.publish", "content.manage")
+
+	// Every role holding content.manage, any scope.
+	manage, err := client.Permission.Query().Where(entpermission.NameEQ("content.manage")).Only(ctx)
+	if err != nil {
+		t.Fatalf("content.manage must be in the catalog: %v", err)
+	}
+	roles, err := client.Role.Query().Where(entrole.HasPermissionsWith(entpermission.IDEQ(manage.ID))).All(ctx)
+	if err != nil {
+		t.Fatalf("roles holding content.manage: %v", err)
+	}
+	got := map[string]bool{}
+	for _, r := range roles {
+		got[r.Scope+"/"+r.Name] = true
+	}
+	if len(got) != 2 || !got["merchant/merchant_owner"] || !got["platform/super_admin"] {
+		t.Errorf("content.manage must be held by exactly merchant_owner and super_admin, got %v", got)
+	}
+
+	// page.* aliases are unchanged: editor keeps view/create/edit, no
+	// delete/publish.
+	editor := roleNodes(t, client, "editor")
+	for _, n := range []string{"page.view", "page.create", "page.edit"} {
+		if !editor[n] {
+			t.Errorf("editor must still hold %s", n)
+		}
+	}
+	for _, n := range []string{"page.delete", "page.publish"} {
+		if editor[n] {
+			t.Errorf("editor must NOT hold %s", n)
+		}
+	}
+}

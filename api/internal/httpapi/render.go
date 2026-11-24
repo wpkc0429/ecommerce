@@ -90,7 +90,7 @@ func (h *RenderHandler) Preview(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	if !snap.CanAccessShop() || !snap.Allows("page.view") {
+	if !snap.CanAccessShop() || (!snap.Allows("page.view") && !snap.Allows("content.view")) {
 		httpx.Forbidden(w)
 		return
 	}

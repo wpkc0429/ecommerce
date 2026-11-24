@@ -34,7 +34,7 @@ func (h *MediaHandler) MountShopAdmin(r chi.Router) {
 	// The permission for an upload intent depends on its purpose, which lives in
 	// the body, so the route only requires shop access and the handler decides.
 	r.With(h.Authz.RequireShopAccess()).Post("/media/uploads", h.createUpload)
-	r.With(h.Authz.RequireShopPermission("page.edit")).Post("/media/content-images", h.createContentImage)
+	r.With(h.Authz.RequireShopAnyPermission("page.edit", "content.edit")).Post("/media/content-images", h.createContentImage)
 
 	r.With(h.Authz.RequireShopPermission("product.view")).Get("/products/{productID}/images", h.listImages)
 	r.With(h.Authz.RequireShopPermission("product.edit")).Post("/products/{productID}/images", h.attachImage)
@@ -102,7 +102,7 @@ func (h *MediaHandler) createUpload(w http.ResponseWriter, r *http.Request) {
 	case media.PurposeProductImage:
 		node = "product.edit"
 	case media.PurposeContentImage:
-		node = "page.edit"
+		node = "page.edit" // content.edit is accepted too (below)
 	default:
 		httpx.Unprocessable(w, "purpose must be \"product_image\" or \"content_image\"", nil)
 		return
@@ -112,7 +112,11 @@ func (h *MediaHandler) createUpload(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	if !snap.Allows(node) {
+	allowed := snap.Allows(node)
+	if !allowed && in.Purpose == media.PurposeContentImage {
+		allowed = snap.Allows("content.edit")
+	}
+	if !allowed {
 		httpx.Forbidden(w)
 		return
 	}

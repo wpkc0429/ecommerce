@@ -91,6 +91,35 @@ CategorySummary.slug
 ContentImage.height
 ContentImage.urls
 ContentImage.width
+ContentSchemaDocumentReport.invalid
+ContentSchemaDocumentReport.key
+ContentSchemaDocumentReport.kind
+ContentSchemaDocumentReport.published_invalid
+ContentSchemaDocumentReport.removed_paths
+ContentSchemaDocumentReport.status
+ContentSchemaRegisterResult.changed
+ContentSchemaRegisterResult.dry_run
+ContentSchemaRegisterResult.report
+ContentSchemaRegisterResult.version
+ContentSchemaRegisterResult.would_register_version
+ContentSchemaReport.documents
+ContentSchemaVersion.created_at
+ContentSchemaVersion.created_by_user_id
+ContentSchemaVersion.format
+ContentSchemaVersion.has_snapshot
+ContentSchemaVersion.schema
+ContentSchemaVersion.sha256
+ContentSchemaVersion.snapshot
+ContentSchemaVersion.source
+ContentSchemaVersion.version
+ContentSchemaVersionInfo.created_at
+ContentSchemaVersionInfo.created_by_user_id
+ContentSchemaVersionInfo.format
+ContentSchemaVersionInfo.has_snapshot
+ContentSchemaVersionInfo.sha256
+ContentSchemaVersionInfo.source
+ContentSchemaVersionInfo.version
+ContentSchemaVersionList.versions
 CredentialLink.delivery
 CredentialLink.expires_at
 CredentialLink.reset_url
@@ -188,6 +217,14 @@ GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path cate
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
+GET /api/v1/admin/shops/{shopID}/content/schema
+GET /api/v1/admin/shops/{shopID}/content/schema path shopID
+GET /api/v1/admin/shops/{shopID}/content/schema query include
+GET /api/v1/admin/shops/{shopID}/content/schema query include optional
+GET /api/v1/admin/shops/{shopID}/content/schema query version
+GET /api/v1/admin/shops/{shopID}/content/schema query version optional
+GET /api/v1/admin/shops/{shopID}/content/schema/versions
+GET /api/v1/admin/shops/{shopID}/content/schema/versions path shopID
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 GET /api/v1/admin/shops/{shopID}/invitations
@@ -637,6 +674,13 @@ PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path cate
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 PUT /api/v1/admin/shops/{shopID}/content
 PUT /api/v1/admin/shops/{shopID}/content path shopID
+PUT /api/v1/admin/shops/{shopID}/content/schema
+PUT /api/v1/admin/shops/{shopID}/content/schema path shopID
+PUT /api/v1/admin/shops/{shopID}/content/schema query confirm_removals
+PUT /api/v1/admin/shops/{shopID}/content/schema query confirm_removals optional
+PUT /api/v1/admin/shops/{shopID}/content/schema query dry_run
+PUT /api/v1/admin/shops/{shopID}/content/schema query dry_run optional
+PUT /api/v1/admin/shops/{shopID}/content/schema response 429 Retry-After
 PUT /api/v1/admin/shops/{shopID}/ecpay-credentials
 PUT /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 PUT /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
@@ -672,6 +716,7 @@ Page.content_json
 Page.id
 Page.incompatible
 Page.meta
+Page.needs_attention
 Page.page_schema
 Page.published_json
 Page.slug
@@ -681,6 +726,7 @@ Page.type_key
 Page.updated_at
 PageListEntry.id
 PageListEntry.incompatible
+PageListEntry.needs_attention
 PageListEntry.slug
 PageListEntry.status
 PageListEntry.title

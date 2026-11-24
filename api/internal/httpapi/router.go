@@ -27,17 +27,20 @@ type Deps struct {
 	Roles      *RolesHandler
 	Shops      *ShopsHandler
 	Pages      *PagesHandler
-	Render     *RenderHandler
-	Categories *CategoriesHandler // change product-catalog
-	Products   *ProductsHandler   // change product-catalog (merchant CRUD + public read)
-	Cart       *CartHandler       // change shopping-cart (member self-service, no RBAC)
-	Orders     *OrderHandler      // change order-management (member self-service + merchant back office)
-	Payments   *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
-	Shipping   *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
-	Points     *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
-	Members    *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
-	ClientAuth *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
-	Guest      *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
+	// ContentSchema: per-shop content schema registration (change
+	// headless-content-store, first slice).
+	ContentSchema *ContentSchemaHandler
+	Render        *RenderHandler
+	Categories    *CategoriesHandler // change product-catalog
+	Products      *ProductsHandler   // change product-catalog (merchant CRUD + public read)
+	Cart          *CartHandler       // change shopping-cart (member self-service, no RBAC)
+	Orders        *OrderHandler      // change order-management (member self-service + merchant back office)
+	Payments      *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
+	Shipping      *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
+	Points        *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
+	Members       *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
+	ClientAuth    *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
+	Guest         *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
 	// change merchant-reports: the platform's first aggregate queries, and the
 	// merchant-scoped settings endpoint that gives them a time zone to cut days by.
 	Reports      *ReportsHandler
@@ -165,6 +168,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Pages != nil {
 							d.Pages.MountShop(sh)
+						}
+						if d.ContentSchema != nil {
+							d.ContentSchema.MountShopAdmin(sh)
 						}
 						if d.Categories != nil {
 							d.Categories.MountShop(sh)
