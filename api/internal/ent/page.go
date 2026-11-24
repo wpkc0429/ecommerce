@@ -39,6 +39,8 @@ type Page struct {
 	PublishedJSON json.RawMessage `json:"published_json,omitempty"`
 	// Meta holds the value of the "meta" field.
 	Meta json.RawMessage `json:"meta,omitempty"`
+	// NeedsAttention holds the value of the "needs_attention" field.
+	NeedsAttention bool `json:"needs_attention,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the PageQuery when eager-loading is set.
 	Edges        PageEdges `json:"edges"`
@@ -72,6 +74,8 @@ func (*Page) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case page.FieldContentJSON, page.FieldPublishedJSON, page.FieldMeta:
 			values[i] = new([]byte)
+		case page.FieldNeedsAttention:
+			values[i] = new(sql.NullBool)
 		case page.FieldID, page.FieldShopID, page.FieldStatus:
 			values[i] = new(sql.NullInt64)
 		case page.FieldTypeKey, page.FieldTitle, page.FieldSlug:
@@ -165,6 +169,12 @@ func (_m *Page) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field meta: %w", err)
 				}
 			}
+		case page.FieldNeedsAttention:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field needs_attention", values[i])
+			} else if value.Valid {
+				_m.NeedsAttention = value.Bool
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -235,6 +245,9 @@ func (_m *Page) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("meta=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Meta))
+	builder.WriteString(", ")
+	builder.WriteString("needs_attention=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NeedsAttention))
 	builder.WriteByte(')')
 	return builder.String()
 }

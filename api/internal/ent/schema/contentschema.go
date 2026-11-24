@@ -30,6 +30,15 @@ import (
 // listing). Rows written by the one-time backfill (source "theme_backfill") may
 // also carry a "component_keys" object copied from the removed theme system;
 // readers ignore it. source: "theme_backfill" or "registered".
+//
+// format 2 is what a human registers through the admin API (design D3):
+//
+//	{"format":2,
+//	 "types":{"<type_key>":{"title":"...","schema":<JSON Schema>}},
+//	 "documents":{"<key>":{"type":"<type_key>"}},
+//	 "collections":{"<prefix->":{"type":"<type_key>","max":N}}}
+//
+// The type "global" is the shop-global content schema.
 type ContentSchema struct {
 	ent.Schema
 }
@@ -45,6 +54,17 @@ func (ContentSchema) Fields() []ent.Field {
 		// that compare must recompute from schema_json (contentschema does).
 		field.String("sha256").MaxLen(64).SchemaType(map[string]string{dialect.Postgres: "varchar(64)"}).NotEmpty(),
 		field.String("source").MaxLen(30).SchemaType(map[string]string{dialect.Postgres: "varchar(30)"}).NotEmpty(),
+		// created_by_user_id: the human who registered this version (change
+		// headless-content-store, first slice). NULL for the backfill and the
+		// demo seed. No FK on purpose: the audit trail must outlive the account.
+		field.Int("created_by_user_id").Optional().Nillable(),
+		// snapshot_json: the content of every document this registration put at
+		// risk (its draft and, when different, its published snapshot, as they
+		// were just before the version took effect), so a removed or renamed
+		// field's values are never lost: {"documents":[{"kind","key","draft",
+		// "published"}]}. NULL when nothing was at risk. Written once with the
+		// row, never updated.
+		field.JSON("snapshot_json", json.RawMessage{}).Optional(),
 		field.Time("created_at").Immutable().Default(time.Now),
 	}
 }

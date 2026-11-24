@@ -239,6 +239,8 @@ var (
 		{Name: "schema_json", Type: field.TypeJSON},
 		{Name: "sha256", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
 		{Name: "source", Type: field.TypeString, Size: 30, SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "created_by_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "snapshot_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "shop_id", Type: field.TypeInt},
 	}
@@ -250,7 +252,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "content_schemas_shops_shop",
-				Columns:    []*schema.Column{ContentSchemasColumns[6]},
+				Columns:    []*schema.Column{ContentSchemasColumns[8]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -259,7 +261,7 @@ var (
 			{
 				Name:    "contentschema_shop_id_version",
 				Unique:  true,
-				Columns: []*schema.Column{ContentSchemasColumns[6], ContentSchemasColumns[1]},
+				Columns: []*schema.Column{ContentSchemasColumns[8], ContentSchemasColumns[1]},
 			},
 		},
 	}
@@ -574,6 +576,7 @@ var (
 		{Name: "content_json", Type: field.TypeJSON},
 		{Name: "published_json", Type: field.TypeJSON, Nullable: true},
 		{Name: "meta", Type: field.TypeJSON},
+		{Name: "needs_attention", Type: field.TypeBool, Default: false},
 		{Name: "shop_id", Type: field.TypeInt},
 	}
 	// PagesTable holds the schema information for the "pages" table.
@@ -584,7 +587,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "pages_shops_pages",
-				Columns:    []*schema.Column{PagesColumns[10]},
+				Columns:    []*schema.Column{PagesColumns[11]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -593,12 +596,12 @@ var (
 			{
 				Name:    "page_shop_id_slug",
 				Unique:  true,
-				Columns: []*schema.Column{PagesColumns[10], PagesColumns[5]},
+				Columns: []*schema.Column{PagesColumns[11], PagesColumns[5]},
 			},
 			{
 				Name:    "page_shop_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{PagesColumns[10], PagesColumns[6]},
+				Columns: []*schema.Column{PagesColumns[11], PagesColumns[6]},
 			},
 		},
 	}

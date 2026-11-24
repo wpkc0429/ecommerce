@@ -116,6 +116,20 @@ func (_c *PageCreate) SetMeta(v json.RawMessage) *PageCreate {
 	return _c
 }
 
+// SetNeedsAttention sets the "needs_attention" field.
+func (_c *PageCreate) SetNeedsAttention(v bool) *PageCreate {
+	_c.mutation.SetNeedsAttention(v)
+	return _c
+}
+
+// SetNillableNeedsAttention sets the "needs_attention" field if the given value is not nil.
+func (_c *PageCreate) SetNillableNeedsAttention(v *bool) *PageCreate {
+	if v != nil {
+		_c.SetNeedsAttention(*v)
+	}
+	return _c
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_c *PageCreate) SetShop(v *Shop) *PageCreate {
 	return _c.SetShopID(v.ID)
@@ -180,6 +194,10 @@ func (_c *PageCreate) defaults() {
 		v := page.DefaultMeta
 		_c.mutation.SetMeta(v)
 	}
+	if _, ok := _c.mutation.NeedsAttention(); !ok {
+		v := page.DefaultNeedsAttention
+		_c.mutation.SetNeedsAttention(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -225,6 +243,9 @@ func (_c *PageCreate) check() error {
 	}
 	if _, ok := _c.mutation.Meta(); !ok {
 		return &ValidationError{Name: "meta", err: errors.New(`ent: missing required field "Page.meta"`)}
+	}
+	if _, ok := _c.mutation.NeedsAttention(); !ok {
+		return &ValidationError{Name: "needs_attention", err: errors.New(`ent: missing required field "Page.needs_attention"`)}
 	}
 	if len(_c.mutation.ShopIDs()) == 0 {
 		return &ValidationError{Name: "shop", err: errors.New(`ent: missing required edge "Page.shop"`)}
@@ -291,6 +312,10 @@ func (_c *PageCreate) createSpec() (*Page, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Meta(); ok {
 		_spec.SetField(page.FieldMeta, field.TypeJSON, value)
 		_node.Meta = value
+	}
+	if value, ok := _c.mutation.NeedsAttention(); ok {
+		_spec.SetField(page.FieldNeedsAttention, field.TypeBool, value)
+		_node.NeedsAttention = value
 	}
 	if nodes := _c.mutation.ShopIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -481,6 +506,18 @@ func (u *PageUpsert) UpdateMeta() *PageUpsert {
 	return u
 }
 
+// SetNeedsAttention sets the "needs_attention" field.
+func (u *PageUpsert) SetNeedsAttention(v bool) *PageUpsert {
+	u.Set(page.FieldNeedsAttention, v)
+	return u
+}
+
+// UpdateNeedsAttention sets the "needs_attention" field to the value that was provided on create.
+func (u *PageUpsert) UpdateNeedsAttention() *PageUpsert {
+	u.SetExcluded(page.FieldNeedsAttention)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -663,6 +700,20 @@ func (u *PageUpsertOne) SetMeta(v json.RawMessage) *PageUpsertOne {
 func (u *PageUpsertOne) UpdateMeta() *PageUpsertOne {
 	return u.Update(func(s *PageUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetNeedsAttention sets the "needs_attention" field.
+func (u *PageUpsertOne) SetNeedsAttention(v bool) *PageUpsertOne {
+	return u.Update(func(s *PageUpsert) {
+		s.SetNeedsAttention(v)
+	})
+}
+
+// UpdateNeedsAttention sets the "needs_attention" field to the value that was provided on create.
+func (u *PageUpsertOne) UpdateNeedsAttention() *PageUpsertOne {
+	return u.Update(func(s *PageUpsert) {
+		s.UpdateNeedsAttention()
 	})
 }
 
@@ -1014,6 +1065,20 @@ func (u *PageUpsertBulk) SetMeta(v json.RawMessage) *PageUpsertBulk {
 func (u *PageUpsertBulk) UpdateMeta() *PageUpsertBulk {
 	return u.Update(func(s *PageUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetNeedsAttention sets the "needs_attention" field.
+func (u *PageUpsertBulk) SetNeedsAttention(v bool) *PageUpsertBulk {
+	return u.Update(func(s *PageUpsert) {
+		s.SetNeedsAttention(v)
+	})
+}
+
+// UpdateNeedsAttention sets the "needs_attention" field to the value that was provided on create.
+func (u *PageUpsertBulk) UpdateNeedsAttention() *PageUpsertBulk {
+	return u.Update(func(s *PageUpsert) {
+		s.UpdateNeedsAttention()
 	})
 }
 

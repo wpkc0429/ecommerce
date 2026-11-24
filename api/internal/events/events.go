@@ -33,6 +33,17 @@ type ShopContentUpdated struct{ ShopID int }
 
 func (ShopContentUpdated) EventName() string { return "shop.content_updated" }
 
+// ContentSchemaRegistered — a human registered a new content schema version for
+// the shop (change headless-content-store). Hydrated output of every cached
+// page and the bundle's global content depends on the schema, so the whole
+// shop's render cache is invalidated.
+type ContentSchemaRegistered struct {
+	ShopID  int
+	Version int
+}
+
+func (ContentSchemaRegistered) EventName() string { return "content.schema_registered" }
+
 // ShopStatusChanged — a shop's status changed (or a shop was provisioned).
 // Subscribers drop every cache entry that embeds the shop's status: the render
 // cache version is bumped, and the publishable-key cache entries are

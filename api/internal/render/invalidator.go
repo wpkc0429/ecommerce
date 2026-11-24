@@ -24,6 +24,8 @@ func (i *Invalidator) Handle(ctx context.Context, e events.Event) {
 		i.Cache.DeletePage(ctx, ev.ShopID, ev.Slug)
 	case events.ShopContentUpdated:
 		i.Cache.BumpShops(ctx, ev.ShopID)
+	case events.ContentSchemaRegistered:
+		i.Cache.BumpShops(ctx, ev.ShopID)
 	case events.ShopStatusChanged:
 		i.Cache.BumpShops(ctx, ev.ShopIDs...)
 	}

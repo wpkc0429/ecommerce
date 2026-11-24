@@ -54,6 +54,26 @@ func (_c *ContentSchemaCreate) SetSource(v string) *ContentSchemaCreate {
 	return _c
 }
 
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (_c *ContentSchemaCreate) SetCreatedByUserID(v int) *ContentSchemaCreate {
+	_c.mutation.SetCreatedByUserID(v)
+	return _c
+}
+
+// SetNillableCreatedByUserID sets the "created_by_user_id" field if the given value is not nil.
+func (_c *ContentSchemaCreate) SetNillableCreatedByUserID(v *int) *ContentSchemaCreate {
+	if v != nil {
+		_c.SetCreatedByUserID(*v)
+	}
+	return _c
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (_c *ContentSchemaCreate) SetSnapshotJSON(v json.RawMessage) *ContentSchemaCreate {
+	_c.mutation.SetSnapshotJSON(v)
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ContentSchemaCreate) SetCreatedAt(v time.Time) *ContentSchemaCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -189,6 +209,14 @@ func (_c *ContentSchemaCreate) createSpec() (*ContentSchema, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.Source(); ok {
 		_spec.SetField(contentschema.FieldSource, field.TypeString, value)
 		_node.Source = value
+	}
+	if value, ok := _c.mutation.CreatedByUserID(); ok {
+		_spec.SetField(contentschema.FieldCreatedByUserID, field.TypeInt, value)
+		_node.CreatedByUserID = &value
+	}
+	if value, ok := _c.mutation.SnapshotJSON(); ok {
+		_spec.SetField(contentschema.FieldSnapshotJSON, field.TypeJSON, value)
+		_node.SnapshotJSON = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(contentschema.FieldCreatedAt, field.TypeTime, value)
@@ -329,6 +357,48 @@ func (u *ContentSchemaUpsert) UpdateSource() *ContentSchemaUpsert {
 	return u
 }
 
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (u *ContentSchemaUpsert) SetCreatedByUserID(v int) *ContentSchemaUpsert {
+	u.Set(contentschema.FieldCreatedByUserID, v)
+	return u
+}
+
+// UpdateCreatedByUserID sets the "created_by_user_id" field to the value that was provided on create.
+func (u *ContentSchemaUpsert) UpdateCreatedByUserID() *ContentSchemaUpsert {
+	u.SetExcluded(contentschema.FieldCreatedByUserID)
+	return u
+}
+
+// AddCreatedByUserID adds v to the "created_by_user_id" field.
+func (u *ContentSchemaUpsert) AddCreatedByUserID(v int) *ContentSchemaUpsert {
+	u.Add(contentschema.FieldCreatedByUserID, v)
+	return u
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (u *ContentSchemaUpsert) ClearCreatedByUserID() *ContentSchemaUpsert {
+	u.SetNull(contentschema.FieldCreatedByUserID)
+	return u
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (u *ContentSchemaUpsert) SetSnapshotJSON(v json.RawMessage) *ContentSchemaUpsert {
+	u.Set(contentschema.FieldSnapshotJSON, v)
+	return u
+}
+
+// UpdateSnapshotJSON sets the "snapshot_json" field to the value that was provided on create.
+func (u *ContentSchemaUpsert) UpdateSnapshotJSON() *ContentSchemaUpsert {
+	u.SetExcluded(contentschema.FieldSnapshotJSON)
+	return u
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (u *ContentSchemaUpsert) ClearSnapshotJSON() *ContentSchemaUpsert {
+	u.SetNull(contentschema.FieldSnapshotJSON)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -448,6 +518,55 @@ func (u *ContentSchemaUpsertOne) SetSource(v string) *ContentSchemaUpsertOne {
 func (u *ContentSchemaUpsertOne) UpdateSource() *ContentSchemaUpsertOne {
 	return u.Update(func(s *ContentSchemaUpsert) {
 		s.UpdateSource()
+	})
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (u *ContentSchemaUpsertOne) SetCreatedByUserID(v int) *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.SetCreatedByUserID(v)
+	})
+}
+
+// AddCreatedByUserID adds v to the "created_by_user_id" field.
+func (u *ContentSchemaUpsertOne) AddCreatedByUserID(v int) *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.AddCreatedByUserID(v)
+	})
+}
+
+// UpdateCreatedByUserID sets the "created_by_user_id" field to the value that was provided on create.
+func (u *ContentSchemaUpsertOne) UpdateCreatedByUserID() *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.UpdateCreatedByUserID()
+	})
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (u *ContentSchemaUpsertOne) ClearCreatedByUserID() *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.ClearCreatedByUserID()
+	})
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (u *ContentSchemaUpsertOne) SetSnapshotJSON(v json.RawMessage) *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.SetSnapshotJSON(v)
+	})
+}
+
+// UpdateSnapshotJSON sets the "snapshot_json" field to the value that was provided on create.
+func (u *ContentSchemaUpsertOne) UpdateSnapshotJSON() *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.UpdateSnapshotJSON()
+	})
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (u *ContentSchemaUpsertOne) ClearSnapshotJSON() *ContentSchemaUpsertOne {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.ClearSnapshotJSON()
 	})
 }
 
@@ -736,6 +855,55 @@ func (u *ContentSchemaUpsertBulk) SetSource(v string) *ContentSchemaUpsertBulk {
 func (u *ContentSchemaUpsertBulk) UpdateSource() *ContentSchemaUpsertBulk {
 	return u.Update(func(s *ContentSchemaUpsert) {
 		s.UpdateSource()
+	})
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (u *ContentSchemaUpsertBulk) SetCreatedByUserID(v int) *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.SetCreatedByUserID(v)
+	})
+}
+
+// AddCreatedByUserID adds v to the "created_by_user_id" field.
+func (u *ContentSchemaUpsertBulk) AddCreatedByUserID(v int) *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.AddCreatedByUserID(v)
+	})
+}
+
+// UpdateCreatedByUserID sets the "created_by_user_id" field to the value that was provided on create.
+func (u *ContentSchemaUpsertBulk) UpdateCreatedByUserID() *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.UpdateCreatedByUserID()
+	})
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (u *ContentSchemaUpsertBulk) ClearCreatedByUserID() *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.ClearCreatedByUserID()
+	})
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (u *ContentSchemaUpsertBulk) SetSnapshotJSON(v json.RawMessage) *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.SetSnapshotJSON(v)
+	})
+}
+
+// UpdateSnapshotJSON sets the "snapshot_json" field to the value that was provided on create.
+func (u *ContentSchemaUpsertBulk) UpdateSnapshotJSON() *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.UpdateSnapshotJSON()
+	})
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (u *ContentSchemaUpsertBulk) ClearSnapshotJSON() *ContentSchemaUpsertBulk {
+	return u.Update(func(s *ContentSchemaUpsert) {
+		s.ClearSnapshotJSON()
 	})
 }
 

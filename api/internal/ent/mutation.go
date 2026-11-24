@@ -4838,22 +4838,26 @@ func (m *CheckoutIdempotencyKeyMutation) ResetEdge(name string) error {
 // ContentSchemaMutation represents an operation that mutates the ContentSchema nodes in the graph.
 type ContentSchemaMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int
-	version           *int
-	addversion        *int
-	schema_json       *json.RawMessage
-	appendschema_json json.RawMessage
-	sha256            *string
-	source            *string
-	created_at        *time.Time
-	clearedFields     map[string]struct{}
-	shop              *int
-	clearedshop       bool
-	done              bool
-	oldValue          func(context.Context) (*ContentSchema, error)
-	predicates        []predicate.ContentSchema
+	op                    Op
+	typ                   string
+	id                    *int
+	version               *int
+	addversion            *int
+	schema_json           *json.RawMessage
+	appendschema_json     json.RawMessage
+	sha256                *string
+	source                *string
+	created_by_user_id    *int
+	addcreated_by_user_id *int
+	snapshot_json         *json.RawMessage
+	appendsnapshot_json   json.RawMessage
+	created_at            *time.Time
+	clearedFields         map[string]struct{}
+	shop                  *int
+	clearedshop           bool
+	done                  bool
+	oldValue              func(context.Context) (*ContentSchema, error)
+	predicates            []predicate.ContentSchema
 }
 
 var _ ent.Mutation = (*ContentSchemaMutation)(nil)
@@ -5169,6 +5173,141 @@ func (m *ContentSchemaMutation) ResetSource() {
 	m.source = nil
 }
 
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *ContentSchemaMutation) SetCreatedByUserID(i int) {
+	m.created_by_user_id = &i
+	m.addcreated_by_user_id = nil
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *ContentSchemaMutation) CreatedByUserID() (r int, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldCreatedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// AddCreatedByUserID adds i to the "created_by_user_id" field.
+func (m *ContentSchemaMutation) AddCreatedByUserID(i int) {
+	if m.addcreated_by_user_id != nil {
+		*m.addcreated_by_user_id += i
+	} else {
+		m.addcreated_by_user_id = &i
+	}
+}
+
+// AddedCreatedByUserID returns the value that was added to the "created_by_user_id" field in this mutation.
+func (m *ContentSchemaMutation) AddedCreatedByUserID() (r int, exists bool) {
+	v := m.addcreated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (m *ContentSchemaMutation) ClearCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.addcreated_by_user_id = nil
+	m.clearedFields[contentschema.FieldCreatedByUserID] = struct{}{}
+}
+
+// CreatedByUserIDCleared returns if the "created_by_user_id" field was cleared in this mutation.
+func (m *ContentSchemaMutation) CreatedByUserIDCleared() bool {
+	_, ok := m.clearedFields[contentschema.FieldCreatedByUserID]
+	return ok
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *ContentSchemaMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.addcreated_by_user_id = nil
+	delete(m.clearedFields, contentschema.FieldCreatedByUserID)
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (m *ContentSchemaMutation) SetSnapshotJSON(jm json.RawMessage) {
+	m.snapshot_json = &jm
+	m.appendsnapshot_json = nil
+}
+
+// SnapshotJSON returns the value of the "snapshot_json" field in the mutation.
+func (m *ContentSchemaMutation) SnapshotJSON() (r json.RawMessage, exists bool) {
+	v := m.snapshot_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSnapshotJSON returns the old "snapshot_json" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldSnapshotJSON(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSnapshotJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSnapshotJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSnapshotJSON: %w", err)
+	}
+	return oldValue.SnapshotJSON, nil
+}
+
+// AppendSnapshotJSON adds jm to the "snapshot_json" field.
+func (m *ContentSchemaMutation) AppendSnapshotJSON(jm json.RawMessage) {
+	m.appendsnapshot_json = append(m.appendsnapshot_json, jm...)
+}
+
+// AppendedSnapshotJSON returns the list of values that were appended to the "snapshot_json" field in this mutation.
+func (m *ContentSchemaMutation) AppendedSnapshotJSON() (json.RawMessage, bool) {
+	if len(m.appendsnapshot_json) == 0 {
+		return nil, false
+	}
+	return m.appendsnapshot_json, true
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (m *ContentSchemaMutation) ClearSnapshotJSON() {
+	m.snapshot_json = nil
+	m.appendsnapshot_json = nil
+	m.clearedFields[contentschema.FieldSnapshotJSON] = struct{}{}
+}
+
+// SnapshotJSONCleared returns if the "snapshot_json" field was cleared in this mutation.
+func (m *ContentSchemaMutation) SnapshotJSONCleared() bool {
+	_, ok := m.clearedFields[contentschema.FieldSnapshotJSON]
+	return ok
+}
+
+// ResetSnapshotJSON resets all changes to the "snapshot_json" field.
+func (m *ContentSchemaMutation) ResetSnapshotJSON() {
+	m.snapshot_json = nil
+	m.appendsnapshot_json = nil
+	delete(m.clearedFields, contentschema.FieldSnapshotJSON)
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ContentSchemaMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -5266,7 +5405,7 @@ func (m *ContentSchemaMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ContentSchemaMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 8)
 	if m.shop != nil {
 		fields = append(fields, contentschema.FieldShopID)
 	}
@@ -5281,6 +5420,12 @@ func (m *ContentSchemaMutation) Fields() []string {
 	}
 	if m.source != nil {
 		fields = append(fields, contentschema.FieldSource)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, contentschema.FieldCreatedByUserID)
+	}
+	if m.snapshot_json != nil {
+		fields = append(fields, contentschema.FieldSnapshotJSON)
 	}
 	if m.created_at != nil {
 		fields = append(fields, contentschema.FieldCreatedAt)
@@ -5303,6 +5448,10 @@ func (m *ContentSchemaMutation) Field(name string) (ent.Value, bool) {
 		return m.Sha256()
 	case contentschema.FieldSource:
 		return m.Source()
+	case contentschema.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case contentschema.FieldSnapshotJSON:
+		return m.SnapshotJSON()
 	case contentschema.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -5324,6 +5473,10 @@ func (m *ContentSchemaMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldSha256(ctx)
 	case contentschema.FieldSource:
 		return m.OldSource(ctx)
+	case contentschema.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case contentschema.FieldSnapshotJSON:
+		return m.OldSnapshotJSON(ctx)
 	case contentschema.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -5370,6 +5523,20 @@ func (m *ContentSchemaMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetSource(v)
 		return nil
+	case contentschema.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case contentschema.FieldSnapshotJSON:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSnapshotJSON(v)
+		return nil
 	case contentschema.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -5388,6 +5555,9 @@ func (m *ContentSchemaMutation) AddedFields() []string {
 	if m.addversion != nil {
 		fields = append(fields, contentschema.FieldVersion)
 	}
+	if m.addcreated_by_user_id != nil {
+		fields = append(fields, contentschema.FieldCreatedByUserID)
+	}
 	return fields
 }
 
@@ -5398,6 +5568,8 @@ func (m *ContentSchemaMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case contentschema.FieldVersion:
 		return m.AddedVersion()
+	case contentschema.FieldCreatedByUserID:
+		return m.AddedCreatedByUserID()
 	}
 	return nil, false
 }
@@ -5414,6 +5586,13 @@ func (m *ContentSchemaMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddVersion(v)
 		return nil
+	case contentschema.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreatedByUserID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ContentSchema numeric field %s", name)
 }
@@ -5421,7 +5600,14 @@ func (m *ContentSchemaMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *ContentSchemaMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(contentschema.FieldCreatedByUserID) {
+		fields = append(fields, contentschema.FieldCreatedByUserID)
+	}
+	if m.FieldCleared(contentschema.FieldSnapshotJSON) {
+		fields = append(fields, contentschema.FieldSnapshotJSON)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -5434,6 +5620,14 @@ func (m *ContentSchemaMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *ContentSchemaMutation) ClearField(name string) error {
+	switch name {
+	case contentschema.FieldCreatedByUserID:
+		m.ClearCreatedByUserID()
+		return nil
+	case contentschema.FieldSnapshotJSON:
+		m.ClearSnapshotJSON()
+		return nil
+	}
 	return fmt.Errorf("unknown ContentSchema nullable field %s", name)
 }
 
@@ -5455,6 +5649,12 @@ func (m *ContentSchemaMutation) ResetField(name string) error {
 		return nil
 	case contentschema.FieldSource:
 		m.ResetSource()
+		return nil
+	case contentschema.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case contentschema.FieldSnapshotJSON:
+		m.ResetSnapshotJSON()
 		return nil
 	case contentschema.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -13470,6 +13670,7 @@ type PageMutation struct {
 	appendpublished_json json.RawMessage
 	meta                 *json.RawMessage
 	appendmeta           json.RawMessage
+	needs_attention      *bool
 	clearedFields        map[string]struct{}
 	shop                 *int
 	clearedshop          bool
@@ -14015,6 +14216,42 @@ func (m *PageMutation) ResetMeta() {
 	m.appendmeta = nil
 }
 
+// SetNeedsAttention sets the "needs_attention" field.
+func (m *PageMutation) SetNeedsAttention(b bool) {
+	m.needs_attention = &b
+}
+
+// NeedsAttention returns the value of the "needs_attention" field in the mutation.
+func (m *PageMutation) NeedsAttention() (r bool, exists bool) {
+	v := m.needs_attention
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNeedsAttention returns the old "needs_attention" field's value of the Page entity.
+// If the Page object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PageMutation) OldNeedsAttention(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNeedsAttention is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNeedsAttention requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNeedsAttention: %w", err)
+	}
+	return oldValue.NeedsAttention, nil
+}
+
+// ResetNeedsAttention resets all changes to the "needs_attention" field.
+func (m *PageMutation) ResetNeedsAttention() {
+	m.needs_attention = nil
+}
+
 // ClearShop clears the "shop" edge to the Shop entity.
 func (m *PageMutation) ClearShop() {
 	m.clearedshop = true
@@ -14076,7 +14313,7 @@ func (m *PageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PageMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.created_at != nil {
 		fields = append(fields, page.FieldCreatedAt)
 	}
@@ -14107,6 +14344,9 @@ func (m *PageMutation) Fields() []string {
 	if m.meta != nil {
 		fields = append(fields, page.FieldMeta)
 	}
+	if m.needs_attention != nil {
+		fields = append(fields, page.FieldNeedsAttention)
+	}
 	return fields
 }
 
@@ -14135,6 +14375,8 @@ func (m *PageMutation) Field(name string) (ent.Value, bool) {
 		return m.PublishedJSON()
 	case page.FieldMeta:
 		return m.Meta()
+	case page.FieldNeedsAttention:
+		return m.NeedsAttention()
 	}
 	return nil, false
 }
@@ -14164,6 +14406,8 @@ func (m *PageMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldPublishedJSON(ctx)
 	case page.FieldMeta:
 		return m.OldMeta(ctx)
+	case page.FieldNeedsAttention:
+		return m.OldNeedsAttention(ctx)
 	}
 	return nil, fmt.Errorf("unknown Page field %s", name)
 }
@@ -14242,6 +14486,13 @@ func (m *PageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMeta(v)
+		return nil
+	case page.FieldNeedsAttention:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNeedsAttention(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Page field %s", name)
@@ -14345,6 +14596,9 @@ func (m *PageMutation) ResetField(name string) error {
 		return nil
 	case page.FieldMeta:
 		m.ResetMeta()
+		return nil
+	case page.FieldNeedsAttention:
+		m.ResetNeedsAttention()
 		return nil
 	}
 	return fmt.Errorf("unknown Page field %s", name)

@@ -34,6 +34,11 @@ func (Page) Fields() []ent.Field {
 		field.JSON("content_json", json.RawMessage{}).Default(json.RawMessage("{}")),
 		field.JSON("published_json", json.RawMessage{}).Optional(),
 		field.JSON("meta", json.RawMessage{}).Default(json.RawMessage("{}")),
+		// needs_attention: set when a schema registration found that the draft
+		// (or the published snapshot) no longer validates (change
+		// headless-content-store, design D4). The published content keeps being
+		// served; the draft must be fixed before it can be saved or published.
+		field.Bool("needs_attention").Default(false),
 	}
 }
 

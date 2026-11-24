@@ -157,6 +157,20 @@ func (_u *PageUpdate) AppendMeta(v json.RawMessage) *PageUpdate {
 	return _u
 }
 
+// SetNeedsAttention sets the "needs_attention" field.
+func (_u *PageUpdate) SetNeedsAttention(v bool) *PageUpdate {
+	_u.mutation.SetNeedsAttention(v)
+	return _u
+}
+
+// SetNillableNeedsAttention sets the "needs_attention" field if the given value is not nil.
+func (_u *PageUpdate) SetNillableNeedsAttention(v *bool) *PageUpdate {
+	if v != nil {
+		_u.SetNeedsAttention(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *PageUpdate) SetShop(v *Shop) *PageUpdate {
 	return _u.SetShopID(v.ID)
@@ -294,6 +308,9 @@ func (_u *PageUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, page.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.NeedsAttention(); ok {
+		_spec.SetField(page.FieldNeedsAttention, field.TypeBool, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -471,6 +488,20 @@ func (_u *PageUpdateOne) AppendMeta(v json.RawMessage) *PageUpdateOne {
 	return _u
 }
 
+// SetNeedsAttention sets the "needs_attention" field.
+func (_u *PageUpdateOne) SetNeedsAttention(v bool) *PageUpdateOne {
+	_u.mutation.SetNeedsAttention(v)
+	return _u
+}
+
+// SetNillableNeedsAttention sets the "needs_attention" field if the given value is not nil.
+func (_u *PageUpdateOne) SetNillableNeedsAttention(v *bool) *PageUpdateOne {
+	if v != nil {
+		_u.SetNeedsAttention(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *PageUpdateOne) SetShop(v *Shop) *PageUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -638,6 +669,9 @@ func (_u *PageUpdateOne) sqlSave(ctx context.Context) (_node *Page, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, page.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.NeedsAttention(); ok {
+		_spec.SetField(page.FieldNeedsAttention, field.TypeBool, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

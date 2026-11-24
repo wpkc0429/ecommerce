@@ -35,6 +35,8 @@ const (
 	FieldPublishedJSON = "published_json"
 	// FieldMeta holds the string denoting the meta field in the database.
 	FieldMeta = "meta"
+	// FieldNeedsAttention holds the string denoting the needs_attention field in the database.
+	FieldNeedsAttention = "needs_attention"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
 	EdgeShop = "shop"
 	// Table holds the table name of the page in the database.
@@ -61,6 +63,7 @@ var Columns = []string{
 	FieldContentJSON,
 	FieldPublishedJSON,
 	FieldMeta,
+	FieldNeedsAttention,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -94,6 +97,8 @@ var (
 	DefaultContentJSON json.RawMessage
 	// DefaultMeta holds the default value on creation for the "meta" field.
 	DefaultMeta json.RawMessage
+	// DefaultNeedsAttention holds the default value on creation for the "needs_attention" field.
+	DefaultNeedsAttention bool
 )
 
 // OrderOption defines the ordering options for the Page queries.
@@ -137,6 +142,11 @@ func BySlug(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByNeedsAttention orders the results by the needs_attention field.
+func ByNeedsAttention(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNeedsAttention, opts...).ToFunc()
 }
 
 // ByShopField orders the results by shop field.

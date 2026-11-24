@@ -87,7 +87,7 @@ func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey str
 	v, err := s.schemas().Active(ctx, shopID)
 	if err != nil {
 		if errors.Is(err, contentschema.ErrNoSchema) {
-			return nil, &ValidationError{Message: "shop has no content schema"}
+			return nil, noSchemaError(shopID)
 		}
 		return nil, err
 	}
@@ -99,6 +99,16 @@ func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey str
 		}
 	}
 	return schema, nil
+}
+
+// noSchemaError is the actionable 422 for a shop that has no content schema
+// yet: it names the call that fixes it (change headless-content-store). The
+// message keeps its historical prefix so clients matching on it still work.
+func noSchemaError(shopID int) *ValidationError {
+	return &ValidationError{
+		Message: fmt.Sprintf("shop has no content schema: register one first with PUT /api/v1/admin/shops/%d/content/schema (dry run with ?dry_run=true; a starter schema is in docs/content-schema.md)", shopID),
+		Details: []Detail{{Pointer: "", Message: "no content schema registered for this shop"}},
+	}
 }
 
 func normalizeSlug(raw string) (string, error) {
@@ -197,6 +207,12 @@ func (s *Service) UpdatePage(ctx context.Context, shopID, pageID int, in PageUpd
 			return nil, err
 		}
 		upd.SetContentJSON(content)
+		// The new draft passes the active schema. The page leaves the
+		// needs-attention state unless its published snapshot is still invalid
+		// (publishing the fixed draft clears that).
+		if p.NeedsAttention {
+			upd.SetNeedsAttention(len(p.PublishedJSON) > 0 && ValidatePayload(schema, p.PublishedJSON) != nil)
+		}
 	}
 	if len(in.Meta) > 0 {
 		upd.SetMeta(in.Meta)
@@ -231,6 +247,7 @@ func (s *Service) PublishPage(ctx context.Context, shopID, pageID int) (*ent.Pag
 	p, err = p.Update().
 		SetPublishedJSON(p.ContentJSON).
 		SetStatus(1).
+		SetNeedsAttention(false).
 		Save(ctx)
 	if err != nil {
 		return nil, err
@@ -336,7 +353,7 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 		return nil, fmt.Errorf("cms: load content schema: %w", err)
 	}
 	if !ok {
-		return nil, &ValidationError{Message: "shop has no content schema"}
+		return nil, noSchemaError(shopID)
 	}
 	if len(content) == 0 {
 		content = json.RawMessage("{}")

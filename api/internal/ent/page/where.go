@@ -90,6 +90,11 @@ func Status(v int16) predicate.Page {
 	return predicate.Page(sql.FieldEQ(FieldStatus, v))
 }
 
+// NeedsAttention applies equality check predicate on the "needs_attention" field. It's identical to NeedsAttentionEQ.
+func NeedsAttention(v bool) predicate.Page {
+	return predicate.Page(sql.FieldEQ(FieldNeedsAttention, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Page {
 	return predicate.Page(sql.FieldEQ(FieldCreatedAt, v))
@@ -433,6 +438,16 @@ func PublishedJSONIsNil() predicate.Page {
 // PublishedJSONNotNil applies the NotNil predicate on the "published_json" field.
 func PublishedJSONNotNil() predicate.Page {
 	return predicate.Page(sql.FieldNotNull(FieldPublishedJSON))
+}
+
+// NeedsAttentionEQ applies the EQ predicate on the "needs_attention" field.
+func NeedsAttentionEQ(v bool) predicate.Page {
+	return predicate.Page(sql.FieldEQ(FieldNeedsAttention, v))
+}
+
+// NeedsAttentionNEQ applies the NEQ predicate on the "needs_attention" field.
+func NeedsAttentionNEQ(v bool) predicate.Page {
+	return predicate.Page(sql.FieldNEQ(FieldNeedsAttention, v))
 }
 
 // HasShop applies the HasEdge predicate on the "shop" edge.

@@ -34,12 +34,37 @@ const (
 var ErrNoSchema = errors.New("contentschema: shop has no content schema")
 
 // Doc is the format-1 schema document stored in content_schemas.schema_json.
+//
+// For a format-2 row (registered through the admin API, design D3) the same
+// struct is the normalized READ view: Types maps each type key to its JSON
+// Schema (the wrapper's title is in Titles), Global is the schema of the
+// "global" type, and Documents / Collections carry the declarations. Format-2
+// rows are never produced by marshaling a Doc.
 type Doc struct {
-	Format        int                        `json:"format"`
-	Types         map[string]json.RawMessage `json:"types"`
-	TypeOrder     []string                   `json:"type_order,omitempty"`
-	Global        json.RawMessage            `json:"global"`
+	Format    int                        `json:"format"`
+	Types     map[string]json.RawMessage `json:"types"`
+	TypeOrder []string                   `json:"type_order,omitempty"`
+	Global    json.RawMessage            `json:"global"`
+
+	Titles      map[string]string         `json:"-"`
+	Documents   map[string]DocumentDecl   `json:"-"`
+	Collections map[string]CollectionDecl `json:"-"`
 }
+
+// DocumentDecl declares a fixed document key (format 2).
+type DocumentDecl struct {
+	Type string `json:"type"`
+}
+
+// CollectionDecl declares a dynamic key prefix (format 2).
+type CollectionDecl struct {
+	Type string `json:"type"`
+	Max  int    `json:"max"`
+}
+
+// EmptyGlobalSchema is the global schema of a format-2 document that defines
+// no "global" type: nothing may be stored.
+const EmptyGlobalSchema = `{"type":"object","additionalProperties":false,"properties":{}}`
 
 // TypeInfo describes one page type of a shop's schema.
 type TypeInfo struct {
@@ -55,6 +80,8 @@ type Store struct {
 type Version struct {
 	Version int
 	Doc     Doc
+	// Raw is the stored schema_json (format 1 or 2).
+	Raw json.RawMessage
 }
 
 // Active returns the shop's highest schema version, or ErrNoSchema.
@@ -135,7 +162,47 @@ func (d Doc) TypeInfos() []TypeInfo {
 	return out
 }
 
+// format2 is the stored shape of a registered content.schema.json.
+type format2 struct {
+	Format int `json:"format"`
+	Types  map[string]struct {
+		Title  string          `json:"title"`
+		Schema json.RawMessage `json:"schema"`
+	} `json:"types"`
+	Documents   map[string]DocumentDecl   `json:"documents"`
+	Collections map[string]CollectionDecl `json:"collections"`
+}
+
 func decodeRow(row *ent.ContentSchema) (*Version, error) {
+	var head struct {
+		Format int `json:"format"`
+	}
+	if err := json.Unmarshal(row.SchemaJSON, &head); err != nil {
+		return nil, fmt.Errorf("contentschema: decode shop %d version %d: %w", row.ShopID, row.Version, err)
+	}
+	if head.Format == 2 {
+		var f format2
+		if err := json.Unmarshal(row.SchemaJSON, &f); err != nil {
+			return nil, fmt.Errorf("contentschema: decode shop %d version %d: %w", row.ShopID, row.Version, err)
+		}
+		d := Doc{
+			Format:      2,
+			Types:       map[string]json.RawMessage{},
+			Titles:      map[string]string{},
+			Documents:   f.Documents,
+			Collections: f.Collections,
+			Global:      json.RawMessage(EmptyGlobalSchema),
+		}
+		for k, t := range f.Types {
+			if k == "global" {
+				d.Global = t.Schema
+				continue
+			}
+			d.Types[k] = t.Schema
+			d.Titles[k] = t.Title
+		}
+		return &Version{Version: row.Version, Doc: d, Raw: row.SchemaJSON}, nil
+	}
 	var d Doc
 	if err := json.Unmarshal(row.SchemaJSON, &d); err != nil {
 		return nil, fmt.Errorf("contentschema: decode shop %d version %d: %w", row.ShopID, row.Version, err)
@@ -143,8 +210,11 @@ func decodeRow(row *ent.ContentSchema) (*Version, error) {
 	if d.Types == nil {
 		d.Types = map[string]json.RawMessage{}
 	}
-	return &Version{Version: row.Version, Doc: d}, nil
+	return &Version{Version: row.Version, Doc: d, Raw: row.SchemaJSON}, nil
 }
+
+// DecodeRow exposes the row decoder to the registration service.
+func DecodeRow(row *ent.ContentSchema) (*Version, error) { return decodeRow(row) }
 
 // Digest returns the hex SHA-256 of the normalized (keys sorted, compact)
 // form of the document, so two semantically equal documents hash equally no
@@ -194,6 +264,12 @@ func (w Writer) Write(ctx context.Context, shopID int, d Doc, source string) (wr
 		cur, derr := decodeRow(last)
 		if derr != nil {
 			return false, derr
+		}
+		if cur.Doc.Format == 2 {
+			// A registered (format 2) schema is owned by whoever registered it;
+			// a re-run of a format-1 writer such as the demo seed must not
+			// replace it.
+			return false, nil
 		}
 		curDigest, derr := Digest(cur.Doc)
 		if derr != nil {

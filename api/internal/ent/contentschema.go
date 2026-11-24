@@ -29,6 +29,10 @@ type ContentSchema struct {
 	Sha256 string `json:"sha256,omitempty"`
 	// Source holds the value of the "source" field.
 	Source string `json:"source,omitempty"`
+	// CreatedByUserID holds the value of the "created_by_user_id" field.
+	CreatedByUserID *int `json:"created_by_user_id,omitempty"`
+	// SnapshotJSON holds the value of the "snapshot_json" field.
+	SnapshotJSON json.RawMessage `json:"snapshot_json,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -62,9 +66,9 @@ func (*ContentSchema) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case contentschema.FieldSchemaJSON:
+		case contentschema.FieldSchemaJSON, contentschema.FieldSnapshotJSON:
 			values[i] = new([]byte)
-		case contentschema.FieldID, contentschema.FieldShopID, contentschema.FieldVersion:
+		case contentschema.FieldID, contentschema.FieldShopID, contentschema.FieldVersion, contentschema.FieldCreatedByUserID:
 			values[i] = new(sql.NullInt64)
 		case contentschema.FieldSha256, contentschema.FieldSource:
 			values[i] = new(sql.NullString)
@@ -122,6 +126,21 @@ func (_m *ContentSchema) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field source", values[i])
 			} else if value.Valid {
 				_m.Source = value.String
+			}
+		case contentschema.FieldCreatedByUserID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field created_by_user_id", values[i])
+			} else if value.Valid {
+				_m.CreatedByUserID = new(int)
+				*_m.CreatedByUserID = int(value.Int64)
+			}
+		case contentschema.FieldSnapshotJSON:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field snapshot_json", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.SnapshotJSON); err != nil {
+					return fmt.Errorf("unmarshal field snapshot_json: %w", err)
+				}
 			}
 		case contentschema.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -184,6 +203,14 @@ func (_m *ContentSchema) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("source=")
 	builder.WriteString(_m.Source)
+	builder.WriteString(", ")
+	if v := _m.CreatedByUserID; v != nil {
+		builder.WriteString("created_by_user_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	builder.WriteString("snapshot_json=")
+	builder.WriteString(fmt.Sprintf("%v", _m.SnapshotJSON))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

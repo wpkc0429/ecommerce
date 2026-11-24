@@ -315,7 +315,7 @@ func init() {
 		}
 	}()
 	// contentschemaDescCreatedAt is the schema descriptor for created_at field.
-	contentschemaDescCreatedAt := contentschemaFields[5].Descriptor()
+	contentschemaDescCreatedAt := contentschemaFields[7].Descriptor()
 	// contentschema.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentschema.DefaultCreatedAt = contentschemaDescCreatedAt.Default.(func() time.Time)
 	mediauploadFields := schema.MediaUpload{}.Fields()
@@ -730,6 +730,10 @@ func init() {
 	pageDescMeta := pageFields[7].Descriptor()
 	// page.DefaultMeta holds the default value on creation for the meta field.
 	page.DefaultMeta = pageDescMeta.Default.(json.RawMessage)
+	// pageDescNeedsAttention is the schema descriptor for needs_attention field.
+	pageDescNeedsAttention := pageFields[8].Descriptor()
+	// page.DefaultNeedsAttention holds the default value on creation for the needs_attention field.
+	page.DefaultNeedsAttention = pageDescNeedsAttention.Default.(bool)
 	paymentMixin := schema.Payment{}.Mixin()
 	paymentMixinFields0 := paymentMixin[0].Fields()
 	_ = paymentMixinFields0

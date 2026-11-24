@@ -106,6 +106,51 @@ func (_u *ContentSchemaUpdate) SetNillableSource(v *string) *ContentSchemaUpdate
 	return _u
 }
 
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (_u *ContentSchemaUpdate) SetCreatedByUserID(v int) *ContentSchemaUpdate {
+	_u.mutation.ResetCreatedByUserID()
+	_u.mutation.SetCreatedByUserID(v)
+	return _u
+}
+
+// SetNillableCreatedByUserID sets the "created_by_user_id" field if the given value is not nil.
+func (_u *ContentSchemaUpdate) SetNillableCreatedByUserID(v *int) *ContentSchemaUpdate {
+	if v != nil {
+		_u.SetCreatedByUserID(*v)
+	}
+	return _u
+}
+
+// AddCreatedByUserID adds value to the "created_by_user_id" field.
+func (_u *ContentSchemaUpdate) AddCreatedByUserID(v int) *ContentSchemaUpdate {
+	_u.mutation.AddCreatedByUserID(v)
+	return _u
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (_u *ContentSchemaUpdate) ClearCreatedByUserID() *ContentSchemaUpdate {
+	_u.mutation.ClearCreatedByUserID()
+	return _u
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (_u *ContentSchemaUpdate) SetSnapshotJSON(v json.RawMessage) *ContentSchemaUpdate {
+	_u.mutation.SetSnapshotJSON(v)
+	return _u
+}
+
+// AppendSnapshotJSON appends value to the "snapshot_json" field.
+func (_u *ContentSchemaUpdate) AppendSnapshotJSON(v json.RawMessage) *ContentSchemaUpdate {
+	_u.mutation.AppendSnapshotJSON(v)
+	return _u
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (_u *ContentSchemaUpdate) ClearSnapshotJSON() *ContentSchemaUpdate {
+	_u.mutation.ClearSnapshotJSON()
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ContentSchemaUpdate) SetShop(v *Shop) *ContentSchemaUpdate {
 	return _u.SetShopID(v.ID)
@@ -204,6 +249,26 @@ func (_u *ContentSchemaUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if value, ok := _u.mutation.Source(); ok {
 		_spec.SetField(contentschema.FieldSource, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CreatedByUserID(); ok {
+		_spec.SetField(contentschema.FieldCreatedByUserID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCreatedByUserID(); ok {
+		_spec.AddField(contentschema.FieldCreatedByUserID, field.TypeInt, value)
+	}
+	if _u.mutation.CreatedByUserIDCleared() {
+		_spec.ClearField(contentschema.FieldCreatedByUserID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SnapshotJSON(); ok {
+		_spec.SetField(contentschema.FieldSnapshotJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSnapshotJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, contentschema.FieldSnapshotJSON, value)
+		})
+	}
+	if _u.mutation.SnapshotJSONCleared() {
+		_spec.ClearField(contentschema.FieldSnapshotJSON, field.TypeJSON)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -328,6 +393,51 @@ func (_u *ContentSchemaUpdateOne) SetNillableSource(v *string) *ContentSchemaUpd
 	if v != nil {
 		_u.SetSource(*v)
 	}
+	return _u
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (_u *ContentSchemaUpdateOne) SetCreatedByUserID(v int) *ContentSchemaUpdateOne {
+	_u.mutation.ResetCreatedByUserID()
+	_u.mutation.SetCreatedByUserID(v)
+	return _u
+}
+
+// SetNillableCreatedByUserID sets the "created_by_user_id" field if the given value is not nil.
+func (_u *ContentSchemaUpdateOne) SetNillableCreatedByUserID(v *int) *ContentSchemaUpdateOne {
+	if v != nil {
+		_u.SetCreatedByUserID(*v)
+	}
+	return _u
+}
+
+// AddCreatedByUserID adds value to the "created_by_user_id" field.
+func (_u *ContentSchemaUpdateOne) AddCreatedByUserID(v int) *ContentSchemaUpdateOne {
+	_u.mutation.AddCreatedByUserID(v)
+	return _u
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (_u *ContentSchemaUpdateOne) ClearCreatedByUserID() *ContentSchemaUpdateOne {
+	_u.mutation.ClearCreatedByUserID()
+	return _u
+}
+
+// SetSnapshotJSON sets the "snapshot_json" field.
+func (_u *ContentSchemaUpdateOne) SetSnapshotJSON(v json.RawMessage) *ContentSchemaUpdateOne {
+	_u.mutation.SetSnapshotJSON(v)
+	return _u
+}
+
+// AppendSnapshotJSON appends value to the "snapshot_json" field.
+func (_u *ContentSchemaUpdateOne) AppendSnapshotJSON(v json.RawMessage) *ContentSchemaUpdateOne {
+	_u.mutation.AppendSnapshotJSON(v)
+	return _u
+}
+
+// ClearSnapshotJSON clears the value of the "snapshot_json" field.
+func (_u *ContentSchemaUpdateOne) ClearSnapshotJSON() *ContentSchemaUpdateOne {
+	_u.mutation.ClearSnapshotJSON()
 	return _u
 }
 
@@ -459,6 +569,26 @@ func (_u *ContentSchemaUpdateOne) sqlSave(ctx context.Context) (_node *ContentSc
 	}
 	if value, ok := _u.mutation.Source(); ok {
 		_spec.SetField(contentschema.FieldSource, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.CreatedByUserID(); ok {
+		_spec.SetField(contentschema.FieldCreatedByUserID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedCreatedByUserID(); ok {
+		_spec.AddField(contentschema.FieldCreatedByUserID, field.TypeInt, value)
+	}
+	if _u.mutation.CreatedByUserIDCleared() {
+		_spec.ClearField(contentschema.FieldCreatedByUserID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SnapshotJSON(); ok {
+		_spec.SetField(contentschema.FieldSnapshotJSON, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSnapshotJSON(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, contentschema.FieldSnapshotJSON, value)
+		})
+	}
+	if _u.mutation.SnapshotJSONCleared() {
+		_spec.ClearField(contentschema.FieldSnapshotJSON, field.TypeJSON)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

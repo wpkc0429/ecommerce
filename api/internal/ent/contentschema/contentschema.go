@@ -24,6 +24,10 @@ const (
 	FieldSha256 = "sha256"
 	// FieldSource holds the string denoting the source field in the database.
 	FieldSource = "source"
+	// FieldCreatedByUserID holds the string denoting the created_by_user_id field in the database.
+	FieldCreatedByUserID = "created_by_user_id"
+	// FieldSnapshotJSON holds the string denoting the snapshot_json field in the database.
+	FieldSnapshotJSON = "snapshot_json"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
@@ -47,6 +51,8 @@ var Columns = []string{
 	FieldSchemaJSON,
 	FieldSha256,
 	FieldSource,
+	FieldCreatedByUserID,
+	FieldSnapshotJSON,
 	FieldCreatedAt,
 }
 
@@ -95,6 +101,11 @@ func BySha256(opts ...sql.OrderTermOption) OrderOption {
 // BySource orders the results by the source field.
 func BySource(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSource, opts...).ToFunc()
+}
+
+// ByCreatedByUserID orders the results by the created_by_user_id field.
+func ByCreatedByUserID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreatedByUserID, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

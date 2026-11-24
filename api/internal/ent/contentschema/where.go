@@ -75,6 +75,11 @@ func Source(v string) predicate.ContentSchema {
 	return predicate.ContentSchema(sql.FieldEQ(FieldSource, v))
 }
 
+// CreatedByUserID applies equality check predicate on the "created_by_user_id" field. It's identical to CreatedByUserIDEQ.
+func CreatedByUserID(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldEQ(FieldCreatedByUserID, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ContentSchema {
 	return predicate.ContentSchema(sql.FieldEQ(FieldCreatedAt, v))
@@ -268,6 +273,66 @@ func SourceEqualFold(v string) predicate.ContentSchema {
 // SourceContainsFold applies the ContainsFold predicate on the "source" field.
 func SourceContainsFold(v string) predicate.ContentSchema {
 	return predicate.ContentSchema(sql.FieldContainsFold(FieldSource, v))
+}
+
+// CreatedByUserIDEQ applies the EQ predicate on the "created_by_user_id" field.
+func CreatedByUserIDEQ(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldEQ(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDNEQ applies the NEQ predicate on the "created_by_user_id" field.
+func CreatedByUserIDNEQ(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldNEQ(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDIn applies the In predicate on the "created_by_user_id" field.
+func CreatedByUserIDIn(vs ...int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldIn(FieldCreatedByUserID, vs...))
+}
+
+// CreatedByUserIDNotIn applies the NotIn predicate on the "created_by_user_id" field.
+func CreatedByUserIDNotIn(vs ...int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldNotIn(FieldCreatedByUserID, vs...))
+}
+
+// CreatedByUserIDGT applies the GT predicate on the "created_by_user_id" field.
+func CreatedByUserIDGT(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldGT(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDGTE applies the GTE predicate on the "created_by_user_id" field.
+func CreatedByUserIDGTE(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldGTE(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDLT applies the LT predicate on the "created_by_user_id" field.
+func CreatedByUserIDLT(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldLT(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDLTE applies the LTE predicate on the "created_by_user_id" field.
+func CreatedByUserIDLTE(v int) predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldLTE(FieldCreatedByUserID, v))
+}
+
+// CreatedByUserIDIsNil applies the IsNil predicate on the "created_by_user_id" field.
+func CreatedByUserIDIsNil() predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldIsNull(FieldCreatedByUserID))
+}
+
+// CreatedByUserIDNotNil applies the NotNil predicate on the "created_by_user_id" field.
+func CreatedByUserIDNotNil() predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldNotNull(FieldCreatedByUserID))
+}
+
+// SnapshotJSONIsNil applies the IsNil predicate on the "snapshot_json" field.
+func SnapshotJSONIsNil() predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldIsNull(FieldSnapshotJSON))
+}
+
+// SnapshotJSONNotNil applies the NotNil predicate on the "snapshot_json" field.
+func SnapshotJSONNotNil() predicate.ContentSchema {
+	return predicate.ContentSchema(sql.FieldNotNull(FieldSnapshotJSON))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
