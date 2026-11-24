@@ -253,6 +253,24 @@ async function commercePath() {
   check("checkout decremented stock by the ordered quantity",
     stockAfterGuest === stockBeforeGuest - 1, `${stockBeforeGuest} → ${stockAfterGuest}`);
 
+  // change order-and-invitation-polish: shipping an UNPAID order is refused by
+  // the API itself (409), not just by whichever admin front end is in use.
+  const gUnpaidShip = await req("POST", shopPath(`/orders/${gOrder.id}/shipments`), {
+    token: admin, body: { carrier: paidMethod.carrier },
+  });
+  check("an unpaid order cannot be shipped (409 order is not paid)",
+    gUnpaidShip.status === 409 && /not paid/.test(gUnpaidShip.text), brief(gUnpaidShip));
+  const gStillUnfulfilled = await req("GET", shopPath(`/orders/${gOrder.id}`), { token: admin });
+  check("…and the refusal leaves the order unfulfilled",
+    gStillUnfulfilled.json?.fulfillment_status === 0, String(gStillUnfulfilled.json?.fulfillment_status));
+
+  // change order-and-invitation-polish: order items carry the SKU's options
+  // as a snapshot, so clients stop parsing sku_code suffixes.
+  const gOpts = gOrder.items?.[0]?.options;
+  check("order items carry the options snapshot as an object (size, not a sku_code suffix)",
+    gOpts !== null && typeof gOpts === "object" && typeof gOpts.size === "string" && gOpts.size.length > 0,
+    JSON.stringify(gOrder.items?.[0]));
+
   const gPay = await req("POST", "/api/v1/shop/guest/order/payments", { token: gToken, pk: PK, body: {} });
   need(gPay.status === 201, `guest payment initiation failed: ${brief(gPay)}`);
   check("the amount sent to the payment provider is the PAYABLE total (shipping included)",
@@ -262,6 +280,14 @@ async function commercePath() {
   check("signed provider webhook accepted", gHook.status === 200, brief(gHook));
   const gAfterPay = await req("GET", "/api/v1/shop/guest/order", { token: gToken, pk: PK });
   check("order is marked paid", gAfterPay.json?.payment_status === 1, String(gAfterPay.json?.payment_status));
+
+  // change order-and-invitation-polish: the mock provider reports no time, yet a
+  // succeeded payment still carries paid_at.
+  const gPayRows = await req("GET", shopPath(`/orders/${gOrder.id}/payments`), { token: admin });
+  const gPaidAt = gPayRows.json?.payments?.[0]?.paid_at;
+  check("a succeeded mock payment has paid_at (the merchant can say WHEN)",
+    typeof gPaidAt === "string" && Math.abs(Date.now() - Date.parse(gPaidAt)) < 10 * 60 * 1000,
+    String(gPaidAt));
 
   // The cross-package seam: payment → events.OrderPaymentSucceeded → points.
   const expectedAward = Math.floor(gOrder.subtotal_amount / 100);
@@ -848,6 +874,17 @@ async function commercePath() {
     pOrder.items.every((i) => i.shipped_quantity === 0) && pOrder.fulfillment_status === 0,
     JSON.stringify(pOrder.items.map((i) => i.shipped_quantity)));
 
+  // Shipping needs a PAID order (change order-and-invitation-polish). Paying
+  // awards points to the shared demo customer, so the section hands them back
+  // at the end with a manual adjustment (a delivered parcel cannot be returned,
+  // and this section needs it delivered) — that is what keeps this file
+  // re-runnable.
+  const pPointsBefore = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json?.points;
+  const pPay = await req("POST", `/api/v1/shop/orders/${pOrder.id}/payments`, { token: member, pk: PK, body: {} });
+  need(pPay.status === 201, `partial-shipment payment initiation failed: ${brief(pPay)}`);
+  const pHook = await deliverWebhook(pPay.json.provider_reference);
+  need(pHook.status === 200, `partial-shipment payment webhook failed: ${brief(pHook)}`);
+
   // The plural customer endpoint answers 200 with an empty collection before
   // anything ships — a list's empty case is not a 404 (design D6).
   const pNone = await req("GET", `/api/v1/shop/orders/${pOrder.id}/shipments`, { token: member, pk: PK });
@@ -949,6 +986,18 @@ async function commercePath() {
   });
   check("a fully shipped order refuses a further parcel (409)",
     nothingLeft.status === 409, brief(nothingLeft));
+
+  // Hand the points back (see above) with a merchant adjustment of exactly the award.
+  const pPointsMid = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json?.points;
+  if (pPointsMid !== pPointsBefore) {
+    const give = await req("POST", shopPath(`/members/${pOrder.member_id}/points/adjust`), {
+      token: admin, body: { points_delta: pPointsBefore - pPointsMid, reason: "e2e: undo partial-shipment award" },
+    });
+    need(give.status === 200 || give.status === 201, `points hand-back failed: ${brief(give)}`);
+  }
+  const pPointsAfter = (await req("GET", "/api/v1/shop/points", { token: member, pk: PK })).json?.points;
+  check("the section is points-neutral again (re-runnable)",
+    pPointsAfter === pPointsBefore, `${pPointsBefore} → ${pPointsMid} → ${pPointsAfter}`);
 
   // ── ⑭ 營運報表（change merchant-reports）──
   //

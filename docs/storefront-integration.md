@@ -450,6 +450,16 @@ GET /api/v1/shop/guest/order/shipment    → **最近一筆**出貨（單一物�
 - **單數的 `/shipment` 仍然可用**，語意是「最近一筆」。單箱訂單的回應與過去逐位元組相同；多箱時它只看得到最新那箱。
 - 訂單的 `items[]` 新增 `shipped_quantity`：這一行**已經出貨的數量**。`quantity - shipped_quantity` 就是還沒出的。
 
+### 訂單品項的規格選項 `options`（change order-and-invitation-polish）
+
+訂單（會員、訪客、後台三種回應都一樣）的 `items[]` 每一列新增 `options`：下單當下該 SKU 的規格選項快照，
+例如 `{"size": "M", "color": "red"}`。**請直接讀它，不要再從 `sku_code` 的 `-S/-M/-L` 尾碼猜尺寸。**
+
+- 它是快照：商家日後改 SKU 的選項或刪除 SKU，已成立訂單的 `options` 不變。
+- SKU 沒有任何選項時是 `{}`（不是 `null`）。
+- **早於此欄位的舊訂單可能是 `null`**——必須容許。migration 已盡力以 SKU 目前的選項回填；SKU 已刪除者維持 `null`，
+  而被回填的值若在下單後被改過，只是近似值。遇到 `null` 請退回顯示 `sku_code`。
+
 ### `fulfillment_status` 新增了值 `4`
 
 | 值 | 意思 |

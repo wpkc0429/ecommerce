@@ -591,6 +591,13 @@ try {
   check("a two-line guest order was placed for the partial-shipment screen",
     partPlaced.status === 201, brief(partPlaced));
   const partOrder = partPlaced.json?.order ?? {};
+  // Shipments require a paid order (change order-and-invitation-polish).
+  const partPay = await req("POST", "/api/v1/shop/guest/order/payments", {
+    token: partPlaced.json?.order_access_token, pk: PK, body: {},
+  });
+  const partHook = await deliverWebhook(partPay.json?.provider_reference);
+  check("the partial-shipment order was paid so it can ship", partPay.status === 201 && partHook.status === 200,
+    `${partPay.status}/${partHook.status}`);
   const partLines = partOrder.items ?? [];
   const lineOf = (code) => partLines.find((i) => i.sku_code === code);
 
@@ -1179,6 +1186,11 @@ try {
       await existingCtx.close();
     }
     const pending = await req("GET", `/api/v1/admin/shops/${SHOP}/invitations`, { token: ownerTok });
+    check("every listed invitation carries an explicit status, and the live ones are pending",
+      (pending.json?.invitations ?? []).length > 0 &&
+        pending.json.invitations.every((i) => i.status === "pending" || i.status === "expired") &&
+        pending.json.invitations.find((i) => i.email === inviteEmail)?.status === "pending",
+      JSON.stringify(pending.json?.invitations?.map((i) => [i.email, i.status])));
     const adminInviteID = pending.json?.invitations?.find((i) => i.email === ADMIN_EMAIL.toLowerCase())?.id;
     const revoked = await req("DELETE", `/api/v1/admin/shops/${SHOP}/invitations/${adminInviteID}`, { token: ownerTok });
     check("that invitation is revoked again", revoked.status === 204, brief(revoked));

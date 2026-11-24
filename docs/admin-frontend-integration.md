@@ -201,6 +201,26 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 （出貨、訂單、點數皆不變）；`delivered` 只需 `shipment.update`。UI 應依 `GET /shops/{shopID}/me` 的 `permissions`
 決定是否畫「標記退貨」按鈕。
 
+### 建立出貨需要訂單已付款（change order-and-invitation-polish）
+
+`POST …/orders/{orderID}/shipments` 只對 `payment_status = 1`（已付款）的訂單成立；未付款（`0`）與已退款（`2`／`3`）
+回 **`409`**（`error.code = "conflict"`，`message = "order is not paid"`），不寫入任何出貨。這是伺服器端的授權，
+**前端不能再以「UI 擋住」為唯一防線，也要處理 409**：顯示「訂單尚未付款，無法出貨」並重新讀取訂單。
+`409` 另外仍涵蓋訂單已取消、已無未出貨數量、已有退貨出貨。目前沒有貨到付款的例外（資料模型沒有付款方式旗標）。
+
+### 邀請清單含已過期者，並帶 `status`
+
+`GET …/invitations` 現在回傳**所有未接受、未撤回**的邀請，每筆新增 `status`：`"pending"`（可接受）或 `"expired"`
+（連結已失效）。原有欄位不變，但清單多了已過期的列——**請依 `status` 顯示**（例如已過期者標示並只留「撤回」）。
+`DELETE …/invitations/{invitationID}` 對已過期的邀請同樣回 `204`，撤回後從清單消失。要重新邀請同一個 email 也可以直接再邀請一次
+（會取代舊的）。
+
+### `paid_at` 與訂單品項 `options`
+
+- 付款列（`GET …/orders/{id}/payments`、`GET …/payments`）的 `paid_at`：**成功的付款一定有值**。服務商有宣告時間就用它，
+  沒有（mock、綠界略去 `PaymentDate`）時是平台記錄成功的時間；待付款與失敗的付款仍是 `null`。
+- 訂單 `items[].options`：下單當下的 SKU 規格選項快照（物件；沒有選項時 `{}`；舊訂單可能為 `null`，請容許並退回 `sku_code`）。
+
 ---
 
 ## 任何後台前端都必須實作的契約（change admin-api-public-exposure）
