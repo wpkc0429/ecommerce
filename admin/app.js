@@ -28,6 +28,7 @@ import { createReportsView } from "./views/reports.js";
 import { createStorefrontClientsView } from "./views/storefront-clients.js";
 import { createPlatformShopsView } from "./views/platform-shops.js";
 import { createPlatformAccountsView } from "./views/platform-accounts.js";
+import { createPlatformApplicationsView, refreshApplicationsBadge } from "./views/platform-applications.js";
 import { createSetPasswordView } from "./views/set-password.js";
 import { createAcceptInviteView } from "./views/accept-invite.js";
 import { createTeamView } from "./views/team.js";
@@ -91,6 +92,11 @@ const views = {
   "platform-accounts": {
     label: "帳號（平台）", panel: "tab-platform-accounts", nav: true,
     platformPerm: "account.view", view: createPlatformAccountsView(),
+  },
+  // 開店申請審核（change platform-website）：同為平台視圖，可見性是平台權限節點。
+  "platform-applications": {
+    label: "開店申請", panel: "tab-platform-applications", nav: true,
+    platformPerm: "shop_application.view", view: createPlatformApplicationsView(),
   },
 };
 
@@ -210,6 +216,7 @@ async function refreshShopContext(honorHash) {
   // configured yet). Kept in lib/upload.js; controls render only when enabled.
   await loadMediaConfig();
   const first = renderNav();
+  refreshApplicationsBadge();
   const notice = $("#no-access");
   if (!first) {
     showPanel(null);

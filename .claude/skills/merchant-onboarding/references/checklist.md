@@ -4,7 +4,7 @@ Tick items in a run log (a scratch file outside the repos, no secrets). Mark eac
 
 ## Intake (step 0)
 
-- [ ] Shop display name; owner email (kept out of files); the storefront is always headless, created from the merchant template (ADR 0001: there is no platform-hosted option; planned intake from the platform website application form is not built yet).
+- [ ] Shop display name; owner email (kept out of files); the storefront is always headless, created from the merchant template (ADR 0001: there is no platform-hosted option; applications arrive through the public endpoint and are reviewed in the platform admin view "開店申請"; the website form itself is not built yet, see `docs/deploy/platform-website-api-notes.md`). If the shop comes from an application, approving it already performed step 2 (shop under review, owner account); copy the one-time `setup_url` at approval, it is never shown again.
 - [ ] Hostnames decided: storefront (`shop.example.com`), the merchant's admin (`admin.shop.example.com`), whether images share the platform image domain.
 - [ ] ECPay: merchant has an account; stage credentials first; who enters them (the owner).
 - [ ] Target API: local throwaway, staging or production; who holds the platform token and through which route (platform admin domain behind Access).

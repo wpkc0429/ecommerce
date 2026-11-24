@@ -727,6 +727,78 @@
           </form>
         </dialog>
       </div>
+
+      <!-- 平台：開店申請（change platform-website） -->
+      <div id="tab-platform-applications" class="tab-panel" hidden>
+        <div class="toolbar">
+          <h2>開店申請</h2>
+          <div class="filters">
+            <select id="platform-applications-filter">
+              <option value="">全部狀態</option>
+              <option value="pending_review">待審核</option>
+              <option value="pending_verification">待驗證信箱</option>
+              <option value="approved">已核准</option>
+              <option value="rejected">已拒絕</option>
+              <option value="expired">已過期</option>
+              <option value="withdrawn">已撤回</option>
+            </select>
+            <input type="search" id="platform-applications-q" placeholder="搜尋 email、店名、聯絡人" />
+            <button id="platform-applications-search">搜尋</button>
+          </div>
+        </div>
+        <p class="hint">官網送來的申請。信箱驗證前不可核准；核准會一次開好商家與 owner 帳號（預設狀態「審核中」），owner 的密碼設定連結只顯示這一次。沒有設定 SMTP 時，驗證信與通知會留在下方「通知訊息」，請複製後以其他管道轉交並標記已寄出。</p>
+        <p id="platform-applications-summary" class="hint"></p>
+        <p id="platform-applications-error" class="error" hidden></p>
+        <div id="platform-application-result" class="card" hidden></div>
+        <table class="table">
+          <thead><tr><th>ID</th><th>狀態</th><th>店名</th><th>聯絡人</th><th>旗標</th><th>申請時間</th><th>動作</th></tr></thead>
+          <tbody id="platform-applications-tbody"></tbody>
+        </table>
+        <div class="pager">
+          <button id="platform-applications-prev">← 上一頁</button>
+          <span id="platform-applications-pageinfo"></span>
+          <button id="platform-applications-next">下一頁 →</button>
+        </div>
+        <div id="platform-application-detail" class="card" hidden></div>
+
+        <dialog id="platform-application-approve-dialog">
+          <form id="platform-application-approve-form" method="dialog">
+            <h3>核准並開店</h3>
+            <label>商家名稱 <input type="text" id="platform-application-approve-name" required /></label>
+            <label>商家狀態
+              <select id="platform-application-approve-status">
+                <option value="2">審核中（店面不可達，預設）</option>
+                <option value="1">啟用</option>
+                <option value="0">停用</option>
+              </select>
+            </label>
+            <div id="platform-application-approve-existing" hidden>
+              <p class="error">此 email 已是後台帳號：會被加入為 owner，其密碼與憑證完全不動。</p>
+              <label class="inline"><input type="checkbox" id="platform-application-approve-confirm" /> 我確認要把這個既有帳號加入為新商家的 owner</label>
+            </div>
+            <p class="hint">新帳號的密碼由本人透過一次性連結設定；連結只在核准後顯示一次。</p>
+            <p id="platform-application-approve-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="platform-application-approve-cancel">取消</button>
+              <button type="submit" class="primary">核准並開店</button>
+            </div>
+          </form>
+        </dialog>
+
+        <dialog id="platform-application-reject-dialog">
+          <form id="platform-application-reject-form" method="dialog">
+            <h3>拒絕申請</h3>
+            <label>拒絕理由（申請者看得到） <textarea id="platform-application-reject-reason" rows="4" required maxlength="1000"></textarea></label>
+            <label>內部備註（只有操作員看得到） <textarea id="platform-application-reject-note" rows="2" maxlength="2000"></textarea></label>
+            <p class="hint">被拒絕的 email 在冷卻期（預設 30 天）內無法重新申請。</p>
+            <p id="platform-application-reject-error" class="error" hidden></p>
+            <div class="dialog-actions">
+              <button type="button" id="platform-application-reject-cancel">取消</button>
+              <button type="submit" class="danger">拒絕</button>
+            </div>
+          </form>
+        </dialog>
+      </div>
     </section>
   </div>
   <script type="module" src="./app.js"></script>

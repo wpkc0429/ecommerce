@@ -14,6 +14,7 @@
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
+import { applicationBody, runApplicationPath, submitApplication, tokenFromMessage } from "./application-path.mjs";
 import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
@@ -903,7 +904,7 @@ try {
       (await ownerPage.locator("#shop-select option").count()) === 1);
     await ownerPage.waitForSelector("#tabs .tab", { timeout: 8000 });
     check("a merchant owner sees no platform tabs",
-      (await ownerPage.locator('.tab[data-tab="platform-shops"], .tab[data-tab="platform-accounts"]').count()) === 0);
+      (await ownerPage.locator('.tab[data-tab="platform-shops"], .tab[data-tab="platform-accounts"], .tab[data-tab="platform-applications"]').count()) === 0);
 
     // super admin 停用該 owner；owner 的下一個操作被拒並被導回登入。
     await page.goto(`${ADMIN}/#/platform-accounts`);
@@ -937,6 +938,86 @@ try {
   await page.waitForSelector('#platform-shop-checklist [data-check="owner_password_set"]', { timeout: 8000 });
   check("the checklist now shows the owner's password as set",
     (await page.locator('#platform-shop-checklist [data-check="owner_password_set"]').getAttribute("data-done")) === "true");
+
+  console.log("㉔b 開店申請審核 UI：列表／篩選／詳情、outbox 訊息、核准（連結只顯示一次）、拒絕（change platform-website）");
+  {
+    const uiApprove = `e2e-ui-apply-${runID}@example.com`;
+    const uiReject = `e2e-ui-reject-${runID}@example.com`;
+    await submitApplication(applicationBody(uiApprove, { shop_name: `E2E UI 申請店 ${runID}` }));
+    await submitApplication(applicationBody(uiReject));
+    await page.goto(`${ADMIN}/#/platform-applications`);
+    await page.waitForSelector("#tab-platform-applications:not([hidden])", { timeout: 8000 });
+    await page.waitForSelector('.tab[data-tab="platform-applications"] .nav-count', { timeout: 8000 }).catch(() => {});
+    check("the platform admin sees the applications tab with a pending badge",
+      (await page.locator('.tab[data-tab="platform-applications"]').count()) === 1 &&
+      (await page.locator('.tab[data-tab="platform-applications"] .nav-count').count()) === 1);
+    await page.selectOption("#platform-applications-filter", "pending_verification");
+    const rowSel = (email) => `#platform-applications-tbody tr[data-email="${email}"]`;
+    await page.waitForSelector(rowSel(uiApprove), { timeout: 8000 });
+    check("the status filter lists unverified applications, marked unverified",
+      ((await page.textContent(rowSel(uiApprove))) ?? "").includes("待驗證信箱"));
+    await page.click(`${rowSel(uiApprove)} [data-act="open"]`);
+    await page.waitForSelector("#platform-application-detail [data-message]", { timeout: 8000 });
+    const outboxText = (await page.textContent("#platform-application-detail [data-message] pre")) ?? "";
+    const smtpOn = !outboxText.includes("/apply/verify#");
+    check("the detail shows the outbox verification mail (manual delivery) with a copy button and mark-sent",
+      smtpOn || ((await page.locator('#platform-application-detail [data-message] button', { hasText: "複製內文" }).count()) === 1 &&
+        (await page.locator('#platform-application-detail [data-act="mark-sent"]').count()) === 1));
+    check("an unverified application offers manual confirmation but no approve button",
+      (await page.locator('#platform-application-detail [data-act="approve"]').count()) === 0 &&
+      (await page.locator('#platform-application-detail [data-act="verify-manually"]').count()) === 1);
+    if (!smtpOn) {
+      await page.click('#platform-application-detail [data-act="mark-sent"]');
+      await page.waitForSelector('#platform-application-detail [data-event="message_marked_sent"]', { timeout: 8000 });
+      check("marking the message sent updates it and the timeline",
+        ((await page.textContent("#platform-application-detail")) ?? "").includes("標記訊息已寄出"));
+      const vtok = tokenFromMessage(outboxText);
+      const v = await req("POST", "/api/v1/public/shop-applications/verify", { body: { token: vtok } });
+      check("the applicant verifies through the link's token", v.status === 200, brief(v));
+    } else {
+      page.once("dialog", (d) => d.accept());
+      await page.click('#platform-application-detail [data-act="verify-manually"]');
+    }
+    await page.selectOption("#platform-applications-filter", "pending_review");
+    await page.waitForSelector(rowSel(uiApprove), { timeout: 8000 });
+    await page.click(`${rowSel(uiApprove)} [data-act="open"]`);
+    await page.waitForSelector('#platform-application-detail [data-act="approve"]', { timeout: 8000 });
+    await page.click('#platform-application-detail [data-act="approve"]');
+    await page.waitForSelector("#platform-application-approve-dialog[open]");
+    check("the approve dialog defaults the shop to under review",
+      (await page.inputValue("#platform-application-approve-status")) === "2" &&
+      (await page.inputValue("#platform-application-approve-name")).includes("E2E UI 申請店"));
+    await page.click("#platform-application-approve-form button[type=submit]");
+    await page.waitForSelector("#platform-application-result .link-once", { timeout: 8000 });
+    const appLink = await page.inputValue("#platform-application-result .link-once");
+    const resultText2 = (await page.textContent("#platform-application-result")) ?? "";
+    check("approval shows the owner's one-time setup link, only once",
+      appLink.includes("/#/set-password/") && resultText2.includes("只顯示這一次"), appLink.slice(0, 60));
+    const afterStorage = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    check("the link is written to no storage", !afterStorage.includes(appLink.split("/#/set-password/")[1]));
+    await page.selectOption("#platform-applications-filter", "approved");
+    await page.waitForSelector(rowSel(uiApprove), { timeout: 8000 });
+    check("the approved application is listed as approved",
+      ((await page.textContent(rowSel(uiApprove))) ?? "").includes("已核准"));
+    await page.click(`${rowSel(uiApprove)} [data-act="open"]`);
+    await page.waitForSelector("#platform-application-detail .kv", { timeout: 8000 });
+    check("the approved detail has no approve/reject buttons and no link anywhere",
+      (await page.locator('#platform-application-detail [data-act="approve"], #platform-application-detail [data-act="reject"]').count()) === 0 &&
+      !((await page.textContent("#platform-application-detail")) ?? "").includes("set-password"));
+
+    await page.selectOption("#platform-applications-filter", "pending_verification");
+    await page.waitForSelector(rowSel(uiReject), { timeout: 8000 });
+    await page.click(`${rowSel(uiReject)} [data-act="open"]`);
+    await page.waitForSelector('#platform-application-detail [data-act="reject"]', { timeout: 8000 });
+    await page.click('#platform-application-detail [data-act="reject"]');
+    await page.waitForSelector("#platform-application-reject-dialog[open]");
+    await page.fill("#platform-application-reject-reason", `UI 拒絕理由 ${runID}`);
+    await page.click("#platform-application-reject-form button[type=submit]");
+    await page.waitForSelector('#platform-application-detail [data-event="rejected"]', { timeout: 8000 });
+    const rejDetail = (await page.textContent("#platform-application-detail")) ?? "";
+    check("the rejection is recorded with the reason the applicant will see",
+      rejDetail.includes(`UI 拒絕理由 ${runID}`) && rejDetail.includes("已拒絕"));
+  }
 
   console.log("㉕ 店員 staff：導覽只有訂單、可出貨與看付款紀錄、被禁止的動作回 403（change merchant-staff-role）");
   const SHOP = 1;
@@ -1270,6 +1351,13 @@ try {
 // reflects both halves.
 console.log("\n════ Commerce path ════");
 await runCommercePath();
+
+// ── 開店申請 API 流程（change platform-website）：同樣不需要瀏覽器。──
+try {
+  await runApplicationPath();
+} catch (err) {
+  fail(`application path aborted: ${err?.stack ?? err}`);
+}
 
 if (failureCount() > 0) {
   console.error(`\nE2E FAILED with ${failureCount()} failed check(s)`);

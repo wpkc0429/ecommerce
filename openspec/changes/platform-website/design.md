@@ -138,3 +138,19 @@ live demo：一個**真的 merchant-template 部署**（以 `scripts/new-merchan
 9. **Q9 網域與託管**：官網網域、託管（建議 Cloudflare Workers static assets／Pages，與店面同一種）、Turnstile 帳號與 site key 由誰建立——需要使用者提供帳號與網域。
 11. **Q11 條款／隱私**：正式文字與版本號需由使用者提供；在那之前只上線佔位並標示「測試中」。
 12. **Q12 官網腳手架來源與 repo 名稱／擁有者帳號**：建議在 merchant template 增加 `website` 種類（`template.json` 的 `sites.website`）與建立腳本，沿用同一套守門員；備案是另開一個很小的 template repo。repo 名稱與擁有者帳號需要使用者決定。
+
+## 實作期間對設計的修正（2026-11-25，A 部分；以程式為準）
+
+實作 ecommerce 側時，下列幾處與上文不同，皆是改成**更安全或更貼近現有程式**的作法：
+
+- **CORS（D7、tasks B5.3）**：官網 origin **不加進 `CORS_ALLOWED_ORIGINS`**。`CORS_ALLOWED_ORIGINS` 是平台自己的前端清單，加進去會讓官網 origin 在所有非 admin 路徑被放行。改成 `WEBSITE_URL` 一個設定同時是驗證連結基底與 `/api/v1/public/*` **唯一**的 CORS origin（`NewCORSMiddleware` 的 `WithWebsiteOrigin`）；該路徑下平台清單與商家登記 origin 都沒有 CORS。回滾仍是改掉 `WEBSITE_URL`。
+- **限流順序（D3）**：每 email（不含 IP）規則放在 handler 內、**Turnstile 通過之後**才計；放在中介層會讓沒有 token 的機器人替任何人的信箱燒光額度。每 IP 兩條（broad；IP＋email 雜湊 tight）仍在最前面，Redis 鍵一律只含 email 的雜湊。欄位驗證排在 Turnstile 之前，無效輸入不耗驗證。
+- **全站日上限（D3、tasks 3.4）**：只用資料庫 `COUNT(*)`（近 24 小時建立的申請），**不另做 Redis 計數**——計數與降級檢查是同一個查詢，Redis 掛掉時照樣有效，而且少一個會與它不一致的來源。
+- **欄位（D2）**：新增選填 `elapsed_seconds`（honeypot 之外的「填表過快」旗標）；錯誤碼 413 `payload_too_large`（body 先被完整讀入並以 16 KiB 為上限，之後的 email peek 與 handler 都餵不到更多）、503 `verification_unavailable`、409 `confirm_existing_account_required`。
+- **資料模型（D4）**：沒有 `purge_after` 欄位——保存期限改在 `purge-applications` 執行當下由環境變數計算（調整保存期限即時生效、不必回填舊列），改以 `purged_at` 標記已清除（冪等）。`shop_application_messages.status` 增加 `queued`（SMTP 模式：列已寫入、尚未交出）。`shop_application_events.application_id` **刻意沒有 FK**，使事件在申請整列被刪除後仍保留；tokens／messages 為 FK ON DELETE CASCADE（messages 含收件人 email，隨申請一起消失）。`provisioned_shop_id` 無 FK、UNIQUE。
+- **冷卻（D4）**：已核准的申請同樣啟動 `APPLICATION_REAPPLY_COOLDOWN`（避免同一 email 在核准後立刻再開一筆申請）；清除 PII 不早於 `max(保存期限, 冷卻)`。
+- **未驗證申請（D4／D8）**：`purge-applications` 對超過 7 天的 `pending_verification` 直接整列刪除並留下 `expired`＋`purged` 事件，不經 `expired` 狀態（`expired`／`withdrawn` 狀態保留給日後使用，其 PII 與 `rejected` 同樣處理）。
+- **通知介面（D5）**：`Notify(ctx, client, n)` 在呼叫者的**交易內**寫 outbox 列（與造成它的狀態轉移同生共死），另有 `AfterCommit(ctx, delivery)`——commit 之後 SMTP 實作才把列交給 worker。這比 `Notify(ctx, n)` 一個方法多出的那一半，是「不能在交易還沒 commit 就寄信」的結構保證。
+- **核准（D9）**：先對申請列 `FOR UPDATE`，再做條件式 UPDATE（兩者疊加：鎖讓並發核准排隊、條件式 UPDATE 是仲裁者）。審核端的 `email_has_account` 以**即時查詢**為準，`risk_flags.email_has_account` 只是提交當下的快照。
+- **權限（D9）**：路由守衛是 `shop_application.review`；`shop.create`＋`account.manage` 在 handler 內以平台快照檢查（同 `POST /admin/shop-provisioning`），避免把一個路由掛兩層守衛。
+- **Turnstile 本機驗證器（D3）**：dev／test 未設密鑰時使用**不連網**的 `DevVerifier`（只收 Cloudflare 公布的 dummy token `XXXX.DUMMY.TOKEN.XXXX`），而不是用 Cloudflare 的 dummy secret 去打真實 siteverify；production 除了缺密鑰，連 Cloudflare 公布的測試密鑰與覆寫 `TURNSTILE_VERIFY_URL` 都拒絕啟動。

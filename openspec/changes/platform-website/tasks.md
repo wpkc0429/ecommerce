@@ -7,66 +7,66 @@
 
 ## 1. 資料模型（design D4）
 
-- [ ] 1.1 新增 `api/internal/ent/schema/application.go`：`ShopApplication`、`ShopApplicationToken`、`ShopApplicationEvent`、`ShopApplicationMessage`（欄位、CHECK、部分唯一索引 `UNIQUE(email) WHERE status IN (…)`；**不得有名為 `shop_id` 的欄位**，用 `provisioned_shop_id`）
-- [ ] 1.2 `cd api && GOTOOLCHAIN=go1.26.4 go generate ./internal/ent`；`make migrate-gen name=add_shop_applications`；手動剪除 atlas 夾帶的假差異（見 CLAUDE.md 的 migration 注意）、手寫部分唯一索引與 CHECK、重算 `atlas.sum`；down 檔 DROP 四表
-- [ ] 1.3 `api/internal/tenant/enttenancy_internal_test.go`：確認新表不帶 `shop_id` 因而無需分類（測試應保持綠）；若選擇加 `shop_id` 則必須分類
-- [ ] 1.4 整合測試：部分唯一索引（同 email 兩筆未完成申請第二筆衝突、已拒絕後可再建）
+- [x] 1.1 新增 `api/internal/ent/schema/application.go`：`ShopApplication`、`ShopApplicationToken`、`ShopApplicationEvent`、`ShopApplicationMessage`（欄位、CHECK、部分唯一索引 `UNIQUE(email) WHERE status IN (…)`；**不得有名為 `shop_id` 的欄位**，用 `provisioned_shop_id`）
+- [x] 1.2 `cd api && GOTOOLCHAIN=go1.26.4 go generate ./internal/ent`；`make migrate-gen name=add_shop_applications`；手動剪除 atlas 夾帶的假差異（見 CLAUDE.md 的 migration 注意）、手寫部分唯一索引與 CHECK、重算 `atlas.sum`；down 檔 DROP 四表
+- [x] 1.3 `api/internal/tenant/enttenancy_internal_test.go`：確認新表不帶 `shop_id` 因而無需分類（測試應保持綠）；若選擇加 `shop_id` 則必須分類
+- [x] 1.4 整合測試：部分唯一索引（同 email 兩筆未完成申請第二筆衝突、已拒絕後可再建）
 
 ## 2. 設定與 Turnstile（design D3）
 
-- [ ] 2.1 `api/internal/config/config.go` ＋ `.env.example`：`TURNSTILE_SECRET_KEY`、`TURNSTILE_SITE_KEY`（僅供文件）、`WEBSITE_URL`（驗證連結基底，http(s) origin）、`APPLICATION_DAILY_CAP`、`APPLICATION_REAPPLY_COOLDOWN`、`APPLICATION_REJECTED_RETENTION`、`APPLICATION_APPROVED_RETENTION`、`RATE_LIMIT_APPLICATION_{BROAD,TIGHT,EMAIL}_{LIMIT,WINDOW}`；production 缺 `TURNSTILE_SECRET_KEY` 或 `WEBSITE_URL` 拒絕啟動；單元測試覆蓋
-- [ ] 2.2 新增 `api/internal/turnstile/verify.go`（`Verifier` 介面、HTTP 實作、3 秒逾時、5xx／網路錯誤回 `ErrUnavailable`）與 `verify_test.go`（`httptest` 伺服器：成功、失敗、逾時、5xx、錯誤碼對應；不連網）
-- [ ] 2.3 `api/internal/seed/seed.go`：`PermissionCatalog` 新增 `shop_application.view`、`shop_application.review`（平台層）；授予 `super_admin`（`*` 已涵蓋則補測試斷言**未**授予任何商家角色）；`seed_integration_test.go` 對應更新
+- [x] 2.1 `api/internal/config/config.go` ＋ `.env.example`：`TURNSTILE_SECRET_KEY`、`TURNSTILE_SITE_KEY`（僅供文件）、`WEBSITE_URL`（驗證連結基底，http(s) origin）、`APPLICATION_DAILY_CAP`、`APPLICATION_REAPPLY_COOLDOWN`、`APPLICATION_REJECTED_RETENTION`、`APPLICATION_APPROVED_RETENTION`、`RATE_LIMIT_APPLICATION_{BROAD,TIGHT,EMAIL}_{LIMIT,WINDOW}`；production 缺 `TURNSTILE_SECRET_KEY` 或 `WEBSITE_URL` 拒絕啟動；單元測試覆蓋
+- [x] 2.2 新增 `api/internal/turnstile/verify.go`（`Verifier` 介面、HTTP 實作、3 秒逾時、5xx／網路錯誤回 `ErrUnavailable`）與 `verify_test.go`（`httptest` 伺服器：成功、失敗、逾時、5xx、錯誤碼對應；不連網）
+- [x] 2.3 `api/internal/seed/seed.go`：`PermissionCatalog` 新增 `shop_application.view`、`shop_application.review`（平台層）；授予 `super_admin`（`*` 已涵蓋則補測試斷言**未**授予任何商家角色）；`seed_integration_test.go` 對應更新
 
 ## 3. 申請服務與公開端點（design D2–D6）
 
-- [ ] 3.1 新增 `api/internal/application/service.go`：`Submit`（正規化、冷卻／重複判斷、入庫、簽 token、寫 outbox、稽核）、`Verify`（原子消費 token）、`VerifyManually`、`Reject`、`List`／`Get`、`Purge`；所有轉移用條件式 UPDATE ＋影響列數
-- [ ] 3.2 新增 `api/internal/application/notifier.go`：`Notifier` 介面、`OutboxNotifier`、`SMTPNotifier`（包 `notify.Sender`）；`wire.go` 依 `cfg.SMTP.Enabled()` 選擇（兩者皆是真實實作，非 nil）
-- [ ] 3.3 新增 `api/internal/httpapi/applications_public.go`：`POST /api/v1/public/shop-applications`（一律 202）、`POST …/verify`（無效 token 一律 404）；body 上限 16 KiB、欄位驗證、honeypot、Turnstile、回應位元組一致
-- [ ] 3.4 `api/internal/httpapi/ratelimitmw.go`：新增 `emailRule`（只依 email）與 `NewApplicationRateLimit`、`NewApplicationVerifyRateLimit`；全站日上限（Redis 計數 ＋ DB `COUNT` 降級）
-- [ ] 3.5 `api/internal/httpapi/router.go`：`Deps` 新增 `ApplicationsPublic`、`Applications`、限流欄位；掛載 `/api/v1/public/*`（不經 TenantMW／Admin 中介層）；`wire.go` 建構注入
-- [ ] 3.6 測試 `api/internal/application/*_test.go`（單元）與 `api/internal/httpapi/applications_integration_test.go`：新 email／重複未完成／冷卻中／已是後台帳號 → **回應位元組相同**；honeypot；Turnstile 失敗／故障；同意版本錯誤 422；per-IP 與 per-email 429＋`Retry-After`；token 單次使用、過期、重發使舊 token 失效；驗證前不可核准；並發兩個 verify 恰一個成功；日誌 PII 測試（slog buffer 找不到 email／姓名／電話）
-- [ ] 3.7 `api/internal/app/wiring_integration_test.go`：確認 ⑤（Deps 全填）⑥（路由表）通過；**不新增領域事件／訂閱者**（⑦ 不動）
+- [x] 3.1 新增 `api/internal/application/service.go`：`Submit`（正規化、冷卻／重複判斷、入庫、簽 token、寫 outbox、稽核）、`Verify`（原子消費 token）、`VerifyManually`、`Reject`、`List`／`Get`、`Purge`；所有轉移用條件式 UPDATE ＋影響列數
+- [x] 3.2 新增 `api/internal/application/notifier.go`：`Notifier` 介面、`OutboxNotifier`、`SMTPNotifier`（包 `notify.Sender`）；`wire.go` 依 `cfg.SMTP.Enabled()` 選擇（兩者皆是真實實作，非 nil）
+- [x] 3.3 新增 `api/internal/httpapi/applications_public.go`：`POST /api/v1/public/shop-applications`（一律 202）、`POST …/verify`（無效 token 一律 404）；body 上限 16 KiB、欄位驗證、honeypot、Turnstile、回應位元組一致
+- [x] 3.4 `api/internal/httpapi/ratelimitmw.go`：新增 `emailRule`（只依 email）與 `NewApplicationRateLimit`、`NewApplicationVerifyRateLimit`；全站日上限（Redis 計數 ＋ DB `COUNT` 降級） 〔實作備註：每 email 規則放在 handler、Turnstile 之後；日上限只用資料庫 COUNT，不另做 Redis 計數；見 design「實作期間對設計的修正」〕
+- [x] 3.5 `api/internal/httpapi/router.go`：`Deps` 新增 `ApplicationsPublic`、`Applications`、限流欄位；掛載 `/api/v1/public/*`（不經 TenantMW／Admin 中介層）；`wire.go` 建構注入
+- [x] 3.6 測試 `api/internal/application/*_test.go`（單元）與 `api/internal/httpapi/applications_integration_test.go`：新 email／重複未完成／冷卻中／已是後台帳號 → **回應位元組相同**；honeypot；Turnstile 失敗／故障；同意版本錯誤 422；per-IP 與 per-email 429＋`Retry-After`；token 單次使用、過期、重發使舊 token 失效；驗證前不可核准；並發兩個 verify 恰一個成功；日誌 PII 測試（slog buffer 找不到 email／姓名／電話）
+- [x] 3.7 `api/internal/app/wiring_integration_test.go`：確認 ⑤（Deps 全填）⑥（路由表）通過；**不新增領域事件／訂閱者**（⑦ 不動）
 
 ## 4. 核准與開店（design D9）
 
-- [ ] 4.1 `api/internal/provision/service.go`：拆出 `ProvisionShopTx`／`AfterCommit`，`ProvisionShop` 改為組合兩者；跑既有整合測試（`accounts_integration_test.go` 的開店案例）確認逐位元組相同
-- [ ] 4.2 `api/internal/application/service.go`：`Approve`（單一交易：條件式 UPDATE → `ProvisionShopTx` → 寫 `provisioned_shop_id` ＋ 事件；commit 後 `AfterCommit`）；owner 已有帳號需 `confirm_existing_account`
-- [ ] 4.3 新增 `api/internal/httpapi/applications.go`：`GET /admin/shop-applications`（`status`、`q`、分頁）、`GET …/{id}`（含事件時間線與 outbox 訊息）、`POST …/{id}/approve`、`POST …/{id}/reject`（`decision_reason` 必填）、`POST …/{id}/verify-manually`、`POST …/{id}/messages/{mid}/mark-sent`；守衛 `shop_application.view`／`.review`，approve 另檢 `shop.create`＋`account.manage`
-- [ ] 4.4 測試：核准成功（商家＋owner＋連結一次性回傳＋申請列 `approved` 同交易）、開店失敗整筆回滾且申請仍 `pending_review`、重複核准 409、未驗證 409、既有帳號未確認 409、權限組合 403、拒絕需理由、跨狀態轉移被拒
-- [ ] 4.5 `api/internal/app/authguard_integration_test.go`：新路由皆有 RBAC 守衛，`expectedUnguardedAdminRoutes` 不變
+- [x] 4.1 `api/internal/provision/service.go`：拆出 `ProvisionShopTx`／`AfterCommit`，`ProvisionShop` 改為組合兩者；跑既有整合測試（`accounts_integration_test.go` 的開店案例）確認逐位元組相同
+- [x] 4.2 `api/internal/application/service.go`：`Approve`（單一交易：條件式 UPDATE → `ProvisionShopTx` → 寫 `provisioned_shop_id` ＋ 事件；commit 後 `AfterCommit`）；owner 已有帳號需 `confirm_existing_account`
+- [x] 4.3 新增 `api/internal/httpapi/applications.go`：`GET /admin/shop-applications`（`status`、`q`、分頁）、`GET …/{id}`（含事件時間線與 outbox 訊息）、`POST …/{id}/approve`、`POST …/{id}/reject`（`decision_reason` 必填）、`POST …/{id}/verify-manually`、`POST …/{id}/messages/{mid}/mark-sent`；守衛 `shop_application.view`／`.review`，approve 另檢 `shop.create`＋`account.manage`
+- [x] 4.4 測試：核准成功（商家＋owner＋連結一次性回傳＋申請列 `approved` 同交易）、開店失敗整筆回滾且申請仍 `pending_review`、重複核准 409、未驗證 409、既有帳號未確認 409、權限組合 403、拒絕需理由、跨狀態轉移被拒
+- [x] 4.5 `api/internal/app/authguard_integration_test.go`：新路由皆有 RBAC 守衛，`expectedUnguardedAdminRoutes` 不變
 
 ## 5. 契約
 
-- [ ] 5.1 `api/openapi/openapi.yaml`：新增全部新路由、請求／回應 schema（金額無關）、`/api/v1/public` 的 429／422 回應、`Retry-After` 標頭
-- [ ] 5.2 `cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface`（只新增行；檢視 diff 確認沒有刪除）；`make openapi` 全綠
+- [x] 5.1 `api/openapi/openapi.yaml`：新增全部新路由、請求／回應 schema（金額無關）、`/api/v1/public` 的 429／422 回應、`Retry-After` 標頭
+- [x] 5.2 `cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface`（只新增行；檢視 diff 確認沒有刪除）；`make openapi` 全綠
 
 ## 6. 清除與保存（design D8）
 
-- [ ] 6.1 新增 `api/cmd/purge-applications/main.go`（預設 dry run、`-apply`、`-email <addr>` 個資請求；冪等；只印 id）；`Makefile` 新增 `purge-applications` 目標（dry run）——**此項為 repo 指令不屬於部署設定**
-- [ ] 6.2 整合測試：未驗證 7 天、拒絕後保存期、核准後保存期、冷卻未結束不清、事件列保留且無 PII
+- [x] 6.1 新增 `api/cmd/purge-applications/main.go`（預設 dry run、`-apply`、`-email <addr>` 個資請求；冪等；只印 id）；`Makefile` 新增 `purge-applications` 目標（dry run）——**此項為 repo 指令不屬於部署設定**
+- [x] 6.2 整合測試：未驗證 7 天、拒絕後保存期、核准後保存期、冷卻未結束不清、事件列保留且無 PII
 
 ## 7. 平台後台審核視圖（admin）
 
-- [ ] 7.1 新增 `admin/views/platform-applications.js`：列表（狀態篩選、未驗證標示、風險旗標）、詳情（時間線、outbox 訊息與「複製／標記已寄出」、人工確認、核准對話框〔店名、狀態、既有帳號確認〕、拒絕對話框〔理由必填〕）；核准結果一次性顯示 `setup_url`（同 `platform-shops.js`，不寫入任何儲存）
-- [ ] 7.2 `admin/app.js` 註冊表一列（`perm: "shop_application.view"`，平台層以 `platform_permissions` 判斷可見性）、`admin/index.html` 一個 `.tab-panel`；待處理數徽章
-- [ ] 7.3 e2e：`e2e/happy-path.mjs` 新增一節（API 提交→取得 outbox 驗證連結→驗證→後台核准→owner 設密碼登入）；注意限流 key 在二次執行下的影響（e2e 用唯一 email、`REDIS_DB` 分離）
-- [ ] 7.4 守住 tripwire #4′／#5 的量測並記錄在 CLAUDE.md 的 admin 條目
+- [x] 7.1 新增 `admin/views/platform-applications.js`：列表（狀態篩選、未驗證標示、風險旗標）、詳情（時間線、outbox 訊息與「複製／標記已寄出」、人工確認、核准對話框〔店名、狀態、既有帳號確認〕、拒絕對話框〔理由必填〕）；核准結果一次性顯示 `setup_url`（同 `platform-shops.js`，不寫入任何儲存）
+- [x] 7.2 `admin/app.js` 註冊表一列（`perm: "shop_application.view"`，平台層以 `platform_permissions` 判斷可見性）、`admin/index.html` 一個 `.tab-panel`；待處理數徽章
+- [x] 7.3 e2e：`e2e/happy-path.mjs` 新增一節（API 提交→取得 outbox 驗證連結→驗證→後台核准→owner 設密碼登入）；注意限流 key 在二次執行下的影響（e2e 用唯一 email、`REDIS_DB` 分離）
+- [x] 7.4 守住 tripwire #4′／#5 的量測並記錄在 CLAUDE.md 的 admin 條目
 
 ## 8. e2e 與測試（ecommerce 側）
 
-- [ ] 8.1 e2e：`e2e/happy-path.mjs` 或新檔 `e2e/application-path.mjs` 新增申請流程（以 API 直接提交——官網在另一個 repo，此處不經瀏覽器表單）：API 提交→取得 outbox 驗證連結→驗證→後台核准→owner 設密碼登入；`CLAUDE.md` 同步斷言計數
-- [ ] 8.2 契約範例：在 `openapi.yaml` 為申請端點的請求／回應與錯誤碼補完整範例，供官網 repo 的核心做契約測試（B3.4）
-- [ ] 8.3 **不動** `web/`、`e2e` 中依賴 `WEB` 的斷言、`.github/workflows/*`：它們屬於 `retire-hosted-storefront-and-themes`
+- [x] 8.1 e2e：`e2e/happy-path.mjs` 或新檔 `e2e/application-path.mjs` 新增申請流程（以 API 直接提交——官網在另一個 repo，此處不經瀏覽器表單）：API 提交→取得 outbox 驗證連結→驗證→後台核准→owner 設密碼登入；`CLAUDE.md` 同步斷言計數
+- [x] 8.2 契約範例：在 `openapi.yaml` 為申請端點的請求／回應與錯誤碼補完整範例，供官網 repo 的核心做契約測試（B3.4）
+- [x] 8.3 **不動** `web/`、`e2e` 中依賴 `WEB` 的斷言、`.github/workflows/*`：它們屬於 `retire-hosted-storefront-and-themes`
 
 ## 9. 文件、skill 與驗證（ecommerce 側）
 
-- [ ] 9.1 `docs/deploy/platform-website-api-notes.md`（ecommerce 這側的營運說明）：`TURNSTILE_*`、`WEBSITE_URL`、`CORS_ALLOWED_ORIGINS` 加官網 origin、每日排程 `purge-applications`、人工模式（outbox）操作員 SOP；官網自身的部署 runbook 在官網 repo
-- [ ] 9.2 更新 `.claude/skills/merchant-onboarding/SKILL.md` 與 `references/*`：把「申請流程」由「規劃中」改為現況（intake 來源、審核、核准後接 step 3）；`known-gaps.md` 移除對應項目
-- [ ] 9.3 更新 `docs/PLATFORM-ROADMAP.md`、`README.md`、`CLAUDE.md`（新表與限流、PII 規則、官網在獨立 repo 的說明）；`openspec/project.md`
-- [ ] 9.4 `docs/decisions/` 追加 ADR（官網採零建置獨立 repo；0002 已預留給 v1 例外，編號順延；補充「平台後台也應切成核心與設計層」的 follow-up）
-- [ ] 9.5 驗證：`cd api && go build ./... && make lint && make test && make openapi`；`make test-int`（需 docker infra；串行）；`cd e2e && node commerce-path.mjs`（改動 wire.go 後必跑）與申請流程 e2e
-- [ ] 9.6 手動：Turnstile 測試金鑰全流程（含官網 repo 的表單）；無 SMTP（outbox）與有 SMTP（`SMTPNotifier`）兩種模式各走一次；確認回應位元組在新／重複／冷卻三種情況相同
+- [x] 9.1 `docs/deploy/platform-website-api-notes.md`（ecommerce 這側的營運說明）：`TURNSTILE_*`、`WEBSITE_URL`、`CORS_ALLOWED_ORIGINS` 加官網 origin、每日排程 `purge-applications`、人工模式（outbox）操作員 SOP；官網自身的部署 runbook 在官網 repo
+- [x] 9.2 更新 `.claude/skills/merchant-onboarding/SKILL.md` 與 `references/*`：把「申請流程」由「規劃中」改為現況（intake 來源、審核、核准後接 step 3）；`known-gaps.md` 移除對應項目
+- [x] 9.3 更新 `docs/PLATFORM-ROADMAP.md`、`README.md`、`CLAUDE.md`（新表與限流、PII 規則、官網在獨立 repo 的說明）；`openspec/project.md`
+- [x] 9.4 `docs/decisions/` 追加 ADR（官網採零建置獨立 repo；0002 已預留給 v1 例外，編號順延；補充「平台後台也應切成核心與設計層」的 follow-up） 〔已寫成 `docs/decisions/0003-platform-website-static-site-and-application-backend.md`〕
+- [x] 9.5 驗證：`cd api && go build ./... && make lint && make test && make openapi`；`make test-int`（需 docker infra；串行）；`cd e2e && node commerce-path.mjs`（改動 wire.go 後必跑）與申請流程 e2e
+- [ ] 9.6 手動（**部分完成**：位元組相同＝已由整合測試與 e2e 自動驗證；SMTP 實作以 `RecordingSender` 測過但**未對真實 SMTP 走過**；Turnstile 測試金鑰全流程需要官網 repo 的表單〔B 部分〕，**尚未做**）：Turnstile 測試金鑰全流程（含官網 repo 的表單）；無 SMTP（outbox）與有 SMTP（`SMTPNotifier`）兩種模式各走一次；確認回應位元組在新／重複／冷卻三種情況相同
 
 # B. 新的官網 repo（不在 ecommerce repo 內；本 change 只規範內容，建立 repo 需使用者核准）
 

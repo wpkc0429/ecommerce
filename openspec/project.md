@@ -1,6 +1,6 @@
 # Project Context
 
-> **方向更新（ADR 0001，2026-11-24，同日修正）**：平台定位為 headless 商務 API ＋ 平台後台 ＋ 平台官網；商家店面與後台由 merchant template 建立。**主題／託管渲染（Next.js 店面，含「主題店面電商前台選項 C」）／site 網域對應已移除**（change `retire-hosted-storefront-and-themes`，直接移除、無棄用期，v1 例外見 ADR 0002）；官網見 change `platform-website`。**CMS 的內容功能（頁面與全域內容、每店 content schema、消毒、渲染 bundle 的公開讀取與快取）保留**，並改造成 headless 內容儲存（change `headless-content-store`，第一個切片〔每店 `content_schemas`〕已隨退役 change 交付，其餘未實作）。
+> **方向更新（ADR 0001，2026-11-24，同日修正）**：平台定位為 headless 商務 API ＋ 平台後台 ＋ 平台官網；商家店面與後台由 merchant template 建立。**主題／託管渲染（Next.js 店面，含「主題店面電商前台選項 C」）／site 網域對應已移除**（change `retire-hosted-storefront-and-themes`，直接移除、無棄用期，v1 例外見 ADR 0002）；官網見 change `platform-website`（ecommerce 側〔公開申請端點、`shop_applications`、後台審核與核准、通知 outbox、個資保存〕已實作，官網 repo 尚未建立；見 `docs/deploy/platform-website-api-notes.md`）。**CMS 的內容功能（頁面與全域內容、每店 content schema、消毒、渲染 bundle 的公開讀取與快取）保留**，並改造成 headless 內容儲存（change `headless-content-store`，第一個切片〔每店 `content_schemas`〕已隨退役 change 交付，其餘未實作）。
 ## Purpose
 
 多網站電商 SaaS。Phase 1（`phase1-multitenant-cms-foundation`）交付：多租戶資料模型與路由、shop 範圍化 RBAC、雙軌 JWT 認證、Schema/Payload 解耦的 CMS 引擎、前台渲染管線（Redis 版本化快取 + 事件失效）、Next.js SSR storefront 與薄殼 admin。Phase 2 起疊加電商核心（商品、訂單、金物流）。

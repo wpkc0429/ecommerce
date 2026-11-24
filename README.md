@@ -36,6 +36,8 @@ make admin-dev           # 後台 SPA :3001
 
 **`APP_ENV` 未設定＝`production`**：除 `development`／`test` 外，API（與 migrate／seed）遇到空的、已知預設的或未填的 `<佔位>` 密鑰會拒絕啟動，`seed -demo` 也會被拒絕。放在反向代理或 Cloudflare Tunnel 後面時，以 `TRUSTED_PROXIES`（例如 `127.0.0.1/32,::1/128`）指定可信任其 `CF-Connecting-IP` 的對端；未設定時一律以 TCP 對端為客戶端 IP，`X-Forwarded-For` 永不採信。
 
+**平台官網的後端（開店申請）**：公開、未認證的 `POST /api/v1/public/shop-applications`（＋ `/verify`）、平台後台的「開店申請」審核與核准即開店、通知 outbox 與個資保存指令（`make purge-applications`）已在本 repo 實作；官網本身是另一個 repo 的靜態站（尚未建立）。production 必須設定 `TURNSTILE_SECRET_KEY` 與 `WEBSITE_URL`，否則拒絕啟動。契約、環境變數與操作員手冊見 [`docs/deploy/platform-website-api-notes.md`](docs/deploy/platform-website-api-notes.md)。
+
 在另一組 port／獨立資料庫上跑瀏覽器 E2E（`E2E_API_BASE_URL`／`E2E_ADMIN_BASE_URL` ＋ 不同的 `REDIS_DB`）見 `CLAUDE.md` 的 Commands。
 
 其餘指令（測試、lint、migration 產生、契約檢查、mock server）：`make help`。

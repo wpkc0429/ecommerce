@@ -20,7 +20,7 @@
 | 步驟 | 做什麼 | 對應文件 | 狀態 |
 | --- | --- | --- | --- |
 | 1 | 記錄決策、標記棄用、更新 `merchant-onboarding` skill、寫好後續 change | [ADR 0001](decisions/0001-headless-platform-and-merchant-template.md)、本文件 | 完成（只有文件，沒有行為變更） |
-| 2 | 官網與商家開店申請流程（公開端點、驗證信箱、後台審核、核准即呼叫既有開店 API）。**已決定：零建置靜態站、獨立 repo、採 merchant template 的鎖定核心＋設計層模式**；官網文案與頁面是 repo 內的靜態內容，ecommerce 負責申請的全部後端 | OpenSpec change [`platform-website`](../openspec/changes/platform-website/proposal.md)（**提案，待核准**；含需要使用者回答的開放問題） | 待核准 |
+| 2 | 官網與商家開店申請流程（公開端點、驗證信箱、後台審核、核准即呼叫既有開店 API）。**已決定：零建置靜態站、獨立 repo、採 merchant template 的鎖定核心＋設計層模式**；官網文案與頁面是 repo 內的靜態內容，ecommerce 負責申請的全部後端 | OpenSpec change [`platform-website`](../openspec/changes/platform-website/proposal.md)（**A 部分〔ecommerce 側：公開申請與驗證端點、`shop_applications`、後台審核與核准、通知 outbox、保存與清除〕已實作（2026-11-25）**；B 部分〔官網 repo〕尚未建立，需要使用者決定網域、託管、Turnstile 帳號、條款文字與腳手架來源；運維手冊見 [`docs/deploy/platform-website-api-notes.md`](deploy/platform-website-api-notes.md)） | A 完成、B 待使用者 |
 | 3 | 把 CMS 內容功能改造成 headless 內容儲存：每店 schema、穩定 `key`、草稿／發佈、版本歷史、`content.*` 權限、發佈通知、公開讀取 API；加上 merchant template 的後台內容功能（後續工作） | OpenSpec change [`headless-content-store`](../openspec/changes/headless-content-store/proposal.md)（**提案，未實作**；含需要使用者回答的開放問題） | 提案 |
 | 4 | 退役託管店面與主題：主題端點／表／seed／權限、site／網域路由與 Host 後備、`web/` 的租戶渲染程式碼、相關 e2e 與 CI。**第一階段先交付每店 schema 儲存**（頁面 schema 今天來自主題） | OpenSpec change [`retire-hosted-storefront-and-themes`](../openspec/changes/retire-hosted-storefront-and-themes/proposal.md)（**已實作 2026-11-25**；直接移除、無棄用期；v1 例外見 ADR 0002） | 完成（資料遷移待在正式資料庫套用） |
 
