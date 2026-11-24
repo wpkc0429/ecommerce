@@ -127,7 +127,9 @@ function parcelCard(order, sh, deps, byID, primary) {
       ...(primary ? { id: "shipment-delivered-btn" } : {}),
       class: "primary shipment-delivered", onclick: () => advance(order, sh, "delivered", deps),
     }, "標記已送達"),
-    el("button", {
+    // 退貨另需 shipment.return（change merchant-staff-role）：店員有 shipment.update
+    // 但沒有它，所以按鈕依它決定可見——否則畫一顆按下去必回 403 的危險按鈕。
+    can("shipment.return") && el("button", {
       ...(primary ? { id: "shipment-returned-btn" } : {}),
       class: "danger shipment-returned", onclick: () => advance(order, sh, "returned", deps),
     }, "標記退貨")));

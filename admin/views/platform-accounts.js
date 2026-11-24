@@ -23,7 +23,7 @@ export function showLinkOnce(host, { title, link }) {
   clear(host);
   host.hidden = false;
   host.append(el("h3", {}, title));
-  const url = link.setup_url || link.reset_url;
+  const url = link.setup_url || link.reset_url || link.invite_url;
   if (link.delivery !== "manual" || !url) {
     host.append(el("p", {}, "連結已由系統寄給本人，這裡不會顯示。"));
     return;

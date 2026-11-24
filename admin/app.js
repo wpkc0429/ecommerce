@@ -29,6 +29,8 @@ import { createStorefrontClientsView } from "./views/storefront-clients.js";
 import { createPlatformShopsView } from "./views/platform-shops.js";
 import { createPlatformAccountsView } from "./views/platform-accounts.js";
 import { createSetPasswordView } from "./views/set-password.js";
+import { createAcceptInviteView } from "./views/accept-invite.js";
+import { createTeamView } from "./views/team.js";
 
 const state = { me: null, shopID: null };
 
@@ -77,6 +79,8 @@ const views = {
     perms: ["publishable_key.view", "shop.manage_client_origins", "payment_credential.manage"],
     view: createStorefrontClientsView(ctx),
   },
+  // 成員（change merchant-staff-role）：owner 邀請、停用店員。
+  team: { label: "成員", panel: "tab-team", nav: true, perm: "user.manage_members", view: createTeamView(ctx) },
   // 平台視圖（change platform-account-provisioning）：不屬於任何商家，可見性來源是
   // /admin/me 的 platform_permissions（platformPerm），不是 /shops/{id}/me。
   "platform-shops": {
@@ -107,6 +111,29 @@ function openSetPassword(token) {
   setPasswordView.load(token);
 }
 
+// 邀請接受頁（#/accept-invite/{token}，change merchant-staff-role）：同樣不在註冊表。
+// 接受成功後：新帳號導回登入頁；既有帳號已換發 token，直接進主畫面並切到新商家。
+const acceptInviteView = createAcceptInviteView({
+  toLogin(email) {
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    show("view-login");
+    $("#login-email").value = email || "";
+    $("#login-password").value = "";
+    $(email ? "#login-password" : "#login-email").focus();
+  },
+  async toMain(prevSids) {
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    state.me = await api("GET", "/admin/me");
+    const added = (state.me.sids || []).find((id) => !prevSids.includes(id));
+    await enterMain(added);
+  },
+});
+
+function openAcceptInvite(token) {
+  show("view-accept-invite");
+  acceptInviteView.load(token);
+}
+
 function allowed(def) {
   if (!def) return false;
   if (def.platformPerm) return canPlatform(def.platformPerm);
@@ -130,6 +157,7 @@ function showTab(name, ...params) {
 /** 唯一的畫面切換入口——hashchange 與「hash 未變」的直接呼叫都走這裡。 */
 function renderRoute({ name, params }) {
   if (name === "set-password") return openSetPassword(params[0]);
+  if (name === "accept-invite") return openAcceptInvite(params[0]);
   const def = views[name];
   if (!def || !allowed(def)) {
     // 過期的書籤、無權限的連結、拼錯的 hash——一律安靜地回落到一個進得去的
@@ -207,7 +235,7 @@ async function refreshShopContext(honorHash) {
   showTab(first);
 }
 
-function enterMain() {
+function enterMain(preferShop) {
   setPlatformPermissions(state.me.platform_permissions);
   show("view-main");
   $("#whoami").textContent = state.me.email;
@@ -216,7 +244,8 @@ function enterMain() {
   const sids = state.me.sids || [];
   if (sids.length > 0) {
     for (const id of sids) sel.append(el("option", { value: id }, `Shop #${id}`));
-    state.shopID = sids[0];
+    state.shopID = sids.includes(preferShop) ? preferShop : sids[0];
+    sel.value = String(state.shopID);
     sel.hidden = false;
     $("#shop-input").hidden = true;
   } else {
@@ -236,6 +265,7 @@ setShopIDSource(() => state.shopID);
 async function boot() {
   const route = parseHash();
   if (route.name === "set-password") return openSetPassword(route.params[0]);
+  if (route.name === "accept-invite") return openAcceptInvite(route.params[0]);
   if (tokens.access) {
     try {
       state.me = await api("GET", "/admin/me");

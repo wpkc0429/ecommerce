@@ -37,6 +37,37 @@
       </div>
     </section>
 
+    <!-- 邀請接受頁：未登入可進入（#/accept-invite/{token}，change merchant-staff-role） -->
+    <section id="view-accept-invite" class="view" hidden>
+      <div class="card login-card">
+        <h1>接受邀請</h1>
+        <p id="ai-invalid" class="error" hidden>連結無效或已過期，請聯絡邀請你的人重新產生。</p>
+        <div id="ai-info" hidden>
+          <p>商家：<strong id="ai-shop"></strong></p>
+          <p>角色：<strong id="ai-role"></strong></p>
+          <p>受邀 Email：<strong id="ai-email"></strong></p>
+        </div>
+        <form id="ai-new-form" hidden>
+          <p class="hint">這個 email 還沒有後台帳號。請設定你自己的密碼來接受邀請。</p>
+          <label>新密碼（至少 12 個字元） <input type="password" id="ai-password" required minlength="12" autocomplete="new-password" /></label>
+          <label>再輸入一次 <input type="password" id="ai-password2" required minlength="12" autocomplete="new-password" /></label>
+          <button type="submit" class="primary">設定密碼並接受</button>
+        </form>
+        <form id="ai-login-form" hidden>
+          <p class="hint">這個 email 已經有後台帳號，邀請連結不會更動它的密碼。請以該帳號登入後接受邀請。</p>
+          <p>帳號：<strong id="ai-login-email"></strong></p>
+          <label>密碼 <input type="password" id="ai-login-password" required autocomplete="current-password" /></label>
+          <button type="submit" class="primary">登入並接受</button>
+        </form>
+        <div id="ai-switch" hidden>
+          <p>目前登入的帳號：<strong id="ai-switch-email"></strong></p>
+          <button type="button" id="ai-switch-btn" class="primary">接受邀請</button>
+        </div>
+        <p id="ai-error" class="error" hidden></p>
+        <p><a href="#/" id="ai-to-login">回登入頁</a></p>
+      </div>
+    </section>
+
     <!-- 主畫面 -->
     <section id="view-main" class="view" hidden>
       <header class="topbar">
@@ -613,6 +644,30 @@
             </div>
           </form>
         </dialog>
+      </div>
+
+      <!-- 成員（change merchant-staff-role） -->
+      <div id="tab-team" class="tab-panel" hidden>
+        <div class="toolbar"><h2>成員</h2></div>
+        <p class="hint">停用成員資格只影響<strong>本店</strong>：該帳號與其他商家的權限不受影響。擁有者的指派與移除只有平台能做。</p>
+        <p id="team-error" class="error" hidden></p>
+        <div id="team-link" class="card" hidden></div>
+        <table class="table">
+          <thead><tr><th>Email</th><th>角色</th><th>成員資格</th><th>動作</th></tr></thead>
+          <tbody id="team-members-tbody"></tbody>
+        </table>
+        <h3>邀請成員</h3>
+        <form id="team-invite-form" class="inline-form">
+          <label class="inline">Email <input type="email" id="team-invite-email" required autocomplete="off" /></label>
+          <label class="inline">角色 <select id="team-invite-role"></select></label>
+          <button type="submit" class="primary">產生邀請連結</button>
+        </form>
+        <p class="hint">邀請不會建立帳號。連結有效 7 天、只顯示一次；對方已有後台帳號時，必須先以該帳號登入才能接受。</p>
+        <h3>待接受的邀請</h3>
+        <table class="table">
+          <thead><tr><th>Email</th><th>角色</th><th>到期</th><th>動作</th></tr></thead>
+          <tbody id="team-invites-tbody"></tbody>
+        </table>
       </div>
 
       <!-- 平台：帳號（change platform-account-provisioning） -->
