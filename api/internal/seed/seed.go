@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
@@ -263,6 +264,11 @@ func Run(ctx context.Context, client *ent.Client, opts Options) (err error) {
 	}
 	starterID, err := seedStarterTheme(ctx, tx)
 	if err != nil {
+		return err
+	}
+	// Shops already on the starter theme follow its (re-seeded) schemas: the
+	// per-shop content schema is what validation and rendering read.
+	if err = contentschema.WriterForTx(tx).SyncThemeShops(ctx, starterID); err != nil {
 		return err
 	}
 	if opts.Demo {
@@ -525,6 +531,11 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID,
 		}
 	default:
 		return fmt.Errorf("seed: query demo mapping: %w", err)
+	}
+
+	// The demo shop's content schema (version 1 on first seed).
+	if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shopID, themeID); err != nil {
+		return fmt.Errorf("seed: demo content schema: %w", err)
 	}
 
 	// Auto-created home page (spec page-management/Auto-created home page):

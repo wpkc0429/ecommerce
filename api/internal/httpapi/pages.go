@@ -10,8 +10,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/config"
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/httpx"
 )
 
@@ -47,27 +47,21 @@ func (h *PagesHandler) MountShop(r chi.Router) {
 func (h *PagesHandler) pageTypes(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
 	ctx := r.Context()
-	shop, err := h.Client.Shop.Get(ctx, shopID)
-	if err != nil {
+	if _, err := h.Client.Shop.Get(ctx, shopID); err != nil {
 		httpx.NotFound(w)
 		return
 	}
+	types, err := (&contentschema.Store{Client: h.Client}).Types(ctx, shopID)
+	if err != nil {
+		httpx.Internal(w)
+		return
+	}
 	out := []map[string]any{}
-	if shop.ThemeID != nil {
-		tps, err := h.Client.ThemePage.Query().
-			Where(themepage.ThemeIDEQ(*shop.ThemeID)).
-			Order(themepage.ByID()).
-			All(ctx)
-		if err != nil {
-			httpx.Internal(w)
-			return
-		}
-		for _, tp := range tps {
-			out = append(out, map[string]any{
-				"type_key":      tp.TypeKey,
-				"component_key": tp.ComponentKey,
-			})
-		}
+	for _, t := range types {
+		out = append(out, map[string]any{
+			"type_key":      t.TypeKey,
+			"component_key": t.ComponentKey,
+		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"page_types": out})
 }

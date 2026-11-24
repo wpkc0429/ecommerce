@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/cms"
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 )
 
 // ErrNotFound covers every 404 rendering case: page missing, draft-only,
@@ -80,6 +80,16 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 		}
 		return nil, fmt.Errorf("render: load shop: %w", err)
 	}
+	// Per-shop schema version (change retire-hosted-storefront-and-themes):
+	// a shop without one cannot render. The theme row is read only for the
+	// transitional shop.theme object until the theme code is removed.
+	schemaVer, err := (&contentschema.Store{Client: a.Client}).Active(ctx, shopID)
+	if err != nil {
+		if errors.Is(err, contentschema.ErrNoSchema) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("render: load content schema: %w", err)
+	}
 	if shop.ThemeID == nil {
 		return nil, ErrNotFound // shop without a theme cannot render
 	}
@@ -101,17 +111,12 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 	}
 
 	// Dynamic type resolution (design D3): unsupported type_key → 404.
-	tp, err := a.Client.ThemePage.Query().
-		Where(themepage.ThemeIDEQ(theme.ID), themepage.TypeKeyEQ(pg.TypeKey)).
-		Only(ctx)
-	if err != nil {
-		if ent.IsNotFound(err) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("render: load theme page: %w", err)
+	pageSchema, ok := schemaVer.Doc.Types[pg.TypeKey]
+	if !ok {
+		return nil, ErrNotFound
 	}
 
-	shopContent, err := cms.Hydrate(theme.ConfigSchema, shop.ContentJSON)
+	shopContent, err := cms.Hydrate(schemaVer.Doc.Global, shop.ContentJSON)
 	if err != nil {
 		return nil, fmt.Errorf("render: hydrate shop content: %w", err)
 	}
@@ -119,7 +124,7 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 	if !published {
 		payload = pg.ContentJSON
 	}
-	pageContent, err := cms.Hydrate(tp.PageSchema, payload)
+	pageContent, err := cms.Hydrate(pageSchema, payload)
 	if err != nil {
 		return nil, fmt.Errorf("render: hydrate page content: %w", err)
 	}
@@ -141,7 +146,7 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 		},
 		Page: BundlePage{
 			TypeKey:      pg.TypeKey,
-			ComponentKey: tp.ComponentKey,
+			ComponentKey: schemaVer.Doc.ComponentKeys[pg.TypeKey],
 			Title:        pg.Title,
 			Content:      pageContent,
 			SEO:          seo,

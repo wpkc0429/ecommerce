@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
@@ -56,6 +57,13 @@ func (s *Service) RestrictImageDomain(prefixes ...string) {
 		}
 		s.imagePrefixes = append(s.imagePrefixes, p)
 	}
+}
+
+// schemas is the per-shop content schema store (change
+// retire-hosted-storefront-and-themes group 1). It is derived from Client so
+// every construction site of Service keeps working.
+func (s *Service) schemas() *contentschema.Store {
+	return &contentschema.Store{Client: s.Client}
 }
 
 // ImagePrefixes returns the configured image-domain prefixes (empty when media
@@ -124,6 +132,9 @@ func (s *Service) UpdateTheme(ctx context.Context, themeID int, in ThemeInput) (
 	if err != nil {
 		return nil, err
 	}
+	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, t.ID); err != nil {
+		return nil, err
+	}
 	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: t.ID})
 	return t, nil
 }
@@ -160,6 +171,9 @@ func (s *Service) CreateThemePage(ctx context.Context, themeID int, in ThemePage
 	if err != nil {
 		return nil, err
 	}
+	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
+		return nil, err
+	}
 	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
 	return tp, nil
 }
@@ -185,6 +199,9 @@ func (s *Service) UpdateThemePage(ctx context.Context, themeID, themePageID int,
 	if err != nil {
 		return nil, err
 	}
+	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
+		return nil, err
+	}
 	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
 	return tp, nil
 }
@@ -198,6 +215,9 @@ func (s *Service) DeleteThemePage(ctx context.Context, themeID, themePageID int)
 	}
 	if n == 0 {
 		return ErrNotFound
+	}
+	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
+		return err
 	}
 	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
 	return nil
@@ -256,11 +276,24 @@ func (s *Service) SwitchTheme(ctx context.Context, shopID, themeID int) ([]Incom
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.Client.Shop.UpdateOneID(shopID).SetThemeID(themeID).Save(ctx); err != nil {
+	// The theme pointer and the shop's schema version change together.
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cms: begin tx: %w", err)
+	}
+	if _, err := tx.Shop.UpdateOneID(shopID).SetThemeID(themeID).Save(ctx); err != nil {
+		_ = tx.Rollback()
 		if ent.IsNotFound(err) {
 			return nil, ErrNotFound
 		}
 		return nil, err
+	}
+	if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shopID, themeID); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("cms: commit theme switch: %w", err)
 	}
 	s.Dispatcher.Publish(ctx, events.ThemeSwitched{ShopID: shopID})
 	return incompatible, nil
@@ -276,25 +309,27 @@ type PageInput struct {
 	Meta    json.RawMessage `json:"meta"`
 }
 
-// currentPageSchema resolves the page_schema for (shop's theme, typeKey).
+// currentPageSchema resolves the page schema for (shop, typeKey) from the
+// shop's own content schema.
 func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey string) (json.RawMessage, error) {
-	shop, err := s.Client.Shop.Get(ctx, shopID)
-	if err != nil {
+	if _, err := s.Client.Shop.Get(ctx, shopID); err != nil {
 		return nil, ErrNotFound
 	}
-	if shop.ThemeID == nil {
-		return nil, &ValidationError{Message: "shop has no theme applied"}
-	}
-	tp, err := s.Client.ThemePage.Query().
-		Where(themepage.ThemeIDEQ(*shop.ThemeID), themepage.TypeKeyEQ(typeKey)).
-		Only(ctx)
+	v, err := s.schemas().Active(ctx, shopID)
 	if err != nil {
+		if errors.Is(err, contentschema.ErrNoSchema) {
+			return nil, &ValidationError{Message: "shop has no theme applied"}
+		}
+		return nil, err
+	}
+	schema, ok := v.Doc.Types[typeKey]
+	if !ok {
 		return nil, &ValidationError{
 			Message: "type_key is not supported by the shop's current theme",
 			Details: []Detail{{Pointer: "/type_key", Message: "unsupported page type"}},
 		}
 	}
-	return tp.PageSchema, nil
+	return schema, nil
 }
 
 func normalizeSlug(raw string) (string, error) {
@@ -478,22 +513,16 @@ type PageListEntry struct {
 }
 
 func (s *Service) ListPages(ctx context.Context, shopID int) ([]PageListEntry, error) {
-	shop, err := s.Client.Shop.Get(ctx, shopID)
-	if err != nil {
+	if _, err := s.Client.Shop.Get(ctx, shopID); err != nil {
 		return nil, ErrNotFound
 	}
+	types, err := s.schemas().Types(ctx, shopID)
+	if err != nil {
+		return nil, err
+	}
 	supported := map[string]bool{}
-	if shop.ThemeID != nil {
-		keys, err := s.Client.ThemePage.Query().
-			Where(themepage.ThemeIDEQ(*shop.ThemeID)).
-			Select(themepage.FieldTypeKey).
-			Strings(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, k := range keys {
-			supported[k] = true
-		}
+	for _, t := range types {
+		supported[t.TypeKey] = true
 	}
 	pages, err := s.Client.Page.Query().
 		Where(entpage.ShopIDEQ(shopID)).
@@ -534,17 +563,17 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	if shop.ThemeID == nil {
-		return nil, &ValidationError{Message: "shop has no theme applied"}
-	}
-	theme, err := s.Client.Theme.Get(ctx, *shop.ThemeID)
+	globalSchema, ok, err := s.schemas().GlobalSchema(ctx, shopID)
 	if err != nil {
-		return nil, fmt.Errorf("cms: load theme: %w", err)
+		return nil, fmt.Errorf("cms: load content schema: %w", err)
+	}
+	if !ok {
+		return nil, &ValidationError{Message: "shop has no theme applied"}
 	}
 	if len(content) == 0 {
 		content = json.RawMessage("{}")
 	}
-	content, err = s.validateAndSanitize(theme.ConfigSchema, content)
+	content, err = s.validateAndSanitize(globalSchema, content)
 	if err != nil {
 		return nil, err
 	}
@@ -562,11 +591,9 @@ func (s *Service) GetShopContent(ctx context.Context, shopID int) (json.RawMessa
 	if err != nil {
 		return nil, nil, ErrNotFound
 	}
-	var schema json.RawMessage
-	if shop.ThemeID != nil {
-		if theme, err := s.Client.Theme.Get(ctx, *shop.ThemeID); err == nil {
-			schema = theme.ConfigSchema
-		}
+	schema, _, err := s.schemas().GlobalSchema(ctx, shopID)
+	if err != nil {
+		return nil, nil, err
 	}
 	return shop.ContentJSON, schema, nil
 }
@@ -696,6 +723,11 @@ func createShopTx(ctx context.Context, tx *ent.Tx, name string, status int16, th
 			return nil, &ValidationError{Message: "shop could not be created"}
 		}
 		return nil, err
+	}
+	if themeID != nil {
+		if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shop.ID, *themeID); err != nil {
+			return nil, err
+		}
 	}
 	if err := createHomePage(ctx, tx, shop.ID); err != nil {
 		return nil, err

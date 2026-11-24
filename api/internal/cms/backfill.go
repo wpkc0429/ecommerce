@@ -3,12 +3,13 @@ package cms
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/events"
 )
 
@@ -83,20 +84,20 @@ func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, em
 	if err != nil {
 		return fmt.Errorf("cms: backfill: list pages of shop %d: %w", sh.ID, err)
 	}
-	if sh.ThemeID == nil {
+	active, err := s.schemas().Active(ctx, sh.ID)
+	if errors.Is(err, contentschema.ErrNoSchema) {
 		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "no theme applied"})
 		for _, p := range pages {
 			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "shop has no theme applied"})
 		}
 		return nil
 	}
-	theme, err := s.Client.Theme.Get(ctx, *sh.ThemeID)
 	if err != nil {
-		return fmt.Errorf("cms: backfill: load theme %d: %w", *sh.ThemeID, err)
+		return fmt.Errorf("cms: backfill: load content schema of shop %d: %w", sh.ID, err)
 	}
 
 	// Shop global content.
-	clean, changed, err := SanitizeRichText(theme.ConfigSchema, sh.ContentJSON)
+	clean, changed, err := SanitizeRichText(active.Doc.Global, sh.ContentJSON)
 	if err != nil {
 		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "unparseable content"})
 	} else {
@@ -109,23 +110,8 @@ func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, em
 		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Changed: changed})
 	}
 
-	schemas := map[string]json.RawMessage{}
 	for _, p := range pages {
-		schema, ok := schemas[p.TypeKey]
-		if !ok {
-			tp, err := s.Client.ThemePage.Query().
-				Where(themepage.ThemeIDEQ(theme.ID), themepage.TypeKeyEQ(p.TypeKey)).
-				Only(ctx)
-			switch {
-			case ent.IsNotFound(err):
-				schema = nil
-			case err != nil:
-				return fmt.Errorf("cms: backfill: load theme page %s: %w", p.TypeKey, err)
-			default:
-				schema = tp.PageSchema
-			}
-			schemas[p.TypeKey] = schema
-		}
+		schema := active.Doc.Types[p.TypeKey]
 		if schema == nil {
 			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "type_key not in current theme"})
 			continue
