@@ -33,7 +33,12 @@ import (
 //	                                e-mail equality check are the authority, and
 //	                                the service refuses a disabled account
 //	                                (change merchant-staff-role)
+//	GET /api/v1/admin/branding      unauthenticated by design: the shared admin SPA
+//	                                needs the shop's name, logo and colors on the
+//	                                login page, resolved from the registered admin
+//	                                host (change admin-api-public-exposure D8)
 var expectedUnguardedAdminRoutes = []string{
+	"GET /api/v1/admin/branding",
 	"GET /api/v1/admin/me",
 	"GET /api/v1/admin/media/config",
 	"POST /api/v1/admin/invitations/accept",

@@ -58,6 +58,10 @@ func (s *Service) RestrictImageDomain(prefixes ...string) {
 	}
 }
 
+// ImagePrefixes returns the configured image-domain prefixes (empty when media
+// is not configured).
+func (s *Service) ImagePrefixes() []string { return s.imagePrefixes }
+
 // ── themes (platform) ─────────────────────────────────────────────
 
 type ThemeInput struct {

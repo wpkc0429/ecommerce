@@ -248,6 +248,16 @@ components:
         maxLength: 255
         pattern: '^[\x21-\x7E]+$'
         examples: ["k-mfa3x1p-9qz2h7"]
+    AdminRefreshHeader:
+      name: X-Admin-Refresh
+      in: header
+      required: false
+      description: |
+        後台 **cookie 模式**的 refresh／logout **必須**帶 `1`（change admin-api-public-exposure
+        design D5）。自訂標頭迫使跨源請求先做 preflight，而 preflight 只會對該商家自己的 admin
+        origin 放行——擋住同站不同源（子網域）的 CSRF，這是 `SameSite=Strict` 單獨做不到的。
+        body 模式不需要。
+      schema: { type: string, examples: ["1"] }
     ShopIDPath:
       name: shopID
       in: path
@@ -453,19 +463,25 @@ components:
     TokenResponse:
       type: object
       additionalProperties: false
-      required: [access_token, refresh_token, token_type, expires_in]
+      required: [access_token, token_type, expires_in]
       description: |
         後台與前台共用的權杖回應形狀。
 
         `refresh_token` 是**一次性**的：每次換發都會旋轉，舊值立即失效。
         重複使用同一個 refresh token 會得到 401。
+
+        **後台 cookie 模式**（登入時帶 `refresh_transport: "cookie"`）：回應**不含**
+        `refresh_token`，refresh token 改以 `Set-Cookie: __Secure-admin_refresh` 交付
+        （change admin-api-public-exposure）。預設（body）模式與過去逐位元組相同。
       properties:
         access_token:
           type: string
           description: "放進 `Authorization: Bearer <access_token>`。"
         refresh_token:
           type: string
-          description: 只用於 `.../auth/refresh` 與 `.../auth/logout`。**一次性，用過即換新**。
+          description: |
+            只用於 `.../auth/refresh` 與 `.../auth/logout`。**一次性，用過即換新**。
+            後台 cookie 模式下不出現。
         token_type: { type: string, examples: ["Bearer"] }
         expires_in:
           type: integer
@@ -1469,16 +1485,28 @@ components:
     AllowedOrigin:
       type: object
       additionalProperties: false
-      required: [id, origin, created_at]
+      required: [id, origin, purpose, created_at]
       description: |
-        允許以瀏覽器呼叫本 API 的 origin。CORS 的允許集合 ＝ 平台環境變數清單 ∪ 本表。
+        允許以瀏覽器呼叫本 API 的 origin。CORS 的允許集合依**請求路徑與用途**而定
+        （change admin-api-public-exposure）：非後台路徑 ＝ 平台環境變數清單 ∪
+        `purpose=storefront`；`/api/v1/admin/shops/{id}/…` ＝ 平台清單 ∪ 登記於**該**商家的
+        `purpose=admin`；`auth`／`me`／`branding`／`invitations/accept`／`media/config` ＝ 平台清單 ∪
+        任一 `purpose=admin`；其他後台路徑（平台層）＝ 只有平台清單。
+        storefront origin 在任何後台路徑上都不獲得 CORS。
         origin 是**全域競爭的命名空間**，所以登記需要平台層權限，不是商家自助。
       properties:
         id: { type: integer }
         origin:
           type: string
-          description: "`scheme://host[:port]`，不含路徑、不含萬用字元。全域唯一。"
+          description: "`scheme://host[:port]`，不含路徑、不含萬用字元。全域唯一（不分用途）。"
           examples: ["https://ondo.example.com"]
+        purpose:
+          type: string
+          enum: [storefront, admin]
+          description: |
+            `storefront`＝商家自帶的店面前端（呼叫前台 API）；`admin`＝該商家的後台前端
+            （只能呼叫該商家的後台路徑，且伺服器端以主機綁定限制為只能操作自己的店）。
+            既有登記皆為 `storefront`。
         created_at: { type: string, format: date-time }
 
     # ── 後台：租戶與 CMS ───────────────────────────────────────
@@ -1713,9 +1741,10 @@ components:
     ShopSettings:
       type: object
       additionalProperties: false
-      required: [shop_id, timezone, effective_timezone]
-      description: 商家自己可維護的設定。目前只有時區一項。
+      required: [shop_id, timezone, effective_timezone, admin_branding]
+      description: 商家自己可維護的設定：時區與後台品牌。
       properties:
+        admin_branding: { $ref: '#/components/schemas/AdminBranding' }
         shop_id: { type: integer }
         timezone:
           oneOf: [{ type: string }, { type: 'null' }]
@@ -1724,6 +1753,27 @@ components:
             不同——後者是套用回落之後、報表實際使用的值。
           examples: ["Asia/Taipei"]
         effective_timezone: { $ref: '#/components/schemas/EffectiveTimezone' }
+
+    AdminBranding:
+      type: object
+      additionalProperties: false
+      required: [logo_url, primary_color, accent_color]
+      description: |
+        商家共用後台 SPA 的品牌（change admin-api-public-exposure）。純資料：API 不依前端
+        身分分支，自訂的後台前端可以完全忽略它。三個欄位恆存在，`""` ＝ 未設定。
+      properties:
+        logo_url: { type: string, description: "絕對 http(s) URL；媒體已設定時必須位於影像網域。" }
+        primary_color: { type: string, description: "`#rrggbb`（小寫）。", examples: ["#1a73e8"] }
+        accent_color: { type: string, description: "`#rrggbb`（小寫）。", examples: ["#ff6d00"] }
+
+    AdminBrandingView:
+      type: object
+      additionalProperties: false
+      required: [name, branding]
+      properties:
+        shop_id: { type: integer, description: "只在已認證的 `/shops/{shopID}/branding` 出現。" }
+        name: { type: string, description: 商家名稱。 }
+        branding: { $ref: '#/components/schemas/AdminBranding' }
 
     # ── 每商家金流憑證 (change ecpay-per-shop-credentials) ────
     ECPayCredentials:
@@ -3269,6 +3319,20 @@ paths:
       summary: 後台登入
       description: |
         失敗一律是同一個 401，**不區分**帳號不存在／密碼錯誤／帳號停用／尚未設定密碼。
+
+        **帳號層級鎖定**（change admin-api-public-exposure）：同一個 email 在視窗內（預設 15
+        分鐘）**跨所有來源 IP** 累計失敗達上限（預設 10）後，該 email 的登入一律回
+        `429`＋`Retry-After`，**即使密碼正確**，直到視窗滑出；不存在的 email 行為完全相同。
+        成功登入清除計數。代價是任何人可用錯誤密碼把某帳號鎖 15 分鐘。
+
+        **`refresh_transport: "cookie"`**：refresh token 不放進回應主體，改以
+        `Set-Cookie: __Secure-admin_refresh=…; HttpOnly; Secure; SameSite=Strict;
+        Path=/api/v1/admin/auth; Max-Age=<refresh TTL>` 交付。僅適用於與 API **同源**的後台前端
+        （跨源時 SameSite=Strict 的 cookie 不會被帶上，請用預設的 `body`）。
+
+        **Cloudflare Access**：部署設定 `CF_ACCESS_TEAM_DOMAIN`／`CF_ACCESS_AUD` 後，所有
+        `/api/v1/admin/*` 請求必須帶 Access 注入的 `Cf-Access-Jwt-Assertion`，否則 `403`
+        （由 Cloudflare 於邊緣加上，瀏覽器端不需處理；因未設定時不需要，故不列為參數）。
       security: []
       requestBody:
         required: true
@@ -3281,14 +3345,24 @@ paths:
               properties:
                 email: { type: string }
                 password: { type: string }
+                refresh_transport:
+                  type: string
+                  enum: [body, cookie]
+                  default: body
+                  description: refresh token 的交付方式；省略＝`body`（行為與過去相同）。
       responses:
         "200":
-          description: 登入成功。
+          description: 登入成功。`cookie` 模式下回應不含 `refresh_token`，並帶 `Set-Cookie`。
+          headers:
+            Set-Cookie:
+              description: 僅 `cookie` 模式：`__Secure-admin_refresh`（HttpOnly; Secure; SameSite=Strict）。
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
         "400": { $ref: '#/components/responses/BadRequest' }
         "401": { $ref: '#/components/responses/Unauthorized' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
         "429": { $ref: '#/components/responses/TooManyRequests' }
 
   /api/v1/admin/auth/refresh:
@@ -3296,21 +3370,31 @@ paths:
       tags: [admin-auth]
       operationId: adminRefresh
       summary: 換發後台權杖
-      description: refresh token 一次性，成功後舊值立即失效。
+      description: |
+        refresh token 一次性，成功後舊值立即失效。
+
+        主體帶 `refresh_token` ＝ body 模式（行為不變）。主體未帶時改讀
+        `__Secure-admin_refresh` cookie（cookie 模式），此時**必須**帶 `X-Admin-Refresh: 1`，
+        否則 `401` 且 token **不會**被輪替；成功時以新 token 覆寫 cookie，回應不含 `refresh_token`。
       security: []
+      parameters:
+        - $ref: '#/components/parameters/AdminRefreshHeader'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
               additionalProperties: false
-              required: [refresh_token]
               properties:
-                refresh_token: { type: string }
+                refresh_token: { type: string, description: body 模式必填；cookie 模式省略。 }
       responses:
         "200":
-          description: 換發成功。
+          description: 換發成功。cookie 模式下回應不含 `refresh_token`，並以新值覆寫 cookie。
+          headers:
+            Set-Cookie:
+              description: 僅 cookie 模式。
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TokenResponse' }
@@ -3323,20 +3407,70 @@ paths:
       tags: [admin-auth]
       operationId: adminLogout
       summary: 撤銷後台 refresh token
+      description: |
+        主體未帶 `refresh_token` 時改讀 cookie（cookie 模式），此時必須帶
+        `X-Admin-Refresh: 1`（否則 `401`），並清除 cookie。
       security: []
+      parameters:
+        - $ref: '#/components/parameters/AdminRefreshHeader'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
               type: object
               additionalProperties: false
-              required: [refresh_token]
               properties:
-                refresh_token: { type: string }
+                refresh_token: { type: string, description: body 模式必填；cookie 模式省略。 }
       responses:
-        "204": { $ref: '#/components/responses/NoContent' }
+        "204":
+          description: 已撤銷。cookie 模式下同時清除 cookie。
+          headers:
+            Set-Cookie:
+              description: 僅 cookie 模式：Max-Age=0 的 `__Secure-admin_refresh`。
+              schema: { type: string }
         "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/admin/branding:
+    get:
+      tags: [admin-auth]
+      operationId: getAdminBrandingByHost
+      summary: 依請求的 admin 主機取得商家品牌（未認證）
+      description: |
+        共用後台 SPA 在**登入前**呼叫：伺服器以請求的 `Origin`（優先）或 `Host` 對照
+        `purpose=admin` 的 origin 登記解析出商家，回傳名稱與品牌。主機未登記為任何商家的 admin
+        origin 時回 `404`——前端改用平台預設外觀。洩漏面僅限於「知道該 admin 網域的人本來就看得到的
+        登入頁內容」（change admin-api-public-exposure）。
+      security: []
+      responses:
+        "200":
+          description: 該 admin 主機所屬商家的名稱與品牌。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminBrandingView' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/branding:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-rbac]
+      operationId: getShopAdminBranding
+      summary: 取得商家的後台品牌
+      description: |
+        **不需要任何權限節點**，只需要已認證且通過跨店存取守衛（與 `/shops/{shopID}/me` 相同）；
+        寫入走 `PUT /shops/{shopID}/settings` 的 `admin_branding`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 商家名稱與品牌。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminBrandingView' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
 
   /api/v1/admin/me:
     get:
@@ -6648,6 +6782,13 @@ paths:
               required: [origin]
               properties:
                 origin: { type: string, examples: ["https://ondo.example.com"] }
+                purpose:
+                  type: string
+                  enum: [storefront, admin]
+                  default: storefront
+                  description: |
+                    省略＝`storefront`。不屬於這兩值回 422。同一個 origin 不能同時是兩種用途
+                    （全域唯一），重複登記回 422。
       responses:
         "201":
           description: 已登記。
@@ -6666,7 +6807,7 @@ paths:
     put:
       tags: [admin-commerce]
       operationId: updateShopSettings
-      summary: 更新商家自己的設定（目前只有時區）
+      summary: 更新商家自己的設定（時區與後台品牌）
       description: |
         需要**商家層** `shop.update`（既有節點）。
 
@@ -6677,6 +6818,12 @@ paths:
         **`timezone` 送 `null`（或省略）＝ 清除設定**，回到平台預設。這與「把它設成平台
         預設的那個字串」是兩件不同的事：只有前者會在報表上被標示為 `source: "default"`，
         也只有前者會跟著平台日後調整預設值。
+
+        **`admin_branding`**（change admin-api-public-exposure，選填；`shop.update`）：
+        `{logo_url, primary_color, accent_color}`，顏色為 `#RRGGBB`，`logo_url` 在媒體已設定時必須位於
+        影像網域。**整個物件取代**儲存值（空字串或 `null` 清除該鍵，`null`／`{}` 清除全部）；
+        **省略 `admin_branding` ＝ 不變**。只送 `admin_branding`（沒有 `timezone` 鍵）時
+        **時區不受影響**；兩個鍵都沒送的空主體維持既有語意（清除時區）。
 
         本端點**不會**改動商家的名稱、狀態、主題或全域內容。
 
@@ -6702,6 +6849,11 @@ paths:
                     其錯誤只會在切換當日出現一次，而且不會有任何錯誤訊息。
                     亦不接受 `Local`——它會解析成伺服器自己的時區，那正是這個欄位要消除的歧義。
                   examples: ["Asia/Taipei"]
+                admin_branding:
+                  oneOf:
+                    - $ref: '#/components/schemas/AdminBranding'
+                    - type: 'null'
+                  description: 後台品牌；省略＝不變。
       responses:
         "200":
           description: 更新後的設定。

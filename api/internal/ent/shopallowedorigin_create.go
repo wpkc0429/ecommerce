@@ -35,6 +35,20 @@ func (_c *ShopAllowedOriginCreate) SetOrigin(v string) *ShopAllowedOriginCreate 
 	return _c
 }
 
+// SetPurpose sets the "purpose" field.
+func (_c *ShopAllowedOriginCreate) SetPurpose(v string) *ShopAllowedOriginCreate {
+	_c.mutation.SetPurpose(v)
+	return _c
+}
+
+// SetNillablePurpose sets the "purpose" field if the given value is not nil.
+func (_c *ShopAllowedOriginCreate) SetNillablePurpose(v *string) *ShopAllowedOriginCreate {
+	if v != nil {
+		_c.SetPurpose(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ShopAllowedOriginCreate) SetCreatedAt(v time.Time) *ShopAllowedOriginCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -89,6 +103,10 @@ func (_c *ShopAllowedOriginCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *ShopAllowedOriginCreate) defaults() {
+	if _, ok := _c.mutation.Purpose(); !ok {
+		v := shopallowedorigin.DefaultPurpose
+		_c.mutation.SetPurpose(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := shopallowedorigin.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -106,6 +124,14 @@ func (_c *ShopAllowedOriginCreate) check() error {
 	if v, ok := _c.mutation.Origin(); ok {
 		if err := shopallowedorigin.OriginValidator(v); err != nil {
 			return &ValidationError{Name: "origin", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.origin": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Purpose(); !ok {
+		return &ValidationError{Name: "purpose", err: errors.New(`ent: missing required field "ShopAllowedOrigin.purpose"`)}
+	}
+	if v, ok := _c.mutation.Purpose(); ok {
+		if err := shopallowedorigin.PurposeValidator(v); err != nil {
+			return &ValidationError{Name: "purpose", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.purpose": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
@@ -144,6 +170,10 @@ func (_c *ShopAllowedOriginCreate) createSpec() (*ShopAllowedOrigin, *sqlgraph.C
 	if value, ok := _c.mutation.Origin(); ok {
 		_spec.SetField(shopallowedorigin.FieldOrigin, field.TypeString, value)
 		_node.Origin = value
+	}
+	if value, ok := _c.mutation.Purpose(); ok {
+		_spec.SetField(shopallowedorigin.FieldPurpose, field.TypeString, value)
+		_node.Purpose = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(shopallowedorigin.FieldCreatedAt, field.TypeTime, value)
@@ -242,6 +272,18 @@ func (u *ShopAllowedOriginUpsert) UpdateOrigin() *ShopAllowedOriginUpsert {
 	return u
 }
 
+// SetPurpose sets the "purpose" field.
+func (u *ShopAllowedOriginUpsert) SetPurpose(v string) *ShopAllowedOriginUpsert {
+	u.Set(shopallowedorigin.FieldPurpose, v)
+	return u
+}
+
+// UpdatePurpose sets the "purpose" field to the value that was provided on create.
+func (u *ShopAllowedOriginUpsert) UpdatePurpose() *ShopAllowedOriginUpsert {
+	u.SetExcluded(shopallowedorigin.FieldPurpose)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -312,6 +354,20 @@ func (u *ShopAllowedOriginUpsertOne) SetOrigin(v string) *ShopAllowedOriginUpser
 func (u *ShopAllowedOriginUpsertOne) UpdateOrigin() *ShopAllowedOriginUpsertOne {
 	return u.Update(func(s *ShopAllowedOriginUpsert) {
 		s.UpdateOrigin()
+	})
+}
+
+// SetPurpose sets the "purpose" field.
+func (u *ShopAllowedOriginUpsertOne) SetPurpose(v string) *ShopAllowedOriginUpsertOne {
+	return u.Update(func(s *ShopAllowedOriginUpsert) {
+		s.SetPurpose(v)
+	})
+}
+
+// UpdatePurpose sets the "purpose" field to the value that was provided on create.
+func (u *ShopAllowedOriginUpsertOne) UpdatePurpose() *ShopAllowedOriginUpsertOne {
+	return u.Update(func(s *ShopAllowedOriginUpsert) {
+		s.UpdatePurpose()
 	})
 }
 
@@ -551,6 +607,20 @@ func (u *ShopAllowedOriginUpsertBulk) SetOrigin(v string) *ShopAllowedOriginUpse
 func (u *ShopAllowedOriginUpsertBulk) UpdateOrigin() *ShopAllowedOriginUpsertBulk {
 	return u.Update(func(s *ShopAllowedOriginUpsert) {
 		s.UpdateOrigin()
+	})
+}
+
+// SetPurpose sets the "purpose" field.
+func (u *ShopAllowedOriginUpsertBulk) SetPurpose(v string) *ShopAllowedOriginUpsertBulk {
+	return u.Update(func(s *ShopAllowedOriginUpsert) {
+		s.SetPurpose(v)
+	})
+}
+
+// UpdatePurpose sets the "purpose" field to the value that was provided on create.
+func (u *ShopAllowedOriginUpsertBulk) UpdatePurpose() *ShopAllowedOriginUpsertBulk {
+	return u.Update(func(s *ShopAllowedOriginUpsert) {
+		s.UpdatePurpose()
 	})
 }
 

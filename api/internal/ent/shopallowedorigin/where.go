@@ -65,6 +65,11 @@ func Origin(v string) predicate.ShopAllowedOrigin {
 	return predicate.ShopAllowedOrigin(sql.FieldEQ(FieldOrigin, v))
 }
 
+// Purpose applies equality check predicate on the "purpose" field. It's identical to PurposeEQ.
+func Purpose(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldEQ(FieldPurpose, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ShopAllowedOrigin {
 	return predicate.ShopAllowedOrigin(sql.FieldEQ(FieldCreatedAt, v))
@@ -153,6 +158,71 @@ func OriginEqualFold(v string) predicate.ShopAllowedOrigin {
 // OriginContainsFold applies the ContainsFold predicate on the "origin" field.
 func OriginContainsFold(v string) predicate.ShopAllowedOrigin {
 	return predicate.ShopAllowedOrigin(sql.FieldContainsFold(FieldOrigin, v))
+}
+
+// PurposeEQ applies the EQ predicate on the "purpose" field.
+func PurposeEQ(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldEQ(FieldPurpose, v))
+}
+
+// PurposeNEQ applies the NEQ predicate on the "purpose" field.
+func PurposeNEQ(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldNEQ(FieldPurpose, v))
+}
+
+// PurposeIn applies the In predicate on the "purpose" field.
+func PurposeIn(vs ...string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldIn(FieldPurpose, vs...))
+}
+
+// PurposeNotIn applies the NotIn predicate on the "purpose" field.
+func PurposeNotIn(vs ...string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldNotIn(FieldPurpose, vs...))
+}
+
+// PurposeGT applies the GT predicate on the "purpose" field.
+func PurposeGT(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldGT(FieldPurpose, v))
+}
+
+// PurposeGTE applies the GTE predicate on the "purpose" field.
+func PurposeGTE(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldGTE(FieldPurpose, v))
+}
+
+// PurposeLT applies the LT predicate on the "purpose" field.
+func PurposeLT(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldLT(FieldPurpose, v))
+}
+
+// PurposeLTE applies the LTE predicate on the "purpose" field.
+func PurposeLTE(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldLTE(FieldPurpose, v))
+}
+
+// PurposeContains applies the Contains predicate on the "purpose" field.
+func PurposeContains(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldContains(FieldPurpose, v))
+}
+
+// PurposeHasPrefix applies the HasPrefix predicate on the "purpose" field.
+func PurposeHasPrefix(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldHasPrefix(FieldPurpose, v))
+}
+
+// PurposeHasSuffix applies the HasSuffix predicate on the "purpose" field.
+func PurposeHasSuffix(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldHasSuffix(FieldPurpose, v))
+}
+
+// PurposeEqualFold applies the EqualFold predicate on the "purpose" field.
+func PurposeEqualFold(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldEqualFold(FieldPurpose, v))
+}
+
+// PurposeContainsFold applies the ContainsFold predicate on the "purpose" field.
+func PurposeContainsFold(v string) predicate.ShopAllowedOrigin {
+	return predicate.ShopAllowedOrigin(sql.FieldContainsFold(FieldPurpose, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

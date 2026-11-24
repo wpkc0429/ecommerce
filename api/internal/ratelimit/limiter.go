@@ -105,6 +105,81 @@ func (l *Limiter) Allow(ctx context.Context, key string, limit int, window time.
 	return Result{Allowed: allowed == 1, RetryAfter: time.Duration(retryMS) * time.Millisecond}
 }
 
+// peekScript is the read-only half of a failure counter (change
+// admin-api-public-exposure, design D6): trim the window, report how many
+// entries remain, and when the oldest one slides out. It never adds an entry.
+var peekScript = redis.NewScript(`
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local limit = tonumber(ARGV[3])
+
+redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+local count = redis.call('ZCARD', key)
+if count < limit then
+  return {1, 0}
+end
+local oldest = redis.call('ZRANGE', key, 0, 0, 'WITHSCORES')
+local retryAfter = window
+if oldest[2] ~= nil then
+  retryAfter = (tonumber(oldest[2]) + window) - now
+  if retryAfter < 0 then
+    retryAfter = 0
+  end
+end
+return {0, retryAfter}
+`)
+
+// Peek reports whether another attempt is allowed under key WITHOUT recording
+// one. Pair it with Record (on failure) and Reset (on success) to build a
+// failure-only lockout, which Allow cannot express because it counts every
+// call. Fails open like Allow.
+func (l *Limiter) Peek(ctx context.Context, key string, limit int, window time.Duration) Result {
+	if l == nil || l.redis == nil || limit <= 0 || window <= 0 {
+		return Result{Allowed: true}
+	}
+	res, err := peekScript.Run(ctx, l.redis, []string{"ratelimit:" + key}, time.Now().UnixMilli(), window.Milliseconds(), limit).Result()
+	if err != nil {
+		l.warn("peek failed, failing open", key, err)
+		return Result{Allowed: true}
+	}
+	vals, ok := res.([]interface{})
+	if !ok || len(vals) != 2 {
+		l.warn("unexpected peek result, failing open", key, nil)
+		return Result{Allowed: true}
+	}
+	allowed, _ := vals[0].(int64)
+	retryMS, _ := vals[1].(int64)
+	return Result{Allowed: allowed == 1, RetryAfter: time.Duration(retryMS) * time.Millisecond}
+}
+
+// Record adds one entry under key unconditionally (the "failure" half of a
+// Peek/Record/Reset counter). Errors are logged and swallowed (fail-open).
+func (l *Limiter) Record(ctx context.Context, key string, window time.Duration) {
+	if l == nil || l.redis == nil || window <= 0 {
+		return
+	}
+	member := strconv.FormatInt(time.Now().UnixNano(), 36) + "-" + strconv.FormatUint(rand.Uint64(), 36)
+	now := float64(time.Now().UnixMilli())
+	pipe := l.redis.TxPipeline()
+	pipe.ZAdd(ctx, "ratelimit:"+key, redis.Z{Score: now, Member: member})
+	pipe.PExpire(ctx, "ratelimit:"+key, window)
+	if _, err := pipe.Exec(ctx); err != nil {
+		l.warn("record failed, failing open", key, err)
+	}
+}
+
+// Reset forgets every entry under key (a successful login clears its failure
+// counter). Errors are logged and swallowed (fail-open).
+func (l *Limiter) Reset(ctx context.Context, key string) {
+	if l == nil || l.redis == nil {
+		return
+	}
+	if err := l.redis.Del(ctx, "ratelimit:"+key).Err(); err != nil {
+		l.warn("reset failed, failing open", key, err)
+	}
+}
+
 func (l *Limiter) warn(msg, key string, err error) {
 	if l.log == nil {
 		return

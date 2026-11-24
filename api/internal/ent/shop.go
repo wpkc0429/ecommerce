@@ -35,6 +35,8 @@ type Shop struct {
 	Meta json.RawMessage `json:"meta,omitempty"`
 	// Timezone holds the value of the "timezone" field.
 	Timezone *string `json:"timezone,omitempty"`
+	// AdminBranding holds the value of the "admin_branding" field.
+	AdminBranding json.RawMessage `json:"admin_branding,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ShopQuery when eager-loading is set.
 	Edges        ShopEdges `json:"edges"`
@@ -99,7 +101,7 @@ func (*Shop) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shop.FieldContentJSON, shop.FieldMeta:
+		case shop.FieldContentJSON, shop.FieldMeta, shop.FieldAdminBranding:
 			values[i] = new([]byte)
 		case shop.FieldID, shop.FieldThemeID, shop.FieldStatus:
 			values[i] = new(sql.NullInt64)
@@ -181,6 +183,14 @@ func (_m *Shop) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Timezone = new(string)
 				*_m.Timezone = value.String
+			}
+		case shop.FieldAdminBranding:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field admin_branding", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.AdminBranding); err != nil {
+					return fmt.Errorf("unmarshal field admin_branding: %w", err)
+				}
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -265,6 +275,9 @@ func (_m *Shop) String() string {
 		builder.WriteString("timezone=")
 		builder.WriteString(*v)
 	}
+	builder.WriteString(", ")
+	builder.WriteString("admin_branding=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AdminBranding))
 	builder.WriteByte(')')
 	return builder.String()
 }

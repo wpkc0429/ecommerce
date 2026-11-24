@@ -43,9 +43,16 @@ AccountPage.page_size
 AccountPage.total
 AccountRoleRef.id
 AccountRoleRef.name
+AdminBranding.accent_color
+AdminBranding.logo_url
+AdminBranding.primary_color
+AdminBrandingView.branding
+AdminBrandingView.name
+AdminBrandingView.shop_id
 AllowedOrigin.created_at
 AllowedOrigin.id
 AllowedOrigin.origin
+AllowedOrigin.purpose
 Cart.currency
 Cart.id
 Cart.item_count
@@ -160,6 +167,7 @@ GET /api/v1/admin/accounts query q
 GET /api/v1/admin/accounts query q optional
 GET /api/v1/admin/accounts/{userID}
 GET /api/v1/admin/accounts/{userID} path userID
+GET /api/v1/admin/branding
 GET /api/v1/admin/me
 GET /api/v1/admin/media/config
 GET /api/v1/admin/permissions
@@ -173,6 +181,8 @@ GET /api/v1/admin/shops/{shopID}
 GET /api/v1/admin/shops/{shopID} path shopID
 GET /api/v1/admin/shops/{shopID}/allowed-origins
 GET /api/v1/admin/shops/{shopID}/allowed-origins path shopID
+GET /api/v1/admin/shops/{shopID}/branding
+GET /api/v1/admin/shops/{shopID}/branding path shopID
 GET /api/v1/admin/shops/{shopID}/categories
 GET /api/v1/admin/shops/{shopID}/categories path shopID
 GET /api/v1/admin/shops/{shopID}/categories query flat
@@ -514,13 +524,20 @@ POST /api/v1/admin/auth/invitations/accept response 429 Retry-After
 POST /api/v1/admin/auth/invitations/inspect
 POST /api/v1/admin/auth/invitations/inspect response 429 Retry-After
 POST /api/v1/admin/auth/login
+POST /api/v1/admin/auth/login response 200 Set-Cookie
 POST /api/v1/admin/auth/login response 429 Retry-After
 POST /api/v1/admin/auth/logout
+POST /api/v1/admin/auth/logout header X-Admin-Refresh
+POST /api/v1/admin/auth/logout header X-Admin-Refresh optional
+POST /api/v1/admin/auth/logout response 204 Set-Cookie
 POST /api/v1/admin/auth/password-setup
 POST /api/v1/admin/auth/password-setup response 429 Retry-After
 POST /api/v1/admin/auth/password-setup/inspect
 POST /api/v1/admin/auth/password-setup/inspect response 429 Retry-After
 POST /api/v1/admin/auth/refresh
+POST /api/v1/admin/auth/refresh header X-Admin-Refresh
+POST /api/v1/admin/auth/refresh header X-Admin-Refresh optional
+POST /api/v1/admin/auth/refresh response 200 Set-Cookie
 POST /api/v1/admin/auth/refresh response 429 Retry-After
 POST /api/v1/admin/invitations/accept
 POST /api/v1/admin/permissions
@@ -900,6 +917,7 @@ ShopPage.total
 ShopPermissions.permissions
 ShopPermissions.shop_id
 ShopPermissions.user_id
+ShopSettings.admin_branding
 ShopSettings.effective_timezone
 ShopSettings.shop_id
 ShopSettings.timezone

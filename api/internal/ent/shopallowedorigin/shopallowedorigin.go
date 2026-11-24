@@ -18,6 +18,8 @@ const (
 	FieldShopID = "shop_id"
 	// FieldOrigin holds the string denoting the origin field in the database.
 	FieldOrigin = "origin"
+	// FieldPurpose holds the string denoting the purpose field in the database.
+	FieldPurpose = "purpose"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
@@ -38,6 +40,7 @@ var Columns = []string{
 	FieldID,
 	FieldShopID,
 	FieldOrigin,
+	FieldPurpose,
 	FieldCreatedAt,
 }
 
@@ -54,6 +57,10 @@ func ValidColumn(column string) bool {
 var (
 	// OriginValidator is a validator for the "origin" field. It is called by the builders before save.
 	OriginValidator func(string) error
+	// DefaultPurpose holds the default value on creation for the "purpose" field.
+	DefaultPurpose string
+	// PurposeValidator is a validator for the "purpose" field. It is called by the builders before save.
+	PurposeValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -74,6 +81,11 @@ func ByShopID(opts ...sql.OrderTermOption) OrderOption {
 // ByOrigin orders the results by the origin field.
 func ByOrigin(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldOrigin, opts...).ToFunc()
+}
+
+// ByPurpose orders the results by the purpose field.
+func ByPurpose(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPurpose, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -196,7 +196,9 @@ func documentedRoutes(t *testing.T, doc map[string]any) map[string]bool {
 // into the sentence the whole mechanism rests on — "every Deps field is set".
 type nullOriginRegistry struct{}
 
-func (nullOriginRegistry) IsRegisteredOrigin(context.Context, string) bool { return false }
+func (nullOriginRegistry) LookupOrigin(context.Context, string) (int, string, bool) {
+	return 0, "", false
+}
 
 // contractDeps is the "everything is wired" Deps the coverage check enumerates.
 //

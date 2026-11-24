@@ -2,7 +2,10 @@ package app
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -94,7 +97,17 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 
 	engine := rbac.NewEngine(client, rdb, a.log)
 	authz := &httpapi.AuthzMW{Engine: engine}
-	deps.AdminAuth = &httpapi.AdminAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Engine: engine, Log: a.log}
+	// change admin-api-public-exposure D6: the lockout key HMAC is derived from
+	// the admin JWT secret under its own label, so no new secret has to be
+	// managed (and rotating the JWT secret merely resets the failure counters).
+	lockoutKey := hmac.New(sha256.New, []byte(cfg.AdminJWTSecret))
+	_, _ = lockoutKey.Write([]byte("login-lockout-key-v1"))
+	deps.AdminAuth = &httpapi.AdminAuthHandler{
+		Client: client, Issuer: issuer, Refresh: refresh, Engine: engine, Log: a.log,
+		RefreshTTL: cfg.RefreshTokenTTL,
+		Limiter:    limiter, LockoutFailures: cfg.RateLimit.LoginAccountFailures,
+		LockoutWindow: cfg.RateLimit.LoginAccountWindow, LockoutSecret: lockoutKey.Sum(nil),
+	}
 
 	// Back-office account provisioning (change platform-account-provisioning).
 	// Until the VPS move there is no outbound mail for admin accounts, so links
@@ -139,6 +152,26 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 
 	deps.TenantMW = httpapi.NewTenantMiddleware(resolver)
 	deps.CORSOrigins = resolver
+
+	// change admin-api-public-exposure: Cloudflare Access JWT validation
+	// (D2), admin host binding + PLATFORM_ADMIN_HOSTS (D4/D10). All three
+	// middlewares are always mounted and pass through when unconfigured.
+	var cfVerifier *httpapi.CFAccessVerifier
+	if cfg.CFAccess.Enabled() {
+		cfVerifier = httpapi.NewCFAccessVerifier(cfg.CFAccess, a.log)
+	} else if cfg.Env == config.EnvProduction {
+		a.log.Warn("CF_ACCESS_TEAM_DOMAIN / CF_ACCESS_AUD not set - the back-office API does not verify Cloudflare Access tokens; set them once an Access application fronts the admin domains")
+	}
+	deps.AdminAccessMW = httpapi.NewCFAccessMiddleware(cfVerifier, a.log)
+	deps.AdminBindEmailMW = func(next http.Handler) http.Handler { return next }
+	if cfg.CFAccess.Enabled() && cfg.CFAccess.BindEmail {
+		deps.AdminBindEmailMW = httpapi.NewCFAccessBindEmailMiddleware(client, a.log)
+	}
+	if len(cfg.PlatformAdminHosts) == 0 && cfg.Env == config.EnvProduction {
+		a.log.Warn("PLATFORM_ADMIN_HOSTS not set - platform-level back-office APIs are callable from any host")
+	}
+	deps.AdminHostMW = httpapi.NewAdminHostBindingMiddleware(resolver, cfg.PlatformAdminHosts)
+	deps.Branding = &httpapi.BrandingHandler{Client: client, Registry: resolver, Authz: authz, Log: a.log}
 	deps.Sites = &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: a.log, Authz: authz}
 	deps.ClientAuth = &httpapi.ClientAuthHandler{Client: client, Dispatcher: dispatcher, Authz: authz, Log: a.log}
 
@@ -367,6 +400,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// separate from ShopsHandler because that one is platform-scoped (design D7).
 	deps.ShopSettings = &httpapi.ShopSettingsHandler{
 		Client: client, Authz: authz, Log: a.log, DefaultTimezone: cfg.ReportDefaultTimezone,
+		ImagePrefixes: cmsService.ImagePrefixes,
 	}
 
 	deps.Render = &httpapi.RenderHandler{

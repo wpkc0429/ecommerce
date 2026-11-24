@@ -57,6 +57,20 @@ func (_u *ShopAllowedOriginUpdate) SetNillableOrigin(v *string) *ShopAllowedOrig
 	return _u
 }
 
+// SetPurpose sets the "purpose" field.
+func (_u *ShopAllowedOriginUpdate) SetPurpose(v string) *ShopAllowedOriginUpdate {
+	_u.mutation.SetPurpose(v)
+	return _u
+}
+
+// SetNillablePurpose sets the "purpose" field if the given value is not nil.
+func (_u *ShopAllowedOriginUpdate) SetNillablePurpose(v *string) *ShopAllowedOriginUpdate {
+	if v != nil {
+		_u.SetPurpose(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ShopAllowedOriginUpdate) SetShop(v *Shop) *ShopAllowedOriginUpdate {
 	return _u.SetShopID(v.ID)
@@ -107,6 +121,11 @@ func (_u *ShopAllowedOriginUpdate) check() error {
 			return &ValidationError{Name: "origin", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.origin": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Purpose(); ok {
+		if err := shopallowedorigin.PurposeValidator(v); err != nil {
+			return &ValidationError{Name: "purpose", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.purpose": %w`, err)}
+		}
+	}
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "ShopAllowedOrigin.shop"`)
 	}
@@ -133,6 +152,9 @@ func (_u *ShopAllowedOriginUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.Origin(); ok {
 		_spec.SetField(shopallowedorigin.FieldOrigin, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Purpose(); ok {
+		_spec.SetField(shopallowedorigin.FieldPurpose, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -213,6 +235,20 @@ func (_u *ShopAllowedOriginUpdateOne) SetNillableOrigin(v *string) *ShopAllowedO
 	return _u
 }
 
+// SetPurpose sets the "purpose" field.
+func (_u *ShopAllowedOriginUpdateOne) SetPurpose(v string) *ShopAllowedOriginUpdateOne {
+	_u.mutation.SetPurpose(v)
+	return _u
+}
+
+// SetNillablePurpose sets the "purpose" field if the given value is not nil.
+func (_u *ShopAllowedOriginUpdateOne) SetNillablePurpose(v *string) *ShopAllowedOriginUpdateOne {
+	if v != nil {
+		_u.SetPurpose(*v)
+	}
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ShopAllowedOriginUpdateOne) SetShop(v *Shop) *ShopAllowedOriginUpdateOne {
 	return _u.SetShopID(v.ID)
@@ -276,6 +312,11 @@ func (_u *ShopAllowedOriginUpdateOne) check() error {
 			return &ValidationError{Name: "origin", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.origin": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Purpose(); ok {
+		if err := shopallowedorigin.PurposeValidator(v); err != nil {
+			return &ValidationError{Name: "purpose", err: fmt.Errorf(`ent: validator failed for field "ShopAllowedOrigin.purpose": %w`, err)}
+		}
+	}
 	if _u.mutation.ShopCleared() && len(_u.mutation.ShopIDs()) > 0 {
 		return errors.New(`ent: clearing a required unique edge "ShopAllowedOrigin.shop"`)
 	}
@@ -319,6 +360,9 @@ func (_u *ShopAllowedOriginUpdateOne) sqlSave(ctx context.Context) (_node *ShopA
 	}
 	if value, ok := _u.mutation.Origin(); ok {
 		_spec.SetField(shopallowedorigin.FieldOrigin, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Purpose(); ok {
+		_spec.SetField(shopallowedorigin.FieldPurpose, field.TypeString, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

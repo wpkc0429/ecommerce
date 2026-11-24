@@ -24646,31 +24646,33 @@ func (m *ShippingMethodMutation) ResetEdge(name string) error {
 // ShopMutation represents an operation that mutates the Shop nodes in the graph.
 type ShopMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	name               *string
-	status             *int16
-	addstatus          *int16
-	content_json       *json.RawMessage
-	appendcontent_json json.RawMessage
-	meta               *json.RawMessage
-	appendmeta         json.RawMessage
-	timezone           *string
-	clearedFields      map[string]struct{}
-	theme              *int
-	clearedtheme       bool
-	pages              map[int]struct{}
-	removedpages       map[int]struct{}
-	clearedpages       bool
-	sites              map[int]struct{}
-	removedsites       map[int]struct{}
-	clearedsites       bool
-	done               bool
-	oldValue           func(context.Context) (*Shop, error)
-	predicates         []predicate.Shop
+	op                   Op
+	typ                  string
+	id                   *int
+	created_at           *time.Time
+	updated_at           *time.Time
+	name                 *string
+	status               *int16
+	addstatus            *int16
+	content_json         *json.RawMessage
+	appendcontent_json   json.RawMessage
+	meta                 *json.RawMessage
+	appendmeta           json.RawMessage
+	timezone             *string
+	admin_branding       *json.RawMessage
+	appendadmin_branding json.RawMessage
+	clearedFields        map[string]struct{}
+	theme                *int
+	clearedtheme         bool
+	pages                map[int]struct{}
+	removedpages         map[int]struct{}
+	clearedpages         bool
+	sites                map[int]struct{}
+	removedsites         map[int]struct{}
+	clearedsites         bool
+	done                 bool
+	oldValue             func(context.Context) (*Shop, error)
+	predicates           []predicate.Shop
 }
 
 var _ ent.Mutation = (*ShopMutation)(nil)
@@ -25135,6 +25137,57 @@ func (m *ShopMutation) ResetTimezone() {
 	delete(m.clearedFields, shop.FieldTimezone)
 }
 
+// SetAdminBranding sets the "admin_branding" field.
+func (m *ShopMutation) SetAdminBranding(jm json.RawMessage) {
+	m.admin_branding = &jm
+	m.appendadmin_branding = nil
+}
+
+// AdminBranding returns the value of the "admin_branding" field in the mutation.
+func (m *ShopMutation) AdminBranding() (r json.RawMessage, exists bool) {
+	v := m.admin_branding
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdminBranding returns the old "admin_branding" field's value of the Shop entity.
+// If the Shop object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopMutation) OldAdminBranding(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdminBranding is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdminBranding requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdminBranding: %w", err)
+	}
+	return oldValue.AdminBranding, nil
+}
+
+// AppendAdminBranding adds jm to the "admin_branding" field.
+func (m *ShopMutation) AppendAdminBranding(jm json.RawMessage) {
+	m.appendadmin_branding = append(m.appendadmin_branding, jm...)
+}
+
+// AppendedAdminBranding returns the list of values that were appended to the "admin_branding" field in this mutation.
+func (m *ShopMutation) AppendedAdminBranding() (json.RawMessage, bool) {
+	if len(m.appendadmin_branding) == 0 {
+		return nil, false
+	}
+	return m.appendadmin_branding, true
+}
+
+// ResetAdminBranding resets all changes to the "admin_branding" field.
+func (m *ShopMutation) ResetAdminBranding() {
+	m.admin_branding = nil
+	m.appendadmin_branding = nil
+}
+
 // ClearTheme clears the "theme" edge to the Theme entity.
 func (m *ShopMutation) ClearTheme() {
 	m.clearedtheme = true
@@ -25304,7 +25357,7 @@ func (m *ShopMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShopMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 9)
 	if m.created_at != nil {
 		fields = append(fields, shop.FieldCreatedAt)
 	}
@@ -25328,6 +25381,9 @@ func (m *ShopMutation) Fields() []string {
 	}
 	if m.timezone != nil {
 		fields = append(fields, shop.FieldTimezone)
+	}
+	if m.admin_branding != nil {
+		fields = append(fields, shop.FieldAdminBranding)
 	}
 	return fields
 }
@@ -25353,6 +25409,8 @@ func (m *ShopMutation) Field(name string) (ent.Value, bool) {
 		return m.Meta()
 	case shop.FieldTimezone:
 		return m.Timezone()
+	case shop.FieldAdminBranding:
+		return m.AdminBranding()
 	}
 	return nil, false
 }
@@ -25378,6 +25436,8 @@ func (m *ShopMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldMeta(ctx)
 	case shop.FieldTimezone:
 		return m.OldTimezone(ctx)
+	case shop.FieldAdminBranding:
+		return m.OldAdminBranding(ctx)
 	}
 	return nil, fmt.Errorf("unknown Shop field %s", name)
 }
@@ -25442,6 +25502,13 @@ func (m *ShopMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTimezone(v)
+		return nil
+	case shop.FieldAdminBranding:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdminBranding(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Shop field %s", name)
@@ -25545,6 +25612,9 @@ func (m *ShopMutation) ResetField(name string) error {
 		return nil
 	case shop.FieldTimezone:
 		m.ResetTimezone()
+		return nil
+	case shop.FieldAdminBranding:
+		m.ResetAdminBranding()
 		return nil
 	}
 	return fmt.Errorf("unknown Shop field %s", name)
@@ -25685,6 +25755,7 @@ type ShopAllowedOriginMutation struct {
 	typ           string
 	id            *int
 	origin        *string
+	purpose       *string
 	created_at    *time.Time
 	clearedFields map[string]struct{}
 	shop          *int
@@ -25864,6 +25935,42 @@ func (m *ShopAllowedOriginMutation) ResetOrigin() {
 	m.origin = nil
 }
 
+// SetPurpose sets the "purpose" field.
+func (m *ShopAllowedOriginMutation) SetPurpose(s string) {
+	m.purpose = &s
+}
+
+// Purpose returns the value of the "purpose" field in the mutation.
+func (m *ShopAllowedOriginMutation) Purpose() (r string, exists bool) {
+	v := m.purpose
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurpose returns the old "purpose" field's value of the ShopAllowedOrigin entity.
+// If the ShopAllowedOrigin object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopAllowedOriginMutation) OldPurpose(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurpose is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurpose requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurpose: %w", err)
+	}
+	return oldValue.Purpose, nil
+}
+
+// ResetPurpose resets all changes to the "purpose" field.
+func (m *ShopAllowedOriginMutation) ResetPurpose() {
+	m.purpose = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ShopAllowedOriginMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -25961,12 +26068,15 @@ func (m *ShopAllowedOriginMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShopAllowedOriginMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.shop != nil {
 		fields = append(fields, shopallowedorigin.FieldShopID)
 	}
 	if m.origin != nil {
 		fields = append(fields, shopallowedorigin.FieldOrigin)
+	}
+	if m.purpose != nil {
+		fields = append(fields, shopallowedorigin.FieldPurpose)
 	}
 	if m.created_at != nil {
 		fields = append(fields, shopallowedorigin.FieldCreatedAt)
@@ -25983,6 +26093,8 @@ func (m *ShopAllowedOriginMutation) Field(name string) (ent.Value, bool) {
 		return m.ShopID()
 	case shopallowedorigin.FieldOrigin:
 		return m.Origin()
+	case shopallowedorigin.FieldPurpose:
+		return m.Purpose()
 	case shopallowedorigin.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -25998,6 +26110,8 @@ func (m *ShopAllowedOriginMutation) OldField(ctx context.Context, name string) (
 		return m.OldShopID(ctx)
 	case shopallowedorigin.FieldOrigin:
 		return m.OldOrigin(ctx)
+	case shopallowedorigin.FieldPurpose:
+		return m.OldPurpose(ctx)
 	case shopallowedorigin.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -26022,6 +26136,13 @@ func (m *ShopAllowedOriginMutation) SetField(name string, value ent.Value) error
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetOrigin(v)
+		return nil
+	case shopallowedorigin.FieldPurpose:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurpose(v)
 		return nil
 	case shopallowedorigin.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -26087,6 +26208,9 @@ func (m *ShopAllowedOriginMutation) ResetField(name string) error {
 		return nil
 	case shopallowedorigin.FieldOrigin:
 		m.ResetOrigin()
+		return nil
+	case shopallowedorigin.FieldPurpose:
+		m.ResetPurpose()
 		return nil
 	case shopallowedorigin.FieldCreatedAt:
 		m.ResetCreatedAt()

@@ -19,6 +19,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userpermission"
@@ -82,9 +83,10 @@ func (s *Service) Invalidate(ctx context.Context, userIDs ...int) {
 // Deliver turns an issued token into a link and hands it to the configured
 // LinkDelivery. Call it after commit.
 func (s *Service) Deliver(ctx context.Context, is *Issued) (Delivery, error) {
-	url := SetPasswordURL(s.PublicURL, is.Token)
+	base := s.linkBase(ctx, is.ShopID)
+	url := SetPasswordURL(base, is.Token)
 	if is.Kind == KindInvite {
-		url = InviteURL(s.PublicURL, is.Token)
+		url = InviteURL(base, is.Token)
 	}
 	return s.Delivery.Deliver(ctx, LinkMessage{
 		Kind:      is.Kind,
@@ -92,6 +94,27 @@ func (s *Service) Deliver(ctx context.Context, is *Issued) (Delivery, error) {
 		URL:       url,
 		ExpiresAt: is.ExpiresAt,
 	})
+}
+
+// linkBase is the origin links are built on (change admin-api-public-exposure,
+// design D9): the shop's own registered admin origin (smallest id) when the link
+// belongs to a shop and one is registered - so people invited to Bouquet get a
+// link into Bouquet's own admin front end - else ADMIN_PUBLIC_URL, the shared
+// merchant admin. The platform admin domain is never a base for merchant links.
+// A failed lookup falls back to the shared base rather than failing the call:
+// the link is still valid there.
+func (s *Service) linkBase(ctx context.Context, shopID int) string {
+	if shopID <= 0 {
+		return s.PublicURL
+	}
+	row, err := s.Client.ShopAllowedOrigin.Query().
+		Where(shopallowedorigin.ShopIDEQ(shopID), shopallowedorigin.PurposeEQ("admin")).
+		Order(ent.Asc(shopallowedorigin.FieldID)).
+		First(ctx)
+	if err != nil {
+		return s.PublicURL
+	}
+	return row.Origin
 }
 
 // ── create ────────────────────────────────────────────────────────
@@ -160,6 +183,9 @@ func (s *Service) CreateAccountTx(ctx context.Context, tx *ent.Tx, in CreateInpu
 	is, err := s.issueTx(ctx, tx, u, KindSetup, in.CreatedBy)
 	if err != nil {
 		return nil, nil, err
+	}
+	if in.ShopID != nil {
+		is.ShopID = *in.ShopID
 	}
 	return u, is, nil
 }

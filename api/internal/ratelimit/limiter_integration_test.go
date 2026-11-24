@@ -116,3 +116,65 @@ func TestLimiterFailsOpenWithoutRedis(t *testing.T) {
 		t.Fatal("nil-redis limiter must always allow")
 	}
 }
+
+// Scenario: Peek never records — only Record counts toward the lockout, so
+// successes (which never call Record) cannot lock anyone.
+func TestPeekRecordResetLockout(t *testing.T) {
+	rdb := testutil.OpenRedis(t)
+	l := ratelimit.New(rdb, silentLog())
+	ctx := context.Background()
+
+	for i := 0; i < 5; i++ { // peeking alone never consumes quota
+		if res := l.Peek(ctx, "lock", 3, time.Minute); !res.Allowed {
+			t.Fatalf("peek %d: want allowed", i)
+		}
+	}
+	for i := 0; i < 3; i++ {
+		if res := l.Peek(ctx, "lock", 3, time.Minute); !res.Allowed {
+			t.Fatalf("failure %d: peek want allowed", i)
+		}
+		l.Record(ctx, "lock", time.Minute)
+	}
+	res := l.Peek(ctx, "lock", 3, time.Minute)
+	if res.Allowed || res.RetryAfter <= 0 {
+		t.Fatalf("after 3 recorded failures want blocked with Retry-After, got %+v", res)
+	}
+	if res := l.Peek(ctx, "other", 3, time.Minute); !res.Allowed {
+		t.Fatal("keys are independent")
+	}
+	l.Reset(ctx, "lock")
+	if res := l.Peek(ctx, "lock", 3, time.Minute); !res.Allowed {
+		t.Fatal("Reset must clear the counter")
+	}
+}
+
+// Scenario: the lockout slides out with the window.
+func TestPeekRecoversAfterWindow(t *testing.T) {
+	rdb := testutil.OpenRedis(t)
+	l := ratelimit.New(rdb, silentLog())
+	ctx := context.Background()
+	const window = 200 * time.Millisecond
+	l.Record(ctx, "slide", window)
+	l.Record(ctx, "slide", window)
+	if res := l.Peek(ctx, "slide", 2, window); res.Allowed {
+		t.Fatal("want blocked inside window")
+	}
+	time.Sleep(window + 100*time.Millisecond)
+	if res := l.Peek(ctx, "slide", 2, window); !res.Allowed {
+		t.Fatal("want allowed after window")
+	}
+}
+
+// Scenario: Redis down — Peek/Record/Reset fail open and never panic.
+func TestPeekRecordResetFailOpen(t *testing.T) {
+	testutil.RequireIntegration(t)
+	dead := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", DialTimeout: 100 * time.Millisecond, MaxRetries: -1})
+	for _, l := range []*ratelimit.Limiter{ratelimit.New(dead, silentLog()), ratelimit.New(nil, silentLog()), nil} {
+		ctx := context.Background()
+		if res := l.Peek(ctx, "k", 1, time.Minute); !res.Allowed {
+			t.Fatal("Peek must fail open")
+		}
+		l.Record(ctx, "k", time.Minute)
+		l.Reset(ctx, "k")
+	}
+}

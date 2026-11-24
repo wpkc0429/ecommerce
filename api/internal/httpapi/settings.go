@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -30,6 +31,11 @@ type ShopSettingsHandler struct {
 	Authz           *AuthzMW
 	Log             *slog.Logger
 	DefaultTimezone string
+	// ImagePrefixes are the image-domain prefixes the admin_branding logo must
+	// start with (the same list CMS image fields use). Empty = media not
+	// configured = any http(s) URL is accepted.
+	// A func rather than a slice: it is always wired, even when empty.
+	ImagePrefixes func() []string
 }
 
 // MountShopAdmin registers the merchant-scoped settings route under
@@ -58,6 +64,7 @@ func shopSettingsJSON(s *ent.Shop, eff shoptz.Effective) map[string]any {
 		// the raw fact; effective_timezone below is what reports actually use.
 		"timezone":           s.Timezone,
 		"effective_timezone": effectiveTimezoneJSON(eff),
+		"admin_branding":     brandingJSON(s.AdminBranding),
 	}
 }
 
@@ -69,27 +76,52 @@ func (h *ShopSettingsHandler) update(w http.ResponseWriter, r *http.Request) {
 	// clear the setting. Stated explicitly because the moment a second field
 	// arrives, that equivalence stops being safe and this struct needs
 	// *string-vs-omitted handling.
-	var body struct {
-		Timezone *string `json:"timezone"`
-	}
-	if !decodeJSON(w, r, &body) {
+	//
+	// change admin-api-public-exposure added the second field, admin_branding,
+	// and with it the exact problem that comment predicted: a branding-only PUT
+	// must not wipe the time zone. The rule is therefore "the timezone key is
+	// absent AND admin_branding is present -> time zone untouched"; a body with
+	// neither key keeps the historical meaning (clear the time zone), so no
+	// existing caller changes behavior. admin_branding absent = unchanged.
+	var raw map[string]json.RawMessage
+	if !decodeJSON(w, r, &raw) {
 		return
+	}
+	tzRaw, hasTimezone := raw["timezone"]
+	brRaw, hasBranding := raw["admin_branding"]
+	var tz *string
+	if hasTimezone {
+		if err := json.Unmarshal(tzRaw, &tz); err != nil {
+			httpx.BadRequest(w, "invalid JSON body")
+			return
+		}
 	}
 
 	upd := h.Client.Shop.Update().Where(entshop.IDEQ(shopID))
-	if body.Timezone == nil || *body.Timezone == "" {
+	if hasBranding {
+		stored, details := parseAdminBranding(brRaw, h.ImagePrefixes()) // null -> {}
+		if len(details) > 0 {
+			httpx.Unprocessable(w, "invalid admin_branding", details)
+			return
+		}
+		upd = upd.SetAdminBranding(stored)
+	}
+	switch {
+	case hasBranding && !hasTimezone:
+		// branding-only update: leave the time zone alone.
+	case tz == nil || *tz == "":
 		// Back to unset — NOT "set to the platform default value". Those are
 		// two different facts (design D1), and only NULL expresses the first.
 		upd = upd.ClearTimezone()
-	} else {
-		if err := shoptz.Validate(*body.Timezone); err != nil {
+	default:
+		if err := shoptz.Validate(*tz); err != nil {
 			httpx.Unprocessable(w, "timezone must be a valid IANA time zone name (e.g. Asia/Taipei)",
 				[]map[string]any{{"pointer": "/timezone", "message": err.Error()}})
 			return
 		}
-		upd = upd.SetTimezone(*body.Timezone)
+		upd = upd.SetTimezone(*tz)
 	}
-	// A shop-scoped UPDATE that touches ONLY this column: name, status, theme
+	// A shop-scoped UPDATE that touches ONLY these columns: name, status, theme
 	// and content_json are not in the statement at all, so this endpoint cannot
 	// disturb them even by accident.
 	n, err := upd.Save(r.Context())

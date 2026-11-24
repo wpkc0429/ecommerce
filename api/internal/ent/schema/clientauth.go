@@ -100,6 +100,12 @@ func (ShopAllowedOrigin) Fields() []ent.Field {
 		// origin is normalized to scheme://host[:port] — lowercase, no path,
 		// no trailing slash (tenant.NormalizeOrigin).
 		field.String("origin").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).NotEmpty().Unique(),
+		// purpose (change admin-api-public-exposure, design D3): what the
+		// origin is allowed to call. 'storefront' = the merchant's own
+		// storefront front end (customer-facing API); 'admin' = the shop's
+		// back-office front end (admin API, scoped to this shop only). An
+		// origin is globally unique across purposes, so it can never be both.
+		field.String("purpose").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}).Default("storefront"),
 		field.Time("created_at").Immutable().Default(time.Now),
 	}
 }
@@ -118,6 +124,11 @@ func (ShopAllowedOrigin) Indexes() []ent.Index {
 
 func (ShopAllowedOrigin) Annotations() []schema.Annotation {
 	return []schema.Annotation{
-		entsql.Annotation{Table: "shop_allowed_origins"},
+		entsql.Annotation{
+			Table: "shop_allowed_origins",
+			Checks: map[string]string{
+				"shop_allowed_origins_purpose_check": "purpose IN ('storefront', 'admin')",
+			},
+		},
 	}
 }

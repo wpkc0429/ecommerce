@@ -150,10 +150,39 @@ type Config struct {
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
 
+	// CFAccess configures optional Cloudflare Access JWT validation on every
+	// /api/v1/admin request (change admin-api-public-exposure, design D2).
+	CFAccess CFAccessConfig
+
+	// PlatformAdminHosts (PLATFORM_ADMIN_HOSTS, comma-separated host[:port])
+	// lists the only hosts from which platform-level admin APIs may be called
+	// (design D10). Empty = not enforced (local development). No e-mail
+	// address belongs here or anywhere in the repo: who may open the platform
+	// admin domain is a Cloudflare Access policy, set by hand.
+	PlatformAdminHosts []string
+
 	// RateLimit carries the auth-endpoint sliding-window thresholds (design
 	// auth-rate-limiting D2/D4).
 	RateLimit RateLimitConfig
 }
+
+// CFAccessConfig is the Cloudflare Access verification setup (design D2).
+// TeamDomain and Audience are both set or both empty; empty = the check is off
+// (the middleware is still mounted, it just passes through).
+type CFAccessConfig struct {
+	// TeamDomain is "<team>.cloudflareaccess.com" (no scheme, no path).
+	TeamDomain string
+	// Audience is the Access application's AUD tag; several tags may be given
+	// comma-separated (one per Access application fronting this API).
+	Audience string
+	// BindEmail additionally requires the Access JWT e-mail to equal the
+	// back-office account's e-mail. Off by default (decided): merchant admin
+	// domains admit anyone who proves an e-mail and leave authorization to RBAC.
+	BindEmail bool
+}
+
+// Enabled reports whether Access JWT validation is configured.
+func (c CFAccessConfig) Enabled() bool { return c.TeamDomain != "" && c.Audience != "" }
 
 // ECPayConfig carries the platform-wide 綠界 endpoints — what is left after
 // per-merchant credentials moved to per-shop storage (change
@@ -266,6 +295,13 @@ type RateLimitConfig struct {
 	GuestCheckoutBroadWindow time.Duration
 	GuestCheckoutTightLimit  int
 	GuestCheckoutTightWindow time.Duration
+
+	// Account-level admin login lockout (change admin-api-public-exposure,
+	// design D6): failed logins per e-mail across ALL source IPs. Unlike the
+	// rules above it counts failures only, and a locked e-mail gets 429 even
+	// for the correct password until the window slides past.
+	LoginAccountFailures int
+	LoginAccountWindow   time.Duration
 }
 
 // Load reads configuration from the environment. A .env file (searched in the
@@ -353,6 +389,12 @@ func Load() (*Config, error) {
 	if cfg.AdminPublicURL, err = parseAdminPublicURL(getenv("ADMIN_PUBLIC_URL", "http://localhost:3001")); err != nil {
 		return nil, err
 	}
+	if cfg.CFAccess, err = loadCFAccess(); err != nil {
+		return nil, err
+	}
+	if cfg.PlatformAdminHosts, err = parseHosts("PLATFORM_ADMIN_HOSTS"); err != nil {
+		return nil, err
+	}
 	if cfg.OrderAccessTokenTTL, err = parseDuration("ORDER_ACCESS_TOKEN_TTL", 24*time.Hour); err != nil {
 		return nil, err
 	}
@@ -430,6 +472,13 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	if cfg.RateLimit.LoginAccountFailures, err = parseInt("RATE_LIMIT_LOGIN_ACCOUNT_FAILURES", 10); err != nil {
+		return nil, err
+	}
+	if cfg.RateLimit.LoginAccountWindow, err = parseDuration("RATE_LIMIT_LOGIN_ACCOUNT_WINDOW", 15*time.Minute); err != nil {
+		return nil, err
+	}
+
 	// change merchant-reports (design D1): validated at boot, in every
 	// environment. A bad value here is not a degraded feature, it is a 500 on
 	// every report of every unconfigured shop — and it is free to catch now.
@@ -503,6 +552,50 @@ func parsePrefixes(key string) ([]netip.Prefix, error) {
 		}
 		a = a.Unmap()
 		out = append(out, netip.PrefixFrom(a, a.BitLen()))
+	}
+	return out, nil
+}
+
+// loadCFAccess reads CF_ACCESS_*. TEAM_DOMAIN and AUD must come together
+// (half a configuration would silently leave the check off, or reject
+// everything), and BIND_EMAIL is meaningless without them.
+func loadCFAccess() (CFAccessConfig, error) {
+	team := strings.TrimSpace(os.Getenv("CF_ACCESS_TEAM_DOMAIN"))
+	team = strings.TrimPrefix(team, "https://")
+	team = strings.ToLower(strings.TrimRight(team, "/"))
+	aud := strings.TrimSpace(os.Getenv("CF_ACCESS_AUD"))
+	if (team == "") != (aud == "") {
+		return CFAccessConfig{}, fmt.Errorf("config: CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD must be set together")
+	}
+	if strings.ContainsAny(team, "/ ?#@") {
+		return CFAccessConfig{}, fmt.Errorf("config: CF_ACCESS_TEAM_DOMAIN must be a bare host like <team>.cloudflareaccess.com")
+	}
+	bind := false
+	if v := strings.TrimSpace(os.Getenv("CF_ACCESS_BIND_EMAIL")); v != "" {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return CFAccessConfig{}, fmt.Errorf("config: CF_ACCESS_BIND_EMAIL: %w", err)
+		}
+		bind = b
+	}
+	if bind && team == "" {
+		return CFAccessConfig{}, fmt.Errorf("config: CF_ACCESS_BIND_EMAIL requires CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_AUD")
+	}
+	return CFAccessConfig{TeamDomain: team, Audience: aud, BindEmail: bind}, nil
+}
+
+// parseHosts reads a comma-separated list of host[:port] values, lowercased.
+func parseHosts(key string) ([]string, error) {
+	var out []string
+	for _, part := range strings.Split(os.Getenv(key), ",") {
+		part = strings.ToLower(strings.TrimSpace(part))
+		if part == "" {
+			continue
+		}
+		if strings.ContainsAny(part, "/ ?#@*") {
+			return nil, fmt.Errorf("config: %s: %q must be a bare host[:port]", key, part)
+		}
+		out = append(out, part)
 	}
 	return out, nil
 }

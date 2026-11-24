@@ -57,6 +57,12 @@ func (Shop) Fields() []ent.Field {
 		field.String("timezone").MaxLen(64).
 			SchemaType(map[string]string{dialect.Postgres: "varchar(64)"}).
 			Optional().Nillable(),
+		// admin_branding (change admin-api-public-exposure, design D8): per-shop
+		// look of the SHARED merchant admin SPA - {logo_url, primary_color,
+		// accent_color}. Pure data; the API never branches on which front end
+		// reads it. Written through PUT /admin/shops/{id}/settings.
+		field.JSON("admin_branding", json.RawMessage{}).Default(json.RawMessage("{}")).
+			Annotations(entsql.Default("{}")),
 	}
 }
 

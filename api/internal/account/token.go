@@ -23,8 +23,12 @@ const (
 // Issued is a freshly minted credential token. Token is the plaintext: it
 // exists only here and in the link built from it, never in the database.
 type Issued struct {
-	Kind      string
-	UserID    int
+	Kind   string
+	UserID int
+	// ShopID is the shop the link belongs to (invitations, a new shop's owner
+	// setup), 0 for none. It selects the link base (change
+	// admin-api-public-exposure, design D9).
+	ShopID    int
 	Email     string
 	Token     string
 	ExpiresAt time.Time

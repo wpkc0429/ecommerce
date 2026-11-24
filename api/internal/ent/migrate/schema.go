@@ -1100,6 +1100,7 @@ var (
 		{Name: "content_json", Type: field.TypeJSON},
 		{Name: "meta", Type: field.TypeJSON},
 		{Name: "timezone", Type: field.TypeString, Nullable: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "admin_branding", Type: field.TypeJSON, Default: "{}"},
 		{Name: "theme_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ShopsTable holds the schema information for the "shops" table.
@@ -1110,7 +1111,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shops_themes_theme",
-				Columns:    []*schema.Column{ShopsColumns[8]},
+				Columns:    []*schema.Column{ShopsColumns[9]},
 				RefColumns: []*schema.Column{ThemesColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1119,7 +1120,7 @@ var (
 			{
 				Name:    "shop_theme_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShopsColumns[8]},
+				Columns: []*schema.Column{ShopsColumns[9]},
 			},
 		},
 	}
@@ -1127,6 +1128,7 @@ var (
 	ShopAllowedOriginsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "origin", Type: field.TypeString, Unique: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "purpose", Type: field.TypeString, Size: 20, Default: "storefront", SchemaType: map[string]string{"postgres": "varchar(20)"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "shop_id", Type: field.TypeInt},
 	}
@@ -1138,7 +1140,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shop_allowed_origins_shops_shop",
-				Columns:    []*schema.Column{ShopAllowedOriginsColumns[3]},
+				Columns:    []*schema.Column{ShopAllowedOriginsColumns[4]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1147,7 +1149,7 @@ var (
 			{
 				Name:    "shopallowedorigin_shop_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShopAllowedOriginsColumns[3]},
+				Columns: []*schema.Column{ShopAllowedOriginsColumns[4]},
 			},
 		},
 	}
@@ -1662,6 +1664,9 @@ func init() {
 	ShopAllowedOriginsTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopAllowedOriginsTable.Annotation = &entsql.Annotation{
 		Table: "shop_allowed_origins",
+	}
+	ShopAllowedOriginsTable.Annotation.Checks = map[string]string{
+		"shop_allowed_origins_purpose_check": "purpose IN ('storefront', 'admin')",
 	}
 	ShopPaymentProviderCredentialsTable.ForeignKeys[0].RefTable = ShopsTable
 	ShopPaymentProviderCredentialsTable.Annotation = &entsql.Annotation{

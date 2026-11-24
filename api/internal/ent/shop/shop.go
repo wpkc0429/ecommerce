@@ -31,6 +31,8 @@ const (
 	FieldMeta = "meta"
 	// FieldTimezone holds the string denoting the timezone field in the database.
 	FieldTimezone = "timezone"
+	// FieldAdminBranding holds the string denoting the admin_branding field in the database.
+	FieldAdminBranding = "admin_branding"
 	// EdgeTheme holds the string denoting the theme edge name in mutations.
 	EdgeTheme = "theme"
 	// EdgePages holds the string denoting the pages edge name in mutations.
@@ -80,6 +82,7 @@ var Columns = []string{
 	FieldContentJSON,
 	FieldMeta,
 	FieldTimezone,
+	FieldAdminBranding,
 }
 
 var (
@@ -115,6 +118,8 @@ var (
 	DefaultMeta json.RawMessage
 	// TimezoneValidator is a validator for the "timezone" field. It is called by the builders before save.
 	TimezoneValidator func(string) error
+	// DefaultAdminBranding holds the default value on creation for the "admin_branding" field.
+	DefaultAdminBranding json.RawMessage
 )
 
 // OrderOption defines the ordering options for the Shop queries.

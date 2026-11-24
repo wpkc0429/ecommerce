@@ -440,3 +440,62 @@ func TestPublishableKeyDoesNotWidenRateLimit(t *testing.T) {
 		t.Fatalf("shop B must not be affected by shop A's quota")
 	}
 }
+
+// Scenario (storefront-client-auth, change admin-api-public-exposure):
+// purpose defaults to storefront, an unknown purpose is 422, an origin cannot
+// be registered twice across purposes, and an admin origin grants no
+// storefront CORS.
+func TestAllowedOriginPurpose(t *testing.T) {
+	e := newClientAuthEnv(t)
+	reg := func(shop int, origin string, purpose any) (int, map[string]any) {
+		body := map[string]any{"origin": origin}
+		if purpose != nil {
+			body["purpose"] = purpose
+		}
+		return e.adminCall(t, e.platform, "POST", e.shopPath(shop, "/allowed-origins"), body)
+	}
+
+	code, def := reg(e.shopA, "https://a-default.example", nil)
+	if code != http.StatusCreated || def["purpose"] != "storefront" {
+		t.Fatalf("default purpose: %d %v", code, def)
+	}
+	code, adm := reg(e.shopA, "https://admin.a.example", "admin")
+	if code != http.StatusCreated || adm["purpose"] != "admin" {
+		t.Fatalf("admin purpose: %d %v", code, adm)
+	}
+	for _, bad := range []any{"superuser", "ADMIN", 5} {
+		if c, _ := reg(e.shopA, "https://bad-purpose.example", bad); c != http.StatusUnprocessableEntity && c != http.StatusBadRequest {
+			t.Fatalf("purpose %v: want 422/400, got %d", bad, c)
+		}
+	}
+	if c, _ := reg(e.shopA, "https://bad-purpose.example", "superuser"); c != http.StatusUnprocessableEntity {
+		t.Fatalf("unknown purpose: want 422, got %d", c)
+	}
+	// Cross-purpose and cross-shop duplicates.
+	if c, _ := reg(e.shopA, "https://a-default.example", "admin"); c != http.StatusUnprocessableEntity {
+		t.Fatalf("same origin as admin after storefront: want 422, got %d", c)
+	}
+	if c, _ := reg(e.shopB, "https://admin.a.example", "admin"); c != http.StatusUnprocessableEntity {
+		t.Fatalf("same admin origin for another shop: want 422, got %d", c)
+	}
+	// Listing carries the purpose.
+	_, listed := e.adminCall(t, e.platform, "GET", e.shopPath(e.shopA, "/allowed-origins"), nil)
+	rows, _ := listed["origins"].([]any)
+	if len(rows) != 2 || rows[0].(map[string]any)["purpose"] != "storefront" || rows[1].(map[string]any)["purpose"] != "admin" {
+		t.Fatalf("listing: %v", listed)
+	}
+	// An admin origin gets no storefront CORS; a storefront origin does.
+	get := func(origin string) string {
+		req := httptest.NewRequest("GET", "/healthz", nil)
+		req.Header.Set("Origin", origin)
+		rec := httptest.NewRecorder()
+		e.router.ServeHTTP(rec, req)
+		return rec.Header().Get("Access-Control-Allow-Origin")
+	}
+	if get("https://admin.a.example") != "" {
+		t.Fatal("admin origin must not get storefront CORS")
+	}
+	if get("https://a-default.example") != "https://a-default.example" {
+		t.Fatal("storefront origin must keep its CORS grant")
+	}
+}

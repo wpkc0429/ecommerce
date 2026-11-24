@@ -114,6 +114,12 @@ func (_c *ShopCreate) SetNillableTimezone(v *string) *ShopCreate {
 	return _c
 }
 
+// SetAdminBranding sets the "admin_branding" field.
+func (_c *ShopCreate) SetAdminBranding(v json.RawMessage) *ShopCreate {
+	_c.mutation.SetAdminBranding(v)
+	return _c
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_c *ShopCreate) SetTheme(v *Theme) *ShopCreate {
 	return _c.SetThemeID(v.ID)
@@ -204,6 +210,10 @@ func (_c *ShopCreate) defaults() {
 		v := shop.DefaultMeta
 		_c.mutation.SetMeta(v)
 	}
+	if _, ok := _c.mutation.AdminBranding(); !ok {
+		v := shop.DefaultAdminBranding
+		_c.mutation.SetAdminBranding(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -235,6 +245,9 @@ func (_c *ShopCreate) check() error {
 		if err := shop.TimezoneValidator(v); err != nil {
 			return &ValidationError{Name: "timezone", err: fmt.Errorf(`ent: validator failed for field "Shop.timezone": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.AdminBranding(); !ok {
+		return &ValidationError{Name: "admin_branding", err: errors.New(`ent: missing required field "Shop.admin_branding"`)}
 	}
 	return nil
 }
@@ -290,6 +303,10 @@ func (_c *ShopCreate) createSpec() (*Shop, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Timezone(); ok {
 		_spec.SetField(shop.FieldTimezone, field.TypeString, value)
 		_node.Timezone = &value
+	}
+	if value, ok := _c.mutation.AdminBranding(); ok {
+		_spec.SetField(shop.FieldAdminBranding, field.TypeJSON, value)
+		_node.AdminBranding = value
 	}
 	if nodes := _c.mutation.ThemeIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -498,6 +515,18 @@ func (u *ShopUpsert) ClearTimezone() *ShopUpsert {
 	return u
 }
 
+// SetAdminBranding sets the "admin_branding" field.
+func (u *ShopUpsert) SetAdminBranding(v json.RawMessage) *ShopUpsert {
+	u.Set(shop.FieldAdminBranding, v)
+	return u
+}
+
+// UpdateAdminBranding sets the "admin_branding" field to the value that was provided on create.
+func (u *ShopUpsert) UpdateAdminBranding() *ShopUpsert {
+	u.SetExcluded(shop.FieldAdminBranding)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -659,6 +688,20 @@ func (u *ShopUpsertOne) UpdateTimezone() *ShopUpsertOne {
 func (u *ShopUpsertOne) ClearTimezone() *ShopUpsertOne {
 	return u.Update(func(s *ShopUpsert) {
 		s.ClearTimezone()
+	})
+}
+
+// SetAdminBranding sets the "admin_branding" field.
+func (u *ShopUpsertOne) SetAdminBranding(v json.RawMessage) *ShopUpsertOne {
+	return u.Update(func(s *ShopUpsert) {
+		s.SetAdminBranding(v)
+	})
+}
+
+// UpdateAdminBranding sets the "admin_branding" field to the value that was provided on create.
+func (u *ShopUpsertOne) UpdateAdminBranding() *ShopUpsertOne {
+	return u.Update(func(s *ShopUpsert) {
+		s.UpdateAdminBranding()
 	})
 }
 
@@ -989,6 +1032,20 @@ func (u *ShopUpsertBulk) UpdateTimezone() *ShopUpsertBulk {
 func (u *ShopUpsertBulk) ClearTimezone() *ShopUpsertBulk {
 	return u.Update(func(s *ShopUpsert) {
 		s.ClearTimezone()
+	})
+}
+
+// SetAdminBranding sets the "admin_branding" field.
+func (u *ShopUpsertBulk) SetAdminBranding(v json.RawMessage) *ShopUpsertBulk {
+	return u.Update(func(s *ShopUpsert) {
+		s.SetAdminBranding(v)
+	})
+}
+
+// UpdateAdminBranding sets the "admin_branding" field to the value that was provided on create.
+func (u *ShopUpsertBulk) UpdateAdminBranding() *ShopUpsertBulk {
+	return u.Update(func(s *ShopUpsert) {
+		s.UpdateAdminBranding()
 	})
 }
 

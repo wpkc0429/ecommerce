@@ -42,11 +42,17 @@ type imageChecker struct {
 	bad      []Detail
 }
 
-func (c *imageChecker) allowed(v string) bool {
+func (c *imageChecker) allowed(v string) bool { return ImageURLAllowed(c.prefixes, v) }
+
+// ImageURLAllowed is the single image-domain predicate: empty is allowed, and a
+// non-empty value must start with one of prefixes (each ending in "/"). Shared
+// with the admin branding logo check (change admin-api-public-exposure, D8) so
+// there is exactly one implementation of "is this on the image domain".
+func ImageURLAllowed(prefixes []string, v string) bool {
 	if v == "" {
 		return true
 	}
-	for _, p := range c.prefixes {
+	for _, p := range prefixes {
 		if strings.HasPrefix(v, p) {
 			return true
 		}

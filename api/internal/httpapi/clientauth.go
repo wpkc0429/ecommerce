@@ -69,6 +69,7 @@ func allowedOriginJSON(o *ent.ShopAllowedOrigin) map[string]any {
 	return map[string]any{
 		"id":         o.ID,
 		"origin":     o.Origin,
+		"purpose":    o.Purpose,
 		"created_at": o.CreatedAt,
 	}
 }
@@ -194,9 +195,21 @@ func (h *ClientAuthHandler) createOrigin(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var req struct {
-		Origin string `json:"origin"`
+		Origin  string `json:"origin"`
+		Purpose string `json:"purpose"`
 	}
 	if !decodeJSON(w, r, &req) {
+		return
+	}
+	// purpose is optional and defaults to storefront (change
+	// admin-api-public-exposure, design D3): existing callers are unaffected.
+	if req.Purpose == "" {
+		req.Purpose = tenant.PurposeStorefront
+	}
+	if !tenant.ValidPurpose(req.Purpose) {
+		httpx.Unprocessable(w, "invalid purpose", []httpx.ValidationDetail{
+			{Pointer: "/purpose", Message: "must be \"storefront\" or \"admin\""},
+		})
 		return
 	}
 	origin := tenant.NormalizeOrigin(req.Origin)
@@ -214,6 +227,7 @@ func (h *ClientAuthHandler) createOrigin(w http.ResponseWriter, r *http.Request)
 	row, err := h.Client.ShopAllowedOrigin.Create().
 		SetShopID(shopID).
 		SetOrigin(origin).
+		SetPurpose(req.Purpose).
 		Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {

@@ -2,9 +2,13 @@ package httpapi
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
@@ -12,7 +16,23 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
+)
+
+// RefreshCookieName is the HttpOnly cookie that carries the refresh token in
+// cookie mode (change admin-api-public-exposure, design D5). The __Secure-
+// prefix makes browsers refuse it unless it is set with the Secure attribute.
+const RefreshCookieName = "__Secure-admin_refresh"
+
+// refreshCookiePath confines the cookie to the auth endpoints, the only ones
+// that ever read it.
+const refreshCookiePath = "/api/v1/admin/auth"
+
+// Refresh token transports (login body field "refresh_transport").
+const (
+	refreshTransportBody   = "body"
+	refreshTransportCookie = "cookie"
 )
 
 // AdminAuthHandler implements the back-office auth API (task 3.4):
@@ -26,11 +46,68 @@ type AdminAuthHandler struct {
 	// platform-account-provisioning, design D9). nil → always [].
 	Engine *rbac.Engine
 	Log    *slog.Logger
+
+	// RefreshTTL is the refresh token lifetime, used as the cookie Max-Age in
+	// cookie mode.
+	RefreshTTL time.Duration
+
+	// Account-level lockout (change admin-api-public-exposure, design D6).
+	// Limiter nil or LockoutFailures <= 0 disables it. LockoutSecret keys the
+	// HMAC that turns an e-mail into the counter key, so Redis never holds an
+	// e-mail list (it is derived from the admin JWT secret, adding no new
+	// secret to manage).
+	Limiter         *ratelimit.Limiter
+	LockoutFailures int
+	LockoutWindow   time.Duration
+	LockoutSecret   []byte
+}
+
+// lockoutKey is the Redis key counting failed logins of one e-mail across all
+// source IPs. Unknown e-mails get a key too: the lockout behaves identically
+// whether or not the account exists.
+func (h *AdminAuthHandler) lockoutKey(email string) string {
+	mac := hmac.New(sha256.New, h.LockoutSecret)
+	_, _ = mac.Write([]byte("admin_login_lockout:" + email))
+	return "admin_login_account:" + hex.EncodeToString(mac.Sum(nil))
+}
+
+func (h *AdminAuthHandler) lockoutEnabled() bool {
+	return h.Limiter != nil && h.LockoutFailures > 0 && h.LockoutWindow > 0 && len(h.LockoutSecret) > 0
+}
+
+// setRefreshCookie writes (or, with an empty value, expires) the refresh cookie.
+func (h *AdminAuthHandler) setRefreshCookie(w http.ResponseWriter, value string) {
+	c := &http.Cookie{
+		Name:     RefreshCookieName,
+		Value:    value,
+		Path:     refreshCookiePath,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(h.RefreshTTL.Seconds()),
+	}
+	if value == "" {
+		c.MaxAge = -1
+	}
+	http.SetCookie(w, c)
+}
+
+// cookieRefreshToken reads the refresh token from the cookie. ok is false when
+// there is no cookie. The caller must also require X-Admin-Refresh.
+func cookieRefreshToken(r *http.Request) (string, bool) {
+	c, err := r.Cookie(RefreshCookieName)
+	if err != nil || c.Value == "" {
+		return "", false
+	}
+	return c.Value, true
 }
 
 type tokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
+	AccessToken string `json:"access_token"`
+	// RefreshToken is omitted in cookie mode (the token travels in the
+	// HttpOnly cookie instead); in body mode it is never empty, so the default
+	// response is byte-for-byte what it was before the field gained omitempty.
+	RefreshToken string `json:"refresh_token,omitempty"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
 }
@@ -46,31 +123,66 @@ func (h *AdminAuthHandler) tokenResponse(access, refresh string) tokenResponse {
 
 func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		Email            string `json:"email"`
+		Password         string `json:"password"`
+		RefreshTransport string `json:"refresh_transport"`
 	}
 	if !decodeJSON(w, r, &req) {
+		return
+	}
+	transport := req.RefreshTransport
+	switch transport {
+	case "", refreshTransportBody:
+		transport = refreshTransportBody
+	case refreshTransportCookie:
+	default:
+		httpx.Unprocessable(w, "invalid refresh_transport", []httpx.ValidationDetail{
+			{Pointer: "/refresh_transport", Message: "must be \"body\" or \"cookie\""},
+		})
 		return
 	}
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	ctx := r.Context()
 
+	// Account-level lockout (design D6): checked BEFORE any password work, so a
+	// locked e-mail answers 429 even for the right password, and identically
+	// whether or not the account exists.
+	var lockKey string
+	if h.lockoutEnabled() {
+		lockKey = h.lockoutKey(email)
+		if res := h.Limiter.Peek(ctx, lockKey, h.LockoutFailures, h.LockoutWindow); !res.Allowed {
+			// Only the HMAC prefix is logged - never the address (PII).
+			h.Log.Warn("admin_login_lockout", "email_hash", strings.TrimPrefix(lockKey, "admin_login_account:")[:12])
+			httpx.TooManyRequests(w, res.RetryAfter)
+			return
+		}
+	}
+	fail := func() {
+		if lockKey != "" {
+			h.Limiter.Record(ctx, lockKey, h.LockoutWindow)
+		}
+		httpx.Unauthorized(w)
+	}
+
 	u, err := h.Client.User.Query().Where(user.EmailEQ(email)).Only(ctx)
 	if err != nil {
-		auth.EqualizeVerifyTiming() // account-not-found ≈ wrong-password timing
-		httpx.Unauthorized(w)
+		auth.EqualizeVerifyTiming() // account-not-found ~ wrong-password timing
+		fail()
 		return
 	}
 	if u.PasswordHash == nil {
 		// Password not set yet (provisioned account): same answer and same
 		// timing as an unknown account.
 		auth.EqualizeVerifyTiming()
-		httpx.Unauthorized(w)
+		fail()
 		return
 	}
 	if !auth.VerifyPassword(req.Password, *u.PasswordHash) || u.Status != 1 {
-		httpx.Unauthorized(w)
+		fail()
 		return
+	}
+	if lockKey != "" {
+		h.Limiter.Reset(ctx, lockKey)
 	}
 
 	sids, err := h.Client.ShopUser.Query().
@@ -94,19 +206,48 @@ func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
+	if transport == refreshTransportCookie {
+		h.setRefreshCookie(w, refresh)
+		httpx.WriteJSON(w, http.StatusOK, h.tokenResponse(access, ""))
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, h.tokenResponse(access, refresh))
 }
 
-func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+// refreshInput resolves the refresh token of a refresh/logout request. A token
+// in the JSON body wins and keeps the original (body mode) behavior exactly.
+// Otherwise the HttpOnly cookie is used, and ONLY together with the
+// X-Admin-Refresh header (design D5): without it the request is refused with 401
+// before anything is rotated or revoked. ok=false means the response has been
+// written.
+func (h *AdminAuthHandler) refreshInput(w http.ResponseWriter, r *http.Request) (token string, viaCookie, ok bool) {
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if !decodeJSON(w, r, &req) {
+		return "", false, false
+	}
+	if req.RefreshToken != "" {
+		return req.RefreshToken, false, true
+	}
+	if c, has := cookieRefreshToken(r); has {
+		if r.Header.Get(AdminRefreshHeader) != "1" {
+			httpx.Unauthorized(w)
+			return "", true, false
+		}
+		return c, true, true
+	}
+	return "", false, true // nothing supplied: let the body-mode path answer as before
+}
+
+func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
+	token, viaCookie, ok := h.refreshInput(w, r)
+	if !ok {
 		return
 	}
 	ctx := r.Context()
 
-	uid, newRefresh, err := h.Refresh.RotateUser(ctx, req.RefreshToken)
+	uid, newRefresh, err := h.Refresh.RotateUser(ctx, token)
 	if err != nil {
 		httpx.Unauthorized(w)
 		return
@@ -126,20 +267,26 @@ func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) 
 		httpx.Internal(w)
 		return
 	}
+	if viaCookie {
+		h.setRefreshCookie(w, newRefresh)
+		httpx.WriteJSON(w, http.StatusOK, h.tokenResponse(access, ""))
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, h.tokenResponse(access, newRefresh))
 }
 
 func (h *AdminAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		RefreshToken string `json:"refresh_token"`
-	}
-	if !decodeJSON(w, r, &req) {
+	token, viaCookie, ok := h.refreshInput(w, r)
+	if !ok {
 		return
 	}
-	if err := h.Refresh.RevokeUser(r.Context(), req.RefreshToken); err != nil {
+	if err := h.Refresh.RevokeUser(r.Context(), token); err != nil {
 		h.Log.Error("logout: revoke", "err", err)
 		httpx.Internal(w)
 		return
+	}
+	if viaCookie {
+		h.setRefreshCookie(w, "")
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

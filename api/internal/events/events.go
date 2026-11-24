@@ -54,7 +54,7 @@ func (SiteMappingChanged) EventName() string { return "site.mapping_changed" }
 
 // StorefrontClientChanged — a shop's publishable keys or allowed origins were
 // created, revoked or deleted (change storefront-client-auth, design D10).
-// Subscribers drop the affected `pkey:{key}` / `corsorigin:{origin}` cache
+// Subscribers drop the affected `pkey:{key}` / `corsorigin2:{origin}` cache
 // entries so revocation takes effect immediately instead of after the TTL.
 // Either slice may be empty; both name the values as they were before the
 // mutation, which is what the cache is keyed by.

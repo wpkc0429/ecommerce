@@ -22,6 +22,8 @@ type ShopAllowedOrigin struct {
 	ShopID int `json:"shop_id,omitempty"`
 	// Origin holds the value of the "origin" field.
 	Origin string `json:"origin,omitempty"`
+	// Purpose holds the value of the "purpose" field.
+	Purpose string `json:"purpose,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -57,7 +59,7 @@ func (*ShopAllowedOrigin) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case shopallowedorigin.FieldID, shopallowedorigin.FieldShopID:
 			values[i] = new(sql.NullInt64)
-		case shopallowedorigin.FieldOrigin:
+		case shopallowedorigin.FieldOrigin, shopallowedorigin.FieldPurpose:
 			values[i] = new(sql.NullString)
 		case shopallowedorigin.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -93,6 +95,12 @@ func (_m *ShopAllowedOrigin) assignValues(columns []string, values []any) error 
 				return fmt.Errorf("unexpected type %T for field origin", values[i])
 			} else if value.Valid {
 				_m.Origin = value.String
+			}
+		case shopallowedorigin.FieldPurpose:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field purpose", values[i])
+			} else if value.Valid {
+				_m.Purpose = value.String
 			}
 		case shopallowedorigin.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -146,6 +154,9 @@ func (_m *ShopAllowedOrigin) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("origin=")
 	builder.WriteString(_m.Origin)
+	builder.WriteString(", ")
+	builder.WriteString("purpose=")
+	builder.WriteString(_m.Purpose)
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

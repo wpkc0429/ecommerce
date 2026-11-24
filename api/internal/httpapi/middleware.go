@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,23 +17,92 @@ import (
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
-// OriginRegistry answers "is this origin registered by some shop?" — the only
-// question a CORS preflight can ask, since an OPTIONS preflight carries no
-// custom header values and therefore no tenant context (change
-// storefront-client-auth, design D3). *tenant.Resolver implements it.
+// OriginRegistry answers "which shop registered this origin, and for what?" -
+// the only question a CORS preflight can ask, since an OPTIONS preflight
+// carries no custom header values and therefore no tenant context (change
+// storefront-client-auth, design D3; purpose added by admin-api-public-exposure
+// D3). *tenant.Resolver implements it.
 type OriginRegistry interface {
-	IsRegisteredOrigin(ctx context.Context, origin string) bool
+	LookupOrigin(ctx context.Context, origin string) (shopID int, purpose string, ok bool)
 }
 
-// NewCORSMiddleware grants browser access to the API. The allowed set is the
-// union of two sources:
+// adminPathKind classifies a request path for CORS and host binding (change
+// admin-api-public-exposure, design D3).
+type adminPathKind int
+
+const (
+	// pathNonAdmin: anything outside /api/v1/admin.
+	pathNonAdmin adminPathKind = iota
+	// pathAdminShop: /api/v1/admin/shops/{id}/... - one shop's back office.
+	pathAdminShop
+	// pathAdminShared: auth/*, me, branding, invitations/accept, media/config -
+	// reachable from any shop's admin front end.
+	pathAdminShared
+	// pathAdminPlatform: every other admin path (including /shops and
+	// /shops/{id} themselves, which are platform-scoped routes).
+	pathAdminPlatform
+)
+
+const adminPrefix = "/api/v1/admin"
+
+// classifyAdminPath is the pure path classifier behind the per-purpose CORS
+// split and the admin host binding. It runs before chi routing (CORS) or at
+// group level (binding), so it cannot use URL params: the shop id is parsed
+// from the path text with the same strconv.Atoi the router-side shopIDParam
+// uses, and anything that does not parse is treated as platform-level - the
+// strictest class.
+func classifyAdminPath(path string) (adminPathKind, int) {
+	rest, ok := strings.CutPrefix(path, adminPrefix)
+	if !ok || (rest != "" && rest[0] != '/') {
+		return pathNonAdmin, 0
+	}
+	segs := strings.Split(rest, "/") // "" , seg1, seg2, ...
+	if len(segs) < 2 {
+		return pathAdminPlatform, 0
+	}
+	switch segs[1] {
+	case "shops":
+		if len(segs) >= 4 && segs[3] != "" {
+			if id, err := strconv.Atoi(segs[2]); err == nil && id > 0 {
+				return pathAdminShop, id
+			}
+		}
+		return pathAdminPlatform, 0
+	case "auth":
+		if len(segs) >= 3 && segs[2] != "" {
+			return pathAdminShared, 0
+		}
+	case "me", "branding":
+		if len(segs) == 2 {
+			return pathAdminShared, 0
+		}
+	case "invitations":
+		if len(segs) == 3 && segs[2] == "accept" {
+			return pathAdminShared, 0
+		}
+	case "media":
+		if len(segs) == 3 && segs[2] == "config" {
+			return pathAdminShared, 0
+		}
+	}
+	return pathAdminPlatform, 0
+}
+
+// NewCORSMiddleware grants browser access to the API. The allowed set depends
+// on the request PATH (change admin-api-public-exposure, design D3):
 //
-//	platform list (CORS_ALLOWED_ORIGINS) — the platform's own front ends: the
-//	    admin SPA, the storefront dev server, any future platform-hosted
-//	    multi-tenant SPA.
-//	registry (shop_allowed_origins)      — merchant-owned front ends, registered
-//	    per shop and effective immediately, with no env change or restart
-//	    (change storefront-client-auth).
+//	/api/v1/admin/shops/{id}/...   platform list + admin origins of shop {id}
+//	admin shared (auth, me, ...)   platform list + any admin origin
+//	other /api/v1/admin/...        platform list only
+//	everything else                platform list + storefront origins (as before)
+//
+// A storefront origin therefore never gains CORS on the back-office API. The
+// platform list (CORS_ALLOWED_ORIGINS) is the platform's own front ends; the
+// registry (shop_allowed_origins) is merchant-owned front ends, effective
+// immediately with no env change or restart.
+//
+// CORS is not authorization (curl ignores it): it stops other sites' scripts
+// from reading responses. The real boundary is Access + RBAC + host binding.
 //
 // Credentials are not used (Bearer tokens travel in headers), so no
 // Access-Control-Allow-Credentials is emitted.
@@ -47,8 +117,7 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 			// The platform list short-circuits first: admin/web traffic never
 			// reaches the registry lookup, and server-to-server requests carry
 			// no Origin at all.
-			if origin != "" && (allowed[origin] ||
-				(registry != nil && registry.IsRegisteredOrigin(r.Context(), origin))) {
+			if origin != "" && (allowed[origin] || registryAllows(r, registry, origin)) {
 				h := w.Header()
 				h.Set("Access-Control-Allow-Origin", origin)
 				h.Set("Vary", "Origin")
@@ -64,8 +133,13 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 				// is allowed fails the actual checkout after a successful
 				// preflight, and the symptom reads as "checkout broke when we
 				// added retries".
+				//
+				// X-Admin-Refresh (change admin-api-public-exposure D5) is the
+				// CSRF guard of cookie-mode refresh: a custom header forces a
+				// cross-origin request through a preflight this middleware
+				// answers only for the shop's own admin origin.
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+
-					PublishableKeyHeader+", "+IdempotencyKeyHeader)
+					PublishableKeyHeader+", "+IdempotencyKeyHeader+", "+AdminRefreshHeader)
 				// Idempotency-Replayed is exposed so a storefront can verify its
 				// own retry logic; without Expose-Headers, JS cannot read it and
 				// the header's entire diagnostic value is lost.
@@ -78,6 +152,29 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry) func(ht
 			}
 			next.ServeHTTP(w, r)
 		})
+	}
+}
+
+// registryAllows decides a registered (non-platform) origin by path class.
+func registryAllows(r *http.Request, registry OriginRegistry, origin string) bool {
+	if registry == nil {
+		return false
+	}
+	kind, pathShop := classifyAdminPath(r.URL.Path)
+	if kind == pathAdminPlatform {
+		return false // platform-level admin paths: platform list only
+	}
+	shopID, purpose, ok := registry.LookupOrigin(r.Context(), origin)
+	if !ok {
+		return false
+	}
+	switch kind {
+	case pathAdminShop:
+		return purpose == tenant.PurposeAdmin && shopID == pathShop
+	case pathAdminShared:
+		return purpose == tenant.PurposeAdmin
+	default:
+		return purpose == tenant.PurposeStorefront
 	}
 }
 

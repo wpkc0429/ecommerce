@@ -175,7 +175,7 @@ func (s *Service) inviteTx(ctx context.Context, tx *ent.Tx, in InviteInput, emai
 	if err != nil {
 		return nil, nil, fmt.Errorf("account: store invitation: %w", err)
 	}
-	return &Invited{ID: row.ID, Email: email}, &Issued{Kind: KindInvite, Email: email, Token: plain, ExpiresAt: expires}, nil
+	return &Invited{ID: row.ID, Email: email}, &Issued{Kind: KindInvite, ShopID: in.ShopID, Email: email, Token: plain, ExpiresAt: expires}, nil
 }
 
 // Invitation is a pending invitation as listed to the shop's owner. It never

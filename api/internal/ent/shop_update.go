@@ -139,6 +139,18 @@ func (_u *ShopUpdate) ClearTimezone() *ShopUpdate {
 	return _u
 }
 
+// SetAdminBranding sets the "admin_branding" field.
+func (_u *ShopUpdate) SetAdminBranding(v json.RawMessage) *ShopUpdate {
+	_u.mutation.SetAdminBranding(v)
+	return _u
+}
+
+// AppendAdminBranding appends value to the "admin_branding" field.
+func (_u *ShopUpdate) AppendAdminBranding(v json.RawMessage) *ShopUpdate {
+	_u.mutation.AppendAdminBranding(v)
+	return _u
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_u *ShopUpdate) SetTheme(v *Theme) *ShopUpdate {
 	return _u.SetThemeID(v.ID)
@@ -329,6 +341,14 @@ func (_u *ShopUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.TimezoneCleared() {
 		_spec.ClearField(shop.FieldTimezone, field.TypeString)
+	}
+	if value, ok := _u.mutation.AdminBranding(); ok {
+		_spec.SetField(shop.FieldAdminBranding, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAdminBranding(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, shop.FieldAdminBranding, value)
+		})
 	}
 	if _u.mutation.ThemeCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -588,6 +608,18 @@ func (_u *ShopUpdateOne) ClearTimezone() *ShopUpdateOne {
 	return _u
 }
 
+// SetAdminBranding sets the "admin_branding" field.
+func (_u *ShopUpdateOne) SetAdminBranding(v json.RawMessage) *ShopUpdateOne {
+	_u.mutation.SetAdminBranding(v)
+	return _u
+}
+
+// AppendAdminBranding appends value to the "admin_branding" field.
+func (_u *ShopUpdateOne) AppendAdminBranding(v json.RawMessage) *ShopUpdateOne {
+	_u.mutation.AppendAdminBranding(v)
+	return _u
+}
+
 // SetTheme sets the "theme" edge to the Theme entity.
 func (_u *ShopUpdateOne) SetTheme(v *Theme) *ShopUpdateOne {
 	return _u.SetThemeID(v.ID)
@@ -808,6 +840,14 @@ func (_u *ShopUpdateOne) sqlSave(ctx context.Context) (_node *Shop, err error) {
 	}
 	if _u.mutation.TimezoneCleared() {
 		_spec.ClearField(shop.FieldTimezone, field.TypeString)
+	}
+	if value, ok := _u.mutation.AdminBranding(); ok {
+		_spec.SetField(shop.FieldAdminBranding, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAdminBranding(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, shop.FieldAdminBranding, value)
+		})
 	}
 	if _u.mutation.ThemeCleared() {
 		edge := &sqlgraph.EdgeSpec{

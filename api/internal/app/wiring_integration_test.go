@@ -172,7 +172,9 @@ func TestWiredRouteTableMatchesContractSource(t *testing.T) {
 // tables' equality rests on.
 type nullOriginRegistry struct{}
 
-func (nullOriginRegistry) IsRegisteredOrigin(context.Context, string) bool { return false }
+func (nullOriginRegistry) LookupOrigin(context.Context, string) (int, string, bool) {
+	return 0, "", false
+}
 
 func difference(a, b []string) []string {
 	in := make(map[string]bool, len(b))

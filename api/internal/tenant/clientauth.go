@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/ent"
@@ -75,7 +76,7 @@ type keyEntry struct {
 
 func keyCacheKey(key string) string { return "pkey:" + key }
 
-func originCacheKey(origin string) string { return "corsorigin:" + origin }
+func originCacheKey(origin string) string { return "corsorigin2:" + origin }
 
 // ResolveKey maps a publishable key to its shop, applying the same shop-status
 // gate as Resolve (1 → serve, 0 → ErrShopDisabled, 2 → ErrShopUnderReview).
@@ -165,43 +166,82 @@ func NormalizeOrigin(raw string) string {
 	return scheme + "://" + host
 }
 
-// IsRegisteredOrigin reports whether the origin is registered by any shop.
+// Origin purposes (change admin-api-public-exposure, design D3).
+const (
+	PurposeStorefront = "storefront"
+	PurposeAdmin      = "admin"
+)
+
+// ValidPurpose reports whether p is a known origin purpose.
+func ValidPurpose(p string) bool { return p == PurposeStorefront || p == PurposeAdmin }
+
+// LookupOrigin answers the one question a CORS decision can ask: which shop
+// registered this origin, and for which purpose?
 //
-// "any shop" is the only question answerable at CORS time: a preflight carries
-// no publishable key (custom headers have no value in an OPTIONS preflight),
-// so there is no tenant context yet — the registered-origin set is itself the
-// origin → shop index (design D3). Errors resolve to false: a failing lookup
-// must not hand out cross-origin access.
-func (r *Resolver) IsRegisteredOrigin(ctx context.Context, origin string) bool {
+// A preflight carries no publishable key (custom headers have no value in an
+// OPTIONS preflight), so there is no tenant context yet - the registered-origin
+// set is itself the origin -> shop index (design D3). Errors resolve to
+// ok=false: a failing lookup must not hand out cross-origin access.
+//
+// The cache value is "{shop}:{purpose}" (or "0" for a negative entry) under the
+// corsorigin2: prefix, so entries written by the pre-purpose code can never be
+// misread.
+func (r *Resolver) LookupOrigin(ctx context.Context, origin string) (shopID int, purpose string, ok bool) {
 	origin = NormalizeOrigin(origin)
 	if origin == "" {
-		return false
+		return 0, "", false
 	}
 	ck := originCacheKey(origin)
 	if r.redis != nil {
 		if raw, err := r.redis.Get(ctx, ck).Result(); err == nil {
-			return raw == "1"
+			if s, p, parsed := parseOriginCache(raw); parsed {
+				return s, p, s != 0
+			}
 		}
 	}
-	found, err := r.client.ShopAllowedOrigin.Query().
+	row, err := r.client.ShopAllowedOrigin.Query().
 		Where(shopallowedorigin.OriginEQ(origin)).
-		Exist(ctx)
-	if err != nil {
+		Only(ctx)
+	if err != nil && !ent.IsNotFound(err) {
 		r.log.Warn("allowed origin lookup failed", "origin", origin, "err", err)
-		return false
+		return 0, "", false
+	}
+	val := "0"
+	if err == nil {
+		shopID, purpose, ok = row.ShopID, row.Purpose, true
+		val = strconv.Itoa(row.ShopID) + ":" + row.Purpose
 	}
 	if r.redis != nil {
 		// Negative caching included on purpose: every preflight from an
 		// unregistered origin would otherwise hit the database (design D10).
-		val := "0"
-		if found {
-			val = "1"
-		}
 		if serr := r.redis.Set(ctx, ck, val, routeCacheTTL).Err(); serr != nil {
 			r.log.Warn("allowed origin cache set failed", "origin", origin, "err", serr)
 		}
 	}
-	return found
+	return shopID, purpose, ok
+}
+
+func parseOriginCache(raw string) (shopID int, purpose string, ok bool) {
+	if raw == "0" {
+		return 0, "", true
+	}
+	idStr, p, found := strings.Cut(raw, ":")
+	if !found || !ValidPurpose(p) {
+		return 0, "", false
+	}
+	id, err := strconv.Atoi(idStr)
+	if err != nil || id <= 0 {
+		return 0, "", false
+	}
+	return id, p, true
+}
+
+// IsRegisteredOrigin reports whether the origin is registered by any shop as a
+// STOREFRONT origin. Admin-purpose origins deliberately answer false: they must
+// not gain customer-facing CORS (spec storefront-client-auth).
+func (r *Resolver) IsRegisteredOrigin(ctx context.Context, origin string) bool {
+	_, purpose, ok := r.LookupOrigin(ctx, origin)
+	return ok && purpose == PurposeStorefront
 }
 
 // InvalidateKeys drops cached key resolutions (spec: 撤銷即時生效).

@@ -58,14 +58,23 @@ type Deps struct {
 	Provisioning *ProvisioningHandler
 	// Team: change merchant-staff-role (owner-facing member management).
 	Team *TeamHandler
+	// Branding: change admin-api-public-exposure (per-shop admin branding
+	// reads: authenticated per shop, and the unauthenticated host-resolved one).
+	Branding *BrandingHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
+	// change admin-api-public-exposure. All three are always mounted on the
+	// /admin group and are pass-through when their feature is not configured,
+	// so the route table never depends on settings.
+	AdminAccessMW    func(http.Handler) http.Handler // Cloudflare Access JWT (D2), runs first
+	AdminHostMW      func(http.Handler) http.Handler // admin host binding + PLATFORM_ADMIN_HOSTS (D4/D10)
+	AdminBindEmailMW func(http.Handler) http.Handler // CF_ACCESS_BIND_EMAIL (D2), runs after AdminMW
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
 	MemberMW      func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
 	OrderAccessMW func(http.Handler) http.Handler // order access token auth (requires TenantMW)
 
-	// CORSOrigins resolves per-shop registered browser origins (change
-	// storefront-client-auth). nil → only Cfg.CORSAllowedOrigins applies,
+	// CORSOrigins resolves per-shop registered browser origins and their
+	// purpose (change storefront-client-auth, admin-api-public-exposure). nil → only Cfg.CORSAllowedOrigins applies,
 	// which is the pre-change behavior every existing test relies on.
 	CORSOrigins OriginRegistry
 
@@ -124,6 +133,10 @@ func New(d Deps) http.Handler {
 	r.Route("/api/v1", func(v1 chi.Router) {
 		// ── Admin (back office) ────────────────────────────────
 		v1.Route("/admin", func(ar chi.Router) {
+			// Access verification first (an unverified request learns nothing,
+			// not even which admin paths exist), then host binding.
+			ar.Use(orPassthrough(d.AdminAccessMW))
+			ar.Use(orPassthrough(d.AdminHostMW))
 			if d.AdminAuth != nil {
 				ar.With(orPassthrough(d.AdminLoginRateLimit)).Post("/auth/login", d.AdminAuth.Login)
 				ar.With(orPassthrough(d.AdminRefreshRateLimit)).Post("/auth/refresh", d.AdminAuth.RefreshToken)
@@ -135,9 +148,13 @@ func New(d Deps) http.Handler {
 			if d.Team != nil {
 				d.Team.MountAuth(ar, d.AdminPasswordSetupRateLimit)
 			}
+			if d.Branding != nil {
+				d.Branding.MountPublic(ar)
+			}
 			if d.AdminMW != nil {
 				ar.Group(func(pr chi.Router) {
 					pr.Use(d.AdminMW)
+					pr.Use(orPassthrough(d.AdminBindEmailMW))
 					if d.AdminAuth != nil {
 						pr.Get("/me", d.AdminAuth.Me)
 					}
@@ -195,6 +212,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.Team != nil {
 							d.Team.MountShopAdmin(sh, d.AdminInviteRateLimit)
+						}
+						if d.Branding != nil {
+							d.Branding.MountShopAdmin(sh)
 						}
 					})
 					if d.Media != nil {

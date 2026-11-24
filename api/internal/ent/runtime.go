@@ -1210,6 +1210,10 @@ func init() {
 	shopDescTimezone := shopFields[5].Descriptor()
 	// shop.TimezoneValidator is a validator for the "timezone" field. It is called by the builders before save.
 	shop.TimezoneValidator = shopDescTimezone.Validators[0].(func(string) error)
+	// shopDescAdminBranding is the schema descriptor for admin_branding field.
+	shopDescAdminBranding := shopFields[6].Descriptor()
+	// shop.DefaultAdminBranding holds the default value on creation for the admin_branding field.
+	shop.DefaultAdminBranding = shopDescAdminBranding.Default.(json.RawMessage)
 	shopallowedoriginFields := schema.ShopAllowedOrigin{}.Fields()
 	_ = shopallowedoriginFields
 	// shopallowedoriginDescOrigin is the schema descriptor for origin field.
@@ -1230,8 +1234,14 @@ func init() {
 			return nil
 		}
 	}()
+	// shopallowedoriginDescPurpose is the schema descriptor for purpose field.
+	shopallowedoriginDescPurpose := shopallowedoriginFields[2].Descriptor()
+	// shopallowedorigin.DefaultPurpose holds the default value on creation for the purpose field.
+	shopallowedorigin.DefaultPurpose = shopallowedoriginDescPurpose.Default.(string)
+	// shopallowedorigin.PurposeValidator is a validator for the "purpose" field. It is called by the builders before save.
+	shopallowedorigin.PurposeValidator = shopallowedoriginDescPurpose.Validators[0].(func(string) error)
 	// shopallowedoriginDescCreatedAt is the schema descriptor for created_at field.
-	shopallowedoriginDescCreatedAt := shopallowedoriginFields[2].Descriptor()
+	shopallowedoriginDescCreatedAt := shopallowedoriginFields[3].Descriptor()
 	// shopallowedorigin.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shopallowedorigin.DefaultCreatedAt = shopallowedoriginDescCreatedAt.Default.(func() time.Time)
 	shoppaymentprovidercredentialMixin := schema.ShopPaymentProviderCredential{}.Mixin()
