@@ -40,4 +40,4 @@ ADR `docs/decisions/0001-headless-platform-and-merchant-template.md` 的「修�
 - **API 契約**：新增約 17 條路由（additive）；`openapi.yaml` 與 `v1-surface.txt` 只新增；既有端點不變。`wiring_integration_test` 的 ⑤⑥⑦ 需涵蓋新 Deps 與新事件訂閱者。
 - **部署**：新環境變數 `CONTENT_*`（見 design）；發佈 hook 的主機 allowlist 是平台層設定。
 - **merchant-template（後續，不在本 change）**：見 design「merchant template 後續工作」與 tasks 群組 11。
-- **需使用者回答的開放問題**：見 design「Open Questions」。
+- **開放問題**：已於 2026-11-25 由使用者決定（「照建議調整」），見 design「Decisions record」；只剩 Q9（Cloudflare deploy hook 主機，實作時查官方文件）。

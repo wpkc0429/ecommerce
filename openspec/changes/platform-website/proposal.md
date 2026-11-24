@@ -38,4 +38,4 @@ ADR `docs/decisions/0001-headless-platform-and-merchant-template.md` 決定：�
 - **API 契約**：新增 ≥ 9 條路由（additive）；`openapi.yaml` 與 `v1-surface.txt` 只新增；`wiring_integration_test` 的 ⑤⑥ 需涵蓋新 Deps；不新增領域事件（檢查 ⑦ 不動）。
 - **部署**：官網靜態託管（見 design D7）；`CORS_ALLOWED_ORIGINS` 加官網 origin；新環境變數 `TURNSTILE_*`、`RATE_LIMIT_APPLICATION_*`、`APPLICATION_*`。
 - **相依**：`platform-account-provisioning`（已實作，未封存）。不相依 `retire-hosted-storefront-and-themes`，也不相依 `headless-content-store`（官網文案由人維護，不經內容儲存）。
-- **需使用者回答的開放問題**：見 design「Open Questions」，**在回答前不要開始實作**。
+- **開放問題**：使用者於 2026-11-25 採用建議預設（Q3–Q8、Q10，見 design「Decisions record」）；**仍開放並需要使用者輸入：Q9（網域、託管、Turnstile 帳號）、Q11（條款與隱私文字）、Q12（官網 repo 與腳手架來源）**；Q5 的保存期限待使用者的法務確認。

@@ -207,16 +207,18 @@
 
 見 D1「遷移路徑」。部署順序：群組 1（隨退役 change）→ 群組 2–3（新表與回填，無行為改變）→ 群組 4（切換，雙寫）→ 群組 5–9（新 API、hook、後台）→ 觀察期後群組 10（清理，需 Q 的決定）。群組 11（template）在 merchant-template repo 獨立進行。
 
-## Open Questions（需使用者回答；附建議）
+## Decisions record（原 Open Questions；**DECIDED 2026-11-25，decided by the user：「照建議調整」**，採用各題的建議答案；僅 Q9 仍開放）
 
-1. **Q1 `page.*` 權限去留**：保留 `page.*` 為別名、新增 `content.*`（建議，相容期結束後移除 `page.*`），或直接改名？（影響自訂角色與 `retire` change 已決定保留 `page.*`。）
-2. **Q2 清理階段何時做**：確認沒有流量後移除 `pages` 表、`shops.content_json` 與相容端點？建議**不移除相容端點**（薄轉接層維護成本低，且 v1 表面鎖保護；移除需要另一次 v1 例外），只移除 `pages` 表與 `shops.content_json`——但 `Shop.content_json` 是回應中的 required 欄位，移除要走例外。建議：**保留兩個欄位為由文件投影的唯讀值**，不做第二次 v1 例外。
-3. **Q3 schema 註冊要不要允許 CI 自動推送**：建議**否**（人工觸發，AI 不能自己改內容形狀）。若要，需要一個只能 PUT schema 的每店服務憑證，另開 change。
-4. **Q4 `content.manage` 是否拆成 schema 與 hook 兩個節點**：建議不拆（只有 owner 與平台持有，拆了沒有第二個持有者）。
-5. **Q5 `editor` 角色是否給 `content.publish`**：今天 `editor` 沒有 `page.publish`；建議維持（商家 owner 才能發佈），商家若要放寬由自訂角色處理。
-6. **Q6 預設快取 `max-age=60` 是否可接受**（發佈後最長 60 秒才在所有瀏覽器可見；`stale-while-revalidate=300`）？建議可接受；要更即時可縮短，但 API 負載增加。
-7. **Q7 版本歷史保留 20 筆發佈是否足夠**？建議足夠；`schema_snapshot` 另計。
-8. **Q8 每店 100 份文件／2 MiB 已發佈總量是否足夠**（FAQ 與活動頁都在內）？建議足夠；可由平台設定覆寫。
-9. **Q9 Cloudflare deploy hook 的確切主機**需在實作前以官方文件核對並放進預設 allowlist。
-10. **Q10 預覽 token 的 TTL**：沿用 `PREVIEW_TOKEN_TTL`（10 分鐘）還是為內容預覽另設較長值（建議 30 分鐘，編輯者看預覽時不被打斷）？
-11. **Q11 排程發佈**（定時上線的活動橫幅）：本 change Non-Goal；是否要排進下一個 change？建議等第一個商家要求。
+1. **Q1 `page.*` 權限：DECIDED 2026-11-25（decided by the user）**——新增 `content.*`，`page.*` 在相容期間保留為**等價別名**（兩者互通，持有其一即可通過對應的相容端點）；`page.*` 日後與相容端點一併退役——那是另一次、需要自己 v1 例外的決定，不在本 change 內（見 Q2）。與 `retire-hosted-storefront-and-themes` 保留 `page.*` 的決定一致。
+2. **Q2 清理與相容端點：DECIDED 2026-11-25（decided by the user）**——保留相容端點（薄轉接層）；**不做第二次 v1 例外**；`Shop.content_json` 保留為由 `global` 文件投影的**唯讀值**（`Page` 回應同理），只移除 `pages` 表的寫入路徑與舊儲存，不移除任何 v1 欄位或路由。
+3. **Q3 schema 註冊：DECIDED 2026-11-25（decided by the user）**——只能由人經 admin API 註冊（先 dry run）；**不**由 CI 或 AI 編輯服務自動推送，因為 AI 不得改變內容的形狀。要自動化需另開 change 與專用憑證。
+4. **Q4 `content.manage` 不拆**：DECIDED 2026-11-25（decided by the user）。
+5. **Q5 `editor` 有 view 與 edit、沒有 publish**：DECIDED 2026-11-25（decided by the user）；商家要放寬由自訂角色處理。
+6. **Q6 公開快取 `max-age=60`、`stale-while-revalidate=300`**：DECIDED 2026-11-25（decided by the user）。
+7. **Q7 版本歷史保留 20 筆發佈（`schema_snapshot` 另計）**：DECIDED 2026-11-25（decided by the user）。
+8. **Q8 每店 100 份文件／2 MiB 已發佈總量，可由平台設定覆寫**：DECIDED 2026-11-25（decided by the user）。
+9. **Q9 Cloudflare deploy hook 的確切主機：仍然開放（OPEN）**——實作前以 Cloudflare 官方文件核對，再放進預設 allowlist。
+10. **Q10 內容預覽 token TTL 30 分鐘**（與 `PREVIEW_TOKEN_TTL`＝10 分鐘分開設定）：DECIDED 2026-11-25（decided by the user）。
+11. **Q11 排程發佈：第一版不做**（等第一個商家要求）：DECIDED 2026-11-25（decided by the user）。
+
+**仍開放**：只有 Q9（實作時查官方文件，不需要使用者回答）。

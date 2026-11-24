@@ -1,4 +1,4 @@
-> 前置：design「Open Questions」Q1–Q11 由使用者回答（每題有建議答案；以下採建議答案）。**群組 1 已由已核准的 `retire-hosted-storefront-and-themes` 第一階段交付**，不要做第二次；其餘群組在**使用者核准本 change 之後**才可實作。每個群組結束時：`cd api && go build ./... && make lint && make test && make test-int && make openapi` 全綠、`node e2e/commerce-path.mjs` 通過、可獨立部署。
+> 前置：design「Decisions record」Q1–Q11 已於 2026-11-25 由使用者決定（採建議答案；Q9 仍待實作時查官方文件）。**群組 1 已由已核准的 `retire-hosted-storefront-and-themes` 第一階段交付**，不要做第二次；其餘群組在**使用者核准本 change 之後**才可實作。每個群組結束時：`cd api && go build ./... && make lint && make test && make test-int && make openapi` 全綠、`node e2e/commerce-path.mjs` 通過、可獨立部署。
 
 ## 1. 每店 schema 儲存（**由 `retire-hosted-storefront-and-themes` 的 tasks 群組 1 交付**；此處只列為相依）
 
@@ -68,10 +68,10 @@
 - [ ] 9.3 `CLAUDE.md`（內容儲存條目：模型、樂觀鎖、消毒閘門、hook 的 SSRF 規則、PII 規則）、`README.md`、`openspec/project.md`；`.claude/skills/merchant-onboarding/`（標示已實作並更新步驟與 known-gaps）
 - [ ] 9.4 spec 增量：實作完成、封存時把本 change 的 delta 併入 `openspec/specs/`，並對 `page-management`／`content-rendering` 以 MODIFIED 對齊
 
-## 10. 清理（**需要使用者回答 Q2 後才做**；與其他群組獨立）
+## 10. 清理（Q2 已決定 2026-11-25：保留相容端點、不做第二次 v1 例外；與其他群組獨立）
 
 - [ ] 10.1 依 Q2 的決定：移除 `pages` 表（保留 `Shop.content_json` 為由 `global` 文件投影的唯讀值）、移除雙寫、`createHomePage`；保留相容端點與其轉接層
-- [ ] 10.2 依 Q1：`page.*` 權限的別名期結束與否
+- [ ] 10.2 依 Q1（已決定）：`page.*` 別名保留；它與相容端點的退役是日後另一次決定（需要自己的 v1 例外），本 change 不做
 - [ ] 10.3 migration（破壞性，down 拒絕回滾並說明從備份還原）、備份與演練
 
 ## 11. merchant template 後續工作（**在 merchant-template repo，守門員流程之內；本 change 只列出，不實作**；design D10）

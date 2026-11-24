@@ -1,4 +1,4 @@
-> 前置：design「Open Questions」尚未回答的項目（Q3–Q12）需由使用者回答後才可實作。**已決定（2026-11-24，使用者決定）**：①官網是零建置靜態站，沿用 merchant template 的鎖定核心＋設計層、守門員與嚴格 CSP；②官網程式碼放在**獨立 repo**，不放在 ecommerce repo，`web/` 不動。
+> 前置：design「Decisions record」已於 2026-11-25 採用 Q3–Q8、Q10 的建議預設；仍開放的 Q9、Q11、Q12（需使用者的網域／帳號／文字／repo 決定）影響 B 部分的部署與文案，Q5 的保存期限待使用者法務確認。**已決定（2026-11-24，使用者決定）**：①官網是零建置靜態站，沿用 merchant template 的鎖定核心＋設計層、守門員與嚴格 CSP；②官網程式碼放在**獨立 repo**，不放在 ecommerce repo，`web/` 不動。
 > 工作分兩部分：**A. 落在 ecommerce repo**（群組 1–9：公開申請端點、`shop_applications` 模型、平台後台審核與核准、Turnstile 驗證、通知、限流與稽核、文件與 e2e）；**B. 落在新的官網 repo**（群組 B1–B7：腳手架、鎖定核心的表單邏輯、設計層頁面、守門員、CSP、部署與 Cloudflare、文案、live demo 連結）。A 的群組 1–7 不依賴 B，B 的表單核心需要 A 的端點契約（群組 5）先定。
 
 > **放置規則（design D13，使用者決定）**：官網 repo 只放靜態內容與只呼叫公開申請端點的鎖定核心，**不需要任何自己的後端**（沒有 server／function／資料庫／secrets）；Turnstile secret、儲存、審核、通知、稽核都在 A 部分。

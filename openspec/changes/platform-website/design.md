@@ -119,17 +119,22 @@ live demo：一個**真的 merchant-template 部署**（以 `scripts/new-merchan
 
 純新增表與端點，無資料遷移。down migration 直接 DROP 四表。部署順序：API（migration、設定、`make seed` 新權限）→ 後台 → 官網。回滾：把官網 origin 從 `CORS_ALLOWED_ORIGINS` 拿掉即讓表單失效；表保留。
 
-## Open Questions（**需要使用者回答，實作前必須有答案**）
+## Decisions record 與仍開放的問題（**使用者於 2026-11-25 回覆「照建議調整」：有建議預設的題目採用預設，標示 recommended default adopted 2026-11-25**）
 
-（**Q1 技術路線與 Q2 `web/` 處理已於 2026-11-24 由使用者決定**，見 D1 與 D9，不再是開放問題；其餘編號保留以免改動引用。）
+（Q1 技術路線與 Q2 `web/` 處理已於 2026-11-24 由使用者決定，見 D1 與 D9；其餘編號保留以免改動引用。）
 
-3. **Q3 寄信**：上線時是否有寄信服務？沒有的話接受「操作員人工轉交驗證連結／人工確認聯絡方式」作為正式流程嗎？（建議上線前接上寄信服務，並先評估 Gmail 額度。）
-4. **Q4 live demo**：用哪個 demo shop？結帳啟用與否（mock 付款？）？網域、是否允許被官網內嵌？
-5. **Q5 保存期限**：已拒絕 90 天、已核准 1 年是否可接受？有無法務／會計要求？
-6. **Q6 重新申請冷卻**：被拒絕後多久可再申請（建議 30 天）？拒絕理由是否對申請者可見（建議可見，由操作員撰寫）？
-7. **Q7 申請欄位**：是否需要網站類型／預期商品數／現有網址／統編？（越多＝越多個資。）
-8. **Q8 審核 SLA 與通知**：新申請如何通知操作員（後台徽章、email、LINE）？未處理申請是否自動過期？
-9. **Q9 網域與託管**：官網網域、Cloudflare Workers 或 Pages（建議，與店面同一種；官網是純靜態站，不再有 Docker 選項）？Turnstile 帳號與 site key 由誰建立？
-10. **Q10 核准後預設**：預設 `status` 2 是否合適？核准是否同時建立 publishable key（`provision` 目前不建）？
-11. **Q11 條款／隱私**：誰提供正式文字與版本號？在那之前是否只上線佔位並標示「測試中」？
-12. **Q12 官網腳手架來源**：官網 repo 的守門員與同步工具從哪來？建議在 merchant template 增加 `website` 種類（`template.json` 的 `sites.website`）與 `new-merchant.mjs` 之外的建立腳本，沿用同一套 `check-scope`／`check-locked`／`check-layers`／`sync-core`；備案是另開一個很小的 template repo。repo 名稱與擁有者帳號也需決定。
+**已採用建議預設（recommended default adopted 2026-11-25，decided by the user）**
+
+3. **Q3 寄信**：上線前**必須**接上交易式 email／SMTP 寄信服務（先評估 Gmail 額度）；「操作員人工轉交驗證連結／人工確認聯絡方式」的 outbox 保留為**有文件的後備**，不是正式流程。
+4. **Q4 live demo**：使用 `mock` 付款提供者，結帳停用或僅 mock；demo 站不允許被第三方內嵌（`frame-ancestors` 限制；官網只以連結＋自家 `sandbox` iframe 呈現，demo 站只允許官網 origin 內嵌）。
+5. **Q5 保存期限**：已拒絕 90 天、已核准 1 年。**待使用者的法務確認（pending the user's legal confirmation）**，確認前以此為實作預設。
+6. **Q6 重新申請冷卻**：30 天（`APPLICATION_REAPPLY_COOLDOWN`），拒絕理由（`decision_reason`，由操作員撰寫）對申請者可見。
+7. **Q7 申請欄位**：採 D4 的欄位（`contact_name`、`phone`、`shop_name`、`business_summary`、同意版本）；不收統編、網站類型、預期商品數、現有網址（越少越少個資）。
+8. **Q8 審核 SLA 與通知**：後台待審徽章數字（人工模式）；有 SMTP 後可加給操作員的 email 提示；未處理的 `pending_review` **不自動過期**（只有 `pending_verification` 超過 7 天過期，見 D4）。
+10. **Q10 核准後預設**：預設 `status` 2（審核中，店面不可達，上線時改 1）；核准**不**自動建立 publishable key（`provision` 不建；由 `merchant-onboarding` 流程處理）。
+
+**仍然開放（需要使用者本人的輸入或帳號）**
+
+9. **Q9 網域與託管**：官網網域、託管（建議 Cloudflare Workers static assets／Pages，與店面同一種）、Turnstile 帳號與 site key 由誰建立——需要使用者提供帳號與網域。
+11. **Q11 條款／隱私**：正式文字與版本號需由使用者提供；在那之前只上線佔位並標示「測試中」。
+12. **Q12 官網腳手架來源與 repo 名稱／擁有者帳號**：建議在 merchant template 增加 `website` 種類（`template.json` 的 `sites.website`）與建立腳本，沿用同一套守門員；備案是另開一個很小的 template repo。repo 名稱與擁有者帳號需要使用者決定。
