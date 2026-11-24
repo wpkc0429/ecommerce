@@ -130,7 +130,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 
 	resolver := tenant.NewResolver(client, rdb, a.log)
 	dispatcher.Subscribe(func(ctx context.Context, e events.Event) {
-		if ev, ok := e.(events.SiteMappingChanged); ok {
+		if ev, ok := e.(events.ShopStatusChanged); ok {
 			resolver.InvalidateHosts(ctx, ev.Hosts...)
 			// change storefront-client-auth (design D10): this event is also
 			// what a shop status change publishes, and the cached publishable

@@ -68,7 +68,7 @@ func ValidKeyFormat(s string) bool {
 // keyEntry is the cached publishable-key → shop mapping. shop_status is cached
 // alongside for the same reason routeEntry caches it: the gate below needs it
 // on every request. Staleness is bounded by the TTL and cut short by the
-// StorefrontClientChanged / SiteMappingChanged invalidations (design D10).
+// StorefrontClientChanged / ShopStatusChanged invalidations (design D10).
 type keyEntry struct {
 	ShopID     int   `json:"shop_id"`
 	ShopStatus int16 `json:"shop_status"`

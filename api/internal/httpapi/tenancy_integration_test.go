@@ -70,7 +70,7 @@ func newTenancyEnv(t *testing.T) *tenancyEnv {
 	e.resolver = tenant.NewResolver(client, rdb, log)
 	dispatcher := events.NewDispatcher(log)
 	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.SiteMappingChanged); ok {
+		if m, ok := ev.(events.ShopStatusChanged); ok {
 			e.resolver.InvalidateHosts(ctx, m.Hosts...)
 		}
 	})
@@ -194,7 +194,7 @@ func TestSitesAPIConstraintsAndInvalidation(t *testing.T) {
 	if _, err := e.resolver.Resolve(ctx, "second.test", "/"); !errors.Is(err, tenant.ErrNoDefaultShop) {
 		t.Fatalf("prime: %v", err)
 	}
-	// Bind the brand shop as default via the API (publishes SiteMappingChanged).
+	// Bind the brand shop as default via the API (publishes ShopStatusChanged).
 	code, body = e.adminCall(t, "POST", fmt.Sprintf("/api/v1/admin/sites/%d/shops", secondID),
 		map[string]any{"shop_id": e.brandA})
 	if code != 201 {

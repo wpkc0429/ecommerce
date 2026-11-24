@@ -202,7 +202,7 @@ func difference(a, b []string) []string {
 // answer "does e2e need an assertion for this?", the question
 // commerce-demo-seed left open.
 var expectedSubscribers = []string{
-	"ksdevworks/ecommerce/api/internal/app.(*App).wire.<closure>",   // SiteMappingChanged → host/key cache
+	"ksdevworks/ecommerce/api/internal/app.(*App).wire.<closure>",   // ShopStatusChanged → host/key cache
 	"ksdevworks/ecommerce/api/internal/app.(*App).wire.<closure>",   // StorefrontClientChanged → key/origin cache
 	"ksdevworks/ecommerce/api/internal/points.(*Service).Handle-fm", // 付款核發點數 / 退貨扣回
 	"ksdevworks/ecommerce/api/internal/render.(*Invalidator).Handle-fm",

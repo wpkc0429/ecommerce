@@ -119,7 +119,7 @@ func (h *SitesHandler) delete(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	h.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: []string{s.Domain}, ShopIDs: shopIDs})
+	h.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: []string{s.Domain}, ShopIDs: shopIDs})
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -170,7 +170,7 @@ func (h *SitesHandler) bindShop(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	h.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: []string{s.Domain}, ShopIDs: []int{req.ShopID}})
+	h.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: []string{s.Domain}, ShopIDs: []int{req.ShopID}})
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
 		"site_id": siteID, "shop_id": req.ShopID, "path_prefix": prefix, "is_primary": req.IsPrimary,
 	})
@@ -228,7 +228,7 @@ func (h *SitesHandler) updateBinding(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	h.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: []string{s.Domain}, ShopIDs: []int{shopID}})
+	h.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: []string{s.Domain}, ShopIDs: []int{shopID}})
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"site_id": siteID, "shop_id": shopID})
 }
 
@@ -256,7 +256,7 @@ func (h *SitesHandler) unbindShop(w http.ResponseWriter, r *http.Request) {
 		httpx.NotFound(w)
 		return
 	}
-	h.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: []string{s.Domain}, ShopIDs: []int{shopID}})
+	h.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: []string{s.Domain}, ShopIDs: []int{shopID}})
 	w.WriteHeader(http.StatusNoContent)
 }
 

@@ -82,7 +82,7 @@ func newShopsEnv(t *testing.T) *shopsEnv {
 	e.resolver = tenant.NewResolver(client, rdb, log)
 	dispatcher := events.NewDispatcher(log)
 	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.SiteMappingChanged); ok {
+		if m, ok := ev.(events.ShopStatusChanged); ok {
 			e.resolver.InvalidateHosts(ctx, m.Hosts...)
 		}
 	})

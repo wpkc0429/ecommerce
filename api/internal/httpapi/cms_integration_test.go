@@ -72,7 +72,7 @@ func newCMSEnv(t *testing.T) *cmsEnv {
 	dispatcher := events.NewDispatcher(log)
 	resolver := tenant.NewResolver(client, rdb, log)
 	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.SiteMappingChanged); ok {
+		if m, ok := ev.(events.ShopStatusChanged); ok {
 			resolver.InvalidateHosts(ctx, m.Hosts...)
 		}
 	})

@@ -122,7 +122,7 @@ func (s *Service) ProvisionShop(ctx context.Context, in Input) (*Result, error) 
 	// After commit: cache invalidation through events, then link delivery.
 	s.Accounts.Invalidate(ctx, res.OwnerID)
 	if res.Binding != nil {
-		s.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: []string{res.Binding.Domain}, ShopIDs: []int{res.Shop.ID}})
+		s.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: []string{res.Binding.Domain}, ShopIDs: []int{res.Shop.ID}})
 	}
 	if len(res.Origins) > 0 {
 		s.Dispatcher.Publish(ctx, events.StorefrontClientChanged{ShopID: res.Shop.ID, Origins: res.Origins})

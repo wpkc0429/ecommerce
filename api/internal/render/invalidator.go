@@ -40,7 +40,7 @@ func (i *Invalidator) Handle(ctx context.Context, e events.Event) {
 			return
 		}
 		i.Cache.BumpShops(ctx, ids...)
-	case events.SiteMappingChanged:
+	case events.ShopStatusChanged:
 		i.Cache.BumpShops(ctx, ev.ShopIDs...)
 	}
 }

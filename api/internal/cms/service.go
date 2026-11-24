@@ -843,7 +843,7 @@ func (s *Service) UpdateShop(ctx context.Context, shopID int, in ShopUpdate) (*e
 		// ShopIDs so the render cache version bump (design D8) is not
 		// skipped — only the route-cache host invalidation degrades.
 		domains, _ := shop.QuerySites().Select(entsite.FieldDomain).Strings(ctx)
-		s.Dispatcher.Publish(ctx, events.SiteMappingChanged{Hosts: domains, ShopIDs: []int{shopID}})
+		s.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: domains, ShopIDs: []int{shopID}})
 	}
 	return shop, nil
 }
