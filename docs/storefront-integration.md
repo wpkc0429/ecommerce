@@ -108,6 +108,25 @@ const { products, page, page_size, total } = await res.json();
 - 單一商品：`GET /api/v1/shop/products/{slug}`。
 - `subtitle`：商品卡片的第二行（例如英文品名），沒有時是空字串 `""`。語言由商家決定，平台不解讀。
 - `categories`：`[{id, slug, name}]`，依分類 `position`、`id` 排序；`category_ids` 是同一個集合的 id 版本。
+- `images`（change product-images-r2）：`[{id, alt, position, width, height, urls: {thumb, large}}]`，
+  依 `position`、`id` 遞增，**永遠存在**——沒有圖片（或這個部署還沒設定媒體儲存）時是 `[]`，不會缺鍵或為 `null`。
+
+### 3.0 商品圖片
+
+```js
+const p = await (await fetch(`${API}/api/v1/shop/products/${slug}`, { headers })).json();
+const [cover, ...rest] = p.images;           // 順序就是商家在後台排的順序
+// <img src={cover.urls.large} srcset={`${cover.urls.thumb} 480w, ${cover.urls.large} 1600w`} alt={cover.alt} />
+```
+
+- 兩個變體都是 **WebP**：`thumb` 長邊 ≤ 480、`large` 長邊 ≤ 1600，**只縮不放**（原圖較小就是原尺寸）、
+  保持比例、不裁切（要裁切請用 CSS `object-fit`）。`width`／`height` 是 `large` 的實際尺寸，
+  可直接寫進 `<img width height>` 避免版面位移。
+- **網址不可變**：每張圖片的網址含一個永不重用的 uuid，內容從不改寫，回應標頭是
+  `Cache-Control: public, max-age=31536000, immutable`——放心長期快取。商家換圖＝新網址。
+- 網址由圖片網域（`IMAGE_PUBLIC_BASE_URL`）與儲存鍵在**讀取時**組成。換 CDN 網域不需要資料遷移，
+  但也代表**不要把圖片網址存進你自己的資料庫**——存商品 id，要圖時再讀。
+- 圖片的上傳與排序是後台（admin）的事，不是公開 API 的事；公開端只讀。
 
 ### 3.1 分類與「依分類列商品」
 

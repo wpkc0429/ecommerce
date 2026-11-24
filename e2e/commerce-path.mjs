@@ -21,6 +21,7 @@
 // Prereqs: API on :8080, and `make migrate && make seed-demo`.
 // Run alone:      cd e2e && node commerce-path.mjs
 // Run with CMS:   cd e2e && node happy-path.mjs
+import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   API, brief, check, deliverECPayCallback, deliverWebhook, ecpayCheckMac, fail, failureCount, isoDate, req,
@@ -1121,6 +1122,111 @@ async function commercePath() {
   const noPeriod = await req("GET", shopPath("/reports/sales"), { token: admin });
   check("a report without an explicit period is refused (422), not silently defaulted",
     noPeriod.status === 422, brief(noPeriod));
+
+  await mediaPath(admin, shopID, shopPath);
+}
+
+// ── 商品圖片（change product-images-r2）──
+//
+// API 層走完 presign → 直傳 PUT → attach，不需要瀏覽器。用一個**這一輪專屬的
+// 暫時商品**，結束時刪掉（連同儲存空間裡的物件），所以不會破壞這支腳本的
+// 可重複執行性，也不會動到 demo 商品。API 未設定媒體儲存時整段略過。
+async function mediaPath(admin, shopID, shopPath) {
+  section("⑬ Product images: presign -> direct PUT -> attach -> public read");
+  const cfg = await req("GET", "/api/v1/admin/media/config", { token: admin });
+  if (cfg.json?.enabled !== true) {
+    console.log("  - media storage is not configured on this API: image checks skipped");
+    // Still worth asserting: routes are mounted and answer the documented 503.
+    const off = await req("POST", shopPath("/media/uploads"), {
+      token: admin, body: { content_type: "image/jpeg", size_bytes: 10, purpose: "product_image" },
+    });
+    check("disabled media answers 503 media_not_configured (routes stay mounted)",
+      off.status === 503 && off.json?.error?.code === "media_not_configured", brief(off));
+    return;
+  }
+
+  const slug = `e2e-media-${runID}`;
+  const created = await req("POST", shopPath("/products"), {
+    token: admin,
+    body: { title: `E2E media ${runID}`, slug, status: 1,
+      skus: [{ sku_code: `E2E-MEDIA-${runID}`, price_amount: 100, stock_qty: 1 }] },
+  });
+  need(created.status === 201, `temp product create failed: ${brief(created)}`);
+  const pid = created.json.id;
+  try {
+    const data = readFileSync(new URL("./fixtures/exif-orientation-6.jpg", import.meta.url));
+    const upload = async (purpose, type = "image/jpeg", body = data) => {
+      const intent = await req("POST", shopPath("/media/uploads"), {
+        token: admin, body: { content_type: type, size_bytes: body.length, purpose },
+      });
+      if (intent.status !== 201) return { intent };
+      const put = await fetch(intent.json.upload_url, { method: "PUT", headers: intent.json.headers, body });
+      return { intent, put };
+    };
+
+    const heic = await req("POST", shopPath("/media/uploads"), {
+      token: admin, body: { content_type: "image/heic", size_bytes: 10, purpose: "product_image" },
+    });
+    check("HEIC is refused by the server (frontends convert first)", heic.status === 422, brief(heic));
+
+    const up = await upload("product_image");
+    check("presigned PUT to object storage succeeds", up.put?.status === 200, String(up.put?.status));
+    const wrongType = await fetch(up.intent.json.upload_url, {
+      method: "PUT", headers: { "Content-Type": "text/html" }, body: data,
+    });
+    check("the presigned URL is bound to its signed Content-Type (a different one is refused)",
+      wrongType.status >= 400, String(wrongType.status));
+
+    const attach = await req("POST", shopPath(`/products/${pid}/images`), {
+      token: admin, body: { upload_id: up.intent.json.upload_id, alt: "e2e alt" },
+    });
+    check("attach converts and returns 201", attach.status === 201, brief(attach));
+    check("variants: EXIF applied, portrait 400x600, thumb/large WebP urls",
+      attach.json?.width === 400 && attach.json?.height === 600 &&
+        attach.json?.urls?.large?.endsWith("/large.webp") && attach.json?.urls?.thumb?.endsWith("/thumb.webp"),
+      JSON.stringify(attach.json));
+    const asset = await fetch(attach.json.urls.large);
+    check("the converted object is publicly readable as image/webp",
+      asset.status === 200 && asset.headers.get("content-type") === "image/webp",
+      `${asset.status} ${asset.headers.get("content-type")}`);
+
+    const reuse = await req("POST", shopPath(`/products/${pid}/images`), {
+      token: admin, body: { upload_id: up.intent.json.upload_id },
+    });
+    check("reusing an upload_id is a 409", reuse.status === 409, brief(reuse));
+
+    const html = Buffer.from("<html><script>alert(1)</script></html>");
+    const bad = await upload("product_image", "image/jpeg", html);
+    const badAttach = await req("POST", shopPath(`/products/${pid}/images`), {
+      token: admin, body: { upload_id: bad.intent.json.upload_id },
+    });
+    check("HTML declared as JPEG is a 422", badAttach.status === 422, brief(badAttach));
+
+    const pub = await req("GET", `/api/v1/shop/products/${slug}`, { pk: PK });
+    check("public detail carries the image", pub.json?.images?.length === 1 && pub.json.images[0].id === attach.json.id,
+      brief(pub));
+
+    // The product PUT is full-replacement for SKUs — and must leave images alone.
+    const put = await req("PUT", shopPath(`/products/${pid}`), {
+      token: admin,
+      body: { title: `E2E media ${runID} (renamed)`, skus: created.json.skus.map((s) => ({
+        id: s.id, sku_code: s.sku_code, price_amount: s.price_amount, stock_qty: s.stock_qty })) },
+    });
+    check("product PUT succeeds", put.status === 200, brief(put));
+    const list = await req("GET", shopPath(`/products/${pid}/images`), { token: admin });
+    check("product PUT left the image untouched", list.json?.images?.length === 1, brief(list));
+
+    // Content image (CMS image field pipeline).
+    const cu = await upload("content_image");
+    const content = await req("POST", shopPath("/media/content-images"), {
+      token: admin, body: { upload_id: cu.intent.json.upload_id },
+    });
+    check("content image conversion returns urls", content.status === 201 && Boolean(content.json?.urls?.large),
+      brief(content));
+  } finally {
+    const del = await req("DELETE", shopPath(`/products/${pid}`), { token: admin });
+    check("temporary product removed (images cascade)", del.status === 204, brief(del));
+  }
 }
 
 

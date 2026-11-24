@@ -11,6 +11,7 @@
 //
 // Prereqs: API on :8080, web on :3000, admin on :3001, seeded demo shop
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
@@ -368,6 +369,71 @@ try {
   check("public product carries its category summary",
     (published?.categories ?? []).some((c) => c.slug === catSlug && c.id === Number(newCategoryID)),
     JSON.stringify(published?.categories));
+
+  // ══ 商品圖片（change product-images-r2）══
+  //
+  // 走真正的 MinIO（presigned PUT 直傳、伺服器轉檔成 WebP）。API 未設定媒體儲存時
+  // 整段略過——那本身是被支援的部署形態（路由回 503），不是失敗。
+  console.log("⑫a 商品圖片：在編輯器上傳兩張（含 EXIF 方向 6）、改 alt、重排 → 公開詳情");
+  const mediaCfg = await req("GET", "/api/v1/admin/media/config", { token: adminToken });
+  if (mediaCfg.json?.enabled !== true) {
+    console.log("  - media storage is not configured on this API: image checks skipped");
+  } else {
+    await page.waitForSelector("#product-image-input", { state: "attached" });
+    const fixture = fileURLToPath(new URL("./fixtures/exif-orientation-6.jpg", import.meta.url));
+    await page.setInputFiles("#product-image-input", [fixture, fixture]);
+    const imageRows = page.locator("#product-images .image-row");
+    await page.waitForFunction(
+      () => document.querySelectorAll("#product-images .image-row").length === 2, null, { timeout: 60000 });
+    check("two images uploaded through the editor (presign -> direct PUT -> server conversion)",
+      (await imageRows.count()) === 2);
+    const idA = Number(await imageRows.nth(0).getAttribute("data-image-id"));
+    const idB = Number(await imageRows.nth(1).getAttribute("data-image-id"));
+    check("the file input is the only way images enter: product save button is not involved",
+      (await page.locator("#product-images").count()) === 1);
+
+    const adminImages = async () =>
+      (await req("GET", `/api/v1/admin/shops/1/products/${published.id}/images`, { token: adminToken })).json?.images ?? [];
+    const until = async (name, pred) => {
+      for (let i = 0; i < 50; i++) {
+        if (pred(await adminImages())) return true;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      return check(name, false);
+    };
+
+    const altText = `E2E 第一張 ${runID}`;
+    await imageRows.nth(0).locator(".image-alt").fill(altText);
+    await imageRows.nth(0).locator(".image-alt").press("Tab"); // change event -> PUT alt
+    await until("alt saved", (imgs) => imgs[0]?.alt === altText);
+    await imageRows.nth(1).locator(".image-up").click();
+    await until("reordered", (imgs) => imgs[0]?.id === idB && imgs[1]?.id === idA);
+
+    const pub = await req("GET", `/api/v1/shop/products/${prodSlug}`, { pk: "pk_demoseedstorefrontkeynotsecret" });
+    const pimgs = pub.json?.images ?? [];
+    check("public detail lists both images in the reordered order",
+      pimgs.length === 2 && pimgs[0].id === idB && pimgs[1].id === idA, JSON.stringify(pimgs.map((i) => i.id)));
+    check("alt set in the editor is on the public image", pimgs[1]?.alt === altText, JSON.stringify(pimgs[1]));
+    check("EXIF orientation 6 was applied by the server (600x400 landscape -> 400x600 portrait)",
+      pimgs[0]?.width === 400 && pimgs[0]?.height === 600, JSON.stringify(pimgs[0]));
+    const large = await fetch(pimgs[0].urls.large);
+    check("urls.large is publicly readable as image/webp",
+      large.status === 200 && large.headers.get("content-type") === "image/webp",
+      `${large.status} ${large.headers.get("content-type")}`);
+    check("variant objects are immutable-cacheable",
+      (large.headers.get("cache-control") ?? "").includes("immutable"), String(large.headers.get("cache-control")));
+    const thumb = await fetch(pimgs[0].urls.thumb);
+    check("urls.thumb is publicly readable", thumb.status === 200, String(thumb.status));
+    const bytes = new Uint8Array(await large.arrayBuffer());
+    check("the stored variant is a real WebP (RIFF....WEBP) with no EXIF chunk",
+      String.fromCharCode(...bytes.slice(0, 4)) === "RIFF" && String.fromCharCode(...bytes.slice(8, 12)) === "WEBP" &&
+        !Buffer.from(bytes).includes("EXIF"));
+    // 圖片是子資源：商品「儲存」（全量 PUT）不得影響它們。
+    await page.click("#product-save");
+    await page.waitForFunction(() =>
+      document.querySelector("#product-editor-status").textContent.includes("已儲存"));
+    check("saving the product does not touch its images", (await adminImages()).length === 2);
+  }
 
   console.log("⑫b 分類視圖調整「本季新品」商品排序 → 公開列表順序一致，結束時還原");
   const PK_ORDER = "pk_demoseedstorefrontkeynotsecret";
