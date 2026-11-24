@@ -34,18 +34,19 @@ Agent: the admin ships inside the same repo (`admin/`), static, no build.
 
 ## Verification (step 15)
 
-Content store (PLANNED: change `headless-content-store` is a proposal; none of this can be done yet, skip it until the change is implemented and `docs/content-store-integration.md` exists):
+Content store. **BUILT (first slice): schema registration and page creation.** Reference: `docs/content-schema.md`.
 
-- [ ] The site's design layer ships `public/content.schema.json` (types, declared documents, optional collections; allowed vocabulary and limits are in the change's design D3). The AI may edit it, but only a human registers it.
-- [ ] A human registers the schema from the merchant admin (or the API `PUT /api/v1/admin/shops/{id}/content/schema`), first with `dry_run=true`; field-removal warnings need explicit confirmation. Needs `content.manage` (merchant owner or platform).
-- [ ] Create and publish the initial documents (`content.edit`, then `content.publish`); verify with `GET /api/v1/shop/content` and the publishable key.
-- [ ] Optional: set the publish hook (a deploy-hook URL on an allowlisted host; the URL is a secret, entered write-only) and press test; confirm the site rebuilds.
-- [ ] Staff roles get no `content.*` permissions by default; grant them deliberately.
+- [ ] The schema to register: the shop's own `public/content.schema.json` once the template ships one (not yet: the template has no such file today; that is template work T1), or the platform's starter `docs/content-schema/starter.content.schema.json`, which matches the template's `public/content.js` fields (brand, store info, hero, story, FAQ, product info). The AI may prepare or edit the file, **but only a human registers it**; never run the registration from CI, a script run unattended, or an agent holding a human's token.
+- [ ] H (shop owner or platform admin, node `content.manage`) runs `PUT /api/v1/admin/shops/{id}/content/schema?dry_run=true`, reads the report (`ok` / `needs_attention` / `orphaned`, `removed_paths`), then the same call without `dry_run`. If it answers 409 `removals_require_confirmation`, review the paths and repeat with `confirm_removals=true` only if intended. 422 details name the offending JSON Pointer.
+- [ ] `GET /api/v1/admin/shops/{id}/content/schema` returns version 1; `.../versions` lists it. (There is no `content_schema_registered` setup-status flag.)
+- [ ] The auto-created `home` page holds an empty placeholder: if the schema has a `home` type it shows `needs_attention`; save it once with real content (`PUT /pages/{id}`), then publish. Create other pages with `POST /pages` (`type_key` from the schema, not `global`), `PUT`, `POST /pages/{id}/publish`; verify with `GET /api/v1/render/page?path=/<slug>` and the publishable key.
+- [ ] Staff roles get no `content.*` permissions by default and editors get view and edit only (never publish or manage); grant publish deliberately.
+- [ ] **PLANNED, not built (skip):** key-based content documents and `GET /api/v1/shop/content`, revisions and restore, the preview token endpoint, the publish hook (deploy-hook URL on an allowlisted host), and the template's `ShopCommerce.content` / admin content screens. Until then the merchant's copy is still read from `public/content.js` by the storefront.
 
 Platform side (agent, against local/throwaway stack unless the operator authorises production reads):
 
 - [ ] `make openapi` (contract checks; no infra) and `make test` pass if the platform code was touched (it should not be).
-- [ ] `GET .../setup-status`: `owner_assigned`, `owner_password_set`, `shipping_method_active`, `payment_credentials_set`, `publishable_key_active` all true (`home_published` reflects the CMS home page: ignore it until the content store is implemented).
+- [ ] `GET .../setup-status`: `owner_assigned`, `owner_password_set`, `shipping_method_active`, `payment_credentials_set`, `publishable_key_active` all true (`home_published` reflects the CMS home page: it is true only after a content schema is registered and the home page is saved and published).
 - [ ] Storefront read-back with the key: `curl -s -H "X-Publishable-Key: $PK" "$API/api/v1/shop/products"`, `/categories`, `/shipping-methods` return the expected catalogue; images present.
 - [ ] CORS: from the browser at the storefront origin the three calls above succeed. If `curl` works but the browser fails, the origin is not registered (or has the wrong purpose).
 - [ ] Guest checkout end to end on stage: place an order, follow the ECPay stage redirect, confirm the payment webhook turns the order paid (`ECPAY_RETURN_URL` reachable), check the order in the admin. (`cd e2e && node commerce-path.mjs` is the platform regression chain: it needs a throwaway stack with `make seed-demo` data and tests the demo shop, not the new merchant; run it only if platform code changed, never against production or the main database.)

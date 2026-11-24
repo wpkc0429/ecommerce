@@ -1,8 +1,10 @@
+> **進度（2026-11-25，第一個切片「每店 schema 註冊」已實作）**：`[x]` 完成、`[~]` 本切片只做了其中一部分（括號內寫明做了什麼、什麼沒做）、`[ ]` 未動。**切線**：群組 1（先前已交付）＋ 群組 3（schema 註冊與驗證）＋ 群組 5 中與 schema 註冊直接相關的部分（`content.*` 權限節點與 `page.*` 別名、content-image 守衛）＋ 群組 9 中屬於這個切片的契約與文件 ＋ e2e 的新店註冊流程。**刻意沒做**（需要文件表，屬於之後的切片）：群組 2（`content_documents`／`content_revisions`／`content_audit_log` 與回填）、群組 4（content 服務與雙寫）、群組 6（公開讀取、預覽、快取）、群組 7（發佈 hook）、群組 8（後台畫面）、群組 10、11。**這個切片沒有被迫長出任何後面的部分**：快照放在版本列（`content_schemas.snapshot_json`）、`needs_attention` 放在 `pages`、稽核用 `content_schemas.created_by_user_id` 加結構化日誌，所以不需要文件表；下一個切片（群組 2）建立文件表時，才把這些搬進 `content_revisions`（`kind=schema_snapshot`）與 `content_audit_log`。
+>
 > 前置：design「Decisions record」Q1–Q11 已於 2026-11-25 由使用者決定（採建議答案；Q9 仍待實作時查官方文件）。**群組 1 已由已核准的 `retire-hosted-storefront-and-themes` 第一階段交付**，不要做第二次；其餘群組在**使用者核准本 change 之後**才可實作。每個群組結束時：`cd api && go build ./... && make lint && make test && make test-int && make openapi` 全綠、`node e2e/commerce-path.mjs` 通過、可獨立部署。
 
 ## 1. 每店 schema 儲存（**由 `retire-hosted-storefront-and-themes` 的 tasks 群組 1 交付**；此處只列為相依）
 
-- [ ] 1.1 確認以下已存在：`content_schemas` 表與 ent 實體、`api/internal/contentschema/` 的 `Store`、format 1 回填、頁面與全域內容的 schema 讀取已改走 Store（見退役 change 的 1.1–1.8）
+- [x] 1.1 （已確認：`content_schemas`、`internal/contentschema` 的 `Store`／`Writer`、format 1 回填與讀取皆存在）確認以下已存在：`content_schemas` 表與 ent 實體、`api/internal/contentschema/` 的 `Store`、format 1 回填、頁面與全域內容的 schema 讀取已改走 Store（見退役 change 的 1.1–1.8）
 
 ## 2. 文件資料表與回填（design D1）
 
@@ -13,12 +15,12 @@
 
 ## 3. schema 註冊與驗證（design D3、D4）
 
-- [ ] 3.1 新增 `api/internal/contentschema/vocab.go`：詞彙 allowlist（design D3）與常數上限；`Validate(raw json.RawMessage) (*Parsed, []Detail)`：依序做 1–8 步（拒絕重複鍵與預先限制深度的 JSON 解析器、結構上限、詞彙走訪、`$ref` 環與展開節點數、`cms.CompileSchema` 編譯、預設值自洽檢查〔2 秒 context〕、鍵名與 type 引用、文字欄位不含 `<`）
-- [ ] 3.2 `api/internal/contentschema/validate_test.go`（單元，不需基礎設施）：每條規則的通過與失敗各一；**惡意案例**：重複鍵、深度 9、`$ref` 環、`$ref` 放大（展開 >5000 節點）、遠端 `$ref`、`patternProperties`、`allOf`、未宣告 `maxLength` 的 string、未宣告 `maxItems` 的 array、`additionalProperties` 缺省、`pattern` 過長、`format: regex`、`x-foo`、128 KiB 以上、含 `<script>` 的 `title`
-- [ ] 3.3 `api/internal/contentschema/diff.go`：`Diff(oldDocs, newSchema)`：對每份文件驗證 `draft_json`／`published_json`、計算將被 hydrate 丟棄的鍵路徑（重用 `cms` 的走訪邏輯；必要時把 `hydrator` 的 `resolve`／`sectionBranches` 匯出到新的小套件 `internal/cms/schemawalk` 並讓 `cms` 改用，**行為不變**）；單元測試涵蓋：欄位移除、改名、型別變更、enum 縮小、新增必填（有／無 default）、鍵不再被宣告
-- [ ] 3.4 `api/internal/content/schema_service.go`：`Register(ctx, shopID, actor, raw, opts{DryRun, ConfirmRemovals})`——單一交易：驗證 → sha256 比對作用中版本（相同＝`changed:false`）→ 計算報告 → 有移除而無 `ConfirmRemovals` 回 409（帶報告）→ 寫新版本 → 對 `ok` 以外的文件寫 `schema_snapshot` revision（群組 2 的表）→ 建立 `documents` 宣告的缺少文件（空草稿，hydrate 預設）→ 更新各文件的 `needs_attention`／`declared` → commit 後發 `ContentSchemaRegistered`；`audit` 記 `schema.register`／`schema.dry_run`
-- [ ] 3.5 `api/internal/httpapi/content_admin.go`（先做 schema 部分）：`GET/PUT /admin/shops/{shopID}/content/schema`（body 上限 128 KiB，覆寫 `decodeJSON` 的 1 MiB；限流每商家每小時 20、dry run 每分鐘 10）；整合測試：dry run 不寫入、重複註冊不增版、移除警告需確認、跨店隔離、權限（群組 5 的節點）
-- [ ] 3.6 驗證：同群組標準
+- [x] 3.1 （位置改為 `api/internal/content/vocab.go`：驗證需要 `cms.CompileSchema`／`Hydrate`，而 `cms` 已 import `contentschema`，放進後者會循環 import。原始 JSON 巢狀上限改為 40：design 的 12 會拒絕結構深度 8 的合法 schema（每層結構佔兩層 JSON）。由 `const`／`enum` 固定值的字串免 `maxLength`）新增 `api/internal/contentschema/vocab.go`：詞彙 allowlist（design D3）與常數上限；`Validate(raw json.RawMessage) (*Parsed, []Detail)`：依序做 1–8 步（拒絕重複鍵與預先限制深度的 JSON 解析器、結構上限、詞彙走訪、`$ref` 環與展開節點數、`cms.CompileSchema` 編譯、預設值自洽檢查〔2 秒 context〕、鍵名與 type 引用、文字欄位不含 `<`）
+- [x] 3.2 （實作於 `api/internal/content/vocab_test.go` 與 `diff_test.go`；惡意案例全涵蓋，另加 regex-DoS 與 `$ref` 放大的耗時斷言，並測 `docs/content-schema/starter.content.schema.json` 通過驗證器）`api/internal/contentschema/validate_test.go`（單元，不需基礎設施）：每條規則的通過與失敗各一；**惡意案例**：重複鍵、深度 9、`$ref` 環、`$ref` 放大（展開 >5000 節點）、遠端 `$ref`、`patternProperties`、`allOf`、未宣告 `maxLength` 的 string、未宣告 `maxItems` 的 array、`additionalProperties` 缺省、`pattern` 過長、`format: regex`、`x-foo`、128 KiB 以上、含 `<script>` 的 `title`
+- [x] 3.3 （實作於 `api/internal/content/diff.go`。沒有把 `hydrator` 匯出成 `schemawalk`，而是自帶與 hydrate 同規則的小走訪器，`cms` 的 hydrate 一個字沒動；`removed_paths` 只計有值的鍵（空值不算，所以建店的空首頁不逼人確認）；報告多一個 `published_invalid`）`api/internal/contentschema/diff.go`：`Diff(oldDocs, newSchema)`：對每份文件驗證 `draft_json`／`published_json`、計算將被 hydrate 丟棄的鍵路徑（重用 `cms` 的走訪邏輯；必要時把 `hydrator` 的 `resolve`／`sectionBranches` 匯出到新的小套件 `internal/cms/schemawalk` 並讓 `cms` 改用，**行為不變**）；單元測試涵蓋：欄位移除、改名、型別變更、enum 縮小、新增必填（有／無 default）、鍵不再被宣告
+- [~] 3.4 （已做：`Register`／dry run／`Get`／`Versions`、單一交易（`shops` 列 `FOR UPDATE` 序列化）、sha256 重複註冊、移除需確認的 409、快照、`pages.needs_attention` 旗標、`ContentSchemaRegistered` 事件、結構化稽核日誌與 `created_by_user_id`。未做：快照寫進 `content_revisions`（表未建，改存版本列 `snapshot_json`）、建立 `documents` 宣告的缺少文件與 `declared`（文件表未建，宣告只驗證與儲存）、`content_audit_log` 表）`api/internal/content/schema_service.go`：`Register(ctx, shopID, actor, raw, opts{DryRun, ConfirmRemovals})`——單一交易：驗證 → sha256 比對作用中版本（相同＝`changed:false`）→ 計算報告 → 有移除而無 `ConfirmRemovals` 回 409（帶報告）→ 寫新版本 → 對 `ok` 以外的文件寫 `schema_snapshot` revision（群組 2 的表）→ 建立 `documents` 宣告的缺少文件（空草稿，hydrate 預設）→ 更新各文件的 `needs_attention`／`declared` → commit 後發 `ContentSchemaRegistered`；`audit` 記 `schema.register`／`schema.dry_run`
+- [x] 3.5 （路由在 `api/internal/httpapi/content_schema.go`（`GET/PUT …/content/schema`、`GET …/content/schema/versions`）；本體上限 128 KiB、限流每商家＋呼叫者每小時 20／dry run 每分鐘 10；整合測試 `content_schema_integration_test.go` 涵蓋 dry run 不寫入、重複註冊不增版、移除警告需確認、跨店隔離、權限）`api/internal/httpapi/content_admin.go`（先做 schema 部分）：`GET/PUT /admin/shops/{shopID}/content/schema`（body 上限 128 KiB，覆寫 `decodeJSON` 的 1 MiB；限流每商家每小時 20、dry run 每分鐘 10）；整合測試：dry run 不寫入、重複註冊不增版、移除警告需確認、跨店隔離、權限（群組 5 的節點）
+- [x] 3.6 （go build／vet／`make lint`／`go test`／整合測試全套／`make openapi`／e2e（commerce-path 新增第 ⑮ 節）皆綠，結果見最後的收尾紀錄）驗證：同群組標準
 
 ## 4. content 服務、現有端點切換與雙寫（design D1 遷移路徑、D6）
 
@@ -30,12 +32,12 @@
 
 ## 5. 權限與管理端 API（design D5）
 
-- [ ] 5.1 `internal/seed/seed.go`：`PermissionCatalog` 新增 `content.view`／`content.edit`／`content.publish`／`content.manage`；授予 `merchant_owner` 全部、`editor` 只有 `view`＋`edit`；`staff` 無；`page.*` 的現有授予複製成對應 `content.*`；`seed_integration_test.go` 以**相等**比對斷言 staff 與 editor 的節點集合（新增節點不會悄悄流進 staff）；自訂角色的複製寫成 migration 並測試
+- [x] 5.1 （`PermissionCatalog` 新增四個節點；`merchant_owner` 全有、`editor` 只有 view＋edit、`staff` 無、`super_admin` 經 `*`；`page.*` 的授予由 migration 複製成 `content.*`（含自訂角色與使用者覆寫，整合測試以檔案內 SQL 驗證）；`content.manage` 不複製，只由 seed 授予 owner／super_admin；`seed_integration_test.go` 以相等比對 staff／editor／owner 的 `content.*` 集合與「只有 owner 與 super_admin 持有 content.manage」）`internal/seed/seed.go`：`PermissionCatalog` 新增 `content.view`／`content.edit`／`content.publish`／`content.manage`；授予 `merchant_owner` 全部、`editor` 只有 `view`＋`edit`；`staff` 無；`page.*` 的現有授予複製成對應 `content.*`；`seed_integration_test.go` 以**相等**比對斷言 staff 與 editor 的節點集合（新增節點不會悄悄流進 staff）；自訂角色的複製寫成 migration 並測試
 - [ ] 5.2 `api/internal/httpapi/content_admin.go`（文件部分）：`GET /documents`、`GET|PUT /documents/{key}`（`If-Match`／`If-None-Match: *`，412 語意）、`publish`、`unpublish`、`DELETE`、`revisions`（列表／讀取）、`restore`、`preview-token`；各自限流（儲存 60／分、發佈 20／分，每商家＋呼叫者）；`Deps` 欄位與 `wire.go` 接線（稽核 ⑤ 要求非 nil）
-- [ ] 5.3 `httpapi/media.go`：`content_image` 上傳的守衛改為 `content.edit`（相容期同時接受 `page.edit`）
+- [x] 5.3 （`POST …/media/content-images` 與 `POST …/media/uploads`（purpose `content_image`）同時接受 `page.edit` 與 `content.edit`；render preview 與 `/pages*`、`/page-types` 守衛改為 `RequireShopAnyPermission(page.*, content.*)`（相容別名））`httpapi/media.go`：`content_image` 上傳的守衛改為 `content.edit`（相容期同時接受 `page.edit`）
 - [ ] 5.4 稽核：所有寫入記 `content_audit_log`；PII 整合測試（slog 導入 buffer，內容與 hook URL 的特徵值一個都找不到）；`cmd/purge-content-audit`（預設 dry run、`-apply`、冪等、只印 id）與 `Makefile` 目標
-- [ ] 5.5 測試：樂觀鎖（並發兩個 PUT 恰一個成功）、跨店隔離（A 店 owner 讀寫 B 店 key 回 403／404）、`editor` 不能 `publish` 與 `schema`、`staff` 全部 403、`restore` 只動草稿、revision 裁剪恰為 20、schema 變更後 `needs_attention` 的文件不能發佈
-- [ ] 5.6 `internal/app/authguard_integration_test.go`：新路由皆有 RBAC 守衛；`expectedUnguardedAdminRoutes` 不變
+- [~] 5.5 （本切片已測：editor 不能 `schema`（註冊）、`staff` 全部 403、跨店隔離（B 店 owner 對 A 店 403）、schema 變更後 `needs_attention` 的頁面不能發佈。未做（對象不存在）：樂觀鎖、`restore`、revision 裁剪、文件層測試）測試：樂觀鎖（並發兩個 PUT 恰一個成功）、跨店隔離（A 店 owner 讀寫 B 店 key 回 403／404）、`editor` 不能 `publish` 與 `schema`、`staff` 全部 403、`restore` 只動草稿、revision 裁剪恰為 20、schema 變更後 `needs_attention` 的文件不能發佈
+- [x] 5.6 （`authguard_integration_test.go`、`wiring_integration_test.go`（⑤⑥⑦）在整合全套中通過；新路由皆有 RBAC 守衛，`expectedUnguardedAdminRoutes` 不變）`internal/app/authguard_integration_test.go`：新路由皆有 RBAC 守衛；`expectedUnguardedAdminRoutes` 不變
 
 ## 6. 公開讀取 API、快取與預覽（design D2）
 
@@ -59,13 +61,13 @@
 
 - [ ] 8.1 `admin/views/pages.js`、`content.js`、`lib/schemaform.js`：改打新端點（或保留舊端點，擇一並在 PR 說明）；新增 `link`、`select`、`textarea`、`list` 的控件；顯示 `needs_attention`、`declared`、版本歷史與還原、`draft_rev` 的 412 處理（「他人已更新，重新載入」）
 - [ ] 8.2 新視圖：內容 schema 檢視與註冊（dry run 報告、移除警告確認）、發佈 hook 設定（遮罩顯示、測試、手動重建）；`admin/app.js` 註冊表與 `index.html` 面板；權限由 `/shops/{id}/me` 的節點決定可見性
-- [ ] 8.3 e2e：`e2e/happy-path.mjs` 新增內容流程（註冊 schema → 儲存草稿 → 預覽 token → 發佈 → 公開端點讀到 → 改 schema 移除欄位的警告 → 還原）；`e2e/commerce-path.mjs` 新增公開讀取與 ETag／304 的無瀏覽器斷言；`CLAUDE.md` 同步斷言計數；守住 tripwire #4′／#5 並記錄
+- [~] 8.3 （本切片只做 `e2e/commerce-path.mjs` 的第 ⑮ 節（無瀏覽器）：開新店→owner 設密碼→建頁 422 指向註冊→dry run→註冊→建立／編輯／發佈頁面→公開端點讀到→改 schema 移除欄位的 409／確認／快照／needs_attention。happy-path 的瀏覽器內容流程屬後台畫面（群組 8），未做）e2e：`e2e/happy-path.mjs` 新增內容流程（註冊 schema → 儲存草稿 → 預覽 token → 發佈 → 公開端點讀到 → 改 schema 移除欄位的警告 → 還原）；`e2e/commerce-path.mjs` 新增公開讀取與 ETag／304 的無瀏覽器斷言；`CLAUDE.md` 同步斷言計數；守住 tripwire #4′／#5 並記錄
 
 ## 9. 契約與文件
 
-- [ ] 9.1 `api/openapi/openapi.yaml`：新增全部新路由、`ContentDocument`／`ContentSchemaReport`／`ContentRevision`／`PublishHookStatus` 等 schema、`ETag`／`If-Match`／`If-None-Match`／`X-Preview-Token` 參數與標頭、422／409／412／429 回應；`-openapi.update-surface`（**只新增行**，檢視 diff）；`make openapi` 全綠
-- [ ] 9.2 `docs/content-store-integration.md`（新）：給商家站台的消費契約（端點、ETag、預覽、hydrate 行為、`link`／`richtext` 的呈現規則、CSP 建議、build-time 與 runtime 的取捨與建議）；`docs/storefront-integration.md` 加指向；`docs/admin-frontend-integration.md` 補內容端點與 412／422 的處理；`docs/media-r2-setup.md` 的內容圖片段落更新權限名
-- [ ] 9.3 `CLAUDE.md`（內容儲存條目：模型、樂觀鎖、消毒閘門、hook 的 SSRF 規則、PII 規則）、`README.md`、`openspec/project.md`；`.claude/skills/merchant-onboarding/`（標示已實作並更新步驟與 known-gaps）
+- [~] 9.1 （本切片已做：三條新路由、`ContentSchema*` schema、Page／PageListEntry 的 `needs_attention`、錯誤碼表新增 `content_schema_not_found`／`removals_require_confirmation`；`v1-surface.txt` 只新增 46 行。其餘契約屬之後的切片）`api/openapi/openapi.yaml`：新增全部新路由、`ContentDocument`／`ContentSchemaReport`／`ContentRevision`／`PublishHookStatus` 等 schema、`ETag`／`If-Match`／`If-None-Match`／`X-Preview-Token` 參數與標頭、422／409／412／429 回應；`-openapi.update-surface`（**只新增行**，檢視 diff）；`make openapi` 全綠
+- [~] 9.2 （本切片已做：`docs/content-schema.md`（註冊參考、詞彙與限制、人工註冊與禁止自動化）與 `docs/content-schema/starter.content.schema.json`；`docs/storefront-integration.md` 加指向（10.5）、`docs/admin-frontend-integration.md` 補內容 schema 端點與權限。`docs/content-store-integration.md`（消費契約）屬之後的切片）`docs/content-store-integration.md`（新）：給商家站台的消費契約（端點、ETag、預覽、hydrate 行為、`link`／`richtext` 的呈現規則、CSP 建議、build-time 與 runtime 的取捨與建議）；`docs/storefront-integration.md` 加指向；`docs/admin-frontend-integration.md` 補內容端點與 412／422 的處理；`docs/media-r2-setup.md` 的內容圖片段落更新權限名
+- [~] 9.3 （本切片已做：`CLAUDE.md`（「內容 schema 註冊」條目、端點／路由數、seed 說明）、`.claude/skills/merchant-onboarding/`（SKILL.md 方向段與 11a、checklist、known-gaps 13／15、cookbook 3a：標明「已建：schema 註冊與建頁」「仍規劃：文件、公開 `/shop/content`、hook、template」）。`README.md`／`openspec/project.md` 未改（敘述仍正確））`CLAUDE.md`（內容儲存條目：模型、樂觀鎖、消毒閘門、hook 的 SSRF 規則、PII 規則）、`README.md`、`openspec/project.md`；`.claude/skills/merchant-onboarding/`（標示已實作並更新步驟與 known-gaps）
 - [ ] 9.4 spec 增量：實作完成、封存時把本 change 的 delta 併入 `openspec/specs/`，並對 `page-management`／`content-rendering` 以 MODIFIED 對齊
 
 ## 10. 清理（Q2 已決定 2026-11-25：保留相容端點、不做第二次 v1 例外；與其他群組獨立）
@@ -82,3 +84,9 @@
 - [ ] 11.4 T4：`ShopCommerce.content.richText`／`link`；allowlist 同步腳本與雜湊檢查（兩邊 `allowlist.json` 的 sha256 在 CI 比對）
 - [ ] 11.5 T5：`scripts/fetch-content.mjs`（選用）、預覽模式（`?content_preview=`）、`docs/CORE-CHANGELOG.md`（標示 `Design-layer action`）、`new-merchant.mjs` 與 `sync-core` 更新
 - [ ] 11.6 `merchant-onboarding` skill 與 `docs/TEMPLATE-NOTES.md` 同步
+
+## 第一個切片（schema 註冊）收尾紀錄（2026-11-25）
+
+- 驗證：`go build`／`go vet`／`golangci-lint`（0 issues）／`go test ./...`／整合全套（`INTEGRATION=1 go test -p 1 ./...`，含 wiring ⑤⑥⑦、authguard、契約四道）全綠；`e2e/happy-path.mjs` 在全新資料庫上 413 項斷言全過（`commerce-path.mjs` 200 項，含新增的第 ⑮ 節 25 項）。
+- 下一個切片的建議順序與起點：群組 2（文件表與回填；建立時把本切片的 `content_schemas.snapshot_json` 與 `pages.needs_attention` 對應到 `content_revisions(kind=schema_snapshot)` 與 `content_documents.needs_attention`，`created_by_user_id` 對應到 `content_audit_log`，並讓 `Register` 建立 `documents` 宣告的缺少文件與 `declared`）→ 群組 4 → 5.2／5.4 → 6 → 7 → 8 → 9 → 10。
+- 本切片刻意的偏離：驗證器放在 `internal/content`（循環 import）、原始 JSON 巢狀上限 40（design 的 12 過嚴）、字串由 `const`／`enum` 固定值時免 `maxLength`、`removed_paths` 與「孤兒頁需確認」只計有值的內容、沒有 `content_schema_registered` 的 setup-status 項目（design 沒有要求）、快照與稽核暫存於版本列。

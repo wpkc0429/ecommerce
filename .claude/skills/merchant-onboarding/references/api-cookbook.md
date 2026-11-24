@@ -45,7 +45,20 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
 curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/setup-status"
 ```
 
-Returns booleans derived from live data (nothing stored): `owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `home_published` reflects the CMS home page and is only meaningful once the content store ships. The other five are the real onboarding gates. Re-read after every step.
+Returns booleans derived from live data (nothing stored): `owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `home_published` reflects the CMS home page: it can only be true once a content schema is registered (section 3a) and the home page is saved and published. The other five are the real onboarding gates. Re-read after every step.
+
+## 3a. Register the content schema (HUMAN ONLY) [registerContentSchema]
+
+Needs `content.manage` (merchant owner or platform super_admin). **Do not run this from CI, an unattended script, or with a token an agent keeps: a human reads the dry-run report and confirms.** Reference: `docs/content-schema.md`; starter: `docs/content-schema/starter.content.schema.json`.
+
+```bash
+SCHEMA=docs/content-schema/starter.content.schema.json     # or the merchant's own file
+curl -s -X PUT "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/content/schema?dry_run=true" --data-binary @"$SCHEMA"   # 1. report, writes nothing
+curl -s -X PUT "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/content/schema" --data-binary @"$SCHEMA"                  # 2. register (409 = confirm removals first: add ?confirm_removals=true)
+curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/content/schema"                                                   # 3. active version
+```
+
+After this a page can be created (`POST .../pages` with a `type_key` of the schema) and published; without it the API answers 422 `shop has no content schema: register one first with PUT ...`.
 
 ## 4. Owner password link
 

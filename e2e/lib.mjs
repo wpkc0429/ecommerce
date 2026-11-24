@@ -12,6 +12,19 @@ export const API = process.env.E2E_API_BASE_URL ?? "http://localhost:8080";
 
 let failures = 0;
 
+// The platform admin's access token, shared inside one process. The login
+// rate limit allows 5 platform logins per 5 minutes and happy-path.mjs already
+// spends most of them, so a section that needs the platform admin reuses the
+// token happy-path obtained instead of logging in again (it falls back to a
+// login of its own when run standalone or when the token has expired).
+let sharedPlatformToken = null;
+export function setPlatformToken(token) {
+  sharedPlatformToken = token;
+}
+export function getPlatformToken() {
+  return sharedPlatformToken;
+}
+
 export function failureCount() {
   return failures;
 }

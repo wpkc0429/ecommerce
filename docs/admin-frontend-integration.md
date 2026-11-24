@@ -26,7 +26,7 @@
    ```json
    { "content_type": "image/jpeg", "size_bytes": 204800, "purpose": "product_image" }
    ```
-   `purpose` 是 `product_image`（需要 `product.edit`）或 `content_image`（CMS 圖片欄位，需要 `page.edit`）。
+   `purpose` 是 `product_image`（需要 `product.edit`）或 `content_image`（CMS 圖片欄位，需要 `page.edit` 或等價的 `content.edit`）。
    回 201：
    ```json
    { "upload_id": "…uuid…", "upload_url": "https://…", "headers": { "Content-Type": "image/jpeg" }, "expires_at": "…" }
@@ -307,3 +307,12 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 - `GET /api/v1/admin/shops/{shopID}/branding`（已登入的成員，不需權限節點）→ `{shop_id, name, branding}`。
 - `GET /api/v1/admin/branding`（**未登入**）：伺服器以請求的 `Origin`（優先）或 `Host` 解析出商家
   → `{name, branding}`；該主機不是任何商家登記的 admin origin 時 `404`（前端用平台預設）。
+
+## 內容 schema 註冊（change headless-content-store，第一個切片）
+
+後台的內容畫面需要的端點與權限（詳見 [`docs/content-schema.md`](content-schema.md)）：
+
+- 權限節點：`content.view`、`content.edit`、`content.publish`、`content.manage`（皆在 `GET /shops/{shopID}/me` 的節點清單內，據此決定畫面可見性；`page.*` 在相容期內與對應的 `content.*` 等價，頁面端點兩者擇一即可通過）。`editor` 只有 `view`＋`edit`，`staff` 沒有。**只有 `merchant_owner` 與平台 `super_admin` 持有 `content.manage`**。
+- `GET …/content/schema`（生效版本與 schema 本文，沒有時 404 `content_schema_not_found`）、`GET …/content/schema/versions`、`GET …/content/schema?version=N&include=snapshot`。
+- `PUT …/content/schema?dry_run=true` 先看報告，再 `PUT …/content/schema` 註冊；回 409 `removals_require_confirmation` 時要把 `details.report` 展示給人、由人確認後才帶 `confirm_removals=true` 重送。422 的 `details[].pointer` 指向送出文件的位置。**註冊必須是人在畫面上按下的動作**；不要做成自動同步。
+- 頁面（`pages`）回應與列表多了 `needs_attention`：true 時要提示「內容 schema 已變更，草稿需要修正」；已發佈內容仍在線上。

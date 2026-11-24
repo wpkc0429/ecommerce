@@ -636,6 +636,10 @@ total_amount    = subtotal_amount − discount_amount + shipping_fee
 
 ---
 
+## 10.5 商家內容（CMS）與內容 schema（change headless-content-store，第一個切片）
+
+商家站台上由表單編輯的文字、banner、FAQ 等內容，存在平台的 CMS 內容功能（`pages`、全域內容），並以 `GET /api/v1/render/page?path=/<slug>`（帶 publishable key）讀取已發佈內容。**每家商家要先由「人」註冊自己的內容 schema，才能建立與發佈頁面**；新商家沒有 schema 時，建立頁面會回 `422 shop has no content schema: register one first with PUT /api/v1/admin/shops/{id}/content/schema …`。註冊的步驟、起始範本（`docs/content-schema/starter.content.schema.json`）、詞彙與上限、版本與「移除欄位需確認」規則，全在 [`docs/content-schema.md`](content-schema.md)。註冊絕不由 CI 或 AI 自動執行。以 key 讀取內容文件的公開端點（`/shop/content`）**尚未實作**；在那之前商家站台的文案仍在設計層的 `public/content.js`。
+
 ## 11. 離線開發：用 mock server，不必起整套後端
 
 ```bash

@@ -1,0 +1,429 @@
+{
+  "format": 2,
+  "types": {
+    "global": {
+      "title": "全域內容",
+      "schema": {
+        "type": "object",
+        "title": "全域內容",
+        "additionalProperties": false,
+        "properties": {
+          "accent": {
+            "type": "string",
+            "title": "主題色",
+            "default": "#2f5d8a",
+            "maxLength": 7,
+            "x-editor": "color",
+            "x-editor-order": 0
+          },
+          "brand": {
+            "type": "object",
+            "title": "品牌",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "title": "品牌名稱",
+                "default": "你的商店",
+                "maxLength": 100,
+                "x-editor-order": 0
+              },
+              "footer": {
+                "type": "string",
+                "title": "頁尾品牌名稱",
+                "default": "你的商店",
+                "maxLength": 100,
+                "x-editor-order": 1
+              }
+            },
+            "x-editor-order": 1
+          },
+          "searchPlaceholder": {
+            "type": "string",
+            "title": "搜尋框提示",
+            "default": "搜尋商品…",
+            "maxLength": 100,
+            "x-editor-order": 2
+          },
+          "noteLabel": {
+            "type": "string",
+            "title": "商品備註欄標籤",
+            "default": "商品備註",
+            "maxLength": 100,
+            "x-editor-order": 3
+          },
+          "featuredTitle": {
+            "type": "string",
+            "title": "首頁精選區標題",
+            "default": "本季新品",
+            "maxLength": 100,
+            "x-editor-order": 4
+          },
+          "instagram": {
+            "type": "object",
+            "title": "Instagram",
+            "additionalProperties": false,
+            "properties": {
+              "handle": {
+                "type": "string",
+                "title": "帳號",
+                "default": "@your_shop",
+                "maxLength": 100,
+                "x-editor-order": 0
+              }
+            },
+            "x-editor-order": 5
+          },
+          "store": {
+            "type": "object",
+            "title": "門市資訊",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "title": "門市名稱",
+                "default": "你的商店",
+                "maxLength": 100,
+                "x-editor-order": 0
+              },
+              "address": {
+                "type": "string",
+                "title": "完整地址",
+                "default": "（請填寫店面地址）",
+                "maxLength": 300,
+                "x-editor-order": 1
+              },
+              "addressShort": {
+                "type": "string",
+                "title": "簡短地址",
+                "default": "（店面地址）",
+                "maxLength": 100,
+                "x-editor-order": 2
+              },
+              "hours": {
+                "type": "string",
+                "title": "營業時間",
+                "default": "10:00 – 18:00 · 週日休",
+                "maxLength": 200,
+                "x-editor-order": 3
+              },
+              "hoursShort": {
+                "type": "string",
+                "title": "簡短營業時間",
+                "default": "10:00–18:00",
+                "maxLength": 100,
+                "x-editor-order": 4
+              },
+              "tel": {
+                "type": "string",
+                "title": "電話",
+                "default": "00-0000-0000",
+                "maxLength": 50,
+                "x-editor-order": 5
+              }
+            },
+            "x-editor-order": 6
+          },
+          "newsletter": {
+            "type": "object",
+            "title": "電子報",
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "title": "標題",
+                "default": "訂閱電子報，取得新品與活動通知",
+                "maxLength": 200,
+                "x-editor-order": 0
+              },
+              "success": {
+                "type": "string",
+                "title": "訂閱成功訊息",
+                "default": "訂閱成功，感謝你的支持。",
+                "maxLength": 200,
+                "x-editor-order": 1
+              }
+            },
+            "x-editor-order": 7
+          },
+          "promo": {
+            "type": "object",
+            "title": "手機版優惠條",
+            "additionalProperties": false,
+            "properties": {
+              "title": {
+                "type": "string",
+                "title": "標題",
+                "default": "會員專屬優惠",
+                "maxLength": 100,
+                "x-editor-order": 0
+              },
+              "sub": {
+                "type": "string",
+                "title": "說明",
+                "default": "請填寫活動說明",
+                "maxLength": 200,
+                "x-editor-order": 1
+              },
+              "cta": {
+                "type": "string",
+                "title": "按鈕文字",
+                "default": "了解",
+                "maxLength": 50,
+                "x-editor-order": 2
+              }
+            },
+            "x-editor-order": 8
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema"
+      }
+    },
+    "home": {
+      "title": "首頁",
+      "schema": {
+        "type": "object",
+        "title": "首頁",
+        "additionalProperties": false,
+        "properties": {
+          "hero": {
+            "type": "object",
+            "title": "主視覺",
+            "additionalProperties": false,
+            "properties": {
+              "eyebrow": {
+                "type": "string",
+                "title": "小標",
+                "default": "NEW COLLECTION",
+                "maxLength": 100,
+                "x-editor-order": 0
+              },
+              "title": {
+                "type": "string",
+                "title": "標題（換行處會斷行）",
+                "default": "簡單，\n剛剛好",
+                "maxLength": 200,
+                "x-editor": "textarea",
+                "x-editor-order": 1
+              },
+              "lede": {
+                "type": "string",
+                "title": "導語",
+                "default": "這裡是你的商店首頁標語，請換成自己的文字。",
+                "maxLength": 500,
+                "x-editor": "textarea",
+                "x-editor-order": 2
+              }
+            },
+            "x-editor-order": 0
+          },
+          "storyTeaser": {
+            "type": "object",
+            "title": "品牌故事預告",
+            "additionalProperties": false,
+            "properties": {
+              "eyebrow": {
+                "type": "string",
+                "title": "小標",
+                "default": "ABOUT US",
+                "maxLength": 100,
+                "x-editor-order": 0
+              },
+              "title": {
+                "type": "string",
+                "title": "標題（換行處會斷行）",
+                "default": "關於\n你的商店",
+                "maxLength": 200,
+                "x-editor": "textarea",
+                "x-editor-order": 1
+              },
+              "lede": {
+                "type": "string",
+                "title": "導語",
+                "default": "用幾句話介紹你的品牌與理念。",
+                "maxLength": 500,
+                "x-editor": "textarea",
+                "x-editor-order": 2
+              }
+            },
+            "x-editor-order": 1
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema"
+      }
+    },
+    "story": {
+      "title": "品牌故事",
+      "schema": {
+        "type": "object",
+        "title": "品牌故事",
+        "additionalProperties": false,
+        "properties": {
+          "eyebrow": {
+            "type": "string",
+            "title": "小標",
+            "default": "ABOUT US",
+            "maxLength": 100,
+            "x-editor-order": 0
+          },
+          "title": {
+            "type": "string",
+            "title": "標題（換行處會斷行）",
+            "default": "關於\n你的商店",
+            "maxLength": 200,
+            "x-editor": "textarea",
+            "x-editor-order": 1
+          },
+          "paragraphs": {
+            "type": "array",
+            "title": "段落",
+            "maxItems": 20,
+            "default": [
+              "這是品牌故事的第一段，請換成你想對顧客說的話。",
+              "第二段可以介紹你的選品原則、製作方式或服務承諾。"
+            ],
+            "items": {
+              "type": "string",
+              "title": "段落",
+              "default": "",
+              "maxLength": 2000,
+              "x-editor": "textarea"
+            },
+            "x-editor-order": 2
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema"
+      }
+    },
+    "faq": {
+      "title": "常見問題",
+      "schema": {
+        "type": "object",
+        "title": "常見問題",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "title": "問答",
+            "maxItems": 50,
+            "default": [
+              {
+                "q": "配送與到貨時間",
+                "a": "這裡填寫配送範圍與預計到貨時間。"
+              },
+              {
+                "q": "退換貨說明",
+                "a": "這裡填寫退換貨條件與流程。"
+              },
+              {
+                "q": "付款方式",
+                "a": "這裡填寫可用的付款方式。"
+              }
+            ],
+            "items": {
+              "type": "object",
+              "title": "問與答",
+              "additionalProperties": false,
+              "required": [
+                "q",
+                "a"
+              ],
+              "properties": {
+                "q": {
+                  "type": "string",
+                  "title": "問題",
+                  "default": "",
+                  "maxLength": 200,
+                  "x-editor": "text",
+                  "x-editor-order": 0
+                },
+                "a": {
+                  "type": "string",
+                  "title": "答案",
+                  "default": "",
+                  "maxLength": 2000,
+                  "x-editor": "textarea",
+                  "x-editor-order": 1
+                }
+              }
+            },
+            "x-editor-order": 0
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema"
+      }
+    },
+    "product_info": {
+      "title": "商品共通說明",
+      "schema": {
+        "type": "object",
+        "title": "商品共通說明",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "title": "說明項目",
+            "maxItems": 20,
+            "default": [
+              {
+                "q": "商品規格",
+                "a": "這裡填寫共通的商品規格說明。"
+              },
+              {
+                "q": "配送與保養",
+                "a": "這裡填寫共通的配送、使用或保養說明。"
+              }
+            ],
+            "items": {
+              "type": "object",
+              "title": "問與答",
+              "additionalProperties": false,
+              "required": [
+                "q",
+                "a"
+              ],
+              "properties": {
+                "q": {
+                  "type": "string",
+                  "title": "問題",
+                  "default": "",
+                  "maxLength": 200,
+                  "x-editor": "text",
+                  "x-editor-order": 0
+                },
+                "a": {
+                  "type": "string",
+                  "title": "答案",
+                  "default": "",
+                  "maxLength": 2000,
+                  "x-editor": "textarea",
+                  "x-editor-order": 1
+                }
+              }
+            },
+            "x-editor-order": 0
+          }
+        },
+        "$schema": "https://json-schema.org/draft/2020-12/schema"
+      }
+    }
+  },
+  "documents": {
+    "global": {
+      "type": "global"
+    },
+    "home": {
+      "type": "home"
+    },
+    "story": {
+      "type": "story"
+    },
+    "faq": {
+      "type": "faq"
+    },
+    "product-info": {
+      "type": "product_info"
+    }
+  },
+  "collections": {}
+}

@@ -22,10 +22,10 @@
 // Run alone:      cd e2e && node commerce-path.mjs
 // Run with CMS:   cd e2e && node happy-path.mjs
 import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  API, brief, check, deliverECPayCallback, deliverWebhook, ecpayCheckMac, fail, failureCount, isoDate, req,
-  runID, section, tierFor, tierName,
+  API, brief, check, deliverECPayCallback, deliverWebhook, dotEnvValue, ecpayCheckMac, fail, failureCount, getPlatformToken, isoDate,
+  req, runID, section, tierFor, tierName,
 } from "./lib.mjs";
 
 // The back-office half of this path signs in as the shop's own merchant owner,
@@ -1172,7 +1172,156 @@ async function commercePath() {
   check("a report without an explicit period is refused (422), not silently defaulted",
     noPeriod.status === 422, brief(noPeriod));
 
+  await contentSchemaPath();
   await mediaPath(admin, shopID, shopPath);
+}
+
+// ── 內容 schema 註冊（change headless-content-store，第一個切片）──
+//
+// 一家**全新**的商家：由平台管理員開店（owner 沒有密碼，走一次性連結設定），owner 登入後
+// 建立頁面先被 422 擋下並指向註冊端點；先 dry run、再註冊 starter schema；建立、編輯、
+// 發佈頁面；以該店的 publishable key 讀公開端點；最後驗證「改 schema 移除欄位」的確認流程
+// 與 needs_attention。每一輪用新的 owner email 與新的商家，所以可重複執行，也不動 demo
+// 商家的任何資料。
+//
+// 開店是平台操作：優先沿用 happy-path 已取得的平台權杖（登入限流 5 次／5 分鐘，
+// happy-path 已用掉大半），單獨執行時才自己登入；限流若擋下是環境問題不是程式問題。
+async function contentSchemaPath() {
+  section("⑮ Content schema: provision a new shop, dry run, register, create + publish a page, read it publicly");
+  const platformEmail =
+    process.env.E2E_ADMIN_EMAIL || process.env.SEED_ADMIN_EMAIL || dotEnvValue("SEED_ADMIN_EMAIL") || "admin@example.com";
+  const platformPassword =
+    process.env.E2E_ADMIN_PASSWORD || process.env.SEED_ADMIN_PASSWORD || dotEnvValue("SEED_ADMIN_PASSWORD") || "admin-change-me";
+  // Reuse happy-path's platform token while it is still valid (login is limited
+  // to 5 per 5 minutes and happy-path spends most of them); otherwise log in.
+  let platform = getPlatformToken();
+  if (!platform || (await req("GET", "/api/v1/admin/me", { token: platform })).status !== 200) {
+    const plat = await req("POST", "/api/v1/admin/auth/login", { body: { email: platformEmail, password: platformPassword } });
+    need(plat.status !== 429,
+      "platform login is rate limited (429): the tight rule allows 5 per 5 minutes — wait and re-run");
+    need(plat.json?.access_token, `platform admin login failed: ${brief(plat)}`);
+    platform = plat.json.access_token;
+  }
+
+  const ownerEmail = `e2e-content-${runID}@example.com`;
+  const ownerPassword = `e2e-content-owner-${runID}-pw`;
+  const prov = await req("POST", "/api/v1/admin/shop-provisioning", {
+    token: platform, body: { name: `E2E content ${runID}`, owner_email: ownerEmail, status: 1 },
+  });
+  need(prov.status === 201, `shop provisioning failed: ${brief(prov)}`);
+  const shop = prov.json.shop.id;
+  const sp = (p) => `/api/v1/admin/shops/${shop}${p}`;
+  const setupToken = String(prov.json.owner?.setup_url ?? "").split("/").pop();
+  need(setupToken, "provisioning returned no one-time setup link (delivery must be manual)");
+  const setPw = await req("POST", "/api/v1/admin/auth/password-setup", { body: { token: setupToken, password: ownerPassword } });
+  need(setPw.status === 204, `owner password setup failed: ${brief(setPw)}`);
+  const ownerLogin = await req("POST", "/api/v1/admin/auth/login", { body: { email: ownerEmail, password: ownerPassword } });
+  need(ownerLogin.json?.access_token, `new owner login failed: ${brief(ownerLogin)}`);
+  const owner = ownerLogin.json.access_token;
+  check("a brand-new shop and its owner exist (owner set the password from the one-time link)", true, `shop ${shop}`);
+
+  const keyRes = await req("POST", sp("/publishable-keys"), { token: owner, body: { label: `e2e-content-${runID}` } });
+  need(keyRes.status === 201 && keyRes.json?.key, `publishable key failed: ${brief(keyRes)}`);
+  const pk = keyRes.json.key;
+
+  const me = await req("GET", sp("/me"), { token: owner });
+  const perms = me.json?.permissions ?? [];
+  check("the new shop's owner holds content.view/edit/publish/manage",
+    ["content.view", "content.edit", "content.publish", "content.manage"].every((n) => perms.includes(n)),
+    JSON.stringify(perms.filter((n) => n.startsWith("content."))));
+
+  // 1. Without a schema: an actionable 422, and nothing to read.
+  const noSchema = await req("POST", sp("/pages"), { token: owner, body: { type_key: "story", title: "Story", slug: "story" } });
+  check("creating a page before a schema exists is refused with a pointer to the registration call",
+    noSchema.status === 422 &&
+      String(noSchema.json?.error?.message).includes(`PUT /api/v1/admin/shops/${shop}/content/schema`) &&
+      String(noSchema.json?.error?.message).includes("dry_run=true"),
+    brief(noSchema));
+  const noGet = await req("GET", sp("/content/schema"), { token: owner });
+  check("reading the schema of a shop without one is a 404 that names the registration call",
+    noGet.status === 404 && noGet.json?.error?.code === "content_schema_not_found", brief(noGet));
+
+  // 2. Dry run first: reports, writes nothing.
+  const starter = readFileSync(fileURLToPath(new URL("../docs/content-schema/starter.content.schema.json", import.meta.url)), "utf8");
+  const dry = await req("PUT", sp("/content/schema?dry_run=true"), { token: owner, body: starter });
+  check("dry run of the starter schema reports and answers 200",
+    dry.status === 200 && dry.json?.dry_run === true && dry.json?.would_register_version === 1, brief(dry));
+  const stillNone = await req("GET", sp("/content/schema/versions"), { token: owner });
+  check("the dry run wrote no version", stillNone.status === 200 && (stillNone.json?.versions ?? []).length === 0, brief(stillNone));
+  const homeFlag = (dry.json?.report?.documents ?? []).find((d) => d.key === "home");
+  check("the report flags the auto-created empty home page (needs_attention, nothing lost)",
+    homeFlag?.status === "needs_attention" && homeFlag.removed_paths.length === 0, JSON.stringify(homeFlag));
+
+  // 3. A hostile schema is refused with a JSON Pointer and writes nothing.
+  const hostile = await req("PUT", sp("/content/schema"), {
+    token: owner,
+    body: { format: 2, types: { x: { schema: { type: "object", additionalProperties: false,
+      properties: { p: { $ref: "https://example.com/evil.json" } } } } } },
+  });
+  check("a schema with a remote $ref is refused (422 with a pointer)",
+    hostile.status === 422 && (hostile.json?.error?.details ?? []).some((d) => String(d.pointer).includes("$ref")), brief(hostile));
+
+  // 4. Register; registering the same thing again changes nothing.
+  const reg = await req("PUT", sp("/content/schema"), { token: owner, body: starter });
+  check("registering the starter schema creates version 1", reg.status === 200 && reg.json?.version === 1 && reg.json?.changed === true, brief(reg));
+  const again = await req("PUT", sp("/content/schema"), { token: owner, body: starter });
+  check("registering it again is a no-op (changed:false, still version 1)",
+    again.status === 200 && again.json?.changed === false && again.json?.version === 1, brief(again));
+  const active = await req("GET", sp("/content/schema"), { token: owner });
+  check("the active schema is readable", active.status === 200 && active.json?.version === 1 && active.json?.format === 2, brief(active));
+
+  // 5. Create, edit, publish, and read through the public API.
+  const created = await req("POST", sp("/pages"), { token: owner, body: { type_key: "story", title: "Our story", slug: "story" } });
+  need(created.status === 201, `page creation failed after registration: ${brief(created)}`);
+  const pageID = created.json.id;
+  const saved = await req("PUT", sp(`/pages/${pageID}`), {
+    token: owner, body: { content: { eyebrow: "ABOUT", title: `Hello ${runID}` } },
+  });
+  check("the page draft validates against the registered schema", saved.status === 200, brief(saved));
+  const bad = await req("PUT", sp(`/pages/${pageID}`), { token: owner, body: { content: { eyebrow: "x".repeat(101) } } });
+  check("a field over its maxLength is refused (422)", bad.status === 422, brief(bad));
+  const draftOnly = await req("GET", "/api/v1/render/page?path=/story", { pk });
+  check("an unpublished page is not public", draftOnly.status === 404, brief(draftOnly));
+  const published = await req("POST", sp(`/pages/${pageID}/publish`), { token: owner });
+  check("the page publishes", published.status === 200, brief(published));
+  const pub = await req("GET", "/api/v1/render/page?path=/story", { pk });
+  check("the public render API serves it with the shop's publishable key, hydrated with the schema defaults",
+    pub.status === 200 && pub.json?.page?.content?.title === `Hello ${runID}` &&
+      (pub.json?.page?.content?.paragraphs ?? []).length === 2, brief(pub));
+  const crossShop = await req("GET", "/api/v1/render/page?path=/story", { pk: PK });
+  check("another shop's key does not see it", crossShop.status === 404, brief(crossShop));
+
+  // 6. Changing the schema: removal needs confirmation, nothing is lost, published keeps serving.
+  const doc = JSON.parse(starter);
+  delete doc.types.story.schema.properties.eyebrow;
+  const next = JSON.stringify(doc);
+  const unconfirmed = await req("PUT", sp("/content/schema"), { token: owner, body: next });
+  check("dropping a field that holds a value needs confirmation (409 with the report)",
+    unconfirmed.status === 409 && unconfirmed.json?.error?.code === "removals_require_confirmation" &&
+      JSON.stringify(unconfirmed.json?.error?.details?.report ?? {}).includes("/eyebrow"), brief(unconfirmed));
+  const confirmed = await req("PUT", sp("/content/schema?confirm_removals=true"), { token: owner, body: next });
+  check("with confirm_removals the new version is registered", confirmed.status === 200 && confirmed.json?.version === 2, brief(confirmed));
+  const snap = await req("GET", sp("/content/schema?version=2&include=snapshot"), { token: owner });
+  check("the snapshot kept the old value of the removed field",
+    snap.status === 200 && JSON.stringify(snap.json?.snapshot ?? {}).includes("ABOUT"), brief(snap));
+  const still = await req("GET", "/api/v1/render/page?path=/story", { pk });
+  check("the already-published page keeps being served after the schema change",
+    still.status === 200 && still.json?.page?.content?.title === `Hello ${runID}`, brief(still));
+  const flagged = await req("GET", sp(`/pages/${pageID}`), { token: owner });
+  check("the page is flagged needs_attention", flagged.json?.needs_attention === true, brief(flagged));
+  const blocked = await req("POST", sp(`/pages/${pageID}/publish`), { token: owner });
+  check("publishing the stale draft is refused (422)", blocked.status === 422, brief(blocked));
+  const fixed = await req("PUT", sp(`/pages/${pageID}`), { token: owner, body: { content: { title: `Fixed ${runID}` } } });
+  const republished = await req("POST", sp(`/pages/${pageID}/publish`), { token: owner });
+  check("a fixed draft clears needs_attention and publishes",
+    fixed.status === 200 && republished.status === 200 && republished.json?.needs_attention === false, brief(republished));
+
+  // 7. The demo shop's owner cannot register for this shop.
+  const demoOwner = await req("POST", "/api/v1/admin/auth/login", { body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } });
+  if (demoOwner.json?.access_token) {
+    const cross = await req("PUT", sp("/content/schema?dry_run=true"), { token: demoOwner.json.access_token, body: starter });
+    check("another shop's owner is refused (403)", cross.status === 403, brief(cross));
+  }
 }
 
 // ── 商品圖片（change product-images-r2）──

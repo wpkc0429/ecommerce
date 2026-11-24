@@ -14,7 +14,7 @@
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
-import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID } from "./lib.mjs";
+import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 
 // Same source `make seed` used: E2E_* override → env → repo .env → old default.
@@ -160,6 +160,7 @@ try {
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
   const adminToken = login.json.access_token;
+  setPlatformToken(adminToken);
 
   // ══ 商品目錄後台（change admin-commerce-catalog, design D10）══
   //
