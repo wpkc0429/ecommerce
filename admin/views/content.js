@@ -12,7 +12,7 @@ export function createContentView(ctx) {
     if (data.config_schema) {
       buildForm(data.config_schema, data.content || {}, form, data.config_schema);
     } else {
-      form.textContent = "商家尚未套用主題。";
+      form.textContent = "商家尚未註冊內容 schema。";
     }
   }
 

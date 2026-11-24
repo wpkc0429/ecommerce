@@ -1,6 +1,6 @@
 // CMS 頁面清單與編輯器（原 app.js task 9.2/9.3，行為逐字搬移；只把「取得
 // shopID」與「切換分頁」改為由 shell 注入的 ctx，並補上 page.* 權限閘）。
-import { api, WEB_BASE } from "../lib/api.js";
+import { api, API_BASE } from "../lib/api.js";
 import { $, el, clear } from "../lib/dom.js";
 import { buildForm, collectForm, showValidationErrors } from "../lib/schemaform.js";
 import { can, whenCan } from "../lib/rbac.js";
@@ -21,7 +21,7 @@ export function createPagesView(ctx) {
         el("td", {}, p.title || "—"),
         el("td", {}, p.slug),
         el("td", {}, p.incompatible
-          ? el("span", { class: "badge warn", title: "目前主題不支援此頁型" }, `${p.type_key} ⚠ 不相容`)
+          ? el("span", { class: "badge warn", title: "此頁型不在商家的內容 schema 內" }, `${p.type_key} ⚠ 不相容`)
           : p.type_key),
         el("td", {}, status),
         el("td", {},
@@ -55,7 +55,8 @@ export function createPagesView(ctx) {
   async function previewPage(id) {
     try {
       const data = await api("GET", `/admin/shops/${ctx.getShopID()}/pages/${id}/preview-token`);
-      window.open(`${WEB_BASE}/preview?token=${encodeURIComponent(data.preview_token)}`, "_blank");
+      // 預覽＝草稿工作副本的渲染 bundle（JSON）；商家站台自己的預覽頁是各站的設計層。
+      window.open(`${API_BASE}/api/v1/render/preview?token=${encodeURIComponent(data.preview_token)}`, "_blank");
     } catch (err) { alert(err.message); }
   }
 
@@ -65,7 +66,7 @@ export function createPagesView(ctx) {
     ctx.showTab("editor");
     $("#editor-title").textContent = `編輯：${p.title || p.slug}`;
     $("#editor-status").textContent =
-      (p.status === 1 ? "已發佈" : "草稿") + (p.incompatible ? " ｜ ⚠ 目前主題不支援此頁型" : "");
+      (p.status === 1 ? "已發佈" : "草稿") + (p.incompatible ? " ｜ ⚠ 此頁型不在商家的內容 schema 內" : "");
     $("#editor-error").hidden = true;
     const meta = p.meta || {};
     $("#seo-title").value = meta.seo_title || "";
@@ -78,7 +79,7 @@ export function createPagesView(ctx) {
     if (p.page_schema) {
       buildForm(p.page_schema, p.content_json || {}, form, p.page_schema);
     } else {
-      form.textContent = "此頁型不受目前主題支援，無法編輯內容。";
+      form.textContent = "此頁型不在商家的內容 schema 內，無法編輯內容。";
     }
   }
 

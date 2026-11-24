@@ -1,7 +1,7 @@
 // HTTP 層：token 管理（自動 refresh 輪替）、api() 包裝、統一錯誤型別。
 // 自原 app.js 逐字搬移（change admin-commerce-catalog, design D1）。
 //
-// API_BASE / WEB_BASE 刻意是**執行期**設定（localStorage），不是建置期常數
+// API_BASE 刻意是**執行期**設定（localStorage），不是建置期常數
 // ——同一份靜態資源因此可以服務任何環境，這正是 admin 不引入打包器的其中一個
 // 理由（spec admin-catalog-ui：後台前端維持無建置步驟的靜態交付形式）。
 //
@@ -15,7 +15,6 @@
 const isLocalHost = ["localhost", "127.0.0.1", "[::1]"].includes(location.hostname);
 export const API_BASE = localStorage.getItem("apiBase") ||
   (isLocalHost ? "http://localhost:8080" : location.origin);
-export const WEB_BASE = localStorage.getItem("webBase") || "http://localhost:3000";
 export const COOKIE_MODE = API_BASE === location.origin;
 
 let accessToken = "";

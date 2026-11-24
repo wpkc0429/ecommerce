@@ -5,15 +5,13 @@
 // 組合、整筆回滾）都在伺服器的 provision.Service。檢查清單每一項都由伺服器依當下
 // 資料推導（GET /admin/shops/{id}/setup-status），瀏覽器不儲存、不推算任何進度。
 import { api } from "../lib/api.js";
-import { $, el, rows, renderPager, clear, fillSelect } from "../lib/dom.js";
+import { $, el, rows, renderPager, clear } from "../lib/dom.js";
 import { canPlatform } from "../lib/rbac.js";
 import { errText, showLinkOnce } from "./platform-accounts.js";
 
 const PAGE_SIZE = 20;
 
 const CHECKS = [
-  ["theme_applied", "已套用主題"],
-  ["domain_bound", "已綁定網域"],
   ["owner_assigned", "已指派 owner"],
   ["owner_password_set", "owner 已設定密碼"],
   ["home_published", "首頁已發佈"],
@@ -70,16 +68,8 @@ export function createPlatformShopsView() {
     }
   }
 
-  async function openWizard() {
-    const label = $("#platform-shop-theme-label");
-    label.hidden = !canPlatform("theme.manage");
-    if (!label.hidden) {
-      let themes = [];
-      try { themes = (await api("GET", "/admin/themes")).themes || []; } catch { /* 沒有主題清單也能開店 */ }
-      fillSelect($("#platform-shop-theme"),
-        [{ value: "", label: "（稍後再套用）" }, ...themes.map((t) => ({ value: t.id, label: t.name }))], "");
-    }
-    for (const id of ["name", "domain", "prefix", "origin", "owner"]) $(`#platform-shop-${id}`).value = "";
+  function openWizard() {
+    for (const id of ["name", "origin", "owner"]) $(`#platform-shop-${id}`).value = "";
     $("#platform-shop-error").hidden = true;
     $("#platform-shop-dialog").showModal();
   }
@@ -89,12 +79,6 @@ export function createPlatformShopsView() {
     const box = $("#platform-shop-error");
     box.hidden = true;
     const body = { name: $("#platform-shop-name").value.trim(), owner_email: $("#platform-shop-owner").value.trim() };
-    const theme = $("#platform-shop-theme").value;
-    if (!$("#platform-shop-theme-label").hidden && theme) body.theme_id = Number(theme);
-    const domain = $("#platform-shop-domain").value.trim();
-    if (domain) body.domain = domain;
-    const prefix = $("#platform-shop-prefix").value.trim();
-    if (prefix) body.path_prefix = prefix;
     const origin = $("#platform-shop-origin").value.trim();
     if (origin) body.storefront_origins = [origin];
     let res;
