@@ -97,7 +97,7 @@ bucket → Settings → Object lifecycle rules：新增規則，prefix `incoming
   bucket 是公開的，這是隱私需求。
 - 每個商品最多 20 張圖片。
 - 資料庫只存**儲存鍵**不存網址；網址在回應時由 `IMAGE_PUBLIC_BASE_URL` 組成。**換網域只改這個環境變數**，不需要資料遷移。
-- CMS 的圖片欄位（schema 標註 `x-editor: image`）在媒體啟用後，只接受空字串或以 `IMAGE_PUBLIC_BASE_URL + "/"` 開頭的網址
+- （CMS 已棄用，見 ADR 0001）CMS 的圖片欄位（schema 標註 `x-editor: image`）在媒體啟用後，只接受空字串或以 `IMAGE_PUBLIC_BASE_URL + "/"` 開頭的網址
   （含結尾斜線的前綴比對，`https://img.ksdevworks.online.evil.test` 過不了），否則 422；rich text 裡不符的 `<img>` 會被移除。
   既有 CMS 內容若含外部圖片網址，啟用後再存檔會 422——把那些網址列進 `IMAGE_EXTRA_ALLOWED_ORIGINS` 作為過渡，
   之後換成上傳的圖片。

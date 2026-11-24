@@ -1,4 +1,5 @@
 # theme-system Specification
+> **已棄用（ADR 0001，2026-11-24）**：平台改為 headless 商務 API，商家前端由 merchant template 建立；本 capability 描述的租戶渲染功能仍可運作但不再演進，將由草稿 change `retire-tenant-rendering`（未核准）退役。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
 
 ## Purpose
 TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purpose after archive.
