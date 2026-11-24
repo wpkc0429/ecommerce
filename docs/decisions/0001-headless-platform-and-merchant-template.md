@@ -97,7 +97,7 @@ e2e 的租戶渲染區段（依賴 `WEB` 的斷言）。完整清單與依賴見
 | 1 | **記錄並標記**：本決定記錄、`docs/PLATFORM-ROADMAP.md`、README／CLAUDE.md／相關 docs 與 specs 的註記、`merchant-onboarding` skill 改為 headless 唯一路徑、OpenSpec change。**不改任何行為。** | 完成（含本次修正） |
 | 2 | **平台官網**：產品介紹、範本 live demo、開店申請流程。**已決定（2026-11-24）：零建置靜態站（沿用 merchant template 的鎖定核心＋設計層與守門員），放在獨立 repo，不改造 `web/`**。見 `platform-website`。其餘開放問題待使用者回答。 | 待核准（技術路線已定） |
 | 3 | **`headless-content-store`**：把 CMS 內容功能改造成通用 headless 內容儲存（每店 schema、穩定 `key`、版本歷史、`content.*` 權限、發佈通知、新的公開讀取端點）；既有 `pages`／`render` 端點在棄用期內相容，之後由該 change 內的清理階段移除。含 merchant template 的後續工作（`ctx.data`／`ctx.actions`、schema 驅動表單）。 | 提案，待核准 |
-| 4 | **退役託管店面與主題**：依 `retire-hosted-storefront-and-themes`（**已核准**：直接移除、無棄用期、v1 例外）。**第一階段先交付每店 schema 儲存（步驟 3 的第一個切片）**，之後才移除主題與 site。 | 已核准，可實作 |
+| 4 | **退役託管店面與主題**：依 `retire-hosted-storefront-and-themes`（**已核准**：直接移除、無棄用期、v1 例外）。**第一階段先交付每店 schema 儲存（步驟 3 的第一個切片）**，之後才移除主題與 site。 | 已實作（2026-11-25；ADR 0002 記錄 v1 例外；正式資料庫的 migration 待操作員套用） |
 
 步驟 2 與 4 已無耦合：官網在獨立 repo，`web/`（Next.js 租戶渲染）由步驟 4 整個刪除。
 

@@ -9,14 +9,14 @@
 ## Requirements
 ### Requirement: Demo seeding is opt-in and never affects baseline seeding
 
-系統 MUST 提供一個獨立於基準 seed 的 demo 佈建模式（`make seed-demo` / `go run ./cmd/seed -demo`）。基準 seed（權限目錄、平台角色、平台管理員、starter 主題）MUST NOT 因本能力而改變其產出；未指定 demo 模式時，系統 MUST NOT 佈建任何 demo 商家資料。
+系統 MUST 提供一個獨立於基準 seed 的 demo 佈建模式（`make seed-demo` / `go run ./cmd/seed -demo`）。基準 seed（權限目錄、平台角色、平台管理員）MUST NOT 因本能力而改變其產出；未指定 demo 模式時，系統 MUST NOT 佈建任何 demo 商家資料。
 
 demo 佈建的資料 MUST 全部是商家透過既有後台 API 也能自行建立的普通資料——本能力 MUST NOT 佈建任何無法經由 API 產生的狀態。
 
 #### Scenario: 基準 seed 不含 demo 資料
 
 - **WHEN** 於乾淨資料庫執行不帶 demo 模式的 seed
-- **THEN** 權限目錄、平台角色、平台管理員與 starter 主題建立完成，且 MUST NOT 存在任何 demo 商家、商品、運送方式、會員等級、publishable key 或顧客身分
+- **THEN** 權限目錄、平台角色與平台管理員建立完成，且 MUST NOT 存在任何 demo 商家、商品、運送方式、會員等級、publishable key 或顧客身分
 
 #### Scenario: demo 佈建包含基準 seed
 

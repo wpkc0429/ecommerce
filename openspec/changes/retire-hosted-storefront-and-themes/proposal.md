@@ -1,3 +1,4 @@
+> **已實作（2026-11-25）**：群組 1–6 完成（commits 見 git log，標題含 content_schemas／ShopStatusChanged／v1 exemption／drop theme）。計畫修正記錄於 `tasks.md` 開頭。正式資料庫的 migration 待操作員備份後套用。
 > **APPROVED 2026-11-24（使用者核准：「移除舊功能，直接移除」）：可以開始實作。** 必須遵守下方的順序限制（design D4 與 tasks.md）：**頁面 schema 目前來自主題，必須先把 schema 所有權搬到每店的中性儲存（群組 1），才能移除主題。**
 > 範圍：託管的租戶渲染店面、主題與主題系統、site／網域路由。**內容儲存（頁面與全域內容、schema 驗證、草稿／發佈、預覽、消毒、圖片檢查、公開讀取 API、快取失效）保留**，由另一個 change `headless-content-store` 改造。
 

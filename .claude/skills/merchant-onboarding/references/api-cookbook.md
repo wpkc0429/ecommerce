@@ -22,7 +22,7 @@ curl -s "${auth[@]}" "$API/api/v1/admin/me"          # shows platform_permission
 
 ## 2. Provision the shop [provisionShop]
 
-Needs platform `shop.create` + `account.manage`; `domain` also needs `shop.manage_domains`; `storefront_origins` also needs `shop.manage_client_origins`. One transaction: shop, owner, origins (headless; the request also still accepts the deprecated `theme_id`, `domain` and `path_prefix`, which this playbook never sends). Any failure rolls everything back (409 on a conflict).
+Needs platform `shop.create` + `account.manage`; `storefront_origins` also needs `shop.manage_client_origins`. One transaction: shop, owner, origins (headless; the former `theme_id`, `domain` and `path_prefix` inputs were removed with the hosted storefront). Any failure rolls everything back (409 on a conflict).
 
 ```bash
 curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
@@ -34,9 +34,9 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
 ```
 
 - `status` and `storefront_origins` are optional. `status`: 0 disabled (storefront 503), 1 active, 2 under review (storefront 404). Use `status: 2` while the shop is being built if you do not want it reachable, then set 1 at go-live.
-- Do not send `theme_id`, `domain` or `path_prefix`: they belong to the deprecated platform-hosted storefront. A headless storefront (the merchant template) identifies itself with a publishable key.
+- There is no theme, domain or path-prefix input any more (the platform-hosted storefront was removed). A headless storefront (the merchant template) identifies itself with a publishable key; the API resolves a shop by that key only, never by Host.
 - A new owner email creates a password-less account and returns `owner.setup_url` and `owner.expires_at` (`delivery:"manual"`). An existing email is added as `merchant_owner` and its password is left alone (`owner.created:false`, no link).
-- Response also has `shop.id` (use as `$SHOP`), `binding`, `storefront_origins`. The `setup_url` is shown once: hand it to the operator without logging it.
+- Response also has `shop.id` (use as `$SHOP`), `storefront_origins`. The `setup_url` is shown once: hand it to the operator without logging it.
 - Origins registered here are `purpose: storefront`. Register the admin origin separately (step 5).
 
 ## 3. Setup-status checklist [getShopSetupStatus]
@@ -45,7 +45,7 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
 curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/setup-status"
 ```
 
-Returns booleans derived from live data (nothing stored): `theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `theme_applied` and `domain_bound` belong to the hosted storefront that is being removed and stay false for every headless shop: ignore them; `home_published` reflects the CMS home page and is only meaningful once the content store ships. The other five are the real onboarding gates. Re-read after every step.
+Returns booleans derived from live data (nothing stored): `owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `home_published` reflects the CMS home page and is only meaningful once the content store ships. The other five are the real onboarding gates. Re-read after every step.
 
 ## 4. Owner password link
 

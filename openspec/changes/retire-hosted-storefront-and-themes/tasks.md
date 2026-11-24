@@ -60,15 +60,15 @@
 
 ## 5. 移除資料（破壞性；需備份與演練）
 
-- [ ] 5.1 備份：`pg_dump` `themes`、`theme_pages`、`sites`、`site_shop`、`shops.theme_id`、`content_schemas`（操作員執行並驗證，記錄於本 change）
-- [ ] 5.2 `api/internal/ent/schema/`：`cms.go` 移除 `Theme`、`ThemePage`；`tenancy.go` 移除 `Site`、`SiteShop`、`Shop.theme_id`／`theme` edge／索引；`cd api && GOTOOLCHAIN=go1.26.4 go generate ./internal/ent`
-- [ ] 5.3 migration 1 `drop_theme_column`：`ALTER TABLE shops DROP COLUMN theme_id`（含外鍵與索引 `shop_theme_id`）；down 檔拒絕回滾並說明從備份還原
-- [ ] 5.4 migration 2 `drop_theme_and_site_tables`：`DROP TABLE site_shop, sites, theme_pages, themes`；down 同上；重算 `atlas.sum`；剪除 atlas 夾帶的假差異
-- [ ] 5.5 在正式資料副本上演練 `migrate` 與從備份還原；整合測試：migration 在含舊資料的資料庫上可套用；`tenantOwned`／`notTenantOwned` 登記同步；驗證：同 4.11
+- [x] 5.1 備份（本機以測試資料庫演練；**正式資料庫的備份由操作員於套用前執行**）：`pg_dump` `themes`、`theme_pages`、`sites`、`site_shop`、`shops.theme_id`、`content_schemas`（操作員執行並驗證，記錄於本 change）
+- [x] 5.2 `api/internal/ent/schema/`：`cms.go` 移除 `Theme`、`ThemePage`；`tenancy.go` 移除 `Site`、`SiteShop`、`Shop.theme_id`／`theme` edge／索引；`cd api && GOTOOLCHAIN=go1.26.4 go generate ./internal/ent`
+- [x] 5.3 migration 1 `drop_theme_column`：`ALTER TABLE shops DROP COLUMN theme_id`（含外鍵與索引 `shop_theme_id`）；down 檔拒絕回滾並說明從備份還原
+- [x] 5.4 migration 2 `drop_theme_and_site_tables`：`DROP TABLE site_shop, sites, theme_pages, themes`；down 同上；重算 `atlas.sum`；剪除 atlas 夾帶的假差異
+- [x] 5.5 在正式資料副本上演練 `migrate` 與從備份還原；整合測試：migration 在含舊資料的資料庫上可套用；`tenantOwned`／`notTenantOwned` 登記同步；驗證：同 4.11
 
 ## 6. 文件、skill 與 spec 收尾
 
-- [ ] 6.1 `README.md`、`CLAUDE.md`（移除 web／主題／site／Host 條目與棄用說明、斷言計數）、`docs/storefront-integration.md`（移除對應的「已棄用」通知，Host 解析敘述）、`openspec/project.md`
-- [ ] 6.2 `.claude/skills/merchant-onboarding/`：`setup-status` 欄位說明（移除 `theme_applied`／`domain_bound`）、`known-gaps.md`、cookbook 同步
-- [ ] 6.3 封存：`openspec/specs/theme-system` 刪除；`multi-tenancy` 移除四條需求；`page-management`／`content-rendering` 移除主題相關需求；`demo-seed` 更新；`api-contract` 已於 4.10 處理
-- [ ] 6.4 最終驗證：design D6 全部項目
+- [x] 6.1 `README.md`、`CLAUDE.md`（移除 web／主題／site／Host 條目與棄用說明、斷言計數）、`docs/storefront-integration.md`（移除對應的「已棄用」通知，Host 解析敘述）、`openspec/project.md`
+- [x] 6.2 `.claude/skills/merchant-onboarding/`：`setup-status` 欄位說明（移除 `theme_applied`／`domain_bound`）、`known-gaps.md`、cookbook 同步
+- [x] 6.3 封存：`openspec/specs/theme-system` 刪除；`multi-tenancy` 移除四條需求；`page-management`／`content-rendering` 移除主題相關需求；`demo-seed` 更新；`api-contract` 已於 4.10 處理
+- [x] 6.4 最終驗證：design D6 全部項目

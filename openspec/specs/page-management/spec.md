@@ -1,18 +1,18 @@
 # page-management Specification
-> **保留並改造（ADR 0001 的修正，2026-11-24）**：頁面內容與全域內容的管理（草稿／發佈、slug、`home`、全域內容、CMS 圖片欄位）是 headless 內容儲存的一部分，**不棄用**，將由 change `headless-content-store`（提案、未實作）改造成以穩定 `key` 定位的內容文件；改造期間本 capability 的行為不變。其中**依賴主題的部分**（頁型來自目前主題的 `theme_pages`、換版後「不受新主題支援」的標示與預檢）已棄用，隨主題一起退役（已核准的 change `retire-hosted-storefront-and-themes`）。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
+> **保留並改造（ADR 0001 的修正，2026-11-24）**：頁面內容與全域內容的管理（草稿／發佈、slug、`home`、全域內容、CMS 圖片欄位）是 headless 內容儲存的一部分，**不棄用**，將由 change `headless-content-store`（提案、未實作）改造成以穩定 `key` 定位的內容文件；改造期間本 capability 的行為不變。**依賴主題的部分**（頁型來自目前主題的 `theme_pages`、換版預檢）已隨主題移除（change `retire-hosted-storefront-and-themes`）：頁型與 schema 現在來自每店的 `content_schemas`。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
 
 ## Purpose
 TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purpose after archive.
 ## Requirements
-### Requirement: Page creation bound to current theme
-建立頁面時 `type_key` MUST 存在於商家當前主題的 `theme_pages`，否則回 422。`slug` MUST 符合 `^[a-z0-9-]+$`（儲存前小寫正規化）、於同一 shop 內唯一（DB unique 約束）、且 MUST NOT 使用保留字（`home` 以外的系統保留字如 `api`、`admin`、`preview`、`_next`；`home` 僅由系統建立）。
+### Requirement: Page creation bound to the shop's content schema
+建立頁面時 `type_key` MUST 存在於商家作用中的 content schema（`content_schemas` 最新版本的 `types`），否則回 422。`slug` MUST 符合 `^[a-z0-9-]+$`（儲存前小寫正規化）、於同一 shop 內唯一（DB unique 約束）、且 MUST NOT 使用保留字（`home` 以外的系統保留字如 `api`、`admin`、`preview`、`_next`；`home` 僅由系統建立）。
 
 #### Scenario: 建立成功
-- **WHEN** 於套用主題 `starter`（含 `landing_page` 頁型）的商家建立 `type_key = 'landing_page'`、`slug = 'summer-sale'` 的頁面
+- **WHEN** 於 content schema 含 `landing_page` 頁型的商家建立 `type_key = 'landing_page'`、`slug = 'summer-sale'` 的頁面
 - **THEN** 頁面以 `status = 0`（草稿）建立
 
 #### Scenario: 不支援的 type_key
-- **WHEN** 建立 `type_key` 不在當前主題頁型清單中的頁面
+- **WHEN** 建立 `type_key` 不在商家 content schema 頁型清單中的頁面
 - **THEN** 回 422
 
 #### Scenario: 同店 slug 重複
@@ -24,7 +24,7 @@ TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purp
 - **THEN** 回 422
 
 ### Requirement: Payload schema validation on save
-儲存 `pages.content_json` 或 `shops.content_json` 時，系統 MUST 分別依當前主題的 `page_schema` / `config_schema` 驗證 payload；失敗 MUST 回 422，錯誤明細附 JSON Pointer 路徑。
+儲存 `pages.content_json` 或 `shops.content_json` 時，系統 MUST 分別依商家 content schema 的頁型 schema（`types[type_key]`）／全域 schema（`global`）驗證 payload；失敗 MUST 回 422，錯誤明細附 JSON Pointer 路徑。
 
 #### Scenario: 型別錯誤附定位
 - **WHEN** schema 定義 `banner.images` 為陣列而 payload 傳入字串
@@ -50,7 +50,7 @@ TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purp
 - **THEN** `status = 0`，前台該 slug 回 404
 
 ### Requirement: Shop global content editing
-商家全域內容（`shops.content_json`）的更新 MUST 依當前主題 `config_schema` 校驗（422 規則同上），成功後立即生效並觸發該商家整租戶快取失效（version bump）。
+商家全域內容（`shops.content_json`）的更新 MUST 依商家 content schema 的 `global` 校驗（422 規則同上），成功後立即生效並觸發該商家整租戶快取失效（version bump）。
 
 #### Scenario: 全域內容更新
 - **WHEN** 商家更新 Logo 圖片網址且通過校驗
@@ -60,7 +60,7 @@ TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purp
 建立商家時系統 MUST 自動建立 `type_key = 'home'`、`slug = 'home'` 的頁面；前台路徑 `/`（剝離 path_prefix 後為空）MUST 解析為 `slug = 'home'`。
 
 #### Scenario: 建店即有首頁
-- **WHEN** 平台建立新商家並套用主題
+- **WHEN** 平台建立新商家
 - **THEN** 該商家存在 slug 為 `home` 的草稿首頁，發佈後 `/` 可渲染
 
 ### Requirement: SEO meta storage

@@ -42,7 +42,7 @@ In production the platform-level admin API is reachable only from `PLATFORM_ADMI
 | 0 | Intake: shop name, owner email, domains (storefront, admin), ECPay stage or production, tier plan (today the operator supplies these; the platform-website application flow is planned, see Direction) | A+H | - | `references/checklist.md` Intake |
 | 1 | Platform preconditions: API up, migrations applied, `ADMIN_PUBLIC_URL` = shared merchant admin domain, `PAYMENT_CREDENTIALS_ENCRYPTION_KEY` private | H | - | `references/env-reference.md` |
 | 2 | Provision shop: `POST /api/v1/admin/shop-provisioning` (shop, owner, `storefront_origins` in one transaction; no theme, no domain) | A | 1 | cookbook 2 |
-| 3 | Read `GET /api/v1/admin/shops/{id}/setup-status`; keep as the live checklist (ignore `theme_applied` and `domain_bound`, which belong to the retired hosted storefront; `home_published` reflects the CMS home page and is only meaningful once the content store ships) | A | 2 | cookbook 3 |
+| 3 | Read `GET /api/v1/admin/shops/{id}/setup-status`; keep as the live checklist (the hosted-storefront items `theme_applied` and `domain_bound` were removed from the response; `home_published` reflects the CMS home page and is only meaningful once the content store ships) | A | 2 | cookbook 3 |
 | 4 | Hand the owner's one-time password link to the operator (`delivery:"manual"`); owner sets password at `/#/set-password/{token}` | A->H->O | 2, admin site reachable (steps 12-13) | cookbook 4 |
 | 5 | Allowed origins: storefront origin(s) as `purpose:"storefront"`, admin origin as `purpose:"admin"` (different origin for each; no wildcards) | A | 2 | cookbook 5 |
 | 6 | Publishable key: `POST .../publishable-keys` | A | 2 | cookbook 6 |
