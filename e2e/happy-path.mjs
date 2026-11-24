@@ -1016,6 +1016,237 @@ try {
   await page.waitForSelector('#platform-shop-checklist [data-check="owner_password_set"]', { timeout: 8000 });
   check("the checklist now shows the owner's password as set",
     (await page.locator('#platform-shop-checklist [data-check="owner_password_set"]').getAttribute("data-done")) === "true");
+
+  console.log("㉕ 店員 staff：導覽只有訂單、可出貨與看付款紀錄、被禁止的動作回 403（change merchant-staff-role）");
+  const SHOP = 1;
+  const adminLogin = async (email, password) =>
+    (await req("POST", "/api/v1/admin/auth/login", { body: { email, password } })).json?.access_token;
+  const newAdminCtx = async () => {
+    const c = await browser.newContext();
+    await c.addInitScript(([api, web]) => {
+      try {
+        localStorage.setItem("apiBase", api);
+        localStorage.setItem("webBase", web);
+      } catch {}
+    }, [API, WEB.replace("://demo.localhost", "://localhost")]);
+    return c;
+  };
+  const uiLogin = async (p, email, password) => {
+    await p.goto(`${ADMIN}/`);
+    await p.fill("#login-email", email);
+    await p.fill("#login-password", password);
+    await p.click("#login-form button[type=submit]");
+    await p.waitForSelector("#view-main:not([hidden])", { timeout: 8000 });
+    await p.waitForSelector("#tabs .tab", { timeout: 8000 });
+  };
+  const tabsOf = async (p) => p.$$eval("#tabs .tab", (ns) => ns.map((n) => n.dataset.tab));
+
+  const ownerTok = await adminLogin("demo-owner@example.com", "demo-owner-change-me");
+  const staffTok = await adminLogin("demo-staff@example.com", "demo-staff-change-me");
+  check("the seeded clerk can log in", Boolean(staffTok));
+
+  // 兩筆已付款訂單：一筆走 UI 出貨，一筆走 API 驗證退貨被拒。
+  const placePaid = async (label) => {
+    const o = await req("POST", "/api/v1/shop/guest/checkout", {
+      pk: PK,
+      body: {
+        email: `e2e-staff-${label}-${runID}@example.com`,
+        items: [{ sku_id: skuID, quantity: 1 }],
+        shipping_address: { recipient_name: `E2E 店員單 ${label} ${runID}`, phone: "0955123456", line1: "台北市大安區信義路四段 1 號" },
+      },
+    });
+    const pay = await req("POST", "/api/v1/shop/guest/order/payments", { token: o.json?.order_access_token, pk: PK, body: {} });
+    await deliverWebhook(pay.json?.provider_reference);
+    return o.json?.order ?? {};
+  };
+  const staffOrderUI = await placePaid("ui");
+  const staffOrderAPI = await placePaid("api");
+  check("two paid orders exist for the clerk", Boolean(staffOrderUI.id) && Boolean(staffOrderAPI.id));
+
+  const staffCtx = await newAdminCtx();
+  try {
+    const sp = await staffCtx.newPage();
+    sp.on("pageerror", (err) => fail(`staff page JS error: ${err.message}`));
+    await uiLogin(sp, "demo-staff@example.com", "demo-staff-change-me");
+    check("the clerk's navigation contains only the orders view",
+      JSON.stringify(await tabsOf(sp)) === JSON.stringify(["orders"]), JSON.stringify(await tabsOf(sp)));
+
+    await sp.goto(`${ADMIN}/#/orders/${staffOrderUI.id}`);
+    await sp.waitForSelector("#order-amounts", { timeout: 8000 });
+    await sp.waitForSelector("#order-payments-tbody tr", { timeout: 8000 });
+    check("the clerk sees the order's payment record (payment.view)",
+      ((await sp.textContent("#order-payments")) ?? "").includes("mock"), ((await sp.textContent("#order-payments")) ?? "").slice(0, 120));
+    check("the clerk has no cancel button", (await sp.isVisible("#order-cancel-btn")) === false);
+
+    await sp.waitForSelector("#create-shipment-btn", { timeout: 8000 });
+    await sp.fill("#shipment-carrier", "E2E 快遞");
+    await sp.fill("#shipment-tracking", `E2E-STAFF-${runID}`);
+    await sp.click("#create-shipment-btn");
+    await sp.waitForSelector("#shipment-detail", { timeout: 8000 });
+    check("the clerk created a shipment", ((await sp.textContent("#order-shipment")) ?? "").includes(`E2E-STAFF-${runID}`));
+    check("the clerk can mark it delivered but has no return button",
+      (await sp.locator("#shipment-delivered-btn").count()) === 1 && (await sp.locator("#shipment-returned-btn").count()) === 0);
+    sp.once("dialog", (d) => d.accept());
+    await sp.click("#shipment-delivered-btn");
+    await sp.waitForSelector("#shipment-terminal-note", { timeout: 8000 });
+    check("the clerk marked the shipment delivered",
+      ((await sp.textContent("#order-shipment")) ?? "").includes("已送達"));
+  } finally {
+    await staffCtx.close();
+  }
+
+  // 被禁止的動作：直接打 API，一律 403，且不改變任何東西。
+  const staffShip = await req("POST", `/api/v1/admin/shops/${SHOP}/orders/${staffOrderAPI.id}/shipments`, {
+    token: staffTok, body: { carrier: "E2E 快遞", tracking_number: `E2E-STAFF-API-${runID}` },
+  });
+  check("the clerk can create a shipment through the API", staffShip.status === 201, brief(staffShip));
+  const staffReturn = await req("PUT", `/api/v1/admin/shops/${SHOP}/orders/${staffOrderAPI.id}/shipments/${staffShip.json?.id}`, {
+    token: staffTok, body: { status: "returned" },
+  });
+  check("the clerk cannot return a shipment (403)", staffReturn.status === 403, brief(staffReturn));
+  const afterReturn = await req("GET", `/api/v1/admin/shops/${SHOP}/orders/${staffOrderAPI.id}`, { token: ownerTok });
+  check("the refused return changed nothing (order still shipped)", afterReturn.json?.fulfillment_status === 1, brief(afterReturn));
+  const unpaid = await req("POST", "/api/v1/shop/guest/checkout", {
+    pk: PK,
+    body: {
+      email: `e2e-staff-unpaid-${runID}@example.com`,
+      items: [{ sku_id: skuID, quantity: 1 }],
+      shipping_address: { recipient_name: `E2E 未付款 ${runID}`, phone: "0955123456", line1: "台北市大安區信義路四段 1 號" },
+    },
+  });
+  const staffCancel = await req("POST", `/api/v1/admin/shops/${SHOP}/orders/${unpaid.json?.order?.id}/cancel`, { token: staffTok });
+  check("the clerk cannot cancel even an unpaid order (403)", staffCancel.status === 403, brief(staffCancel));
+  const staffEdit = await req("PUT", `/api/v1/admin/shops/${SHOP}/products/${published?.id}`, { token: staffTok, body: {} });
+  check("the clerk cannot edit a product (403)", staffEdit.status === 403, brief(staffEdit));
+  const staffMembers = await req("GET", `/api/v1/admin/shops/${SHOP}/members`, { token: staffTok });
+  check("the clerk cannot read the customer roster (403)", staffMembers.status === 403, brief(staffMembers));
+  const staffInvite = await req("POST", `/api/v1/admin/shops/${SHOP}/invitations`, { token: staffTok, body: { email: "x@example.test", role_id: 1 } });
+  check("the clerk cannot invite members (403)", staffInvite.status === 403, brief(staffInvite));
+  const staffPayments = await req("GET", `/api/v1/admin/shops/${SHOP}/orders/${staffOrderUI.id}/payments`, { token: staffTok });
+  check("the clerk can read payment records (200)", staffPayments.status === 200, brief(staffPayments));
+  const ownerCancel = await req("POST", `/api/v1/admin/shops/${SHOP}/orders/${unpaid.json?.order?.id}/cancel`, { token: ownerTok });
+  check("the owner can cancel that unpaid order (200)", ownerCancel.status === 200, brief(ownerCancel));
+
+  console.log("㉖ owner 邀請店員 → 新 context 開連結設密碼 → 只看到訂單 → owner 停用 → 下一個操作 403（change merchant-staff-role）");
+  const inviteEmail = `e2e-clerk-${runID}@example.test`;
+  // 測試值，只在本機即時產生，不寫入任何檔案。
+  const invitePassword = `pw-${runID}-${Math.random().toString(36).slice(2, 10)}`;
+  const ownerCtx2 = await newAdminCtx();
+  const clerkCtx = await newAdminCtx();
+  try {
+    const op = await ownerCtx2.newPage();
+    op.on("pageerror", (err) => fail(`owner page JS error: ${err.message}`));
+    await uiLogin(op, "demo-owner@example.com", "demo-owner-change-me");
+    check("the owner sees the members view", (await tabsOf(op)).includes("team"), JSON.stringify(await tabsOf(op)));
+    await op.goto(`${ADMIN}/#/team`);
+    await op.waitForSelector("#tab-team:not([hidden])", { timeout: 8000 });
+    await op.waitForSelector('#team-members-tbody tr[data-email="demo-staff@example.com"]', { timeout: 8000 });
+    const ownerRowText = (await op.textContent('#team-members-tbody tr[data-email="demo-owner@example.com"]')) ?? "";
+    check("the owner's own row offers no actions",
+      (await op.locator('#team-members-tbody tr[data-email="demo-owner@example.com"] button').count()) === 0, ownerRowText);
+    const roleOptions = await op.$$eval("#team-invite-role option", (ns) => ns.map((n) => n.textContent));
+    check("the invite role list offers staff and editor but never merchant_owner",
+      roleOptions.includes("staff") && roleOptions.includes("editor") && !roleOptions.includes("merchant_owner"), JSON.stringify(roleOptions));
+
+    await op.fill("#team-invite-email", inviteEmail);
+    await op.selectOption("#team-invite-role", { label: "staff" });
+    await op.click("#team-invite-form button[type=submit]");
+    await op.waitForSelector("#team-link .link-once", { timeout: 8000 });
+    const inviteLink = await op.inputValue("#team-link .link-once");
+    check("the invite link is shown once, in the fragment", inviteLink.includes("/#/accept-invite/"), inviteLink.slice(0, 60));
+    check("the invitation is listed as pending",
+      (await op.locator(`#team-invites-tbody tr[data-email="${inviteEmail}"]`).count()) === 1);
+
+    // 已有後台帳號的 email：連結不能設密碼，只能登入後接受（不改動任何東西）。
+    const existingInvite = await req("POST", `/api/v1/admin/shops/${SHOP}/invitations`, {
+      token: ownerTok, body: { email: ADMIN_EMAIL, role_id: (await req("GET", `/api/v1/admin/shops/${SHOP}/roles`, { token: ownerTok })).json?.roles?.find((r) => r.name === "staff")?.id },
+    });
+    check("inviting an e-mail that already has an account looks the same (201 + link)",
+      existingInvite.status === 201 && Boolean(existingInvite.json?.invite_url), brief(existingInvite));
+    const existingToken = (existingInvite.json?.invite_url ?? "").split("/#/accept-invite/")[1];
+    const takeover = await req("POST", "/api/v1/admin/auth/invitations/accept", { body: { token: existingToken, password: "attacker-chosen-pw-1" } });
+    check("the anonymous accept refuses an existing account (409)", takeover.status === 409, brief(takeover));
+    const loginStill = await req("POST", "/api/v1/admin/auth/login", { body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } });
+    check("the existing account's password is unchanged", loginStill.status === 200, brief(loginStill));
+    const existingCtx = await newAdminCtx();
+    try {
+      const ep = await existingCtx.newPage();
+      await ep.goto(existingInvite.json.invite_url);
+      await ep.waitForSelector("#ai-login-form:not([hidden])", { timeout: 8000 });
+      check("the accept page asks an existing account to sign in instead of setting a password",
+        (await ep.isVisible("#ai-new-form")) === false && ((await ep.textContent("#ai-info")) ?? "").includes(ADMIN_EMAIL));
+    } finally {
+      await existingCtx.close();
+    }
+    const pending = await req("GET", `/api/v1/admin/shops/${SHOP}/invitations`, { token: ownerTok });
+    const adminInviteID = pending.json?.invitations?.find((i) => i.email === ADMIN_EMAIL.toLowerCase())?.id;
+    const revoked = await req("DELETE", `/api/v1/admin/shops/${SHOP}/invitations/${adminInviteID}`, { token: ownerTok });
+    check("that invitation is revoked again", revoked.status === 204, brief(revoked));
+
+    // 新人：另一個沒有任何登入狀態的 context。
+    const cp = await clerkCtx.newPage();
+    cp.on("pageerror", (err) => fail(`clerk page JS error: ${err.message}`));
+    await cp.goto(inviteLink);
+    await cp.waitForSelector("#ai-new-form:not([hidden])", { timeout: 8000 });
+    check("the accept page shows the shop, role and e-mail without any login",
+      ((await cp.textContent("#ai-info")) ?? "").includes(inviteEmail) && ((await cp.textContent("#ai-role")) ?? "") === "staff");
+    await cp.fill("#ai-password", invitePassword);
+    await cp.fill("#ai-password2", invitePassword + "x");
+    await cp.click("#ai-new-form button[type=submit]");
+    await cp.waitForSelector("#ai-error:not([hidden])");
+    check("mismatched passwords are rejected client-side", true);
+    await cp.fill("#ai-password2", invitePassword);
+    await cp.click("#ai-new-form button[type=submit]");
+    await cp.waitForSelector("#view-login:not([hidden])", { timeout: 8000 });
+    check("after accepting, the UI returns to the login page with the e-mail prefilled",
+      (await cp.inputValue("#login-email")) === inviteEmail);
+    const stored = await cp.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    check("the invitation token is never written to persistent storage",
+      !stored.includes(inviteLink.split("/#/accept-invite/")[1]));
+
+    await cp.fill("#login-password", invitePassword);
+    await cp.click("#login-form button[type=submit]");
+    await cp.waitForSelector("#view-main:not([hidden])", { timeout: 8000 });
+    await cp.waitForSelector("#tabs .tab", { timeout: 8000 });
+    check("the invited clerk sees only the orders view", JSON.stringify(await tabsOf(cp)) === JSON.stringify(["orders"]), JSON.stringify(await tabsOf(cp)));
+
+    // 一次性：用過的連結。
+    const reuse = await clerkCtx.newPage();
+    await reuse.goto(inviteLink);
+    await reuse.waitForSelector("#ai-invalid:not([hidden])", { timeout: 8000 });
+    check("a used invitation shows the invalid-link notice", (await reuse.isVisible("#ai-new-form")) === false);
+    await reuse.close();
+
+    // owner 停用（UI）；店員用「同一個 access token」的下一個請求被拒。
+    const clerkTok = await adminLogin(inviteEmail, invitePassword);
+    const before = await req("GET", `/api/v1/admin/shops/${SHOP}/orders`, { token: clerkTok });
+    check("before the disable the clerk can list orders", before.status === 200, brief(before));
+    await op.reload();
+    await op.waitForSelector(`#team-members-tbody tr[data-email="${inviteEmail}"]`, { timeout: 8000 });
+    op.once("dialog", (d) => d.accept());
+    await op.click(`#team-members-tbody tr[data-email="${inviteEmail}"] [data-act="disable"]`);
+    await op.waitForSelector(`#team-members-tbody tr[data-email="${inviteEmail}"] [data-act="enable"]`, { timeout: 8000 });
+    check("the owner disabled the membership from the members view", true);
+    const after = await req("GET", `/api/v1/admin/shops/${SHOP}/orders`, { token: clerkTok });
+    check("the clerk's very next request is refused (403) with the same access token", after.status === 403, brief(after));
+    const afterRelogin = await req("POST", "/api/v1/admin/auth/login", { body: { email: inviteEmail, password: invitePassword } });
+    check("the account itself is not disabled (login still works)", afterRelogin.status === 200, brief(afterRelogin));
+    const meAfter = await req("GET", "/api/v1/admin/me", { token: afterRelogin.json?.access_token });
+    check("the disabled membership is gone from the new token's shops", !(meAfter.json?.sids ?? []).includes(SHOP), brief(meAfter));
+    const clerkRow = await req("GET", `/api/v1/admin/shops/${SHOP}/users`, { token: ownerTok });
+    const clerkID = clerkRow.json?.users?.find((u) => u.email === inviteEmail)?.user_id;
+    const ownerDisable = await req("POST", `/api/v1/admin/shops/${SHOP}/users/${clerkRow.json?.users?.find((u) => u.email === "demo-owner@example.com")?.user_id}/disable`, { token: ownerTok });
+    check("an owner cannot disable themself (409)", ownerDisable.status === 409, brief(ownerDisable));
+    check("the clerk stays listed with a disabled membership",
+      clerkRow.json?.users?.find((u) => u.user_id === clerkID)?.membership_status === 0, brief(clerkRow));
+    const ownerAssign = await req("POST", `/api/v1/admin/shops/${SHOP}/users/${clerkID}/roles`, {
+      token: ownerTok, body: { role_id: (await req("GET", `/api/v1/admin/shops/${SHOP}/roles`, { token: ownerTok })).json?.roles?.find((r) => r.name === "merchant_owner")?.id },
+    });
+    check("an owner cannot appoint another owner (403)", ownerAssign.status === 403, brief(ownerAssign));
+  } finally {
+    await ownerCtx2.close();
+    await clerkCtx.close();
+  }
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.

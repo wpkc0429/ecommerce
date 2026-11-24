@@ -103,7 +103,7 @@ iPhone 的原生照片格式是 HEIC。選到 `image/heic`／`image/heif`（或�
 
 **這個形狀是給每一個 admin 前端的契約**（共用的 admin SPA、Bouquet 自訂後台……）：任何 admin 前端
 **MUST 在自己的根路徑處理 `#/set-password/{token}`**。API 端不知道、也不假設是哪一個前端在處理它。
-（之後的商家成員邀請會用同一種做法：`#/accept-invite/{token}`。）
+（商家成員邀請用同一種做法：`#/accept-invite/{token}`，見本文後段。）
 
 ### 為什麼 token 放在 fragment
 
@@ -156,3 +156,47 @@ API 的環境變數 `ADMIN_PUBLIC_URL` 必須是**共用 merchant admin SPA 的�
 
 回應新增 `platform_permissions`：呼叫者在**平台層**的有效權限節點（依名稱排序；沒有平台角色者是 `[]`）。
 只用來決定要不要畫平台視圖（「商家」「帳號」分頁）；伺服器端的授權不讀它。
+
+## 商家成員邀請連結（`#/accept-invite/{token}`）
+
+商家 owner（`user.manage_members`）以 `POST /api/v1/admin/shops/{shopID}/invitations`（`{ email, role_id }`）邀請成員。
+連結形如 `{ADMIN_PUBLIC_URL}/#/accept-invite/{token}`，與 `#/set-password/{token}` 是**同一種契約**：任何 admin 前端
+**MUST 在自己的根路徑處理 `#/accept-invite/{token}`**；token 在 fragment、只放記憶體、不得寫入任何持久儲存；
+有效 **7 天**（`ADMIN_INVITE_TOKEN_TTL`）、單次使用。`delivery` 先看（同密碼連結）：`"manual"` 時回應含 `invite_url`
+（只顯示一次），`"email"` 時不含連結。
+
+**邀請永遠不能替既有帳號設定密碼。** 邀請時 API 不建立任何帳號；接受時才分流：
+
+1. 路由到 `#/accept-invite/{token}` 時**不需要登入**。先 `POST /api/v1/admin/auth/invitations/inspect`
+   （`{ token }`）→ `200 { shop_name, role_name, email, requires_login, expires_at }`。
+2. `requires_login = false`（該 email 沒有任何後台帳號）：讓使用者輸入兩次密碼（至少 12 字元），
+   `POST /api/v1/admin/auth/invitations/accept`（`{ token, password }`）→ `204`。**不會自動登入**，導回登入頁並預填 email。
+3. `requires_login = true`（該 email 已有後台帳號，不論是否已設定密碼）：**不得**呼叫上面那支（會是 `409`、不做任何變更）。
+   請使用者以**那個帳號**登入，再 `POST /api/v1/admin/invitations/accept`（已認證，`{ token }`）→ `204`；
+   呼叫者 email 必須等於邀請 email，否則 `403`（邀請仍可由本人使用）。成功後重新換發 token（`/auth/refresh`），
+   `GET /admin/me` 的 `sids` 就會含新商家。
+
+| 回應 | 意思 |
+| --- | --- |
+| `404` | token 無效、過期、已使用或已撤回——**一律同一個 404** |
+| `409` | （未認證接受）email 已有帳號，請先登入；（已認證接受）已是該商家成員 |
+| `422` | 密碼少於 12 字元；**不消耗 token** |
+| `429` | 來源 IP 超過速率限制 |
+
+邀請建立端點本身依「商家＋呼叫者」限流，回應對「尚無帳號的 email」與「已有帳號的 email」鍵集合相同。
+inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有後台帳號（manual 交付下持有者就是邀請者；接上信件後
+持有者是受邀者本人，這個殘留消失）。
+
+### 成員資格狀態
+
+`POST /api/v1/admin/shops/{shopID}/users/{userID}/disable|enable`（`user.manage_members`）停用／啟用的是**該店的成員資格**
+（`shop_user.status`），不是帳號：被停用者對該店的下一個請求即 `403`，其他商家與登入本身不受影響；重新換發後 `sids`
+不再含該店。`GET /admin/shops/{shopID}/users` 的每列帶 `membership_status`（1 啟用／0 停用），`roles[]` 與
+`GET /admin/shops/{shopID}/roles` 的每個角色帶 `merchant_assignable`：商家層呼叫者只能邀請、指派 `merchant_assignable = true`
+的角色，且不得對持有不可委派角色（例如另一位 owner）的成員、或對自己做停用／角色變更。`merchant_owner` 只有平台能授予或移除。
+
+### 推進出貨為「已退貨」另需 `shipment.return`
+
+`PUT …/shipments/{shipmentID}` 的 `status = "returned"` 除了 `shipment.update` 另需 `shipment.return`，缺少時回 `403`
+（出貨、訂單、點數皆不變）；`delivered` 只需 `shipment.update`。UI 應依 `GET /shops/{shopID}/me` 的 `permissions`
+決定是否畫「標記退貨」按鈕。
