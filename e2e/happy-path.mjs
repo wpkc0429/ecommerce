@@ -900,6 +900,122 @@ try {
   check("the ranking shows quantities as quantities and amounts as money",
     rankingText.includes("件") && /NT\$[\d,]+/.test(rankingText) && !rankingText.includes("NT$1 件"),
     rankingText.replace(/\s+/g, " "));
+
+  console.log("㉔ 平台開店：精靈 → 設定連結 → 新 owner 設密碼登入 → 停用後被踢回登入（change platform-account-provisioning）");
+  // 每輪唯一的店名、網域與 email；不碰 demo 商家，所以可重複執行。
+  const provShop = `E2E Provisioned ${runID}`;
+  const provDomain = `e2e-${runID}.localhost`;
+  const provOwner = `e2e-owner-${runID}@example.test`;
+  // 測試值，只在本機即時產生，不寫入任何檔案。
+  const provPassword = `pw-${runID}-${Math.random().toString(36).slice(2, 10)}`;
+
+  await page.goto(`${ADMIN}/#/platform-shops`);
+  await page.waitForSelector("#tab-platform-shops:not([hidden])", { timeout: 8000 });
+  check("the platform admin sees the platform tabs",
+    (await page.locator('.tab[data-tab="platform-shops"]').count()) === 1 &&
+    (await page.locator('.tab[data-tab="platform-accounts"]').count()) === 1);
+
+  await page.click("#platform-shop-new-btn");
+  await page.waitForSelector("#platform-shop-dialog[open]");
+  await page.fill("#platform-shop-name", provShop);
+  await page.fill("#platform-shop-domain", provDomain);
+  await page.fill("#platform-shop-owner", provOwner);
+  await page.click("#platform-shop-form button[type=submit]");
+  await page.waitForSelector("#platform-shop-result .link-once", { timeout: 8000 });
+  const setupLink = await page.inputValue("#platform-shop-result .link-once");
+  check("the wizard shows the owner's one-time setup link", setupLink.includes("/#/set-password/"), setupLink.slice(0, 60));
+  const resultText = (await page.textContent("#platform-shop-result")) ?? "";
+  check("the link is labelled as shown once, with its lifetime",
+    resultText.includes("只顯示這一次") && resultText.includes("小時後失效"), resultText.replace(/\s+/g, " ").slice(0, 160));
+  check("the checklist shows the owner assigned but the password not yet set",
+    (await page.locator('#platform-shop-result [data-check="owner_assigned"]').getAttribute("data-done")) === "true" &&
+    (await page.locator('#platform-shop-result [data-check="owner_password_set"]').getAttribute("data-done")) === "false" &&
+    (await page.locator('#platform-shop-result [data-check="domain_bound"]').getAttribute("data-done")) === "true");
+  check("the new shop is in the list", (await page.locator(`#platform-shops-tbody tr[data-name="${provShop}"]`).count()) === 1);
+
+  // 另一個瀏覽器 context（沒有任何登入狀態）：新 owner 開連結。
+  const ownerCtx = await browser.newContext();
+  await ownerCtx.addInitScript(([api, web]) => {
+    try {
+      localStorage.setItem("apiBase", api);
+      localStorage.setItem("webBase", web);
+    } catch {}
+  }, [API, WEB.replace("://demo.localhost", "://localhost")]);
+  const ownerPage = await ownerCtx.newPage();
+  ownerPage.on("pageerror", (err) => fail(`owner page JS error: ${err.message}`));
+  try {
+    await ownerPage.goto(setupLink);
+    await ownerPage.waitForSelector("#sp-form:not([hidden])", { timeout: 8000 });
+    check("the set-password page shows the account email without any login",
+      ((await ownerPage.textContent("#sp-email")) ?? "") === provOwner);
+    await ownerPage.fill("#sp-password", provPassword);
+    await ownerPage.fill("#sp-password2", provPassword + "x");
+    await ownerPage.click("#sp-form button[type=submit]");
+    await ownerPage.waitForSelector("#sp-error:not([hidden])");
+    check("mismatched passwords are rejected client-side", true);
+    await ownerPage.fill("#sp-password2", provPassword);
+    await ownerPage.click("#sp-form button[type=submit]");
+    await ownerPage.waitForSelector("#view-login:not([hidden])", { timeout: 8000 });
+    check("after setting the password the UI returns to the login page with the email prefilled",
+      (await ownerPage.inputValue("#login-email")) === provOwner);
+    const stored = await ownerPage.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
+    const linkToken = setupLink.split("/#/set-password/")[1];
+    check("the token is never written to any persistent storage", !stored.includes(linkToken));
+    check("the token is gone from the address bar", !ownerPage.url().includes(linkToken));
+
+    // 用過的連結：只顯示無效說明，沒有密碼輸入框。
+    const reuse = await ownerCtx.newPage();
+    await reuse.goto(setupLink);
+    await reuse.waitForSelector("#sp-invalid:not([hidden])", { timeout: 8000 });
+    check("a used link shows the invalid-link notice and no password form",
+      (await reuse.isVisible("#sp-form")) === false &&
+      ((await reuse.textContent("#sp-invalid")) ?? "").includes("連結無效或已過期"));
+    await reuse.close();
+
+    // 以新密碼登入，看到自己的商家；沒有平台視圖。
+    await ownerPage.fill("#login-password", provPassword);
+    await ownerPage.click("#login-form button[type=submit]");
+    await ownerPage.waitForSelector("#view-main:not([hidden])", { timeout: 8000 });
+    check("the new owner can log in with the password they set",
+      ((await ownerPage.textContent("#whoami")) ?? "").includes(provOwner));
+    check("the owner is a member of exactly the new shop",
+      (await ownerPage.locator("#shop-select option").count()) === 1);
+    await ownerPage.waitForSelector("#tabs .tab", { timeout: 8000 });
+    check("a merchant owner sees no platform tabs",
+      (await ownerPage.locator('.tab[data-tab="platform-shops"], .tab[data-tab="platform-accounts"]').count()) === 0);
+
+    // super admin 停用該 owner；owner 的下一個操作被拒並被導回登入。
+    await page.goto(`${ADMIN}/#/platform-accounts`);
+    await page.waitForSelector("#tab-platform-accounts:not([hidden])", { timeout: 8000 });
+    await page.fill("#platform-account-q", provOwner);
+    await page.click("#platform-account-search");
+    const acctRow = page.locator(`#platform-accounts-tbody tr[data-email="${provOwner}"]`);
+    await acctRow.waitFor({ timeout: 8000 });
+    check("the account list shows the password as set",
+      ((await acctRow.textContent()) ?? "").includes("已設定"));
+    await acctRow.locator("button", { hasText: "詳情" }).click();
+    await page.waitForSelector('#platform-account-detail [data-act="disable"]', { timeout: 8000 });
+    page.once("dialog", (d) => d.accept());
+    await page.click('#platform-account-detail [data-act="disable"]');
+    await page.waitForSelector('#platform-account-detail [data-act="enable"]', { timeout: 8000 });
+    check("the account is disabled from the platform view", true);
+
+    await ownerPage.click('#tabs .tab[data-tab="orders"]');
+    await ownerPage.waitForSelector("#view-login:not([hidden])", { timeout: 8000 });
+    check("the disabled owner's next action is refused and sends them back to the login page", true);
+    const relogin = await req("POST", "/api/v1/admin/auth/login", { body: { email: provOwner, password: provPassword } });
+    check("the disabled owner can no longer log in", relogin.status === 401, brief(relogin));
+  } finally {
+    await ownerCtx.close();
+  }
+
+  // checklist from the platform side: the owner has set the password.
+  await page.goto(`${ADMIN}/#/platform-shops`);
+  await page.waitForSelector(`#platform-shops-tbody tr[data-name="${provShop}"]`, { timeout: 8000 });
+  await page.locator(`#platform-shops-tbody tr[data-name="${provShop}"] button`).click();
+  await page.waitForSelector('#platform-shop-checklist [data-check="owner_password_set"]', { timeout: 8000 });
+  check("the checklist now shows the owner's password as set",
+    (await page.locator('#platform-shop-checklist [data-check="owner_password_set"]').getAttribute("data-done")) === "true");
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.

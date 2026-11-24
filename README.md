@@ -39,7 +39,7 @@ make admin-dev           # 後台 SPA :3001
 
 | 你想知道 | 看這裡 |
 | --- | --- |
-| **API 有哪些端點、request/response 長什麼樣** | [`api/openapi/openapi.yaml`](api/openapi/openapi.yaml) — OpenAPI 3.1，涵蓋全部 111 條路由，由四道自動化測試守著 |
+| **API 有哪些端點、request/response 長什麼樣** | [`api/openapi/openapi.yaml`](api/openapi/openapi.yaml) — OpenAPI 3.1，涵蓋全部 146 條路由，由四道自動化測試守著 |
 | **自帶前端要怎麼接入**（金鑰、CORS、訪客結帳、付款、查單） | [`docs/storefront-integration.md`](docs/storefront-integration.md) |
 | **這個系統為什麼長這樣**（架構決策、取捨、已知限制） | [`openspec/`](openspec/) — 每個變更都有 proposal／design／spec／tasks |
 | **目前的行為驗收契約**（WHEN/THEN） | [`openspec/specs/<capability>/spec.md`](openspec/specs/) |

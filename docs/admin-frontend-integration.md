@@ -1,7 +1,7 @@
 # 自帶後台前端接入說明
 
 給「不用平台的共用後台 SPA、自己做後台」的前端（例如 Bouquet 的自訂後台）。本文件是**活文件**，
-後台 API 的其他接入說明會陸續加在這裡；目前只有「圖片上傳」一章（change product-images-r2）。
+後台 API 的其他接入說明會陸續加在這裡；目前有「圖片上傳」（change product-images-r2）與「密碼設定連結」（change platform-account-provisioning）兩章。
 
 > 完整端點與欄位以 `api/openapi/openapi.yaml` 為準；這裡只講**流程與容易踩的點**。
 
@@ -88,3 +88,71 @@ iPhone 的原生照片格式是 HEIC。選到 `image/heic`／`image/heif`（或�
 
 所有上面的端點照常存在，回 `503`、`error.code = "media_not_configured"`；`GET /admin/media/config` 回
 `enabled: false`。處理方式只有一個：隱藏上傳控件並顯示「媒體儲存尚未設定」的說明。
+
+
+---
+
+## 密碼設定／重設連結（`#/set-password/{token}`）
+
+平台管理員建立後台帳號、開店、或替既有帳號產生重設連結時，API 回的是一條**一次性連結**，管理員從不知道密碼。
+連結形如：
+
+```
+{ADMIN_PUBLIC_URL}/#/set-password/{token}
+```
+
+**這個形狀是給每一個 admin 前端的契約**（共用的 admin SPA、Bouquet 自訂後台……）：任何 admin 前端
+**MUST 在自己的根路徑處理 `#/set-password/{token}`**。API 端不知道、也不假設是哪一個前端在處理它。
+（之後的商家成員邀請會用同一種做法：`#/accept-invite/{token}`。）
+
+### 為什麼 token 放在 fragment
+
+`#` 之後的部分瀏覽器**不會**送給任何伺服器、proxy 或 Referer，所以 token 不會出現在 nginx、Cloudflare 或
+任何存取日誌裡。頁面也**不得**把 token 寫進 `localStorage` 或任何持久儲存——只放在記憶體（closure）。
+
+### `ADMIN_PUBLIC_URL` 指向誰
+
+API 的環境變數 `ADMIN_PUBLIC_URL` 必須是**共用 merchant admin SPA 的網域**，**不是平台管理員自己的 admin 網域**
+（後者的存取政策只放行平台擁有者，商家 owner 打開連結會被擋下）。商家若使用自帶的 admin 前端，該前端的網域需要
+由平台日後登記後才會被用作連結基底；在那之前連結指向共用 SPA。
+
+### 呼叫順序
+
+1. 路由到 `#/set-password/{token}` 時，**不需要登入**。先
+   `POST /api/v1/admin/auth/password-setup/inspect`，body `{ "token": "…" }`
+   → `200 { email, kind, expires_at }`（`kind` 是 `setup` 或 `reset`）。把 `email` 顯示給使用者確認是自己的帳號。
+2. 使用者輸入兩次新密碼（**至少 12 個字元**）後
+   `POST /api/v1/admin/auth/password-setup`，body `{ "token": "…", "password": "…" }` → `204`。
+3. 成功後**導回登入頁並預填 email**，不要自動登入（伺服器不簽發 token）。同時清掉網址上的 token
+   （`history.replaceState`）。
+
+### 錯誤處理
+
+| 回應 | 意思 | 畫面 |
+| --- | --- | --- |
+| `404` | token 無效、過期或已使用——**一律是同一個 404，不區分原因** | 「連結無效或已過期，請聯絡管理員重新產生」，**不顯示密碼輸入框** |
+| `422` | 密碼少於 12 字元（`details[0].pointer` 是 `/password`）。**不會消耗 token**，可修正後重送 | 顯示訊息、保留表單 |
+| `429` | 來源 IP 超過速率限制，`Retry-After` 標頭是秒數 | 提示稍後再試 |
+
+兩個端點都依來源 IP 限流。token 單次使用：成功設定之後，同一條連結再用一律 404；管理員對同一帳號重新產生連結後，
+**先前未使用的連結也會失效**。設定成功會撤銷該帳號所有既有的 refresh token（其他裝置需重新登入）。
+
+### 管理員那一側：`delivery` 要先看
+
+產生連結的回應（建立帳號、開店、重設）都帶 `delivery`：
+
+- `"manual"`：回應含 `setup_url`（或 `reset_url`）與 `expires_at`。**只顯示這一次**並提供複製按鈕；
+  離開畫面後取不回來（只能重新產生）。提示管理員以安全管道交給本人。
+- `"email"`（日後接上寄信之後）：**回應不含連結**。判斷請以 `delivery` 為準，不要以「有沒有 `setup_url` 欄位」判斷。
+
+在搬到 VPS、接上帳號信件之前，`delivery` 一律是 `"manual"`。
+
+### 停用帳號
+
+停用帳號後，它**已簽發、尚未過期**的 access token 在下一個請求就會被拒絕：受 RBAC 守衛的端點回 `403`，
+`GET /api/v1/admin/me` 回 `401`，refresh 也回 `401`。前端遇到這些回應照既有的「登出並回登入頁」處理即可。
+
+### `GET /api/v1/admin/me` 的 `platform_permissions`
+
+回應新增 `platform_permissions`：呼叫者在**平台層**的有效權限節點（依名稱排序；沒有平台角色者是 `[]`）。
+只用來決定要不要畫平台視圖（「商家」「帳號」分頁）；伺服器端的授權不讀它。
