@@ -25,6 +25,8 @@ type Role struct {
 	Name string `json:"name,omitempty"`
 	// Scope holds the value of the "scope" field.
 	Scope string `json:"scope,omitempty"`
+	// MerchantAssignable holds the value of the "merchant_assignable" field.
+	MerchantAssignable bool `json:"merchant_assignable,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the RoleQuery when eager-loading is set.
 	Edges        RoleEdges `json:"edges"`
@@ -76,6 +78,8 @@ func (*Role) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case role.FieldMerchantAssignable:
+			values[i] = new(sql.NullBool)
 		case role.FieldID:
 			values[i] = new(sql.NullInt64)
 		case role.FieldName, role.FieldScope:
@@ -126,6 +130,12 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field scope", values[i])
 			} else if value.Valid {
 				_m.Scope = value.String
+			}
+		case role.FieldMerchantAssignable:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field merchant_assignable", values[i])
+			} else if value.Valid {
+				_m.MerchantAssignable = value.Bool
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -189,6 +199,9 @@ func (_m *Role) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("scope=")
 	builder.WriteString(_m.Scope)
+	builder.WriteString(", ")
+	builder.WriteString("merchant_assignable=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MerchantAssignable))
 	builder.WriteByte(')')
 	return builder.String()
 }

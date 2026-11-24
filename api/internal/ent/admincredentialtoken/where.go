@@ -75,6 +75,21 @@ func CreatedBy(v int) predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(sql.FieldEQ(FieldCreatedBy, v))
 }
 
+// Email applies equality check predicate on the "email" field. It's identical to EmailEQ.
+func Email(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldEmail, v))
+}
+
+// ShopID applies equality check predicate on the "shop_id" field. It's identical to ShopIDEQ.
+func ShopID(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldShopID, v))
+}
+
+// RoleID applies equality check predicate on the "role_id" field. It's identical to RoleIDEQ.
+func RoleID(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldRoleID, v))
+}
+
 // ExpiresAt applies equality check predicate on the "expires_at" field. It's identical to ExpiresAtEQ.
 func ExpiresAt(v time.Time) predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(sql.FieldEQ(FieldExpiresAt, v))
@@ -108,6 +123,16 @@ func UserIDIn(vs ...int) predicate.AdminCredentialToken {
 // UserIDNotIn applies the NotIn predicate on the "user_id" field.
 func UserIDNotIn(vs ...int) predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(sql.FieldNotIn(FieldUserID, vs...))
+}
+
+// UserIDIsNil applies the IsNil predicate on the "user_id" field.
+func UserIDIsNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIsNull(FieldUserID))
+}
+
+// UserIDNotNil applies the NotNil predicate on the "user_id" field.
+func UserIDNotNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotNull(FieldUserID))
 }
 
 // KindEQ applies the EQ predicate on the "kind" field.
@@ -290,6 +315,161 @@ func CreatedByNotNil() predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(sql.FieldNotNull(FieldCreatedBy))
 }
 
+// EmailEQ applies the EQ predicate on the "email" field.
+func EmailEQ(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldEmail, v))
+}
+
+// EmailNEQ applies the NEQ predicate on the "email" field.
+func EmailNEQ(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNEQ(FieldEmail, v))
+}
+
+// EmailIn applies the In predicate on the "email" field.
+func EmailIn(vs ...string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIn(FieldEmail, vs...))
+}
+
+// EmailNotIn applies the NotIn predicate on the "email" field.
+func EmailNotIn(vs ...string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotIn(FieldEmail, vs...))
+}
+
+// EmailGT applies the GT predicate on the "email" field.
+func EmailGT(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldGT(FieldEmail, v))
+}
+
+// EmailGTE applies the GTE predicate on the "email" field.
+func EmailGTE(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldGTE(FieldEmail, v))
+}
+
+// EmailLT applies the LT predicate on the "email" field.
+func EmailLT(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldLT(FieldEmail, v))
+}
+
+// EmailLTE applies the LTE predicate on the "email" field.
+func EmailLTE(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldLTE(FieldEmail, v))
+}
+
+// EmailContains applies the Contains predicate on the "email" field.
+func EmailContains(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldContains(FieldEmail, v))
+}
+
+// EmailHasPrefix applies the HasPrefix predicate on the "email" field.
+func EmailHasPrefix(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldHasPrefix(FieldEmail, v))
+}
+
+// EmailHasSuffix applies the HasSuffix predicate on the "email" field.
+func EmailHasSuffix(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldHasSuffix(FieldEmail, v))
+}
+
+// EmailIsNil applies the IsNil predicate on the "email" field.
+func EmailIsNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIsNull(FieldEmail))
+}
+
+// EmailNotNil applies the NotNil predicate on the "email" field.
+func EmailNotNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotNull(FieldEmail))
+}
+
+// EmailEqualFold applies the EqualFold predicate on the "email" field.
+func EmailEqualFold(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEqualFold(FieldEmail, v))
+}
+
+// EmailContainsFold applies the ContainsFold predicate on the "email" field.
+func EmailContainsFold(v string) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldContainsFold(FieldEmail, v))
+}
+
+// ShopIDEQ applies the EQ predicate on the "shop_id" field.
+func ShopIDEQ(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldShopID, v))
+}
+
+// ShopIDNEQ applies the NEQ predicate on the "shop_id" field.
+func ShopIDNEQ(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNEQ(FieldShopID, v))
+}
+
+// ShopIDIn applies the In predicate on the "shop_id" field.
+func ShopIDIn(vs ...int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIn(FieldShopID, vs...))
+}
+
+// ShopIDNotIn applies the NotIn predicate on the "shop_id" field.
+func ShopIDNotIn(vs ...int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotIn(FieldShopID, vs...))
+}
+
+// ShopIDGT applies the GT predicate on the "shop_id" field.
+func ShopIDGT(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldGT(FieldShopID, v))
+}
+
+// ShopIDGTE applies the GTE predicate on the "shop_id" field.
+func ShopIDGTE(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldGTE(FieldShopID, v))
+}
+
+// ShopIDLT applies the LT predicate on the "shop_id" field.
+func ShopIDLT(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldLT(FieldShopID, v))
+}
+
+// ShopIDLTE applies the LTE predicate on the "shop_id" field.
+func ShopIDLTE(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldLTE(FieldShopID, v))
+}
+
+// ShopIDIsNil applies the IsNil predicate on the "shop_id" field.
+func ShopIDIsNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIsNull(FieldShopID))
+}
+
+// ShopIDNotNil applies the NotNil predicate on the "shop_id" field.
+func ShopIDNotNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotNull(FieldShopID))
+}
+
+// RoleIDEQ applies the EQ predicate on the "role_id" field.
+func RoleIDEQ(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldEQ(FieldRoleID, v))
+}
+
+// RoleIDNEQ applies the NEQ predicate on the "role_id" field.
+func RoleIDNEQ(v int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNEQ(FieldRoleID, v))
+}
+
+// RoleIDIn applies the In predicate on the "role_id" field.
+func RoleIDIn(vs ...int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIn(FieldRoleID, vs...))
+}
+
+// RoleIDNotIn applies the NotIn predicate on the "role_id" field.
+func RoleIDNotIn(vs ...int) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotIn(FieldRoleID, vs...))
+}
+
+// RoleIDIsNil applies the IsNil predicate on the "role_id" field.
+func RoleIDIsNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldIsNull(FieldRoleID))
+}
+
+// RoleIDNotNil applies the NotNil predicate on the "role_id" field.
+func RoleIDNotNil() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(sql.FieldNotNull(FieldRoleID))
+}
+
 // ExpiresAtEQ applies the EQ predicate on the "expires_at" field.
 func ExpiresAtEQ(v time.Time) predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(sql.FieldEQ(FieldExpiresAt, v))
@@ -435,6 +615,29 @@ func HasUser() predicate.AdminCredentialToken {
 func HasUserWith(preds ...predicate.User) predicate.AdminCredentialToken {
 	return predicate.AdminCredentialToken(func(s *sql.Selector) {
 		step := newUserStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasRole applies the HasEdge predicate on the "role" edge.
+func HasRole() predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, RoleTable, RoleColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasRoleWith applies the HasEdge predicate on the "role" edge with a given conditions (other predicates).
+func HasRoleWith(preds ...predicate.Role) predicate.AdminCredentialToken {
+	return predicate.AdminCredentialToken(func(s *sql.Selector) {
+		step := newRoleStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

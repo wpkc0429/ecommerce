@@ -132,7 +132,7 @@ func (h *RolesHandler) listShopUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]map[string]any, 0, len(memberships))
 	for _, m := range memberships {
-		entry := map[string]any{"user_id": m.UserID}
+		entry := map[string]any{"user_id": m.UserID, "membership_status": m.Status}
 		if m.Edges.User != nil {
 			entry["email"] = m.Edges.User.Email
 			entry["status"] = m.Edges.User.Status
@@ -145,7 +145,9 @@ func (h *RolesHandler) listShopUsers(w http.ResponseWriter, r *http.Request) {
 			var rr []map[string]any
 			for _, a := range assignments {
 				if a.Edges.Role != nil {
-					rr = append(rr, map[string]any{"id": a.RoleID, "name": a.Edges.Role.Name})
+					rr = append(rr, map[string]any{
+						"id": a.RoleID, "name": a.Edges.Role.Name, "merchant_assignable": a.Edges.Role.MerchantAssignable,
+					})
 				}
 			}
 			entry["roles"] = rr
@@ -174,6 +176,13 @@ func (h *RolesHandler) assignShopRole(w http.ResponseWriter, r *http.Request) {
 	rl, err := h.Client.Role.Get(ctx, req.RoleID)
 	if err != nil || rl.Scope != "merchant" {
 		httpx.Unprocessable(w, "role must exist and have merchant scope", nil)
+		return
+	}
+	// Delegation rules (change merchant-staff-role, design D4/D8): a
+	// merchant-level caller may only grant merchant_assignable roles, may not
+	// touch a member who holds a non-assignable one (another owner), and may
+	// not change their own roles. merchant_owner is the platform's to grant.
+	if !h.delegationAllowed(w, r, shopID, targetID, rl.MerchantAssignable) {
 		return
 	}
 	isMember, err := h.Client.ShopUser.Query().
@@ -208,6 +217,47 @@ func (h *RolesHandler) assignShopRole(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"user_id": targetID, "role_id": req.RoleID, "shop_id": shopID})
 }
 
+// delegationAllowed applies the merchant-level delegation rules and writes the
+// refusal itself (409 self, 403 otherwise) when they are not met. Platform
+// administrators are not bound by them (design D4). roleAssignable is the
+// assignability of the role being granted (true when removing: what a removal
+// may touch is decided by what the target holds).
+func (h *RolesHandler) delegationAllowed(w http.ResponseWriter, r *http.Request, shopID, targetID int, roleAssignable bool) bool {
+	actor, ok := auth.AdminFrom(r.Context())
+	if !ok {
+		httpx.Unauthorized(w)
+		return false
+	}
+	byPlatform, err := account.IsPlatformCaller(r.Context(), h.Engine, actor.UserID)
+	if err != nil {
+		h.Log.Error("delegation: platform check", "err", err)
+		httpx.Internal(w)
+		return false
+	}
+	if byPlatform {
+		return true
+	}
+	if actor.UserID == targetID {
+		httpx.Conflict(w, "you cannot change your own roles")
+		return false
+	}
+	if !roleAssignable {
+		httpx.Forbidden(w)
+		return false
+	}
+	blocked, err := account.HoldsNonAssignableRole(r.Context(), h.Client, shopID, targetID)
+	if err != nil {
+		h.Log.Error("delegation: target roles", "err", err)
+		httpx.Internal(w)
+		return false
+	}
+	if blocked {
+		httpx.Forbidden(w)
+		return false
+	}
+	return true
+}
+
 func (h *RolesHandler) removeShopRole(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
 	targetID, ok1 := intParam(r, "userID")
@@ -217,6 +267,9 @@ func (h *RolesHandler) removeShopRole(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	if !h.delegationAllowed(w, r, shopID, targetID, true) {
+		return
+	}
 	n, err := h.Client.RoleUser.Delete().
 		Where(roleuser.UserIDEQ(targetID), roleuser.RoleIDEQ(roleID), roleuser.ShopIDEQ(shopID)).
 		Exec(ctx)
@@ -461,7 +514,7 @@ func rolesJSON(roles []*ent.Role) []map[string]any {
 			perms = append(perms, p.Name)
 		}
 		out = append(out, map[string]any{
-			"id": rl.ID, "name": rl.Name, "scope": rl.Scope, "permissions": perms,
+			"id": rl.ID, "name": rl.Name, "scope": rl.Scope, "merchant_assignable": rl.MerchantAssignable, "permissions": perms,
 		})
 	}
 	return out

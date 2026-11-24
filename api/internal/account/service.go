@@ -69,6 +69,8 @@ type Service struct {
 	PublicURL string
 	SetupTTL  time.Duration
 	ResetTTL  time.Duration
+	// InviteTTL bounds shop invitations (design D7: 7 days).
+	InviteTTL time.Duration
 }
 
 // Invalidate drops cached authorization snapshots of the given users. Call it
@@ -80,10 +82,14 @@ func (s *Service) Invalidate(ctx context.Context, userIDs ...int) {
 // Deliver turns an issued token into a link and hands it to the configured
 // LinkDelivery. Call it after commit.
 func (s *Service) Deliver(ctx context.Context, is *Issued) (Delivery, error) {
+	url := SetPasswordURL(s.PublicURL, is.Token)
+	if is.Kind == KindInvite {
+		url = InviteURL(s.PublicURL, is.Token)
+	}
 	return s.Delivery.Deliver(ctx, LinkMessage{
 		Kind:      is.Kind,
 		Email:     is.Email,
-		URL:       SetPasswordURL(s.PublicURL, is.Token),
+		URL:       url,
 		ExpiresAt: is.ExpiresAt,
 	})
 }
@@ -356,6 +362,7 @@ func (s *Service) Inspect(ctx context.Context, plain string) (*Inspection, error
 	row, err := s.Client.AdminCredentialToken.Query().
 		Where(
 			admincredentialtoken.TokenHashEQ(HashToken(plain)),
+			admincredentialtoken.KindIn(KindSetup, KindReset),
 			admincredentialtoken.UsedAtIsNil(),
 			admincredentialtoken.ExpiresAtGT(time.Now()),
 		).
@@ -386,7 +393,7 @@ func (s *Service) CompletePasswordSetup(ctx context.Context, plainToken, passwor
 	if err != nil {
 		return fmt.Errorf("account: begin tx: %w", err)
 	}
-	row, err := consumeTx(ctx, tx, plainToken)
+	row, err := consumeTx(ctx, tx, plainToken, KindSetup, KindReset)
 	if err != nil {
 		_ = tx.Rollback()
 		return err
@@ -396,11 +403,16 @@ func (s *Service) CompletePasswordSetup(ctx context.Context, plainToken, passwor
 		_ = tx.Rollback()
 		return err
 	}
-	if err := tx.User.UpdateOneID(row.UserID).SetPasswordHash(hash).Exec(ctx); err != nil {
+	if row.UserID == nil {
+		_ = tx.Rollback()
+		return ErrTokenInvalid
+	}
+	userID := *row.UserID
+	if err := tx.User.UpdateOneID(userID).SetPasswordHash(hash).Exec(ctx); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("account: store password: %w", err)
 	}
-	if err := s.Refresh.RevokeAllUser(ctx, tx, row.UserID); err != nil {
+	if err := s.Refresh.RevokeAllUser(ctx, tx, userID); err != nil {
 		_ = tx.Rollback()
 		return err
 	}

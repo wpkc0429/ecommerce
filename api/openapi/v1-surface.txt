@@ -96,6 +96,9 @@ DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID}
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
+DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID}
+DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path invitationID
+DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID}
 DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path memberTierID
 DELETE /api/v1/admin/shops/{shopID}/member-tiers/{memberTierID} path shopID
@@ -184,6 +187,8 @@ GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
+GET /api/v1/admin/shops/{shopID}/invitations
+GET /api/v1/admin/shops/{shopID}/invitations path shopID
 GET /api/v1/admin/shops/{shopID}/me
 GET /api/v1/admin/shops/{shopID}/me path shopID
 GET /api/v1/admin/shops/{shopID}/member-tiers
@@ -400,6 +405,21 @@ GuestCheckoutResult.token_type
 HealthStatus.status
 ImageUrls.large
 ImageUrls.thumb
+Invitation.created_at
+Invitation.email
+Invitation.expires_at
+Invitation.id
+Invitation.role_id
+Invitation.role_name
+InvitationCreated.delivery
+InvitationCreated.expires_at
+InvitationCreated.invitation_id
+InvitationCreated.invite_url
+InvitationInspect.email
+InvitationInspect.expires_at
+InvitationInspect.requires_login
+InvitationInspect.role_name
+InvitationInspect.shop_name
 MediaConfig.accepted_types
 MediaConfig.enabled
 MediaConfig.max_bytes
@@ -489,6 +509,10 @@ POST /api/v1/admin/accounts/{userID}/memberships
 POST /api/v1/admin/accounts/{userID}/memberships path userID
 POST /api/v1/admin/accounts/{userID}/password-reset
 POST /api/v1/admin/accounts/{userID}/password-reset path userID
+POST /api/v1/admin/auth/invitations/accept
+POST /api/v1/admin/auth/invitations/accept response 429 Retry-After
+POST /api/v1/admin/auth/invitations/inspect
+POST /api/v1/admin/auth/invitations/inspect response 429 Retry-After
 POST /api/v1/admin/auth/login
 POST /api/v1/admin/auth/login response 429 Retry-After
 POST /api/v1/admin/auth/logout
@@ -498,6 +522,7 @@ POST /api/v1/admin/auth/password-setup/inspect
 POST /api/v1/admin/auth/password-setup/inspect response 429 Retry-After
 POST /api/v1/admin/auth/refresh
 POST /api/v1/admin/auth/refresh response 429 Retry-After
+POST /api/v1/admin/invitations/accept
 POST /api/v1/admin/permissions
 POST /api/v1/admin/roles
 POST /api/v1/admin/shop-provisioning
@@ -506,6 +531,9 @@ POST /api/v1/admin/shops/{shopID}/allowed-origins
 POST /api/v1/admin/shops/{shopID}/allowed-origins path shopID
 POST /api/v1/admin/shops/{shopID}/categories
 POST /api/v1/admin/shops/{shopID}/categories path shopID
+POST /api/v1/admin/shops/{shopID}/invitations
+POST /api/v1/admin/shops/{shopID}/invitations path shopID
+POST /api/v1/admin/shops/{shopID}/invitations response 429 Retry-After
 POST /api/v1/admin/shops/{shopID}/media/content-images
 POST /api/v1/admin/shops/{shopID}/media/content-images path shopID
 POST /api/v1/admin/shops/{shopID}/media/uploads
@@ -540,6 +568,12 @@ POST /api/v1/admin/shops/{shopID}/shipping-methods
 POST /api/v1/admin/shops/{shopID}/shipping-methods path shopID
 POST /api/v1/admin/shops/{shopID}/theme
 POST /api/v1/admin/shops/{shopID}/theme path shopID
+POST /api/v1/admin/shops/{shopID}/users/{userID}/disable
+POST /api/v1/admin/shops/{shopID}/users/{userID}/disable path shopID
+POST /api/v1/admin/shops/{shopID}/users/{userID}/disable path userID
+POST /api/v1/admin/shops/{shopID}/users/{userID}/enable
+POST /api/v1/admin/shops/{shopID}/users/{userID}/enable path shopID
+POST /api/v1/admin/shops/{shopID}/users/{userID}/enable path userID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path userID
@@ -784,6 +818,7 @@ ReportAmounts.subtotal_amount
 ReportAmounts.total_amount
 ReportAmounts.unpaid_order_count
 Role.id
+Role.merchant_assignable
 Role.name
 Role.permissions
 Role.scope
@@ -869,6 +904,7 @@ ShopSettings.effective_timezone
 ShopSettings.shop_id
 ShopSettings.timezone
 ShopUser.email
+ShopUser.membership_status
 ShopUser.roles
 ShopUser.status
 ShopUser.user_id

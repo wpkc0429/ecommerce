@@ -1502,6 +1502,45 @@ components:
           type: object
         updated_at: { type: string, format: date-time }
 
+    # ── 商家成員邀請 (change merchant-staff-role) ──────────────────
+    InvitationCreated:
+      type: object
+      additionalProperties: false
+      description: |
+        邀請的交付結果。**`delivery` 必填，消費端 MUST 先看它**；`manual` 才有 `invite_url`（只顯示這一次）。
+        對「新 email」與「已有帳號的 email」鍵集合相同。
+      required: [invitation_id, delivery, expires_at]
+      properties:
+        invitation_id: { type: integer }
+        delivery: { type: string, enum: [manual, email] }
+        invite_url: { type: string, description: "形如 `{ADMIN_PUBLIC_URL}/#/accept-invite/{token}`（僅 manual）。" }
+        expires_at: { type: string, format: date-time }
+
+    Invitation:
+      type: object
+      additionalProperties: false
+      required: [id, email, role_id, role_name, expires_at, created_at]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        role_id: { type: integer }
+        role_name: { type: string }
+        expires_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    InvitationInspect:
+      type: object
+      additionalProperties: false
+      required: [shop_name, role_name, email, requires_login, expires_at]
+      properties:
+        shop_name: { type: string }
+        role_name: { type: string }
+        email: { type: string }
+        requires_login:
+          type: boolean
+          description: 該 email 已有後台帳號——必須登入後以已認證端點接受。
+        expires_at: { type: string, format: date-time }
+
     # ── 帳號與開店 (change platform-account-provisioning) ──────────────
     PasswordSetupInspection:
       type: object
@@ -2063,10 +2102,15 @@ components:
     Role:
       type: object
       additionalProperties: false
-      required: [id, name, scope, permissions]
+      required: [id, name, scope, merchant_assignable, permissions]
       properties:
         id: { type: integer }
         name: { type: string }
+        merchant_assignable:
+          type: boolean
+          description: |
+            商家層呼叫者（`user.manage_roles`／`user.manage_members`）是否可指派或邀請此角色
+            （change merchant-staff-role）。`merchant_owner` 為 false：只有平台能授予或移除。
         scope:
           type: string
           enum: [platform, merchant]
@@ -2101,7 +2145,11 @@ components:
       properties:
         user_id: { type: integer }
         email: { type: string }
-        status: { type: integer }
+        status: { type: integer, description: 帳號狀態（`users.status`）。 }
+        membership_status:
+          type: integer
+          enum: [0, 1]
+          description: 本店成員資格狀態：1 啟用、0 停用（change merchant-staff-role；與帳號狀態無關）。
         roles:
           oneOf:
             - type: array
@@ -2112,6 +2160,7 @@ components:
                 properties:
                   id: { type: integer }
                   name: { type: string }
+                  merchant_assignable: { type: boolean }
             - type: 'null'
 
     # ── 渲染 ──────────────────────────────────────────────────
@@ -3381,6 +3430,226 @@ paths:
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
         "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  # ═══════════════════════ 商家成員管理 (change merchant-staff-role) ═══════════════════════
+  /api/v1/admin/auth/invitations/inspect:
+    post:
+      tags: [admin-auth]
+      operationId: adminInvitationInspect
+      summary: 檢視成員邀請連結
+      description: |
+        **未認證**，依來源 IP 限流。回傳邀請的商家名稱、角色、受邀 email 與 `requires_login`，**不消耗 token**。
+        `requires_login` 為 true 表示該 email 已有後台帳號：頁面必須要求登入後以已認證端點接受，
+        邀請連結**永遠不能替既有帳號設定密碼**。這個布林讓持有連結者得知該 email 是否已有帳號
+        （manual 交付下持有者就是邀請者；已知殘留，見 design D6）。
+        無效、過期、已使用、已撤回的 token 一律是**同一個 404**。
+        連結形如 `{ADMIN_PUBLIC_URL}/#/accept-invite/{token}`。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: 邀請有效。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationInspect' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/auth/invitations/accept:
+    post:
+      tags: [admin-auth]
+      operationId: adminInvitationAcceptAnonymous
+      summary: 以新密碼接受成員邀請（僅限尚無後台帳號的 email）
+      description: |
+        **未認證**，依來源 IP 限流。**只有受邀 email 沒有任何後台帳號時才成功**：同一交易內建立帳號
+        （密碼至少 12 字元，不足回 422 且不消耗 token）、成員資格與角色指派並消費邀請。
+        該 email 已有帳號（不論是否已設定密碼）回 **409**、不做任何變更——請改以該帳號登入後呼叫
+        `POST /api/v1/admin/invitations/accept`。無效／過期／已使用／已撤回一律 404。**不會自動登入。**
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 12 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/invitations/accept:
+    post:
+      tags: [admin-auth]
+      operationId: adminInvitationAcceptAuthenticated
+      summary: 以已登入帳號接受成員邀請
+      description: |
+        已認證、**不要求 RBAC 節點**（呼叫者尚不是受邀商家的成員；token 與 email 相等檢查就是授權）。
+        呼叫者 email MUST 等於邀請 email，否則 403（邀請仍可由本人使用）。成功時呼叫者成為該商家的啟用成員並持有
+        受邀角色，**密碼不變**。已是該店成員 409；無效／過期／已使用／已撤回 404。
+        接受後前端應換發 token 使商家選單包含新商家。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shops/{shopID}/invitations:
+    post:
+      tags: [admin-rbac]
+      operationId: createShopInvitation
+      summary: 邀請成員加入本店
+      description: |
+        需要商家層 `user.manage_members`，以「商家＋呼叫者」限流。`role_id` 必須是 `merchant_assignable = true`
+        的商家層角色（商家呼叫者邀請 `merchant_owner` 回 422）。email 已是本店成員（啟用或停用）回 409。
+        **不建立任何帳號。** 有效 7 天（`ADMIN_INVITE_TOKEN_TTL`）；同店同 email 的新邀請使舊的失效。
+
+        **回應對「尚無帳號的 email」與「已有帳號的 email」鍵集合相同**。`delivery` 先看：
+        `manual` 時含 `invite_url`（只顯示這一次，不可再取得）；日後改為 `email` 時**不回連結**。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, role_id]
+              properties:
+                email: { type: string }
+                role_id: { type: integer }
+      responses:
+        "201":
+          description: 邀請已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvitationCreated' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+    get:
+      tags: [admin-rbac]
+      operationId: listShopInvitations
+      summary: 列出待接受的邀請
+      description: |
+        需要商家層 `user.manage_members`。只列本店未接受、未過期、未撤回者，依建立時間遞減。
+        **不含 token 或連結。**
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+      responses:
+        "200":
+          description: 待接受的邀請。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [invitations]
+                properties:
+                  invitations:
+                    type: array
+                    items: { $ref: '#/components/schemas/Invitation' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/invitations/{invitationID}:
+    delete:
+      tags: [admin-rbac]
+      operationId: revokeShopInvitation
+      summary: 撤回邀請
+      description: 需要商家層 `user.manage_members`。撤回後該連結視同無效（inspect 回 404）。不是本店待接受的邀請回 404。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: invitationID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/users/{userID}/disable:
+    post:
+      tags: [admin-rbac]
+      operationId: disableShopMembership
+      summary: 停用成員在本店的成員資格
+      description: |
+        需要商家層 `user.manage_members`。變更的是**本店成員資格**（`shop_user.status`），**不是帳號**：
+        該帳號在其他商家的權限不受影響。停用後該成員對本店的下一個請求即 403。
+        不可停用自己（409）；商家層呼叫者不可停用持有不可委派角色的成員（403，例如另一位 owner）。
+        非本店成員 404。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shops/{shopID}/users/{userID}/enable:
+    post:
+      tags: [admin-rbac]
+      operationId: enableShopMembership
+      summary: 啟用成員在本店的成員資格
+      description: 需要商家層 `user.manage_members`。規則同 disable（冪等）。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/ShopIDPath'
+        - name: userID
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
 
   /api/v1/admin/accounts:
     get:
@@ -4831,6 +5100,11 @@ paths:
       description: |
         需要商家層 `user.manage_roles`。角色必須是 `merchant` scope 且目標使用者必須是本商家成員，
         否則 422。冪等。**授權立即生效。**
+
+        **商家層呼叫者（不持平台角色者）只能指派 `merchant_assignable = true` 的角色**，
+        且不得對持有不可委派角色（例如另一位 owner）的成員、或對自己做角色變更；
+        `merchant_owner` 的授予與移除只有平台管理員能做。違反回 403（對自己為 409）。
+        （change merchant-staff-role：這收緊了先前 owner 可指派 `merchant_owner` 的行為。）
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
@@ -4872,7 +5146,9 @@ paths:
       tags: [admin-rbac]
       operationId: removeShopRole
       summary: 移除商家角色指派
-      description: 需要商家層 `user.manage_roles`。**撤權立即生效。**
+      description: |
+        需要商家層 `user.manage_roles`。**撤權立即生效。**
+        商家層呼叫者不得對持有不可委派角色的成員（403）或自己（409）移除角色；平台管理員不受限。
       security: [{ adminJWT: [] }]
       parameters:
         - $ref: '#/components/parameters/ShopIDPath'
@@ -5808,6 +6084,8 @@ paths:
       summary: 推進出貨狀態
       description: |
         需要商家層 `shipment.update`。只接受 `"delivered"` 或 `"returned"`，兩者皆為終態。
+        **`returned` 另需 `shipment.return`**（change merchant-staff-role）：缺少時回 403，
+        且出貨、訂單與點數皆不變；`delivered` 只需 `shipment.update`。
 
         訂單的 `fulfillment_status` 由**所有**出貨紀錄重新推導，不是直接套用本次的目標狀態
         （change partial-shipment）：兩箱之中的一箱送達，訂單仍是 `1` 已出貨。

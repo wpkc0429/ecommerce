@@ -17,9 +17,12 @@ import (
 	entpublishablekey "ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	entrole "ksdevworks/ecommerce/api/internal/ent/role"
 	entrolepermission "ksdevworks/ecommerce/api/internal/ent/rolepermission"
+	entroleuser "ksdevworks/ecommerce/api/internal/ent/roleuser"
 	entshippingmethod "ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	entpaymentcredential "ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
+	entshopuser "ksdevworks/ecommerce/api/internal/ent/shopuser"
+	entuser "ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/seed"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
@@ -532,5 +535,124 @@ func TestSeedAccountNodesBelongToSuperAdminOnly(t *testing.T) {
 		if len(holders) != 1 || holders[0] != "super_admin" {
 			t.Errorf("%s must be held by super_admin only, got %v", name, holders)
 		}
+	}
+}
+
+// roleNodes returns the permission names granted to the merchant role.
+func roleNodes(t *testing.T, client *ent.Client, name string) map[string]bool {
+	t.Helper()
+	ctx := context.Background()
+	r, err := client.Role.Query().Where(entrole.NameEQ(name), entrole.ScopeEQ("merchant")).Only(ctx)
+	if err != nil {
+		t.Fatalf("role %s: %v", name, err)
+	}
+	names, err := r.QueryPermissions().Select(entpermission.FieldName).Strings(ctx)
+	if err != nil {
+		t.Fatalf("permissions of %s: %v", name, err)
+	}
+	out := make(map[string]bool, len(names))
+	for _, n := range names {
+		out[n] = true
+	}
+	return out
+}
+
+// Scenario: staff 角色只能處理訂單與出貨 (spec rbac, change merchant-staff-role
+// design D1). EQUALITY, not containment: a sixth node added to staff by
+// accident must turn this red.
+func TestSeedStaffRoleHasExactlyTheFiveNodes(t *testing.T) {
+	client := testutil.OpenDB(t)
+	runDemoSeed(t, client)
+
+	want := []string{"order.view", "payment.view", "shipment.view", "shipment.create", "shipment.update"}
+	got := roleNodes(t, client, "staff")
+	if len(got) != len(want) {
+		t.Fatalf("staff nodes = %v, want exactly %v", got, want)
+	}
+	for _, n := range want {
+		if !got[n] {
+			t.Errorf("staff must hold %s", n)
+		}
+	}
+	for _, n := range []string{"order.cancel", "shipment.return", "user.manage_members", "member.view", "report.view", "product.edit"} {
+		if got[n] {
+			t.Errorf("staff must NOT hold %s", n)
+		}
+	}
+}
+
+// Scenario: 既有 seed 角色的能力逐字不變 (design D2): the new shipment.return
+// goes to owner AND editor, so splitting it out takes nothing away from them;
+// user.manage_members is the owner's alone.
+func TestSeedReturnAndMemberManagementGrants(t *testing.T) {
+	client := testutil.OpenDB(t)
+	runDemoSeed(t, client)
+
+	owner, editor := roleNodes(t, client, "merchant_owner"), roleNodes(t, client, "editor")
+	for _, n := range []string{"shipment.return"} {
+		if !owner[n] || !editor[n] {
+			t.Errorf("%s must be granted to merchant_owner and editor", n)
+		}
+	}
+	if !owner["user.manage_members"] {
+		t.Error("merchant_owner must hold user.manage_members")
+	}
+	if editor["user.manage_members"] {
+		t.Error("editor must NOT hold user.manage_members")
+	}
+}
+
+// Scenario: merchant_assignable 由 seed 設定 (design D4): editor and staff may be
+// granted by a shop, merchant_owner only by the platform. Re-running the seed
+// repairs a flipped value (the migration defaults every existing role to
+// false, so the seed has to upsert the flag, not only set it on create).
+func TestSeedMerchantAssignableFlagsAndIdempotence(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	check := func() {
+		t.Helper()
+		for name, want := range map[string]bool{"merchant_owner": false, "editor": true, "staff": true} {
+			r := client.Role.Query().Where(entrole.NameEQ(name), entrole.ScopeEQ("merchant")).OnlyX(ctx)
+			if r.MerchantAssignable != want {
+				t.Errorf("%s.merchant_assignable = %v, want %v", name, r.MerchantAssignable, want)
+			}
+		}
+	}
+	check()
+
+	// Simulate a database migrated before the seed knew the flag.
+	client.Role.Update().Where(entrole.NameIn("editor", "staff")).SetMerchantAssignable(false).ExecX(ctx)
+	runDemoSeed(t, client)
+	check()
+
+	nodes := roleNodes(t, client, "staff")
+	runDemoSeed(t, client)
+	if again := roleNodes(t, client, "staff"); len(again) != len(nodes) {
+		t.Errorf("re-seed changed staff nodes: %v -> %v", nodes, again)
+	}
+	n := client.Role.Query().Where(entrole.NameEQ("staff")).CountX(ctx)
+	if n != 1 {
+		t.Errorf("staff role rows = %d, want 1", n)
+	}
+}
+
+// The demo clerk exists with the staff role (used by e2e).
+func TestDemoSeedProvisionsStaffAccount(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	u := client.User.Query().Where(entuser.EmailEQ("demo-staff@example.com")).OnlyX(ctx)
+	if u.PasswordHash == nil || u.Status != 1 {
+		t.Fatal("demo staff must be an active account with a password")
+	}
+	ru := client.RoleUser.Query().Where(entroleuser.UserIDEQ(u.ID)).WithRole().AllX(ctx)
+	if len(ru) != 1 || ru[0].Edges.Role.Name != "staff" || ru[0].ShopID == nil {
+		t.Fatalf("demo staff roles = %+v, want exactly staff at the demo shop", ru)
+	}
+	if !client.ShopUser.Query().Where(entshopuser.UserIDEQ(u.ID), entshopuser.StatusEQ(1)).ExistX(ctx) {
+		t.Fatal("demo staff must hold an active membership")
 	}
 }

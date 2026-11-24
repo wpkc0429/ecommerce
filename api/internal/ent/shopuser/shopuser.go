@@ -18,6 +18,8 @@ const (
 	FieldShopID = "shop_id"
 	// FieldUserID holds the string denoting the user_id field in the database.
 	FieldUserID = "user_id"
+	// FieldStatus holds the string denoting the status field in the database.
+	FieldStatus = "status"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// EdgeShop holds the string denoting the shop edge name in mutations.
@@ -47,6 +49,7 @@ var Columns = []string{
 	FieldID,
 	FieldShopID,
 	FieldUserID,
+	FieldStatus,
 	FieldCreatedAt,
 }
 
@@ -61,6 +64,8 @@ func ValidColumn(column string) bool {
 }
 
 var (
+	// DefaultStatus holds the default value on creation for the "status" field.
+	DefaultStatus int16
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -81,6 +86,11 @@ func ByShopID(opts ...sql.OrderTermOption) OrderOption {
 // ByUserID orders the results by the user_id field.
 func ByUserID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUserID, opts...).ToFunc()
+}
+
+// ByStatus orders the results by the status field.
+func ByStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldStatus, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

@@ -22,6 +22,8 @@ const (
 	FieldName = "name"
 	// FieldScope holds the string denoting the scope field in the database.
 	FieldScope = "scope"
+	// FieldMerchantAssignable holds the string denoting the merchant_assignable field in the database.
+	FieldMerchantAssignable = "merchant_assignable"
 	// EdgePermissions holds the string denoting the permissions edge name in mutations.
 	EdgePermissions = "permissions"
 	// EdgeRoleUsers holds the string denoting the role_users edge name in mutations.
@@ -58,6 +60,7 @@ var Columns = []string{
 	FieldUpdatedAt,
 	FieldName,
 	FieldScope,
+	FieldMerchantAssignable,
 }
 
 var (
@@ -87,6 +90,8 @@ var (
 	NameValidator func(string) error
 	// ScopeValidator is a validator for the "scope" field. It is called by the builders before save.
 	ScopeValidator func(string) error
+	// DefaultMerchantAssignable holds the default value on creation for the "merchant_assignable" field.
+	DefaultMerchantAssignable bool
 )
 
 // OrderOption defines the ordering options for the Role queries.
@@ -115,6 +120,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByScope orders the results by the scope field.
 func ByScope(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldScope, opts...).ToFunc()
+}
+
+// ByMerchantAssignable orders the results by the merchant_assignable field.
+func ByMerchantAssignable(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMerchantAssignable, opts...).ToFunc()
 }
 
 // ByPermissionsCount orders the results by permissions count.

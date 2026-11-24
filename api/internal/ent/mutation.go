@@ -113,12 +113,17 @@ type AdminCredentialTokenMutation struct {
 	token_hash    *string
 	created_by    *int
 	addcreated_by *int
+	email         *string
+	shop_id       *int
+	addshop_id    *int
 	expires_at    *time.Time
 	used_at       *time.Time
 	created_at    *time.Time
 	clearedFields map[string]struct{}
 	user          *int
 	cleareduser   bool
+	role          *int
+	clearedrole   bool
 	done          bool
 	oldValue      func(context.Context) (*AdminCredentialToken, error)
 	predicates    []predicate.AdminCredentialToken
@@ -239,7 +244,7 @@ func (m *AdminCredentialTokenMutation) UserID() (r int, exists bool) {
 // OldUserID returns the old "user_id" field's value of the AdminCredentialToken entity.
 // If the AdminCredentialToken object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *AdminCredentialTokenMutation) OldUserID(ctx context.Context) (v int, err error) {
+func (m *AdminCredentialTokenMutation) OldUserID(ctx context.Context) (v *int, err error) {
 	if !m.op.Is(OpUpdateOne) {
 		return v, errors.New("OldUserID is only allowed on UpdateOne operations")
 	}
@@ -253,9 +258,22 @@ func (m *AdminCredentialTokenMutation) OldUserID(ctx context.Context) (v int, er
 	return oldValue.UserID, nil
 }
 
+// ClearUserID clears the value of the "user_id" field.
+func (m *AdminCredentialTokenMutation) ClearUserID() {
+	m.user = nil
+	m.clearedFields[admincredentialtoken.FieldUserID] = struct{}{}
+}
+
+// UserIDCleared returns if the "user_id" field was cleared in this mutation.
+func (m *AdminCredentialTokenMutation) UserIDCleared() bool {
+	_, ok := m.clearedFields[admincredentialtoken.FieldUserID]
+	return ok
+}
+
 // ResetUserID resets all changes to the "user_id" field.
 func (m *AdminCredentialTokenMutation) ResetUserID() {
 	m.user = nil
+	delete(m.clearedFields, admincredentialtoken.FieldUserID)
 }
 
 // SetKind sets the "kind" field.
@@ -400,6 +418,174 @@ func (m *AdminCredentialTokenMutation) ResetCreatedBy() {
 	delete(m.clearedFields, admincredentialtoken.FieldCreatedBy)
 }
 
+// SetEmail sets the "email" field.
+func (m *AdminCredentialTokenMutation) SetEmail(s string) {
+	m.email = &s
+}
+
+// Email returns the value of the "email" field in the mutation.
+func (m *AdminCredentialTokenMutation) Email() (r string, exists bool) {
+	v := m.email
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEmail returns the old "email" field's value of the AdminCredentialToken entity.
+// If the AdminCredentialToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminCredentialTokenMutation) OldEmail(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEmail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEmail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEmail: %w", err)
+	}
+	return oldValue.Email, nil
+}
+
+// ClearEmail clears the value of the "email" field.
+func (m *AdminCredentialTokenMutation) ClearEmail() {
+	m.email = nil
+	m.clearedFields[admincredentialtoken.FieldEmail] = struct{}{}
+}
+
+// EmailCleared returns if the "email" field was cleared in this mutation.
+func (m *AdminCredentialTokenMutation) EmailCleared() bool {
+	_, ok := m.clearedFields[admincredentialtoken.FieldEmail]
+	return ok
+}
+
+// ResetEmail resets all changes to the "email" field.
+func (m *AdminCredentialTokenMutation) ResetEmail() {
+	m.email = nil
+	delete(m.clearedFields, admincredentialtoken.FieldEmail)
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *AdminCredentialTokenMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *AdminCredentialTokenMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the AdminCredentialToken entity.
+// If the AdminCredentialToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminCredentialTokenMutation) OldShopID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *AdminCredentialTokenMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *AdminCredentialTokenMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (m *AdminCredentialTokenMutation) ClearShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+	m.clearedFields[admincredentialtoken.FieldShopID] = struct{}{}
+}
+
+// ShopIDCleared returns if the "shop_id" field was cleared in this mutation.
+func (m *AdminCredentialTokenMutation) ShopIDCleared() bool {
+	_, ok := m.clearedFields[admincredentialtoken.FieldShopID]
+	return ok
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *AdminCredentialTokenMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+	delete(m.clearedFields, admincredentialtoken.FieldShopID)
+}
+
+// SetRoleID sets the "role_id" field.
+func (m *AdminCredentialTokenMutation) SetRoleID(i int) {
+	m.role = &i
+}
+
+// RoleID returns the value of the "role_id" field in the mutation.
+func (m *AdminCredentialTokenMutation) RoleID() (r int, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRoleID returns the old "role_id" field's value of the AdminCredentialToken entity.
+// If the AdminCredentialToken object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *AdminCredentialTokenMutation) OldRoleID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRoleID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRoleID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRoleID: %w", err)
+	}
+	return oldValue.RoleID, nil
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (m *AdminCredentialTokenMutation) ClearRoleID() {
+	m.role = nil
+	m.clearedFields[admincredentialtoken.FieldRoleID] = struct{}{}
+}
+
+// RoleIDCleared returns if the "role_id" field was cleared in this mutation.
+func (m *AdminCredentialTokenMutation) RoleIDCleared() bool {
+	_, ok := m.clearedFields[admincredentialtoken.FieldRoleID]
+	return ok
+}
+
+// ResetRoleID resets all changes to the "role_id" field.
+func (m *AdminCredentialTokenMutation) ResetRoleID() {
+	m.role = nil
+	delete(m.clearedFields, admincredentialtoken.FieldRoleID)
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (m *AdminCredentialTokenMutation) SetExpiresAt(t time.Time) {
 	m.expires_at = &t
@@ -529,7 +715,7 @@ func (m *AdminCredentialTokenMutation) ClearUser() {
 
 // UserCleared reports if the "user" edge to the User entity was cleared.
 func (m *AdminCredentialTokenMutation) UserCleared() bool {
-	return m.cleareduser
+	return m.UserIDCleared() || m.cleareduser
 }
 
 // UserIDs returns the "user" edge IDs in the mutation.
@@ -546,6 +732,33 @@ func (m *AdminCredentialTokenMutation) UserIDs() (ids []int) {
 func (m *AdminCredentialTokenMutation) ResetUser() {
 	m.user = nil
 	m.cleareduser = false
+}
+
+// ClearRole clears the "role" edge to the Role entity.
+func (m *AdminCredentialTokenMutation) ClearRole() {
+	m.clearedrole = true
+	m.clearedFields[admincredentialtoken.FieldRoleID] = struct{}{}
+}
+
+// RoleCleared reports if the "role" edge to the Role entity was cleared.
+func (m *AdminCredentialTokenMutation) RoleCleared() bool {
+	return m.RoleIDCleared() || m.clearedrole
+}
+
+// RoleIDs returns the "role" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RoleID instead. It exists only for internal usage by the builders.
+func (m *AdminCredentialTokenMutation) RoleIDs() (ids []int) {
+	if id := m.role; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRole resets all changes to the "role" edge.
+func (m *AdminCredentialTokenMutation) ResetRole() {
+	m.role = nil
+	m.clearedrole = false
 }
 
 // Where appends a list predicates to the AdminCredentialTokenMutation builder.
@@ -582,7 +795,7 @@ func (m *AdminCredentialTokenMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *AdminCredentialTokenMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.user != nil {
 		fields = append(fields, admincredentialtoken.FieldUserID)
 	}
@@ -594,6 +807,15 @@ func (m *AdminCredentialTokenMutation) Fields() []string {
 	}
 	if m.created_by != nil {
 		fields = append(fields, admincredentialtoken.FieldCreatedBy)
+	}
+	if m.email != nil {
+		fields = append(fields, admincredentialtoken.FieldEmail)
+	}
+	if m.shop_id != nil {
+		fields = append(fields, admincredentialtoken.FieldShopID)
+	}
+	if m.role != nil {
+		fields = append(fields, admincredentialtoken.FieldRoleID)
 	}
 	if m.expires_at != nil {
 		fields = append(fields, admincredentialtoken.FieldExpiresAt)
@@ -620,6 +842,12 @@ func (m *AdminCredentialTokenMutation) Field(name string) (ent.Value, bool) {
 		return m.TokenHash()
 	case admincredentialtoken.FieldCreatedBy:
 		return m.CreatedBy()
+	case admincredentialtoken.FieldEmail:
+		return m.Email()
+	case admincredentialtoken.FieldShopID:
+		return m.ShopID()
+	case admincredentialtoken.FieldRoleID:
+		return m.RoleID()
 	case admincredentialtoken.FieldExpiresAt:
 		return m.ExpiresAt()
 	case admincredentialtoken.FieldUsedAt:
@@ -643,6 +871,12 @@ func (m *AdminCredentialTokenMutation) OldField(ctx context.Context, name string
 		return m.OldTokenHash(ctx)
 	case admincredentialtoken.FieldCreatedBy:
 		return m.OldCreatedBy(ctx)
+	case admincredentialtoken.FieldEmail:
+		return m.OldEmail(ctx)
+	case admincredentialtoken.FieldShopID:
+		return m.OldShopID(ctx)
+	case admincredentialtoken.FieldRoleID:
+		return m.OldRoleID(ctx)
 	case admincredentialtoken.FieldExpiresAt:
 		return m.OldExpiresAt(ctx)
 	case admincredentialtoken.FieldUsedAt:
@@ -686,6 +920,27 @@ func (m *AdminCredentialTokenMutation) SetField(name string, value ent.Value) er
 		}
 		m.SetCreatedBy(v)
 		return nil
+	case admincredentialtoken.FieldEmail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEmail(v)
+		return nil
+	case admincredentialtoken.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case admincredentialtoken.FieldRoleID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRoleID(v)
+		return nil
 	case admincredentialtoken.FieldExpiresAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -718,6 +973,9 @@ func (m *AdminCredentialTokenMutation) AddedFields() []string {
 	if m.addcreated_by != nil {
 		fields = append(fields, admincredentialtoken.FieldCreatedBy)
 	}
+	if m.addshop_id != nil {
+		fields = append(fields, admincredentialtoken.FieldShopID)
+	}
 	return fields
 }
 
@@ -728,6 +986,8 @@ func (m *AdminCredentialTokenMutation) AddedField(name string) (ent.Value, bool)
 	switch name {
 	case admincredentialtoken.FieldCreatedBy:
 		return m.AddedCreatedBy()
+	case admincredentialtoken.FieldShopID:
+		return m.AddedShopID()
 	}
 	return nil, false
 }
@@ -744,6 +1004,13 @@ func (m *AdminCredentialTokenMutation) AddField(name string, value ent.Value) er
 		}
 		m.AddCreatedBy(v)
 		return nil
+	case admincredentialtoken.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown AdminCredentialToken numeric field %s", name)
 }
@@ -752,8 +1019,20 @@ func (m *AdminCredentialTokenMutation) AddField(name string, value ent.Value) er
 // mutation.
 func (m *AdminCredentialTokenMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(admincredentialtoken.FieldUserID) {
+		fields = append(fields, admincredentialtoken.FieldUserID)
+	}
 	if m.FieldCleared(admincredentialtoken.FieldCreatedBy) {
 		fields = append(fields, admincredentialtoken.FieldCreatedBy)
+	}
+	if m.FieldCleared(admincredentialtoken.FieldEmail) {
+		fields = append(fields, admincredentialtoken.FieldEmail)
+	}
+	if m.FieldCleared(admincredentialtoken.FieldShopID) {
+		fields = append(fields, admincredentialtoken.FieldShopID)
+	}
+	if m.FieldCleared(admincredentialtoken.FieldRoleID) {
+		fields = append(fields, admincredentialtoken.FieldRoleID)
 	}
 	if m.FieldCleared(admincredentialtoken.FieldUsedAt) {
 		fields = append(fields, admincredentialtoken.FieldUsedAt)
@@ -772,8 +1051,20 @@ func (m *AdminCredentialTokenMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *AdminCredentialTokenMutation) ClearField(name string) error {
 	switch name {
+	case admincredentialtoken.FieldUserID:
+		m.ClearUserID()
+		return nil
 	case admincredentialtoken.FieldCreatedBy:
 		m.ClearCreatedBy()
+		return nil
+	case admincredentialtoken.FieldEmail:
+		m.ClearEmail()
+		return nil
+	case admincredentialtoken.FieldShopID:
+		m.ClearShopID()
+		return nil
+	case admincredentialtoken.FieldRoleID:
+		m.ClearRoleID()
 		return nil
 	case admincredentialtoken.FieldUsedAt:
 		m.ClearUsedAt()
@@ -798,6 +1089,15 @@ func (m *AdminCredentialTokenMutation) ResetField(name string) error {
 	case admincredentialtoken.FieldCreatedBy:
 		m.ResetCreatedBy()
 		return nil
+	case admincredentialtoken.FieldEmail:
+		m.ResetEmail()
+		return nil
+	case admincredentialtoken.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case admincredentialtoken.FieldRoleID:
+		m.ResetRoleID()
+		return nil
 	case admincredentialtoken.FieldExpiresAt:
 		m.ResetExpiresAt()
 		return nil
@@ -813,9 +1113,12 @@ func (m *AdminCredentialTokenMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *AdminCredentialTokenMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.user != nil {
 		edges = append(edges, admincredentialtoken.EdgeUser)
+	}
+	if m.role != nil {
+		edges = append(edges, admincredentialtoken.EdgeRole)
 	}
 	return edges
 }
@@ -828,13 +1131,17 @@ func (m *AdminCredentialTokenMutation) AddedIDs(name string) []ent.Value {
 		if id := m.user; id != nil {
 			return []ent.Value{*id}
 		}
+	case admincredentialtoken.EdgeRole:
+		if id := m.role; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *AdminCredentialTokenMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	return edges
 }
 
@@ -846,9 +1153,12 @@ func (m *AdminCredentialTokenMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *AdminCredentialTokenMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.cleareduser {
 		edges = append(edges, admincredentialtoken.EdgeUser)
+	}
+	if m.clearedrole {
+		edges = append(edges, admincredentialtoken.EdgeRole)
 	}
 	return edges
 }
@@ -859,6 +1169,8 @@ func (m *AdminCredentialTokenMutation) EdgeCleared(name string) bool {
 	switch name {
 	case admincredentialtoken.EdgeUser:
 		return m.cleareduser
+	case admincredentialtoken.EdgeRole:
+		return m.clearedrole
 	}
 	return false
 }
@@ -870,6 +1182,9 @@ func (m *AdminCredentialTokenMutation) ClearEdge(name string) error {
 	case admincredentialtoken.EdgeUser:
 		m.ClearUser()
 		return nil
+	case admincredentialtoken.EdgeRole:
+		m.ClearRole()
+		return nil
 	}
 	return fmt.Errorf("unknown AdminCredentialToken unique edge %s", name)
 }
@@ -880,6 +1195,9 @@ func (m *AdminCredentialTokenMutation) ResetEdge(name string) error {
 	switch name {
 	case admincredentialtoken.EdgeUser:
 		m.ResetUser()
+		return nil
+	case admincredentialtoken.EdgeRole:
+		m.ResetRole()
 		return nil
 	}
 	return fmt.Errorf("unknown AdminCredentialToken edge %s", name)
@@ -20066,23 +20384,24 @@ func (m *PublishableKeyMutation) ResetEdge(name string) error {
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	name               *string
-	scope              *string
-	clearedFields      map[string]struct{}
-	permissions        map[int]struct{}
-	removedpermissions map[int]struct{}
-	clearedpermissions bool
-	role_users         map[int]struct{}
-	removedrole_users  map[int]struct{}
-	clearedrole_users  bool
-	done               bool
-	oldValue           func(context.Context) (*Role, error)
-	predicates         []predicate.Role
+	op                  Op
+	typ                 string
+	id                  *int
+	created_at          *time.Time
+	updated_at          *time.Time
+	name                *string
+	scope               *string
+	merchant_assignable *bool
+	clearedFields       map[string]struct{}
+	permissions         map[int]struct{}
+	removedpermissions  map[int]struct{}
+	clearedpermissions  bool
+	role_users          map[int]struct{}
+	removedrole_users   map[int]struct{}
+	clearedrole_users   bool
+	done                bool
+	oldValue            func(context.Context) (*Role, error)
+	predicates          []predicate.Role
 }
 
 var _ ent.Mutation = (*RoleMutation)(nil)
@@ -20327,6 +20646,42 @@ func (m *RoleMutation) ResetScope() {
 	m.scope = nil
 }
 
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (m *RoleMutation) SetMerchantAssignable(b bool) {
+	m.merchant_assignable = &b
+}
+
+// MerchantAssignable returns the value of the "merchant_assignable" field in the mutation.
+func (m *RoleMutation) MerchantAssignable() (r bool, exists bool) {
+	v := m.merchant_assignable
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMerchantAssignable returns the old "merchant_assignable" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldMerchantAssignable(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMerchantAssignable is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMerchantAssignable requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMerchantAssignable: %w", err)
+	}
+	return oldValue.MerchantAssignable, nil
+}
+
+// ResetMerchantAssignable resets all changes to the "merchant_assignable" field.
+func (m *RoleMutation) ResetMerchantAssignable() {
+	m.merchant_assignable = nil
+}
+
 // AddPermissionIDs adds the "permissions" edge to the Permission entity by ids.
 func (m *RoleMutation) AddPermissionIDs(ids ...int) {
 	if m.permissions == nil {
@@ -20469,7 +20824,7 @@ func (m *RoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleMutation) Fields() []string {
-	fields := make([]string, 0, 4)
+	fields := make([]string, 0, 5)
 	if m.created_at != nil {
 		fields = append(fields, role.FieldCreatedAt)
 	}
@@ -20481,6 +20836,9 @@ func (m *RoleMutation) Fields() []string {
 	}
 	if m.scope != nil {
 		fields = append(fields, role.FieldScope)
+	}
+	if m.merchant_assignable != nil {
+		fields = append(fields, role.FieldMerchantAssignable)
 	}
 	return fields
 }
@@ -20498,6 +20856,8 @@ func (m *RoleMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case role.FieldScope:
 		return m.Scope()
+	case role.FieldMerchantAssignable:
+		return m.MerchantAssignable()
 	}
 	return nil, false
 }
@@ -20515,6 +20875,8 @@ func (m *RoleMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldName(ctx)
 	case role.FieldScope:
 		return m.OldScope(ctx)
+	case role.FieldMerchantAssignable:
+		return m.OldMerchantAssignable(ctx)
 	}
 	return nil, fmt.Errorf("unknown Role field %s", name)
 }
@@ -20551,6 +20913,13 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetScope(v)
+		return nil
+	case role.FieldMerchantAssignable:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMerchantAssignable(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Role field %s", name)
@@ -20612,6 +20981,9 @@ func (m *RoleMutation) ResetField(name string) error {
 		return nil
 	case role.FieldScope:
 		m.ResetScope()
+		return nil
+	case role.FieldMerchantAssignable:
+		m.ResetMerchantAssignable()
 		return nil
 	}
 	return fmt.Errorf("unknown Role field %s", name)
@@ -26586,6 +26958,8 @@ type ShopUserMutation struct {
 	op            Op
 	typ           string
 	id            *int
+	status        *int16
+	addstatus     *int16
 	created_at    *time.Time
 	clearedFields map[string]struct{}
 	shop          *int
@@ -26767,6 +27141,62 @@ func (m *ShopUserMutation) ResetUserID() {
 	m.user = nil
 }
 
+// SetStatus sets the "status" field.
+func (m *ShopUserMutation) SetStatus(i int16) {
+	m.status = &i
+	m.addstatus = nil
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ShopUserMutation) Status() (r int16, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ShopUser entity.
+// If the ShopUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShopUserMutation) OldStatus(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// AddStatus adds i to the "status" field.
+func (m *ShopUserMutation) AddStatus(i int16) {
+	if m.addstatus != nil {
+		*m.addstatus += i
+	} else {
+		m.addstatus = &i
+	}
+}
+
+// AddedStatus returns the value that was added to the "status" field in this mutation.
+func (m *ShopUserMutation) AddedStatus() (r int16, exists bool) {
+	v := m.addstatus
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ShopUserMutation) ResetStatus() {
+	m.status = nil
+	m.addstatus = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *ShopUserMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -26891,12 +27321,15 @@ func (m *ShopUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShopUserMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.shop != nil {
 		fields = append(fields, shopuser.FieldShopID)
 	}
 	if m.user != nil {
 		fields = append(fields, shopuser.FieldUserID)
+	}
+	if m.status != nil {
+		fields = append(fields, shopuser.FieldStatus)
 	}
 	if m.created_at != nil {
 		fields = append(fields, shopuser.FieldCreatedAt)
@@ -26913,6 +27346,8 @@ func (m *ShopUserMutation) Field(name string) (ent.Value, bool) {
 		return m.ShopID()
 	case shopuser.FieldUserID:
 		return m.UserID()
+	case shopuser.FieldStatus:
+		return m.Status()
 	case shopuser.FieldCreatedAt:
 		return m.CreatedAt()
 	}
@@ -26928,6 +27363,8 @@ func (m *ShopUserMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldShopID(ctx)
 	case shopuser.FieldUserID:
 		return m.OldUserID(ctx)
+	case shopuser.FieldStatus:
+		return m.OldStatus(ctx)
 	case shopuser.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	}
@@ -26953,6 +27390,13 @@ func (m *ShopUserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetUserID(v)
 		return nil
+	case shopuser.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
 	case shopuser.FieldCreatedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -26968,6 +27412,9 @@ func (m *ShopUserMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ShopUserMutation) AddedFields() []string {
 	var fields []string
+	if m.addstatus != nil {
+		fields = append(fields, shopuser.FieldStatus)
+	}
 	return fields
 }
 
@@ -26976,6 +27423,8 @@ func (m *ShopUserMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ShopUserMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case shopuser.FieldStatus:
+		return m.AddedStatus()
 	}
 	return nil, false
 }
@@ -26985,6 +27434,13 @@ func (m *ShopUserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ShopUserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case shopuser.FieldStatus:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddStatus(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ShopUser numeric field %s", name)
 }
@@ -27017,6 +27473,9 @@ func (m *ShopUserMutation) ResetField(name string) error {
 		return nil
 	case shopuser.FieldUserID:
 		m.ResetUserID()
+		return nil
+	case shopuser.FieldStatus:
+		m.ResetStatus()
 		return nil
 	case shopuser.FieldCreatedAt:
 		m.ResetCreatedAt()

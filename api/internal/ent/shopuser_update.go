@@ -58,6 +58,27 @@ func (_u *ShopUserUpdate) SetNillableUserID(v *int) *ShopUserUpdate {
 	return _u
 }
 
+// SetStatus sets the "status" field.
+func (_u *ShopUserUpdate) SetStatus(v int16) *ShopUserUpdate {
+	_u.mutation.ResetStatus()
+	_u.mutation.SetStatus(v)
+	return _u
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (_u *ShopUserUpdate) SetNillableStatus(v *int16) *ShopUserUpdate {
+	if v != nil {
+		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// AddStatus adds value to the "status" field.
+func (_u *ShopUserUpdate) AddStatus(v int16) *ShopUserUpdate {
+	_u.mutation.AddStatus(v)
+	return _u
+}
+
 // SetShop sets the "shop" edge to the Shop entity.
 func (_u *ShopUserUpdate) SetShop(v *Shop) *ShopUserUpdate {
 	return _u.SetShopID(v.ID)
@@ -140,6 +161,12 @@ func (_u *ShopUserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.Status(); ok {
+		_spec.SetField(shopuser.FieldStatus, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedStatus(); ok {
+		_spec.AddField(shopuser.FieldStatus, field.TypeInt16, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -246,6 +273,27 @@ func (_u *ShopUserUpdateOne) SetNillableUserID(v *int) *ShopUserUpdateOne {
 	if v != nil {
 		_u.SetUserID(*v)
 	}
+	return _u
+}
+
+// SetStatus sets the "status" field.
+func (_u *ShopUserUpdateOne) SetStatus(v int16) *ShopUserUpdateOne {
+	_u.mutation.ResetStatus()
+	_u.mutation.SetStatus(v)
+	return _u
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (_u *ShopUserUpdateOne) SetNillableStatus(v *int16) *ShopUserUpdateOne {
+	if v != nil {
+		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// AddStatus adds value to the "status" field.
+func (_u *ShopUserUpdateOne) AddStatus(v int16) *ShopUserUpdateOne {
+	_u.mutation.AddStatus(v)
 	return _u
 }
 
@@ -361,6 +409,12 @@ func (_u *ShopUserUpdateOne) sqlSave(ctx context.Context) (_node *ShopUser, err 
 				ps[i](selector)
 			}
 		}
+	}
+	if value, ok := _u.mutation.Status(); ok {
+		_spec.SetField(shopuser.FieldStatus, field.TypeInt16, value)
+	}
+	if value, ok := _u.mutation.AddedStatus(); ok {
+		_spec.AddField(shopuser.FieldStatus, field.TypeInt16, value)
 	}
 	if _u.mutation.ShopCleared() {
 		edge := &sqlgraph.EdgeSpec{

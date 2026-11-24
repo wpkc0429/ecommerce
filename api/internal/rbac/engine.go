@@ -176,10 +176,11 @@ func (e *Engine) load(ctx context.Context, userID, shopID int) (*Snapshot, error
 		}
 	}
 
-	// Cross-shop guard input.
+	// Cross-shop guard input. A disabled membership (shop_user.status = 0,
+	// change merchant-staff-role D3) counts as no membership at all.
 	if shopID != PlatformCtx {
 		isMember, err := e.client.ShopUser.Query().
-			Where(shopuser.ShopIDEQ(shopID), shopuser.UserIDEQ(userID)).
+			Where(shopuser.ShopIDEQ(shopID), shopuser.UserIDEQ(userID), shopuser.StatusEQ(1)).
 			Exist(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("rbac: check membership: %w", err)

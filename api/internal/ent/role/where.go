@@ -75,6 +75,11 @@ func Scope(v string) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldScope, v))
 }
 
+// MerchantAssignable applies equality check predicate on the "merchant_assignable" field. It's identical to MerchantAssignableEQ.
+func MerchantAssignable(v bool) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldMerchantAssignable, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldCreatedAt, v))
@@ -283,6 +288,16 @@ func ScopeEqualFold(v string) predicate.Role {
 // ScopeContainsFold applies the ContainsFold predicate on the "scope" field.
 func ScopeContainsFold(v string) predicate.Role {
 	return predicate.Role(sql.FieldContainsFold(FieldScope, v))
+}
+
+// MerchantAssignableEQ applies the EQ predicate on the "merchant_assignable" field.
+func MerchantAssignableEQ(v bool) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldMerchantAssignable, v))
+}
+
+// MerchantAssignableNEQ applies the NEQ predicate on the "merchant_assignable" field.
+func MerchantAssignableNEQ(v bool) predicate.Role {
+	return predicate.Role(sql.FieldNEQ(FieldMerchantAssignable, v))
 }
 
 // HasPermissions applies the HasEdge predicate on the "permissions" edge.

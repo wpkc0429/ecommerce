@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
+	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"math"
 
@@ -25,6 +26,7 @@ type AdminCredentialTokenQuery struct {
 	inters     []Interceptor
 	predicates []predicate.AdminCredentialToken
 	withUser   *UserQuery
+	withRole   *RoleQuery
 	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -77,6 +79,28 @@ func (_q *AdminCredentialTokenQuery) QueryUser() *UserQuery {
 			sqlgraph.From(admincredentialtoken.Table, admincredentialtoken.FieldID, selector),
 			sqlgraph.To(user.Table, user.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, false, admincredentialtoken.UserTable, admincredentialtoken.UserColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryRole chains the current query on the "role" edge.
+func (_q *AdminCredentialTokenQuery) QueryRole() *RoleQuery {
+	query := (&RoleClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(admincredentialtoken.Table, admincredentialtoken.FieldID, selector),
+			sqlgraph.To(role.Table, role.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, admincredentialtoken.RoleTable, admincredentialtoken.RoleColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -277,6 +301,7 @@ func (_q *AdminCredentialTokenQuery) Clone() *AdminCredentialTokenQuery {
 		inters:     append([]Interceptor{}, _q.inters...),
 		predicates: append([]predicate.AdminCredentialToken{}, _q.predicates...),
 		withUser:   _q.withUser.Clone(),
+		withRole:   _q.withRole.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -292,6 +317,17 @@ func (_q *AdminCredentialTokenQuery) WithUser(opts ...func(*UserQuery)) *AdminCr
 		opt(query)
 	}
 	_q.withUser = query
+	return _q
+}
+
+// WithRole tells the query-builder to eager-load the nodes that are connected to
+// the "role" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AdminCredentialTokenQuery) WithRole(opts ...func(*RoleQuery)) *AdminCredentialTokenQuery {
+	query := (&RoleClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withRole = query
 	return _q
 }
 
@@ -373,8 +409,9 @@ func (_q *AdminCredentialTokenQuery) sqlAll(ctx context.Context, hooks ...queryH
 	var (
 		nodes       = []*AdminCredentialToken{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [2]bool{
 			_q.withUser != nil,
+			_q.withRole != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -404,6 +441,12 @@ func (_q *AdminCredentialTokenQuery) sqlAll(ctx context.Context, hooks ...queryH
 			return nil, err
 		}
 	}
+	if query := _q.withRole; query != nil {
+		if err := _q.loadRole(ctx, query, nodes, nil,
+			func(n *AdminCredentialToken, e *Role) { n.Edges.Role = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
 }
 
@@ -411,7 +454,10 @@ func (_q *AdminCredentialTokenQuery) loadUser(ctx context.Context, query *UserQu
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*AdminCredentialToken)
 	for i := range nodes {
-		fk := nodes[i].UserID
+		if nodes[i].UserID == nil {
+			continue
+		}
+		fk := *nodes[i].UserID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -429,6 +475,38 @@ func (_q *AdminCredentialTokenQuery) loadUser(ctx context.Context, query *UserQu
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "user_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *AdminCredentialTokenQuery) loadRole(ctx context.Context, query *RoleQuery, nodes []*AdminCredentialToken, init func(*AdminCredentialToken), assign func(*AdminCredentialToken, *Role)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*AdminCredentialToken)
+	for i := range nodes {
+		if nodes[i].RoleID == nil {
+			continue
+		}
+		fk := *nodes[i].RoleID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(role.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "role_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -467,6 +545,9 @@ func (_q *AdminCredentialTokenQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withUser != nil {
 			_spec.Node.AddColumnOnce(admincredentialtoken.FieldUserID)
+		}
+		if _q.withRole != nil {
+			_spec.Node.AddColumnOnce(admincredentialtoken.FieldRoleID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

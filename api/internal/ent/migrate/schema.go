@@ -15,10 +15,13 @@ var (
 		{Name: "kind", Type: field.TypeString, Size: 16, SchemaType: map[string]string{"postgres": "varchar(16)"}},
 		{Name: "token_hash", Type: field.TypeString, Unique: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
 		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "email", Type: field.TypeString, Nullable: true, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "shop_id", Type: field.TypeInt, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime},
 		{Name: "used_at", Type: field.TypeTime, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
-		{Name: "user_id", Type: field.TypeInt},
+		{Name: "user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "role_id", Type: field.TypeInt, Nullable: true},
 	}
 	// AdminCredentialTokensTable holds the schema information for the "admin_credential_tokens" table.
 	AdminCredentialTokensTable = &schema.Table{
@@ -28,8 +31,14 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "admin_credential_tokens_users_user",
-				Columns:    []*schema.Column{AdminCredentialTokensColumns[7]},
+				Columns:    []*schema.Column{AdminCredentialTokensColumns[9]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "admin_credential_tokens_roles_role",
+				Columns:    []*schema.Column{AdminCredentialTokensColumns[10]},
+				RefColumns: []*schema.Column{RolesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 		},
@@ -37,7 +46,12 @@ var (
 			{
 				Name:    "admincredentialtoken_user_id_kind",
 				Unique:  false,
-				Columns: []*schema.Column{AdminCredentialTokensColumns[7], AdminCredentialTokensColumns[1]},
+				Columns: []*schema.Column{AdminCredentialTokensColumns[9], AdminCredentialTokensColumns[1]},
+			},
+			{
+				Name:    "admincredentialtoken_shop_id_email",
+				Unique:  false,
+				Columns: []*schema.Column{AdminCredentialTokensColumns[5], AdminCredentialTokensColumns[4]},
 			},
 		},
 	}
@@ -866,6 +880,7 @@ var (
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "name", Type: field.TypeString, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
 		{Name: "scope", Type: field.TypeString, Size: 20, SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "merchant_assignable", Type: field.TypeBool, Default: false},
 	}
 	// RolesTable holds the schema information for the "roles" table.
 	RolesTable = &schema.Table{
@@ -1172,6 +1187,7 @@ var (
 	// ShopUserColumns holds the columns for the "shop_user" table.
 	ShopUserColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "status", Type: field.TypeInt16, Default: 1},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "shop_id", Type: field.TypeInt},
 		{Name: "user_id", Type: field.TypeInt},
@@ -1184,13 +1200,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shop_user_shops_shop",
-				Columns:    []*schema.Column{ShopUserColumns[2]},
+				Columns:    []*schema.Column{ShopUserColumns[3]},
 				RefColumns: []*schema.Column{ShopsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shop_user_users_user",
-				Columns:    []*schema.Column{ShopUserColumns[3]},
+				Columns:    []*schema.Column{ShopUserColumns[4]},
 				RefColumns: []*schema.Column{UsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1199,12 +1215,12 @@ var (
 			{
 				Name:    "shopuser_shop_id_user_id",
 				Unique:  true,
-				Columns: []*schema.Column{ShopUserColumns[2], ShopUserColumns[3]},
+				Columns: []*schema.Column{ShopUserColumns[3], ShopUserColumns[4]},
 			},
 			{
 				Name:    "shopuser_user_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShopUserColumns[3]},
+				Columns: []*schema.Column{ShopUserColumns[4]},
 			},
 		},
 	}
@@ -1455,11 +1471,14 @@ var (
 
 func init() {
 	AdminCredentialTokensTable.ForeignKeys[0].RefTable = UsersTable
+	AdminCredentialTokensTable.ForeignKeys[1].RefTable = RolesTable
 	AdminCredentialTokensTable.Annotation = &entsql.Annotation{
 		Table: "admin_credential_tokens",
 	}
 	AdminCredentialTokensTable.Annotation.Checks = map[string]string{
-		"admin_credential_tokens_kind_check": "kind IN ('setup', 'reset')",
+		"admin_credential_tokens_invite_shape_check": "(kind = 'invite') = (shop_id IS NOT NULL AND role_id IS NOT NULL AND email IS NOT NULL)",
+		"admin_credential_tokens_kind_check":         "kind IN ('setup', 'reset', 'invite')",
+		"admin_credential_tokens_user_shape_check":   "(kind <> 'invite') = (user_id IS NOT NULL)",
 	}
 	CartsTable.ForeignKeys[0].RefTable = ShopsTable
 	CartsTable.ForeignKeys[1].RefTable = MembersTable
@@ -1652,6 +1671,9 @@ func init() {
 	ShopUserTable.ForeignKeys[1].RefTable = UsersTable
 	ShopUserTable.Annotation = &entsql.Annotation{
 		Table: "shop_user",
+	}
+	ShopUserTable.Annotation.Checks = map[string]string{
+		"shop_user_status_check": "status IN (0, 1)",
 	}
 	SitesTable.Annotation = &entsql.Annotation{}
 	SitesTable.Annotation.Checks = map[string]string{

@@ -5,6 +5,7 @@ package ent
 import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
+	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"strings"
 	"time"
@@ -19,13 +20,19 @@ type AdminCredentialToken struct {
 	// ID of the ent.
 	ID int `json:"id,omitempty"`
 	// UserID holds the value of the "user_id" field.
-	UserID int `json:"user_id,omitempty"`
+	UserID *int `json:"user_id,omitempty"`
 	// Kind holds the value of the "kind" field.
 	Kind string `json:"kind,omitempty"`
 	// TokenHash holds the value of the "token_hash" field.
 	TokenHash string `json:"token_hash,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy *int `json:"created_by,omitempty"`
+	// Email holds the value of the "email" field.
+	Email *string `json:"email,omitempty"`
+	// ShopID holds the value of the "shop_id" field.
+	ShopID *int `json:"shop_id,omitempty"`
+	// RoleID holds the value of the "role_id" field.
+	RoleID *int `json:"role_id,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt time.Time `json:"expires_at,omitempty"`
 	// UsedAt holds the value of the "used_at" field.
@@ -42,9 +49,11 @@ type AdminCredentialToken struct {
 type AdminCredentialTokenEdges struct {
 	// User holds the value of the user edge.
 	User *User `json:"user,omitempty"`
+	// Role holds the value of the role edge.
+	Role *Role `json:"role,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // UserOrErr returns the User value or an error if the edge
@@ -58,14 +67,25 @@ func (e AdminCredentialTokenEdges) UserOrErr() (*User, error) {
 	return nil, &NotLoadedError{edge: "user"}
 }
 
+// RoleOrErr returns the Role value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e AdminCredentialTokenEdges) RoleOrErr() (*Role, error) {
+	if e.Role != nil {
+		return e.Role, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: role.Label}
+	}
+	return nil, &NotLoadedError{edge: "role"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*AdminCredentialToken) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case admincredentialtoken.FieldID, admincredentialtoken.FieldUserID, admincredentialtoken.FieldCreatedBy:
+		case admincredentialtoken.FieldID, admincredentialtoken.FieldUserID, admincredentialtoken.FieldCreatedBy, admincredentialtoken.FieldShopID, admincredentialtoken.FieldRoleID:
 			values[i] = new(sql.NullInt64)
-		case admincredentialtoken.FieldKind, admincredentialtoken.FieldTokenHash:
+		case admincredentialtoken.FieldKind, admincredentialtoken.FieldTokenHash, admincredentialtoken.FieldEmail:
 			values[i] = new(sql.NullString)
 		case admincredentialtoken.FieldExpiresAt, admincredentialtoken.FieldUsedAt, admincredentialtoken.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -94,7 +114,8 @@ func (_m *AdminCredentialToken) assignValues(columns []string, values []any) err
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
-				_m.UserID = int(value.Int64)
+				_m.UserID = new(int)
+				*_m.UserID = int(value.Int64)
 			}
 		case admincredentialtoken.FieldKind:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -114,6 +135,27 @@ func (_m *AdminCredentialToken) assignValues(columns []string, values []any) err
 			} else if value.Valid {
 				_m.CreatedBy = new(int)
 				*_m.CreatedBy = int(value.Int64)
+			}
+		case admincredentialtoken.FieldEmail:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field email", values[i])
+			} else if value.Valid {
+				_m.Email = new(string)
+				*_m.Email = value.String
+			}
+		case admincredentialtoken.FieldShopID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field shop_id", values[i])
+			} else if value.Valid {
+				_m.ShopID = new(int)
+				*_m.ShopID = int(value.Int64)
+			}
+		case admincredentialtoken.FieldRoleID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field role_id", values[i])
+			} else if value.Valid {
+				_m.RoleID = new(int)
+				*_m.RoleID = int(value.Int64)
 			}
 		case admincredentialtoken.FieldExpiresAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -152,6 +194,11 @@ func (_m *AdminCredentialToken) QueryUser() *UserQuery {
 	return NewAdminCredentialTokenClient(_m.config).QueryUser(_m)
 }
 
+// QueryRole queries the "role" edge of the AdminCredentialToken entity.
+func (_m *AdminCredentialToken) QueryRole() *RoleQuery {
+	return NewAdminCredentialTokenClient(_m.config).QueryRole(_m)
+}
+
 // Update returns a builder for updating this AdminCredentialToken.
 // Note that you need to call AdminCredentialToken.Unwrap() before calling this method if this AdminCredentialToken
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -175,8 +222,10 @@ func (_m *AdminCredentialToken) String() string {
 	var builder strings.Builder
 	builder.WriteString("AdminCredentialToken(")
 	builder.WriteString(fmt.Sprintf("id=%v, ", _m.ID))
-	builder.WriteString("user_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	if v := _m.UserID; v != nil {
+		builder.WriteString("user_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("kind=")
 	builder.WriteString(_m.Kind)
@@ -186,6 +235,21 @@ func (_m *AdminCredentialToken) String() string {
 	builder.WriteString(", ")
 	if v := _m.CreatedBy; v != nil {
 		builder.WriteString("created_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.Email; v != nil {
+		builder.WriteString("email=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ShopID; v != nil {
+		builder.WriteString("shop_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RoleID; v != nil {
+		builder.WriteString("role_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -105,8 +105,11 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	accountService := &account.Service{
 		Client: client, Engine: engine, Refresh: refresh, Delivery: account.ManualDelivery{},
 		PublicURL: cfg.AdminPublicURL, SetupTTL: cfg.AdminSetupTokenTTL, ResetTTL: cfg.AdminResetTokenTTL,
+		InviteTTL: cfg.AdminInviteTokenTTL,
 	}
 	deps.Accounts = &httpapi.AccountsHandler{Service: accountService, Authz: authz, Log: a.log}
+	deps.Team = &httpapi.TeamHandler{Service: accountService, Engine: engine, Authz: authz, Log: a.log}
+	deps.AdminInviteRateLimit = httpapi.NewAdminInviteRateLimit(limiter, cfg.RateLimit)
 	deps.Roles = &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: a.log}
 
 	// Domain events → cache invalidation (design D8: 失效集中於領域事件層).

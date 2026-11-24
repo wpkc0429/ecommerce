@@ -143,6 +143,9 @@ type Config struct {
 	// password setup (new account) / reset link stays valid. 72h / 24h.
 	AdminSetupTokenTTL time.Duration
 	AdminResetTokenTTL time.Duration
+	// AdminInviteTokenTTL bounds a shop invitation link (change
+	// merchant-staff-role). 7 days.
+	AdminInviteTokenTTL time.Duration
 
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
@@ -342,6 +345,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.AdminResetTokenTTL, err = parseDuration("ADMIN_RESET_TOKEN_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
+	if cfg.AdminInviteTokenTTL, err = parseDuration("ADMIN_INVITE_TOKEN_TTL", 7*24*time.Hour); err != nil {
 		return nil, err
 	}
 	if cfg.AdminPublicURL, err = parseAdminPublicURL(getenv("ADMIN_PUBLIC_URL", "http://localhost:3001")); err != nil {

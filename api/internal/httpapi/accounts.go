@@ -55,6 +55,14 @@ func writeAccountError(w http.ResponseWriter, log *slog.Logger, err error) {
 		httpx.Conflict(w, ce.Message)
 	case errors.Is(err, account.ErrEmailTaken):
 		httpx.Conflict(w, "an account with this email already exists")
+	case errors.Is(err, account.ErrAlreadyMember):
+		httpx.Conflict(w, "this e-mail is already a member of this shop")
+	case errors.Is(err, account.ErrAccountExists):
+		httpx.Conflict(w, "an account with this e-mail already exists; sign in first to accept the invitation")
+	case errors.Is(err, account.ErrSelfMembership):
+		httpx.Conflict(w, "you cannot change your own membership")
+	case errors.Is(err, account.ErrNotDelegable), errors.Is(err, account.ErrWrongAccount):
+		httpx.Forbidden(w)
 	case errors.Is(err, account.ErrSelfDisable):
 		httpx.Conflict(w, "you cannot disable your own account")
 	case errors.Is(err, account.ErrLastSuperAdmin):

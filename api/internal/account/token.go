@@ -95,7 +95,11 @@ func (s *Service) issueTx(ctx context.Context, tx *ent.Tx, u *ent.User, kind str
 // exactly once, so of any number of concurrent consumers one succeeds.
 // Unknown, expired and already-used tokens are indistinguishable
 // (ErrTokenInvalid).
-func consumeTx(ctx context.Context, tx *ent.Tx, plain string) (*ent.AdminCredentialToken, error) {
+//
+// kinds restricts what may be spent here: the password-setup endpoint passes
+// setup/reset and the invitation endpoints pass invite, so a token minted for
+// one purpose can never be spent through the other's endpoint.
+func consumeTx(ctx context.Context, tx *ent.Tx, plain string, kinds ...string) (*ent.AdminCredentialToken, error) {
 	if plain == "" {
 		return nil, ErrTokenInvalid
 	}
@@ -103,6 +107,7 @@ func consumeTx(ctx context.Context, tx *ent.Tx, plain string) (*ent.AdminCredent
 	n, err := tx.AdminCredentialToken.Update().
 		Where(
 			admincredentialtoken.TokenHashEQ(hash),
+			admincredentialtoken.KindIn(kinds...),
 			admincredentialtoken.UsedAtIsNil(),
 			admincredentialtoken.ExpiresAtGT(time.Now()),
 		).

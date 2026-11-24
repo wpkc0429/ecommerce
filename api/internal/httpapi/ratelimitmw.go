@@ -206,6 +206,17 @@ func NewMemberRefreshRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig)
 	})
 }
 
+// NewAdminInviteRateLimit bounds shop invitation creation per (shop, caller)
+// (change merchant-staff-role, design D7): a stolen owner token must not be
+// usable to enumerate which e-mails already have back-office accounts. It runs
+// after the RBAC guard, so only authorized callers consume the bucket. Reuses
+// the login "broad" thresholds.
+func NewAdminInviteRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig) func(http.Handler) http.Handler {
+	return newAuthRateLimitMW(l, []rateLimitRule{
+		{limit: cfg.LoginBroadLimit, window: cfg.LoginBroadWindow, keyFn: inviteKey},
+	})
+}
+
 // NewAdminPasswordSetupRateLimit builds the rate limit middleware for the two
 // unauthenticated password setup endpoints (change platform-account-provisioning).
 // IP-scoped only: the body carries a 256-bit token, not an email, so there is

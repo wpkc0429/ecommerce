@@ -55,6 +55,7 @@ type shippingEnv struct {
 	editorA int // shop A role: shipping_method.view/create/edit + shipment.view/create/update (mirrors seed "editor" breadth — no shipping_method.delete)
 	viewerA int // shop A role WITHOUT any shipping_method.*/shipment.* permission
 	ownerB  int // merchant_owner of shop B: cross-shop isolation checks
+	staffA  int // shipment.view/create/update but NOT shipment.return (change merchant-staff-role)
 
 	seq int // fixture uniqueness counter
 }
@@ -71,12 +72,13 @@ func newShippingEnv(t *testing.T) *shippingEnv {
 
 	allNodes := []string{
 		"shipping_method.view", "shipping_method.create", "shipping_method.edit", "shipping_method.delete",
-		"shipment.view", "shipment.create", "shipment.update",
+		"shipment.view", "shipment.create", "shipment.update", "shipment.return",
 	}
 	editorNodes := []string{
 		"shipping_method.view", "shipping_method.create", "shipping_method.edit",
-		"shipment.view", "shipment.create", "shipment.update",
+		"shipment.view", "shipment.create", "shipment.update", "shipment.return",
 	}
+	staffNodes := []string{"shipment.view", "shipment.create", "shipment.update"} // no shipment.return
 	permIDs := map[string]int{}
 	for _, p := range allNodes {
 		permIDs[p] = client.Permission.Create().SetName(p).SaveX(ctx).ID
@@ -90,6 +92,10 @@ func newShippingEnv(t *testing.T) *shippingEnv {
 		client.RolePermission.Create().SetRoleID(editorRole.ID).SetPermissionID(permIDs[p]).SaveX(ctx)
 	}
 	viewerRole := client.Role.Create().SetName("viewer_no_shipping_perms").SetScope("merchant").SaveX(ctx) // no permissions granted
+	staffRole := client.Role.Create().SetName("staff").SetScope("merchant").SaveX(ctx)
+	for _, p := range staffNodes {
+		client.RolePermission.Create().SetRoleID(staffRole.ID).SetPermissionID(permIDs[p]).SaveX(ctx)
+	}
 
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
@@ -115,6 +121,10 @@ func newShippingEnv(t *testing.T) *shippingEnv {
 	e.viewerA = client.User.Create().SetEmail("shipping-viewer-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
 	client.ShopUser.Create().SetShopID(e.shopA).SetUserID(e.viewerA).SaveX(ctx)
 	client.RoleUser.Create().SetUserID(e.viewerA).SetRoleID(viewerRole.ID).SetShopID(e.shopA).SaveX(ctx)
+
+	e.staffA = client.User.Create().SetEmail("shipping-staff-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
+	client.ShopUser.Create().SetShopID(e.shopA).SetUserID(e.staffA).SaveX(ctx)
+	client.RoleUser.Create().SetUserID(e.staffA).SetRoleID(staffRole.ID).SetShopID(e.shopA).SaveX(ctx)
 
 	e.ownerB = client.User.Create().SetEmail("shipping-owner-b@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
 	client.ShopUser.Create().SetShopID(e.shopB).SetUserID(e.ownerB).SaveX(ctx)
@@ -424,6 +434,60 @@ func TestShipmentEndToEndFlow(t *testing.T) {
 	}
 	if mine["tracking_number"] != "TRACK-123" {
 		t.Fatalf("expected tracking number to round-trip, got %+v", mine)
+	}
+}
+
+// Change merchant-staff-role (shipping-logistics spec): returning a shipment
+// needs shipment.return on top of shipment.update. A refusal leaves the
+// shipment, the order and the points untouched; delivering is unaffected.
+func TestStaffCanDeliverButNotReturn(t *testing.T) {
+	e := newShippingEnv(t)
+	ctx := context.Background()
+	orderID := e.checkoutOrder(t, e.shopA, e.memberA1, e.shopADomain, 1000)
+
+	code, created := e.adminCallJSON(t, e.staffA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", orderID)), map[string]any{
+		"carrier": "X", "tracking_number": "T-STAFF",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("staff create shipment: want 201, got %d: %+v", code, created)
+	}
+	shipmentID := int(created["id"].(float64))
+	path := e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments/%d", orderID, shipmentID))
+
+	// Return is refused before anything changes.
+	code, _ = e.adminCallJSON(t, e.staffA, "PUT", path, map[string]any{"status": "returned"})
+	if code != http.StatusForbidden {
+		t.Fatalf("staff return: want 403, got %d", code)
+	}
+	o, err := e.orderSvc.GetOrderAdmin(ctx, e.shopA, orderID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if o.FulfillmentStatus != shipping.ShippedStatus {
+		t.Fatalf("a refused return changed fulfillment_status to %d", o.FulfillmentStatus)
+	}
+
+	// The editor-shaped role keeps the ability (same request, same shipment).
+	code, _ = e.adminCallJSON(t, e.editorA, "PUT", path, map[string]any{"status": "returned"})
+	if code != http.StatusOK {
+		t.Fatalf("editor return: want 200, got %d", code)
+	}
+
+	// Delivered works for staff on another order, and a return stays refused
+	// (403 — the permission check precedes the state-machine's 409).
+	order2 := e.checkoutOrder(t, e.shopA, e.memberA2, e.shopADomain, 1000)
+	code, created = e.adminCallJSON(t, e.staffA, "POST", e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments", order2)), map[string]any{
+		"carrier": "X", "tracking_number": "T-STAFF-2",
+	})
+	if code != http.StatusCreated {
+		t.Fatalf("staff create shipment 2: want 201, got %d", code)
+	}
+	path2 := e.shopPath(e.shopA, fmt.Sprintf("/orders/%d/shipments/%d", order2, int(created["id"].(float64))))
+	if code, _ = e.adminCallJSON(t, e.staffA, "PUT", path2, map[string]any{"status": "delivered"}); code != http.StatusOK {
+		t.Fatalf("staff deliver: want 200, got %d", code)
+	}
+	if code, _ = e.adminCallJSON(t, e.staffA, "PUT", path2, map[string]any{"status": "returned"}); code != http.StatusForbidden {
+		t.Fatalf("staff return after delivery: want 403, got %d", code)
 	}
 }
 

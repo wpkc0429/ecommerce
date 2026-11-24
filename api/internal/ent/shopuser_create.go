@@ -36,6 +36,20 @@ func (_c *ShopUserCreate) SetUserID(v int) *ShopUserCreate {
 	return _c
 }
 
+// SetStatus sets the "status" field.
+func (_c *ShopUserCreate) SetStatus(v int16) *ShopUserCreate {
+	_c.mutation.SetStatus(v)
+	return _c
+}
+
+// SetNillableStatus sets the "status" field if the given value is not nil.
+func (_c *ShopUserCreate) SetNillableStatus(v *int16) *ShopUserCreate {
+	if v != nil {
+		_c.SetStatus(*v)
+	}
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *ShopUserCreate) SetCreatedAt(v time.Time) *ShopUserCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -95,6 +109,10 @@ func (_c *ShopUserCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *ShopUserCreate) defaults() {
+	if _, ok := _c.mutation.Status(); !ok {
+		v := shopuser.DefaultStatus
+		_c.mutation.SetStatus(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := shopuser.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -108,6 +126,9 @@ func (_c *ShopUserCreate) check() error {
 	}
 	if _, ok := _c.mutation.UserID(); !ok {
 		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "ShopUser.user_id"`)}
+	}
+	if _, ok := _c.mutation.Status(); !ok {
+		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "ShopUser.status"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "ShopUser.created_at"`)}
@@ -145,6 +166,10 @@ func (_c *ShopUserCreate) createSpec() (*ShopUser, *sqlgraph.CreateSpec) {
 		_spec = sqlgraph.NewCreateSpec(shopuser.Table, sqlgraph.NewFieldSpec(shopuser.FieldID, field.TypeInt))
 	)
 	_spec.OnConflict = _c.conflict
+	if value, ok := _c.mutation.Status(); ok {
+		_spec.SetField(shopuser.FieldStatus, field.TypeInt16, value)
+		_node.Status = value
+	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(shopuser.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
@@ -259,6 +284,24 @@ func (u *ShopUserUpsert) UpdateUserID() *ShopUserUpsert {
 	return u
 }
 
+// SetStatus sets the "status" field.
+func (u *ShopUserUpsert) SetStatus(v int16) *ShopUserUpsert {
+	u.Set(shopuser.FieldStatus, v)
+	return u
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ShopUserUpsert) UpdateStatus() *ShopUserUpsert {
+	u.SetExcluded(shopuser.FieldStatus)
+	return u
+}
+
+// AddStatus adds v to the "status" field.
+func (u *ShopUserUpsert) AddStatus(v int16) *ShopUserUpsert {
+	u.Add(shopuser.FieldStatus, v)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -329,6 +372,27 @@ func (u *ShopUserUpsertOne) SetUserID(v int) *ShopUserUpsertOne {
 func (u *ShopUserUpsertOne) UpdateUserID() *ShopUserUpsertOne {
 	return u.Update(func(s *ShopUserUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *ShopUserUpsertOne) SetStatus(v int16) *ShopUserUpsertOne {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// AddStatus adds v to the "status" field.
+func (u *ShopUserUpsertOne) AddStatus(v int16) *ShopUserUpsertOne {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.AddStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ShopUserUpsertOne) UpdateStatus() *ShopUserUpsertOne {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.UpdateStatus()
 	})
 }
 
@@ -568,6 +632,27 @@ func (u *ShopUserUpsertBulk) SetUserID(v int) *ShopUserUpsertBulk {
 func (u *ShopUserUpsertBulk) UpdateUserID() *ShopUserUpsertBulk {
 	return u.Update(func(s *ShopUserUpsert) {
 		s.UpdateUserID()
+	})
+}
+
+// SetStatus sets the "status" field.
+func (u *ShopUserUpsertBulk) SetStatus(v int16) *ShopUserUpsertBulk {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.SetStatus(v)
+	})
+}
+
+// AddStatus adds v to the "status" field.
+func (u *ShopUserUpsertBulk) AddStatus(v int16) *ShopUserUpsertBulk {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.AddStatus(v)
+	})
+}
+
+// UpdateStatus sets the "status" field to the value that was provided on create.
+func (u *ShopUserUpsertBulk) UpdateStatus() *ShopUserUpsertBulk {
+	return u.Update(func(s *ShopUserUpsert) {
+		s.UpdateStatus()
 	})
 }
 

@@ -643,6 +643,22 @@ func (c *AdminCredentialTokenClient) QueryUser(_m *AdminCredentialToken) *UserQu
 	return query
 }
 
+// QueryRole queries the role edge of a AdminCredentialToken.
+func (c *AdminCredentialTokenClient) QueryRole(_m *AdminCredentialToken) *RoleQuery {
+	query := (&RoleClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(admincredentialtoken.Table, admincredentialtoken.FieldID, id),
+			sqlgraph.To(role.Table, role.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, admincredentialtoken.RoleTable, admincredentialtoken.RoleColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *AdminCredentialTokenClient) Hooks() []Hook {
 	return c.hooks.AdminCredentialToken

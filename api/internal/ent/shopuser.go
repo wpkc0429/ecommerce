@@ -23,6 +23,8 @@ type ShopUser struct {
 	ShopID int `json:"shop_id,omitempty"`
 	// UserID holds the value of the "user_id" field.
 	UserID int `json:"user_id,omitempty"`
+	// Status holds the value of the "status" field.
+	Status int16 `json:"status,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
@@ -69,7 +71,7 @@ func (*ShopUser) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shopuser.FieldID, shopuser.FieldShopID, shopuser.FieldUserID:
+		case shopuser.FieldID, shopuser.FieldShopID, shopuser.FieldUserID, shopuser.FieldStatus:
 			values[i] = new(sql.NullInt64)
 		case shopuser.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -105,6 +107,12 @@ func (_m *ShopUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field user_id", values[i])
 			} else if value.Valid {
 				_m.UserID = int(value.Int64)
+			}
+		case shopuser.FieldStatus:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field status", values[i])
+			} else if value.Valid {
+				_m.Status = int16(value.Int64)
 			}
 		case shopuser.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -163,6 +171,9 @@ func (_m *ShopUser) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("user_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.UserID))
+	builder.WriteString(", ")
+	builder.WriteString("status=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Status))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

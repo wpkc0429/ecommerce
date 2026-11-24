@@ -22,6 +22,12 @@ const (
 	FieldTokenHash = "token_hash"
 	// FieldCreatedBy holds the string denoting the created_by field in the database.
 	FieldCreatedBy = "created_by"
+	// FieldEmail holds the string denoting the email field in the database.
+	FieldEmail = "email"
+	// FieldShopID holds the string denoting the shop_id field in the database.
+	FieldShopID = "shop_id"
+	// FieldRoleID holds the string denoting the role_id field in the database.
+	FieldRoleID = "role_id"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
 	// FieldUsedAt holds the string denoting the used_at field in the database.
@@ -30,6 +36,8 @@ const (
 	FieldCreatedAt = "created_at"
 	// EdgeUser holds the string denoting the user edge name in mutations.
 	EdgeUser = "user"
+	// EdgeRole holds the string denoting the role edge name in mutations.
+	EdgeRole = "role"
 	// Table holds the table name of the admincredentialtoken in the database.
 	Table = "admin_credential_tokens"
 	// UserTable is the table that holds the user relation/edge.
@@ -39,6 +47,13 @@ const (
 	UserInverseTable = "users"
 	// UserColumn is the table column denoting the user relation/edge.
 	UserColumn = "user_id"
+	// RoleTable is the table that holds the role relation/edge.
+	RoleTable = "admin_credential_tokens"
+	// RoleInverseTable is the table name for the Role entity.
+	// It exists in this package in order to avoid circular dependency with the "role" package.
+	RoleInverseTable = "roles"
+	// RoleColumn is the table column denoting the role relation/edge.
+	RoleColumn = "role_id"
 )
 
 // Columns holds all SQL columns for admincredentialtoken fields.
@@ -48,6 +63,9 @@ var Columns = []string{
 	FieldKind,
 	FieldTokenHash,
 	FieldCreatedBy,
+	FieldEmail,
+	FieldShopID,
+	FieldRoleID,
 	FieldExpiresAt,
 	FieldUsedAt,
 	FieldCreatedAt,
@@ -68,6 +86,8 @@ var (
 	KindValidator func(string) error
 	// TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
 	TokenHashValidator func(string) error
+	// EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	EmailValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 )
@@ -100,6 +120,21 @@ func ByCreatedBy(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedBy, opts...).ToFunc()
 }
 
+// ByEmail orders the results by the email field.
+func ByEmail(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEmail, opts...).ToFunc()
+}
+
+// ByShopID orders the results by the shop_id field.
+func ByShopID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldShopID, opts...).ToFunc()
+}
+
+// ByRoleID orders the results by the role_id field.
+func ByRoleID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRoleID, opts...).ToFunc()
+}
+
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
@@ -121,10 +156,24 @@ func ByUserField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUserStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByRoleField orders the results by role field.
+func ByRoleField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newRoleStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newUserStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UserInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, false, UserTable, UserColumn),
+	)
+}
+func newRoleStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(RoleInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, false, RoleTable, RoleColumn),
 	)
 }

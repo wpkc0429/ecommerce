@@ -28,10 +28,11 @@ import (
 // skipping it (one shop reading another's rows) is exactly the kind of bug no
 // feature test would ever notice.
 var notTenantOwned = map[string]string{
-	"role_user":       "RBAC grant: shop-scoped role assignment, read with shop_id = ? OR shop_id IS NULL",
-	"user_permission": "RBAC grant: shop-scoped direct permission, same NULL-union read",
-	"shop_user":       "platform membership: which users belong to which shop",
-	"site_shop":       "platform routing: which site/host maps to which shop",
+	"role_user":               "RBAC grant: shop-scoped role assignment, read with shop_id = ? OR shop_id IS NULL",
+	"user_permission":         "RBAC grant: shop-scoped direct permission, same NULL-union read",
+	"shop_user":               "platform membership: which users belong to which shop",
+	"site_shop":               "platform routing: which site/host maps to which shop",
+	"admin_credential_tokens": "shop invitations (change merchant-staff-role D5): looked up by token hash on unauthenticated endpoints, outside any tenant context",
 }
 
 // entTypeNames returns every ent entity type name, taken from the generated

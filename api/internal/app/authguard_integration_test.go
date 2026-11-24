@@ -28,9 +28,15 @@ import (
 //
 //	GET /api/v1/admin/me            reads users.status itself and answers 401
 //	GET /api/v1/admin/media/config  upload limits only, nothing tenant-specific
+//	POST /api/v1/admin/invitations/accept  the caller is not yet a member of what
+//	                                the invitation grants; the token plus the
+//	                                e-mail equality check are the authority, and
+//	                                the service refuses a disabled account
+//	                                (change merchant-staff-role)
 var expectedUnguardedAdminRoutes = []string{
 	"GET /api/v1/admin/me",
 	"GET /api/v1/admin/media/config",
+	"POST /api/v1/admin/invitations/accept",
 }
 
 var chiParam = regexp.MustCompile(`\{[^}]+\}`)

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
+	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"time"
 
@@ -41,6 +42,12 @@ func (_u *AdminCredentialTokenUpdate) SetNillableUserID(v *int) *AdminCredential
 	if v != nil {
 		_u.SetUserID(*v)
 	}
+	return _u
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (_u *AdminCredentialTokenUpdate) ClearUserID() *AdminCredentialTokenUpdate {
+	_u.mutation.ClearUserID()
 	return _u
 }
 
@@ -99,6 +106,73 @@ func (_u *AdminCredentialTokenUpdate) ClearCreatedBy() *AdminCredentialTokenUpda
 	return _u
 }
 
+// SetEmail sets the "email" field.
+func (_u *AdminCredentialTokenUpdate) SetEmail(v string) *AdminCredentialTokenUpdate {
+	_u.mutation.SetEmail(v)
+	return _u
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdate) SetNillableEmail(v *string) *AdminCredentialTokenUpdate {
+	if v != nil {
+		_u.SetEmail(*v)
+	}
+	return _u
+}
+
+// ClearEmail clears the value of the "email" field.
+func (_u *AdminCredentialTokenUpdate) ClearEmail() *AdminCredentialTokenUpdate {
+	_u.mutation.ClearEmail()
+	return _u
+}
+
+// SetShopID sets the "shop_id" field.
+func (_u *AdminCredentialTokenUpdate) SetShopID(v int) *AdminCredentialTokenUpdate {
+	_u.mutation.ResetShopID()
+	_u.mutation.SetShopID(v)
+	return _u
+}
+
+// SetNillableShopID sets the "shop_id" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdate) SetNillableShopID(v *int) *AdminCredentialTokenUpdate {
+	if v != nil {
+		_u.SetShopID(*v)
+	}
+	return _u
+}
+
+// AddShopID adds value to the "shop_id" field.
+func (_u *AdminCredentialTokenUpdate) AddShopID(v int) *AdminCredentialTokenUpdate {
+	_u.mutation.AddShopID(v)
+	return _u
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (_u *AdminCredentialTokenUpdate) ClearShopID() *AdminCredentialTokenUpdate {
+	_u.mutation.ClearShopID()
+	return _u
+}
+
+// SetRoleID sets the "role_id" field.
+func (_u *AdminCredentialTokenUpdate) SetRoleID(v int) *AdminCredentialTokenUpdate {
+	_u.mutation.SetRoleID(v)
+	return _u
+}
+
+// SetNillableRoleID sets the "role_id" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdate) SetNillableRoleID(v *int) *AdminCredentialTokenUpdate {
+	if v != nil {
+		_u.SetRoleID(*v)
+	}
+	return _u
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (_u *AdminCredentialTokenUpdate) ClearRoleID() *AdminCredentialTokenUpdate {
+	_u.mutation.ClearRoleID()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *AdminCredentialTokenUpdate) SetExpiresAt(v time.Time) *AdminCredentialTokenUpdate {
 	_u.mutation.SetExpiresAt(v)
@@ -138,6 +212,11 @@ func (_u *AdminCredentialTokenUpdate) SetUser(v *User) *AdminCredentialTokenUpda
 	return _u.SetUserID(v.ID)
 }
 
+// SetRole sets the "role" edge to the Role entity.
+func (_u *AdminCredentialTokenUpdate) SetRole(v *Role) *AdminCredentialTokenUpdate {
+	return _u.SetRoleID(v.ID)
+}
+
 // Mutation returns the AdminCredentialTokenMutation object of the builder.
 func (_u *AdminCredentialTokenUpdate) Mutation() *AdminCredentialTokenMutation {
 	return _u.mutation
@@ -146,6 +225,12 @@ func (_u *AdminCredentialTokenUpdate) Mutation() *AdminCredentialTokenMutation {
 // ClearUser clears the "user" edge to the User entity.
 func (_u *AdminCredentialTokenUpdate) ClearUser() *AdminCredentialTokenUpdate {
 	_u.mutation.ClearUser()
+	return _u
+}
+
+// ClearRole clears the "role" edge to the Role entity.
+func (_u *AdminCredentialTokenUpdate) ClearRole() *AdminCredentialTokenUpdate {
+	_u.mutation.ClearRole()
 	return _u
 }
 
@@ -188,8 +273,10 @@ func (_u *AdminCredentialTokenUpdate) check() error {
 			return &ValidationError{Name: "token_hash", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.token_hash": %w`, err)}
 		}
 	}
-	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "AdminCredentialToken.user"`)
+	if v, ok := _u.mutation.Email(); ok {
+		if err := admincredentialtoken.EmailValidator(v); err != nil {
+			return &ValidationError{Name: "email", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.email": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -227,6 +314,21 @@ func (_u *AdminCredentialTokenUpdate) sqlSave(ctx context.Context) (_node int, e
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(admincredentialtoken.FieldCreatedBy, field.TypeInt)
 	}
+	if value, ok := _u.mutation.Email(); ok {
+		_spec.SetField(admincredentialtoken.FieldEmail, field.TypeString, value)
+	}
+	if _u.mutation.EmailCleared() {
+		_spec.ClearField(admincredentialtoken.FieldEmail, field.TypeString)
+	}
+	if value, ok := _u.mutation.ShopID(); ok {
+		_spec.SetField(admincredentialtoken.FieldShopID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedShopID(); ok {
+		_spec.AddField(admincredentialtoken.FieldShopID, field.TypeInt, value)
+	}
+	if _u.mutation.ShopIDCleared() {
+		_spec.ClearField(admincredentialtoken.FieldShopID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(admincredentialtoken.FieldExpiresAt, field.TypeTime, value)
 	}
@@ -258,6 +360,35 @@ func (_u *AdminCredentialTokenUpdate) sqlSave(ctx context.Context) (_node int, e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoleCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   admincredentialtoken.RoleTable,
+			Columns: []string{admincredentialtoken.RoleColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(role.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoleIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   admincredentialtoken.RoleTable,
+			Columns: []string{admincredentialtoken.RoleColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(role.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -298,6 +429,12 @@ func (_u *AdminCredentialTokenUpdateOne) SetNillableUserID(v *int) *AdminCredent
 	if v != nil {
 		_u.SetUserID(*v)
 	}
+	return _u
+}
+
+// ClearUserID clears the value of the "user_id" field.
+func (_u *AdminCredentialTokenUpdateOne) ClearUserID() *AdminCredentialTokenUpdateOne {
+	_u.mutation.ClearUserID()
 	return _u
 }
 
@@ -356,6 +493,73 @@ func (_u *AdminCredentialTokenUpdateOne) ClearCreatedBy() *AdminCredentialTokenU
 	return _u
 }
 
+// SetEmail sets the "email" field.
+func (_u *AdminCredentialTokenUpdateOne) SetEmail(v string) *AdminCredentialTokenUpdateOne {
+	_u.mutation.SetEmail(v)
+	return _u
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdateOne) SetNillableEmail(v *string) *AdminCredentialTokenUpdateOne {
+	if v != nil {
+		_u.SetEmail(*v)
+	}
+	return _u
+}
+
+// ClearEmail clears the value of the "email" field.
+func (_u *AdminCredentialTokenUpdateOne) ClearEmail() *AdminCredentialTokenUpdateOne {
+	_u.mutation.ClearEmail()
+	return _u
+}
+
+// SetShopID sets the "shop_id" field.
+func (_u *AdminCredentialTokenUpdateOne) SetShopID(v int) *AdminCredentialTokenUpdateOne {
+	_u.mutation.ResetShopID()
+	_u.mutation.SetShopID(v)
+	return _u
+}
+
+// SetNillableShopID sets the "shop_id" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdateOne) SetNillableShopID(v *int) *AdminCredentialTokenUpdateOne {
+	if v != nil {
+		_u.SetShopID(*v)
+	}
+	return _u
+}
+
+// AddShopID adds value to the "shop_id" field.
+func (_u *AdminCredentialTokenUpdateOne) AddShopID(v int) *AdminCredentialTokenUpdateOne {
+	_u.mutation.AddShopID(v)
+	return _u
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (_u *AdminCredentialTokenUpdateOne) ClearShopID() *AdminCredentialTokenUpdateOne {
+	_u.mutation.ClearShopID()
+	return _u
+}
+
+// SetRoleID sets the "role_id" field.
+func (_u *AdminCredentialTokenUpdateOne) SetRoleID(v int) *AdminCredentialTokenUpdateOne {
+	_u.mutation.SetRoleID(v)
+	return _u
+}
+
+// SetNillableRoleID sets the "role_id" field if the given value is not nil.
+func (_u *AdminCredentialTokenUpdateOne) SetNillableRoleID(v *int) *AdminCredentialTokenUpdateOne {
+	if v != nil {
+		_u.SetRoleID(*v)
+	}
+	return _u
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (_u *AdminCredentialTokenUpdateOne) ClearRoleID() *AdminCredentialTokenUpdateOne {
+	_u.mutation.ClearRoleID()
+	return _u
+}
+
 // SetExpiresAt sets the "expires_at" field.
 func (_u *AdminCredentialTokenUpdateOne) SetExpiresAt(v time.Time) *AdminCredentialTokenUpdateOne {
 	_u.mutation.SetExpiresAt(v)
@@ -395,6 +599,11 @@ func (_u *AdminCredentialTokenUpdateOne) SetUser(v *User) *AdminCredentialTokenU
 	return _u.SetUserID(v.ID)
 }
 
+// SetRole sets the "role" edge to the Role entity.
+func (_u *AdminCredentialTokenUpdateOne) SetRole(v *Role) *AdminCredentialTokenUpdateOne {
+	return _u.SetRoleID(v.ID)
+}
+
 // Mutation returns the AdminCredentialTokenMutation object of the builder.
 func (_u *AdminCredentialTokenUpdateOne) Mutation() *AdminCredentialTokenMutation {
 	return _u.mutation
@@ -403,6 +612,12 @@ func (_u *AdminCredentialTokenUpdateOne) Mutation() *AdminCredentialTokenMutatio
 // ClearUser clears the "user" edge to the User entity.
 func (_u *AdminCredentialTokenUpdateOne) ClearUser() *AdminCredentialTokenUpdateOne {
 	_u.mutation.ClearUser()
+	return _u
+}
+
+// ClearRole clears the "role" edge to the Role entity.
+func (_u *AdminCredentialTokenUpdateOne) ClearRole() *AdminCredentialTokenUpdateOne {
+	_u.mutation.ClearRole()
 	return _u
 }
 
@@ -458,8 +673,10 @@ func (_u *AdminCredentialTokenUpdateOne) check() error {
 			return &ValidationError{Name: "token_hash", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.token_hash": %w`, err)}
 		}
 	}
-	if _u.mutation.UserCleared() && len(_u.mutation.UserIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "AdminCredentialToken.user"`)
+	if v, ok := _u.mutation.Email(); ok {
+		if err := admincredentialtoken.EmailValidator(v); err != nil {
+			return &ValidationError{Name: "email", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.email": %w`, err)}
+		}
 	}
 	return nil
 }
@@ -514,6 +731,21 @@ func (_u *AdminCredentialTokenUpdateOne) sqlSave(ctx context.Context) (_node *Ad
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(admincredentialtoken.FieldCreatedBy, field.TypeInt)
 	}
+	if value, ok := _u.mutation.Email(); ok {
+		_spec.SetField(admincredentialtoken.FieldEmail, field.TypeString, value)
+	}
+	if _u.mutation.EmailCleared() {
+		_spec.ClearField(admincredentialtoken.FieldEmail, field.TypeString)
+	}
+	if value, ok := _u.mutation.ShopID(); ok {
+		_spec.SetField(admincredentialtoken.FieldShopID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedShopID(); ok {
+		_spec.AddField(admincredentialtoken.FieldShopID, field.TypeInt, value)
+	}
+	if _u.mutation.ShopIDCleared() {
+		_spec.ClearField(admincredentialtoken.FieldShopID, field.TypeInt)
+	}
 	if value, ok := _u.mutation.ExpiresAt(); ok {
 		_spec.SetField(admincredentialtoken.FieldExpiresAt, field.TypeTime, value)
 	}
@@ -545,6 +777,35 @@ func (_u *AdminCredentialTokenUpdateOne) sqlSave(ctx context.Context) (_node *Ad
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(user.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.RoleCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   admincredentialtoken.RoleTable,
+			Columns: []string{admincredentialtoken.RoleColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(role.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RoleIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   admincredentialtoken.RoleTable,
+			Columns: []string{admincredentialtoken.RoleColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(role.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

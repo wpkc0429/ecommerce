@@ -82,7 +82,7 @@ func newPointsEnv(t *testing.T) *pointsEnv {
 		// shipAndReturn (the clawback end-to-end test) through the real
 		// admin shipment endpoints — not part of this change's own
 		// permission catalog additions.
-		"shipment.create", "shipment.update",
+		"shipment.create", "shipment.update", "shipment.return",
 	}
 	permIDs := map[string]int{}
 	for _, p := range allNodes {

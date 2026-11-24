@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpx"
 	"ksdevworks/ecommerce/api/internal/shipping"
@@ -317,12 +318,41 @@ func (h *ShippingHandler) advanceShipment(w http.ResponseWriter, r *http.Request
 		httpx.Unprocessable(w, `status must be "delivered" or "returned"`, nil)
 		return
 	}
+	// Returning a shipment needs shipment.return IN ADDITION to shipment.update
+	// (the route guard). It is checked here, before the service touches
+	// anything: a refusal leaves the shipment, the order and the customer's
+	// points exactly as they were (change merchant-staff-role, design D2).
+	if target == shipping.ReturnedStatus && !h.canReturn(w, r, shopID) {
+		return
+	}
 	sh, err := h.Service.AdvanceShipment(r.Context(), shopID, orderID, shipmentID, target)
 	if err != nil {
 		writeShippingError(w, h.Log, err)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, shipmentJSON(sh))
+}
+
+// canReturn decides shipment.return for the caller at this shop with the same
+// three-tier snapshot the route guards use; it writes the 401/403/500 itself
+// and returns false when the request must stop.
+func (h *ShippingHandler) canReturn(w http.ResponseWriter, r *http.Request, shopID int) bool {
+	id, ok := auth.AdminFrom(r.Context())
+	if !ok {
+		httpx.Unauthorized(w)
+		return false
+	}
+	snap, err := h.Authz.Engine.Snapshot(r.Context(), id.UserID, shopID)
+	if err != nil {
+		h.Log.Error("load authorization snapshot", "err", err)
+		httpx.Internal(w)
+		return false
+	}
+	if !snap.Allows("shipment.return") {
+		httpx.Forbidden(w)
+		return false
+	}
+	return true
 }
 
 func (h *ShippingHandler) listShipments(w http.ResponseWriter, r *http.Request) {

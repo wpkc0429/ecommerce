@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
+	"ksdevworks/ecommerce/api/internal/ent/role"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"time"
 
@@ -26,6 +27,14 @@ type AdminCredentialTokenCreate struct {
 // SetUserID sets the "user_id" field.
 func (_c *AdminCredentialTokenCreate) SetUserID(v int) *AdminCredentialTokenCreate {
 	_c.mutation.SetUserID(v)
+	return _c
+}
+
+// SetNillableUserID sets the "user_id" field if the given value is not nil.
+func (_c *AdminCredentialTokenCreate) SetNillableUserID(v *int) *AdminCredentialTokenCreate {
+	if v != nil {
+		_c.SetUserID(*v)
+	}
 	return _c
 }
 
@@ -51,6 +60,48 @@ func (_c *AdminCredentialTokenCreate) SetCreatedBy(v int) *AdminCredentialTokenC
 func (_c *AdminCredentialTokenCreate) SetNillableCreatedBy(v *int) *AdminCredentialTokenCreate {
 	if v != nil {
 		_c.SetCreatedBy(*v)
+	}
+	return _c
+}
+
+// SetEmail sets the "email" field.
+func (_c *AdminCredentialTokenCreate) SetEmail(v string) *AdminCredentialTokenCreate {
+	_c.mutation.SetEmail(v)
+	return _c
+}
+
+// SetNillableEmail sets the "email" field if the given value is not nil.
+func (_c *AdminCredentialTokenCreate) SetNillableEmail(v *string) *AdminCredentialTokenCreate {
+	if v != nil {
+		_c.SetEmail(*v)
+	}
+	return _c
+}
+
+// SetShopID sets the "shop_id" field.
+func (_c *AdminCredentialTokenCreate) SetShopID(v int) *AdminCredentialTokenCreate {
+	_c.mutation.SetShopID(v)
+	return _c
+}
+
+// SetNillableShopID sets the "shop_id" field if the given value is not nil.
+func (_c *AdminCredentialTokenCreate) SetNillableShopID(v *int) *AdminCredentialTokenCreate {
+	if v != nil {
+		_c.SetShopID(*v)
+	}
+	return _c
+}
+
+// SetRoleID sets the "role_id" field.
+func (_c *AdminCredentialTokenCreate) SetRoleID(v int) *AdminCredentialTokenCreate {
+	_c.mutation.SetRoleID(v)
+	return _c
+}
+
+// SetNillableRoleID sets the "role_id" field if the given value is not nil.
+func (_c *AdminCredentialTokenCreate) SetNillableRoleID(v *int) *AdminCredentialTokenCreate {
+	if v != nil {
+		_c.SetRoleID(*v)
 	}
 	return _c
 }
@@ -92,6 +143,11 @@ func (_c *AdminCredentialTokenCreate) SetNillableCreatedAt(v *time.Time) *AdminC
 // SetUser sets the "user" edge to the User entity.
 func (_c *AdminCredentialTokenCreate) SetUser(v *User) *AdminCredentialTokenCreate {
 	return _c.SetUserID(v.ID)
+}
+
+// SetRole sets the "role" edge to the Role entity.
+func (_c *AdminCredentialTokenCreate) SetRole(v *Role) *AdminCredentialTokenCreate {
+	return _c.SetRoleID(v.ID)
 }
 
 // Mutation returns the AdminCredentialTokenMutation object of the builder.
@@ -137,9 +193,6 @@ func (_c *AdminCredentialTokenCreate) defaults() {
 
 // check runs all checks and user-defined validators on the builder.
 func (_c *AdminCredentialTokenCreate) check() error {
-	if _, ok := _c.mutation.UserID(); !ok {
-		return &ValidationError{Name: "user_id", err: errors.New(`ent: missing required field "AdminCredentialToken.user_id"`)}
-	}
 	if _, ok := _c.mutation.Kind(); !ok {
 		return &ValidationError{Name: "kind", err: errors.New(`ent: missing required field "AdminCredentialToken.kind"`)}
 	}
@@ -156,14 +209,16 @@ func (_c *AdminCredentialTokenCreate) check() error {
 			return &ValidationError{Name: "token_hash", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.token_hash": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.Email(); ok {
+		if err := admincredentialtoken.EmailValidator(v); err != nil {
+			return &ValidationError{Name: "email", err: fmt.Errorf(`ent: validator failed for field "AdminCredentialToken.email": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.ExpiresAt(); !ok {
 		return &ValidationError{Name: "expires_at", err: errors.New(`ent: missing required field "AdminCredentialToken.expires_at"`)}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "AdminCredentialToken.created_at"`)}
-	}
-	if len(_c.mutation.UserIDs()) == 0 {
-		return &ValidationError{Name: "user", err: errors.New(`ent: missing required edge "AdminCredentialToken.user"`)}
 	}
 	return nil
 }
@@ -204,6 +259,14 @@ func (_c *AdminCredentialTokenCreate) createSpec() (*AdminCredentialToken, *sqlg
 		_spec.SetField(admincredentialtoken.FieldCreatedBy, field.TypeInt, value)
 		_node.CreatedBy = &value
 	}
+	if value, ok := _c.mutation.Email(); ok {
+		_spec.SetField(admincredentialtoken.FieldEmail, field.TypeString, value)
+		_node.Email = &value
+	}
+	if value, ok := _c.mutation.ShopID(); ok {
+		_spec.SetField(admincredentialtoken.FieldShopID, field.TypeInt, value)
+		_node.ShopID = &value
+	}
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(admincredentialtoken.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = value
@@ -230,7 +293,24 @@ func (_c *AdminCredentialTokenCreate) createSpec() (*AdminCredentialToken, *sqlg
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.UserID = nodes[0]
+		_node.UserID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.RoleIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: false,
+			Table:   admincredentialtoken.RoleTable,
+			Columns: []string{admincredentialtoken.RoleColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(role.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.RoleID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -297,6 +377,12 @@ func (u *AdminCredentialTokenUpsert) UpdateUserID() *AdminCredentialTokenUpsert 
 	return u
 }
 
+// ClearUserID clears the value of the "user_id" field.
+func (u *AdminCredentialTokenUpsert) ClearUserID() *AdminCredentialTokenUpsert {
+	u.SetNull(admincredentialtoken.FieldUserID)
+	return u
+}
+
 // SetKind sets the "kind" field.
 func (u *AdminCredentialTokenUpsert) SetKind(v string) *AdminCredentialTokenUpsert {
 	u.Set(admincredentialtoken.FieldKind, v)
@@ -342,6 +428,66 @@ func (u *AdminCredentialTokenUpsert) AddCreatedBy(v int) *AdminCredentialTokenUp
 // ClearCreatedBy clears the value of the "created_by" field.
 func (u *AdminCredentialTokenUpsert) ClearCreatedBy() *AdminCredentialTokenUpsert {
 	u.SetNull(admincredentialtoken.FieldCreatedBy)
+	return u
+}
+
+// SetEmail sets the "email" field.
+func (u *AdminCredentialTokenUpsert) SetEmail(v string) *AdminCredentialTokenUpsert {
+	u.Set(admincredentialtoken.FieldEmail, v)
+	return u
+}
+
+// UpdateEmail sets the "email" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsert) UpdateEmail() *AdminCredentialTokenUpsert {
+	u.SetExcluded(admincredentialtoken.FieldEmail)
+	return u
+}
+
+// ClearEmail clears the value of the "email" field.
+func (u *AdminCredentialTokenUpsert) ClearEmail() *AdminCredentialTokenUpsert {
+	u.SetNull(admincredentialtoken.FieldEmail)
+	return u
+}
+
+// SetShopID sets the "shop_id" field.
+func (u *AdminCredentialTokenUpsert) SetShopID(v int) *AdminCredentialTokenUpsert {
+	u.Set(admincredentialtoken.FieldShopID, v)
+	return u
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsert) UpdateShopID() *AdminCredentialTokenUpsert {
+	u.SetExcluded(admincredentialtoken.FieldShopID)
+	return u
+}
+
+// AddShopID adds v to the "shop_id" field.
+func (u *AdminCredentialTokenUpsert) AddShopID(v int) *AdminCredentialTokenUpsert {
+	u.Add(admincredentialtoken.FieldShopID, v)
+	return u
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (u *AdminCredentialTokenUpsert) ClearShopID() *AdminCredentialTokenUpsert {
+	u.SetNull(admincredentialtoken.FieldShopID)
+	return u
+}
+
+// SetRoleID sets the "role_id" field.
+func (u *AdminCredentialTokenUpsert) SetRoleID(v int) *AdminCredentialTokenUpsert {
+	u.Set(admincredentialtoken.FieldRoleID, v)
+	return u
+}
+
+// UpdateRoleID sets the "role_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsert) UpdateRoleID() *AdminCredentialTokenUpsert {
+	u.SetExcluded(admincredentialtoken.FieldRoleID)
+	return u
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (u *AdminCredentialTokenUpsert) ClearRoleID() *AdminCredentialTokenUpsert {
+	u.SetNull(admincredentialtoken.FieldRoleID)
 	return u
 }
 
@@ -434,6 +580,13 @@ func (u *AdminCredentialTokenUpsertOne) UpdateUserID() *AdminCredentialTokenUpse
 	})
 }
 
+// ClearUserID clears the value of the "user_id" field.
+func (u *AdminCredentialTokenUpsertOne) ClearUserID() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearUserID()
+	})
+}
+
 // SetKind sets the "kind" field.
 func (u *AdminCredentialTokenUpsertOne) SetKind(v string) *AdminCredentialTokenUpsertOne {
 	return u.Update(func(s *AdminCredentialTokenUpsert) {
@@ -487,6 +640,76 @@ func (u *AdminCredentialTokenUpsertOne) UpdateCreatedBy() *AdminCredentialTokenU
 func (u *AdminCredentialTokenUpsertOne) ClearCreatedBy() *AdminCredentialTokenUpsertOne {
 	return u.Update(func(s *AdminCredentialTokenUpsert) {
 		s.ClearCreatedBy()
+	})
+}
+
+// SetEmail sets the "email" field.
+func (u *AdminCredentialTokenUpsertOne) SetEmail(v string) *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetEmail(v)
+	})
+}
+
+// UpdateEmail sets the "email" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertOne) UpdateEmail() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateEmail()
+	})
+}
+
+// ClearEmail clears the value of the "email" field.
+func (u *AdminCredentialTokenUpsertOne) ClearEmail() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearEmail()
+	})
+}
+
+// SetShopID sets the "shop_id" field.
+func (u *AdminCredentialTokenUpsertOne) SetShopID(v int) *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetShopID(v)
+	})
+}
+
+// AddShopID adds v to the "shop_id" field.
+func (u *AdminCredentialTokenUpsertOne) AddShopID(v int) *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.AddShopID(v)
+	})
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertOne) UpdateShopID() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateShopID()
+	})
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (u *AdminCredentialTokenUpsertOne) ClearShopID() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearShopID()
+	})
+}
+
+// SetRoleID sets the "role_id" field.
+func (u *AdminCredentialTokenUpsertOne) SetRoleID(v int) *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetRoleID(v)
+	})
+}
+
+// UpdateRoleID sets the "role_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertOne) UpdateRoleID() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateRoleID()
+	})
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (u *AdminCredentialTokenUpsertOne) ClearRoleID() *AdminCredentialTokenUpsertOne {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearRoleID()
 	})
 }
 
@@ -750,6 +973,13 @@ func (u *AdminCredentialTokenUpsertBulk) UpdateUserID() *AdminCredentialTokenUps
 	})
 }
 
+// ClearUserID clears the value of the "user_id" field.
+func (u *AdminCredentialTokenUpsertBulk) ClearUserID() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearUserID()
+	})
+}
+
 // SetKind sets the "kind" field.
 func (u *AdminCredentialTokenUpsertBulk) SetKind(v string) *AdminCredentialTokenUpsertBulk {
 	return u.Update(func(s *AdminCredentialTokenUpsert) {
@@ -803,6 +1033,76 @@ func (u *AdminCredentialTokenUpsertBulk) UpdateCreatedBy() *AdminCredentialToken
 func (u *AdminCredentialTokenUpsertBulk) ClearCreatedBy() *AdminCredentialTokenUpsertBulk {
 	return u.Update(func(s *AdminCredentialTokenUpsert) {
 		s.ClearCreatedBy()
+	})
+}
+
+// SetEmail sets the "email" field.
+func (u *AdminCredentialTokenUpsertBulk) SetEmail(v string) *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetEmail(v)
+	})
+}
+
+// UpdateEmail sets the "email" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertBulk) UpdateEmail() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateEmail()
+	})
+}
+
+// ClearEmail clears the value of the "email" field.
+func (u *AdminCredentialTokenUpsertBulk) ClearEmail() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearEmail()
+	})
+}
+
+// SetShopID sets the "shop_id" field.
+func (u *AdminCredentialTokenUpsertBulk) SetShopID(v int) *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetShopID(v)
+	})
+}
+
+// AddShopID adds v to the "shop_id" field.
+func (u *AdminCredentialTokenUpsertBulk) AddShopID(v int) *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.AddShopID(v)
+	})
+}
+
+// UpdateShopID sets the "shop_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertBulk) UpdateShopID() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateShopID()
+	})
+}
+
+// ClearShopID clears the value of the "shop_id" field.
+func (u *AdminCredentialTokenUpsertBulk) ClearShopID() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearShopID()
+	})
+}
+
+// SetRoleID sets the "role_id" field.
+func (u *AdminCredentialTokenUpsertBulk) SetRoleID(v int) *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.SetRoleID(v)
+	})
+}
+
+// UpdateRoleID sets the "role_id" field to the value that was provided on create.
+func (u *AdminCredentialTokenUpsertBulk) UpdateRoleID() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.UpdateRoleID()
+	})
+}
+
+// ClearRoleID clears the value of the "role_id" field.
+func (u *AdminCredentialTokenUpsertBulk) ClearRoleID() *AdminCredentialTokenUpsertBulk {
+	return u.Update(func(s *AdminCredentialTokenUpsert) {
+		s.ClearRoleID()
 	})
 }
 

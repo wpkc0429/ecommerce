@@ -24,6 +24,10 @@ func (Role) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("name").MaxLen(50).SchemaType(map[string]string{dialect.Postgres: "varchar(50)"}).NotEmpty(),
 		field.String("scope").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}),
+		// merchant_assignable (change merchant-staff-role, design D4): only
+		// roles with this flag may be granted or invited by a merchant-level
+		// caller. Default false = fail closed for platform-made custom roles.
+		field.Bool("merchant_assignable").Default(false),
 	}
 }
 

@@ -44,7 +44,7 @@ func newRBACEnv(t *testing.T) *rbacEnv {
 	permManage := client.Permission.Create().SetName("user.manage_roles").SaveX(ctx)
 
 	ownerRole := client.Role.Create().SetName("merchant_owner").SetScope("merchant").SaveX(ctx)
-	editorRole := client.Role.Create().SetName("editor").SetScope("merchant").SaveX(ctx)
+	editorRole := client.Role.Create().SetName("editor").SetScope("merchant").SetMerchantAssignable(true).SaveX(ctx)
 	superRole := client.Role.Create().SetName("super_admin").SetScope("platform").SaveX(ctx)
 	e.ownerRole, e.editorRole, e.superRole = ownerRole.ID, editorRole.ID, superRole.ID
 

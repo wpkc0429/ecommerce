@@ -74,6 +74,7 @@ func newAcctEnv(t *testing.T) *acctEnv {
 	e.svc = &account.Service{
 		Client: client, Engine: engine, Refresh: e.refresh, Delivery: account.ManualDelivery{},
 		PublicURL: acctPublicURL, SetupTTL: 72 * time.Hour, ResetTTL: 24 * time.Hour,
+		InviteTTL: 7 * 24 * time.Hour,
 	}
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
 	limiter := ratelimit.New(rdb, log)
@@ -85,11 +86,15 @@ func newAcctEnv(t *testing.T) *acctEnv {
 		Roles:     &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: log},
 		Sites:     &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: log, Authz: authz},
 		Accounts:  &httpapi.AccountsHandler{Service: e.svc, Authz: authz, Log: log},
+		Team:      &httpapi.TeamHandler{Service: e.svc, Engine: engine, Authz: authz, Log: log},
 		Provisioning: &httpapi.ProvisioningHandler{
 			Service: &provision.Service{Client: client, CMS: cmsService, Accounts: e.svc, Dispatcher: dispatcher},
 			Engine:  engine, Authz: authz, Log: log,
 		},
 		AdminPasswordSetupRateLimit: httpapi.NewAdminPasswordSetupRateLimit(limiter, config.RateLimitConfig{
+			LoginBroadLimit: 1000, LoginBroadWindow: time.Minute,
+		}),
+		AdminInviteRateLimit: httpapi.NewAdminInviteRateLimit(limiter, config.RateLimitConfig{
 			LoginBroadLimit: 1000, LoginBroadWindow: time.Minute,
 		}),
 	})

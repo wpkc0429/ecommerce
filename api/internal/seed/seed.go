@@ -105,7 +105,15 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"shipping_method.delete", "刪除物流方式"},
 	{"shipment.view", "檢視出貨紀錄"},
 	{"shipment.create", "建立出貨紀錄（出貨）"},
-	{"shipment.update", "更新出貨狀態（送達/退貨）"},
+	{"shipment.update", "更新出貨狀態（送達）；推進為已退貨另需 shipment.return"},
+	// change merchant-staff-role (design D2): returning a shipment flags the
+	// whole order returned and claws back the customer's points, so it is
+	// authorized separately from marking delivered. Checked by the handler on
+	// top of shipment.update.
+	{"shipment.return", "將出貨標記為已退貨（扣回整筆點數）"},
+	// change merchant-staff-role (design D5): the shop owner's own member
+	// management (invite, disable/enable a membership).
+	{"user.manage_members", "邀請、停用與啟用本店成員"},
 	{"member_tier.view", "檢視會員等級"},
 	{"member_tier.create", "建立會員等級"},
 	{"member_tier.edit", "編輯會員等級"},
@@ -141,10 +149,14 @@ var PermissionCatalog = []struct{ Name, Description string }{
 var roleDefs = []struct {
 	Name  string
 	Scope string
-	Perms []string // "*" = every catalog permission
+	// MerchantAssignable: may a merchant-level caller grant or invite this role
+	// (roles.merchant_assignable, change merchant-staff-role design D4).
+	// merchant_owner is false on purpose: only the platform appoints owners.
+	MerchantAssignable bool
+	Perms              []string // "*" = every catalog permission
 }{
-	{"super_admin", "platform", []string{"*"}},
-	{"merchant_owner", "merchant", []string{
+	{"super_admin", "platform", false, []string{"*"}},
+	{"merchant_owner", "merchant", false, []string{
 		"shop.view", "shop.update",
 		"page.view", "page.create", "page.edit", "page.delete", "page.publish",
 		"user.view", "user.manage_roles", "theme.view",
@@ -153,7 +165,8 @@ var roleDefs = []struct {
 		"order.view", "order.cancel",
 		"payment.view",
 		"shipping_method.view", "shipping_method.create", "shipping_method.edit", "shipping_method.delete",
-		"shipment.view", "shipment.create", "shipment.update",
+		"shipment.view", "shipment.create", "shipment.update", "shipment.return",
+		"user.manage_members",
 		"member_tier.view", "member_tier.create", "member_tier.edit", "member_tier.delete",
 		"point.view", "point.adjust",
 		"member.view",
@@ -171,14 +184,22 @@ var roleDefs = []struct {
 		// `editor`.
 		"payment_credential.manage",
 	}},
-	{"editor", "merchant", []string{
+	{"staff", "merchant", true, []string{
+		// change merchant-staff-role (design D1): exactly these five. Orders and
+		// shipping only; payment.view answers "the customer says they paid"
+		// (read-only, no credentials). No order.cancel, no shipment.return:
+		// both are owner/editor decisions. Pinned by an equality test.
+		"order.view", "payment.view",
+		"shipment.view", "shipment.create", "shipment.update",
+	}},
+	{"editor", "merchant", true, []string{
 		"shop.view", "page.view", "page.create", "page.edit", "theme.view",
 		"category.view", "category.create", "category.edit",
 		"product.view", "product.create", "product.edit",
 		"order.view",
 		"payment.view",
 		"shipping_method.view", "shipping_method.create", "shipping_method.edit",
-		"shipment.view", "shipment.create", "shipment.update",
+		"shipment.view", "shipment.create", "shipment.update", "shipment.return",
 		"member_tier.view", "member_tier.create", "member_tier.edit",
 		"point.view", "point.adjust",
 		// change member-directory (design D4): granted, and the reason is not
@@ -249,7 +270,7 @@ func Run(ctx context.Context, client *ent.Client, opts Options) (err error) {
 		if berr != nil {
 			return fmt.Errorf("seed: PaymentCredentialsEncryptionKey: %w", berr)
 		}
-		if err = seedDemoShop(ctx, tx, starterID, roles["merchant_owner"], box); err != nil {
+		if err = seedDemoShop(ctx, tx, starterID, roles["merchant_owner"], roles["staff"], box); err != nil {
 			return err
 		}
 	}
@@ -281,7 +302,10 @@ func seedRoles(ctx context.Context, tx *ent.Tx, perms map[string]int) (map[strin
 	for _, rd := range roleDefs {
 		r, err := tx.Role.Query().Where(role.NameEQ(rd.Name), role.ScopeEQ(rd.Scope)).Only(ctx)
 		if ent.IsNotFound(err) {
-			r, err = tx.Role.Create().SetName(rd.Name).SetScope(rd.Scope).Save(ctx)
+			r, err = tx.Role.Create().SetName(rd.Name).SetScope(rd.Scope).SetMerchantAssignable(rd.MerchantAssignable).Save(ctx)
+		} else if err == nil && r.MerchantAssignable != rd.MerchantAssignable {
+			// Existing roles get the flag too (the migration defaults it to false).
+			r, err = tx.Role.UpdateOneID(r.ID).SetMerchantAssignable(rd.MerchantAssignable).Save(ctx)
 		}
 		if err != nil {
 			return nil, fmt.Errorf("seed: role %s: %w", rd.Name, err)
@@ -454,7 +478,7 @@ func seedStarterTheme(ctx context.Context, tx *ent.Tx) (int, error) {
 	return t.ID, nil
 }
 
-func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID int, box *cryptbox.Box) error {
+func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID, staffRoleID int, box *cryptbox.Box) error {
 	const demoDomain = "demo.localhost"
 
 	s, err := tx.Site.Query().Where(site.DomainEQ(demoDomain)).Only(ctx)
@@ -565,42 +589,51 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID 
 	}
 
 	// Demo merchant owner account for admin-UI/RBAC testing.
-	const ownerEmail = "demo-owner@example.com"
-	owner, err := tx.User.Query().Where(user.EmailEQ(ownerEmail)).Only(ctx)
+	if err := seedDemoMember(ctx, tx, shopID, "demo-owner@example.com", "demo-owner-change-me", merchantOwnerRoleID); err != nil {
+		return err
+	}
+	// Demo clerk (change merchant-staff-role): a `staff` member for e2e.
+	return seedDemoMember(ctx, tx, shopID, "demo-staff@example.com", "demo-staff-change-me", staffRoleID)
+}
+
+// seedDemoMember creates (idempotently) a back-office account with a password,
+// makes it a member of the shop and grants the role. Demo data only.
+func seedDemoMember(ctx context.Context, tx *ent.Tx, shopID int, email, password string, roleID int) error {
+	u, err := tx.User.Query().Where(user.EmailEQ(email)).Only(ctx)
 	if ent.IsNotFound(err) {
-		hash, herr := auth.HashPassword("demo-owner-change-me")
+		hash, herr := auth.HashPassword(password)
 		if herr != nil {
 			return herr
 		}
-		owner, err = tx.User.Create().SetEmail(ownerEmail).SetPasswordHash(hash).SetStatus(1).Save(ctx)
+		u, err = tx.User.Create().SetEmail(email).SetPasswordHash(hash).SetStatus(1).Save(ctx)
 	}
 	if err != nil {
-		return fmt.Errorf("seed: demo owner: %w", err)
+		return fmt.Errorf("seed: demo account %s: %w", email, err)
 	}
 	isMember, err := tx.ShopUser.Query().
-		Where(shopuser.ShopIDEQ(shopID), shopuser.UserIDEQ(owner.ID)).
+		Where(shopuser.ShopIDEQ(shopID), shopuser.UserIDEQ(u.ID)).
 		Exist(ctx)
 	if err != nil {
 		return err
 	}
 	if !isMember {
-		if _, err := tx.ShopUser.Create().SetShopID(shopID).SetUserID(owner.ID).Save(ctx); err != nil {
+		if _, err := tx.ShopUser.Create().SetShopID(shopID).SetUserID(u.ID).Save(ctx); err != nil {
 			return fmt.Errorf("seed: demo shop_user: %w", err)
 		}
 	}
 	hasRole, err := tx.RoleUser.Query().
-		Where(roleuser.UserIDEQ(owner.ID), roleuser.RoleIDEQ(merchantOwnerRoleID), roleuser.ShopIDEQ(shopID)).
+		Where(roleuser.UserIDEQ(u.ID), roleuser.RoleIDEQ(roleID), roleuser.ShopIDEQ(shopID)).
 		Exist(ctx)
 	if err != nil {
 		return err
 	}
 	if !hasRole {
 		if _, err := tx.RoleUser.Create().
-			SetUserID(owner.ID).
-			SetRoleID(merchantOwnerRoleID).
+			SetUserID(u.ID).
+			SetRoleID(roleID).
 			SetShopID(shopID).
 			Save(ctx); err != nil {
-			return fmt.Errorf("seed: demo owner role: %w", err)
+			return fmt.Errorf("seed: demo role: %w", err)
 		}
 	}
 	return nil

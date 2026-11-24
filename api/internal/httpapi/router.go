@@ -56,6 +56,8 @@ type Deps struct {
 	// account management, password setup endpoints, one-call shop opening).
 	Accounts     *AccountsHandler
 	Provisioning *ProvisioningHandler
+	// Team: change merchant-staff-role (owner-facing member management).
+	Team *TeamHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
@@ -79,6 +81,10 @@ type Deps struct {
 	// AdminPasswordSetupRateLimit guards the two unauthenticated password
 	// setup endpoints (IP-scoped).
 	AdminPasswordSetupRateLimit func(http.Handler) http.Handler
+	// AdminInviteRateLimit bounds invitation creation per shop + caller; the
+	// unauthenticated invitation endpoints reuse AdminPasswordSetupRateLimit
+	// (change merchant-staff-role).
+	AdminInviteRateLimit func(http.Handler) http.Handler
 }
 
 // New assembles the full router.
@@ -125,6 +131,9 @@ func New(d Deps) http.Handler {
 			}
 			if d.Accounts != nil {
 				d.Accounts.MountAuth(ar, d.AdminPasswordSetupRateLimit)
+			}
+			if d.Team != nil {
+				d.Team.MountAuth(ar, d.AdminPasswordSetupRateLimit)
 			}
 			if d.AdminMW != nil {
 				ar.Group(func(pr chi.Router) {
@@ -184,6 +193,9 @@ func New(d Deps) http.Handler {
 						if d.Provisioning != nil {
 							d.Provisioning.MountShop(sh)
 						}
+						if d.Team != nil {
+							d.Team.MountShopAdmin(sh, d.AdminInviteRateLimit)
+						}
 					})
 					if d.Media != nil {
 						d.Media.MountAdmin(pr)
@@ -206,6 +218,9 @@ func New(d Deps) http.Handler {
 					}
 					if d.Provisioning != nil {
 						d.Provisioning.MountPlatform(pr)
+					}
+					if d.Team != nil {
+						d.Team.MountAdmin(pr)
 					}
 				})
 			}

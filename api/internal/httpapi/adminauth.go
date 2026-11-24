@@ -74,7 +74,7 @@ func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	sids, err := h.Client.ShopUser.Query().
-		Where(shopuser.UserIDEQ(u.ID)).
+		Where(shopuser.UserIDEQ(u.ID), shopuser.StatusEQ(1)).
 		Select(shopuser.FieldShopID).
 		Ints(ctx)
 	if err != nil {
@@ -112,7 +112,7 @@ func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	sids, err := h.Client.ShopUser.Query().
-		Where(shopuser.UserIDEQ(uid)).
+		Where(shopuser.UserIDEQ(uid), shopuser.StatusEQ(1)).
 		Select(shopuser.FieldShopID).
 		Ints(ctx)
 	if err != nil {

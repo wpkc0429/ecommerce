@@ -87,8 +87,12 @@ func init() {
 			return nil
 		}
 	}()
+	// admincredentialtokenDescEmail is the schema descriptor for email field.
+	admincredentialtokenDescEmail := admincredentialtokenFields[4].Descriptor()
+	// admincredentialtoken.EmailValidator is a validator for the "email" field. It is called by the builders before save.
+	admincredentialtoken.EmailValidator = admincredentialtokenDescEmail.Validators[0].(func(string) error)
 	// admincredentialtokenDescCreatedAt is the schema descriptor for created_at field.
-	admincredentialtokenDescCreatedAt := admincredentialtokenFields[6].Descriptor()
+	admincredentialtokenDescCreatedAt := admincredentialtokenFields[9].Descriptor()
 	// admincredentialtoken.DefaultCreatedAt holds the default value on creation for the created_at field.
 	admincredentialtoken.DefaultCreatedAt = admincredentialtokenDescCreatedAt.Default.(func() time.Time)
 	cartMixin := schema.Cart{}.Mixin()
@@ -1046,6 +1050,10 @@ func init() {
 	roleDescScope := roleFields[1].Descriptor()
 	// role.ScopeValidator is a validator for the "scope" field. It is called by the builders before save.
 	role.ScopeValidator = roleDescScope.Validators[0].(func(string) error)
+	// roleDescMerchantAssignable is the schema descriptor for merchant_assignable field.
+	roleDescMerchantAssignable := roleFields[2].Descriptor()
+	// role.DefaultMerchantAssignable holds the default value on creation for the merchant_assignable field.
+	role.DefaultMerchantAssignable = roleDescMerchantAssignable.Default.(bool)
 	shipmentMixin := schema.Shipment{}.Mixin()
 	shipmentMixinFields0 := shipmentMixin[0].Fields()
 	_ = shipmentMixinFields0
@@ -1283,8 +1291,12 @@ func init() {
 	shoppaymentprovidercredential.ChoosePaymentValidator = shoppaymentprovidercredentialDescChoosePayment.Validators[0].(func(string) error)
 	shopuserFields := schema.ShopUser{}.Fields()
 	_ = shopuserFields
+	// shopuserDescStatus is the schema descriptor for status field.
+	shopuserDescStatus := shopuserFields[2].Descriptor()
+	// shopuser.DefaultStatus holds the default value on creation for the status field.
+	shopuser.DefaultStatus = shopuserDescStatus.Default.(int16)
 	// shopuserDescCreatedAt is the schema descriptor for created_at field.
-	shopuserDescCreatedAt := shopuserFields[2].Descriptor()
+	shopuserDescCreatedAt := shopuserFields[3].Descriptor()
 	// shopuser.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shopuser.DefaultCreatedAt = shopuserDescCreatedAt.Default.(func() time.Time)
 	siteMixin := schema.Site{}.Mixin()

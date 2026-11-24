@@ -64,7 +64,12 @@ type ShopUser struct {
 
 func (ShopUser) Annotations() []schema.Annotation {
 	return []schema.Annotation{
-		entsql.Annotation{Table: "shop_user"},
+		entsql.Annotation{
+			Table: "shop_user",
+			Checks: map[string]string{
+				"shop_user_status_check": "status IN (0, 1)",
+			},
+		},
 	}
 }
 
@@ -72,6 +77,10 @@ func (ShopUser) Fields() []ent.Field {
 	return []ent.Field{
 		field.Int("shop_id"),
 		field.Int("user_id"),
+		// status is the membership state (change merchant-staff-role, design
+		// D3): 0 disabled / 1 active. It is NOT the account state
+		// (users.status): a shop owner can only affect their own shop.
+		field.Int16("status").Default(1),
 		field.Time("created_at").Immutable().Default(time.Now),
 	}
 }

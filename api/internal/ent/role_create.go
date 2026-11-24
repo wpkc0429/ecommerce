@@ -64,6 +64,20 @@ func (_c *RoleCreate) SetScope(v string) *RoleCreate {
 	return _c
 }
 
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (_c *RoleCreate) SetMerchantAssignable(v bool) *RoleCreate {
+	_c.mutation.SetMerchantAssignable(v)
+	return _c
+}
+
+// SetNillableMerchantAssignable sets the "merchant_assignable" field if the given value is not nil.
+func (_c *RoleCreate) SetNillableMerchantAssignable(v *bool) *RoleCreate {
+	if v != nil {
+		_c.SetMerchantAssignable(*v)
+	}
+	return _c
+}
+
 // AddPermissionIDs adds the "permissions" edge to the Permission entity by IDs.
 func (_c *RoleCreate) AddPermissionIDs(ids ...int) *RoleCreate {
 	_c.mutation.AddPermissionIDs(ids...)
@@ -137,6 +151,10 @@ func (_c *RoleCreate) defaults() {
 		v := role.DefaultUpdatedAt()
 		_c.mutation.SetUpdatedAt(v)
 	}
+	if _, ok := _c.mutation.MerchantAssignable(); !ok {
+		v := role.DefaultMerchantAssignable
+		_c.mutation.SetMerchantAssignable(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -162,6 +180,9 @@ func (_c *RoleCreate) check() error {
 		if err := role.ScopeValidator(v); err != nil {
 			return &ValidationError{Name: "scope", err: fmt.Errorf(`ent: validator failed for field "Role.scope": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.MerchantAssignable(); !ok {
+		return &ValidationError{Name: "merchant_assignable", err: errors.New(`ent: missing required field "Role.merchant_assignable"`)}
 	}
 	return nil
 }
@@ -205,6 +226,10 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Scope(); ok {
 		_spec.SetField(role.FieldScope, field.TypeString, value)
 		_node.Scope = value
+	}
+	if value, ok := _c.mutation.MerchantAssignable(); ok {
+		_spec.SetField(role.FieldMerchantAssignable, field.TypeBool, value)
+		_node.MerchantAssignable = value
 	}
 	if nodes := _c.mutation.PermissionsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -326,6 +351,18 @@ func (u *RoleUpsert) UpdateScope() *RoleUpsert {
 	return u
 }
 
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (u *RoleUpsert) SetMerchantAssignable(v bool) *RoleUpsert {
+	u.Set(role.FieldMerchantAssignable, v)
+	return u
+}
+
+// UpdateMerchantAssignable sets the "merchant_assignable" field to the value that was provided on create.
+func (u *RoleUpsert) UpdateMerchantAssignable() *RoleUpsert {
+	u.SetExcluded(role.FieldMerchantAssignable)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -410,6 +447,20 @@ func (u *RoleUpsertOne) SetScope(v string) *RoleUpsertOne {
 func (u *RoleUpsertOne) UpdateScope() *RoleUpsertOne {
 	return u.Update(func(s *RoleUpsert) {
 		s.UpdateScope()
+	})
+}
+
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (u *RoleUpsertOne) SetMerchantAssignable(v bool) *RoleUpsertOne {
+	return u.Update(func(s *RoleUpsert) {
+		s.SetMerchantAssignable(v)
+	})
+}
+
+// UpdateMerchantAssignable sets the "merchant_assignable" field to the value that was provided on create.
+func (u *RoleUpsertOne) UpdateMerchantAssignable() *RoleUpsertOne {
+	return u.Update(func(s *RoleUpsert) {
+		s.UpdateMerchantAssignable()
 	})
 }
 
@@ -663,6 +714,20 @@ func (u *RoleUpsertBulk) SetScope(v string) *RoleUpsertBulk {
 func (u *RoleUpsertBulk) UpdateScope() *RoleUpsertBulk {
 	return u.Update(func(s *RoleUpsert) {
 		s.UpdateScope()
+	})
+}
+
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (u *RoleUpsertBulk) SetMerchantAssignable(v bool) *RoleUpsertBulk {
+	return u.Update(func(s *RoleUpsert) {
+		s.SetMerchantAssignable(v)
+	})
+}
+
+// UpdateMerchantAssignable sets the "merchant_assignable" field to the value that was provided on create.
+func (u *RoleUpsertBulk) UpdateMerchantAssignable() *RoleUpsertBulk {
+	return u.Update(func(s *RoleUpsert) {
+		s.UpdateMerchantAssignable()
 	})
 }
 

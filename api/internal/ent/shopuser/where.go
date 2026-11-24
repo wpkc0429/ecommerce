@@ -65,6 +65,11 @@ func UserID(v int) predicate.ShopUser {
 	return predicate.ShopUser(sql.FieldEQ(FieldUserID, v))
 }
 
+// Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
+func Status(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldEQ(FieldStatus, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.ShopUser {
 	return predicate.ShopUser(sql.FieldEQ(FieldCreatedAt, v))
@@ -108,6 +113,46 @@ func UserIDIn(vs ...int) predicate.ShopUser {
 // UserIDNotIn applies the NotIn predicate on the "user_id" field.
 func UserIDNotIn(vs ...int) predicate.ShopUser {
 	return predicate.ShopUser(sql.FieldNotIn(FieldUserID, vs...))
+}
+
+// StatusEQ applies the EQ predicate on the "status" field.
+func StatusEQ(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldEQ(FieldStatus, v))
+}
+
+// StatusNEQ applies the NEQ predicate on the "status" field.
+func StatusNEQ(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldNEQ(FieldStatus, v))
+}
+
+// StatusIn applies the In predicate on the "status" field.
+func StatusIn(vs ...int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldIn(FieldStatus, vs...))
+}
+
+// StatusNotIn applies the NotIn predicate on the "status" field.
+func StatusNotIn(vs ...int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldNotIn(FieldStatus, vs...))
+}
+
+// StatusGT applies the GT predicate on the "status" field.
+func StatusGT(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldGT(FieldStatus, v))
+}
+
+// StatusGTE applies the GTE predicate on the "status" field.
+func StatusGTE(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldGTE(FieldStatus, v))
+}
+
+// StatusLT applies the LT predicate on the "status" field.
+func StatusLT(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldLT(FieldStatus, v))
+}
+
+// StatusLTE applies the LTE predicate on the "status" field.
+func StatusLTE(v int16) predicate.ShopUser {
+	return predicate.ShopUser(sql.FieldLTE(FieldStatus, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

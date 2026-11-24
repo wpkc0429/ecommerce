@@ -65,6 +65,20 @@ func (_u *RoleUpdate) SetNillableScope(v *string) *RoleUpdate {
 	return _u
 }
 
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (_u *RoleUpdate) SetMerchantAssignable(v bool) *RoleUpdate {
+	_u.mutation.SetMerchantAssignable(v)
+	return _u
+}
+
+// SetNillableMerchantAssignable sets the "merchant_assignable" field if the given value is not nil.
+func (_u *RoleUpdate) SetNillableMerchantAssignable(v *bool) *RoleUpdate {
+	if v != nil {
+		_u.SetMerchantAssignable(*v)
+	}
+	return _u
+}
+
 // AddPermissionIDs adds the "permissions" edge to the Permission entity by IDs.
 func (_u *RoleUpdate) AddPermissionIDs(ids ...int) *RoleUpdate {
 	_u.mutation.AddPermissionIDs(ids...)
@@ -220,6 +234,9 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Scope(); ok {
 		_spec.SetField(role.FieldScope, field.TypeString, value)
 	}
+	if value, ok := _u.mutation.MerchantAssignable(); ok {
+		_spec.SetField(role.FieldMerchantAssignable, field.TypeBool, value)
+	}
 	if _u.mutation.PermissionsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
@@ -362,6 +379,20 @@ func (_u *RoleUpdateOne) SetScope(v string) *RoleUpdateOne {
 func (_u *RoleUpdateOne) SetNillableScope(v *string) *RoleUpdateOne {
 	if v != nil {
 		_u.SetScope(*v)
+	}
+	return _u
+}
+
+// SetMerchantAssignable sets the "merchant_assignable" field.
+func (_u *RoleUpdateOne) SetMerchantAssignable(v bool) *RoleUpdateOne {
+	_u.mutation.SetMerchantAssignable(v)
+	return _u
+}
+
+// SetNillableMerchantAssignable sets the "merchant_assignable" field if the given value is not nil.
+func (_u *RoleUpdateOne) SetNillableMerchantAssignable(v *bool) *RoleUpdateOne {
+	if v != nil {
+		_u.SetMerchantAssignable(*v)
 	}
 	return _u
 }
@@ -550,6 +581,9 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	}
 	if value, ok := _u.mutation.Scope(); ok {
 		_spec.SetField(role.FieldScope, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.MerchantAssignable(); ok {
+		_spec.SetField(role.FieldMerchantAssignable, field.TypeBool, value)
 	}
 	if _u.mutation.PermissionsCleared() {
 		edge := &sqlgraph.EdgeSpec{
