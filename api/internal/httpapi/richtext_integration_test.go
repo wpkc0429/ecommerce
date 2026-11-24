@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"ksdevworks/ecommerce/api/internal/cms"
+	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/events"
 )
 
@@ -119,18 +120,26 @@ func TestRichTextSanitizedOnPageCreate(t *testing.T) {
 func TestRichTextSanitizedOnShopContent(t *testing.T) {
 	e := newCMSEnv(t)
 	ctx := context.Background()
-	sh := e.client.Shop.GetX(ctx, e.shopID)
-	theme := e.client.Theme.GetX(ctx, *sh.ThemeID)
+	// The shop's own schema version is what validates global content: register
+	// a new version with a rich text field added to the header.
+	active, err := (&contentschema.Store{Client: e.client}).Active(ctx, e.shopID)
+	if err != nil {
+		t.Fatal(err)
+	}
 	var schema map[string]any
-	if err := json.Unmarshal(theme.ConfigSchema, &schema); err != nil {
+	if err := json.Unmarshal(active.Doc.Global, &schema); err != nil {
 		t.Fatal(err)
 	}
 	header := schema["properties"].(map[string]any)["header"].(map[string]any)
 	header["properties"].(map[string]any)["notice"] = map[string]any{
 		"type": "string", "default": "", "x-editor": "richtext",
 	}
-	newSchema, _ := json.Marshal(schema)
-	e.client.Theme.UpdateOneID(theme.ID).SetConfigSchema(newSchema).ExecX(ctx)
+	newGlobal, _ := json.Marshal(schema)
+	doc := active.Doc
+	doc.Global = newGlobal
+	raw0, _ := json.Marshal(doc)
+	e.client.ContentSchema.Create().SetShopID(e.shopID).SetVersion(active.Version + 1).
+		SetSchemaJSON(raw0).SetSha256("test").SetSource(contentschema.SourceRegistered).ExecX(ctx)
 
 	code, _, raw := e.admin1(t, "PUT", e.shopPath("/content"), map[string]any{"content": map[string]any{
 		"header": map[string]any{"site_title": "<i>招牌</i>", "notice": xssRichText},
