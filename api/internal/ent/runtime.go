@@ -9,6 +9,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -279,6 +280,48 @@ func init() {
 	checkoutidempotencykeyDescStatus := checkoutidempotencykeyFields[3].Descriptor()
 	// checkoutidempotencykey.DefaultStatus holds the default value on creation for the status field.
 	checkoutidempotencykey.DefaultStatus = checkoutidempotencykeyDescStatus.Default.(int16)
+	contentschemaFields := schema.ContentSchema{}.Fields()
+	_ = contentschemaFields
+	// contentschemaDescSha256 is the schema descriptor for sha256 field.
+	contentschemaDescSha256 := contentschemaFields[3].Descriptor()
+	// contentschema.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	contentschema.Sha256Validator = func() func(string) error {
+		validators := contentschemaDescSha256.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(sha256 string) error {
+			for _, fn := range fns {
+				if err := fn(sha256); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentschemaDescSource is the schema descriptor for source field.
+	contentschemaDescSource := contentschemaFields[4].Descriptor()
+	// contentschema.SourceValidator is a validator for the "source" field. It is called by the builders before save.
+	contentschema.SourceValidator = func() func(string) error {
+		validators := contentschemaDescSource.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(source string) error {
+			for _, fn := range fns {
+				if err := fn(source); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentschemaDescCreatedAt is the schema descriptor for created_at field.
+	contentschemaDescCreatedAt := contentschemaFields[5].Descriptor()
+	// contentschema.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentschema.DefaultCreatedAt = contentschemaDescCreatedAt.Default.(func() time.Time)
 	mediauploadFields := schema.MediaUpload{}.Fields()
 	_ = mediauploadFields
 	// mediauploadDescObjectKey is the schema descriptor for object_key field.

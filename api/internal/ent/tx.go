@@ -24,6 +24,8 @@ type Tx struct {
 	Category *CategoryClient
 	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
 	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
+	// ContentSchema is the client for interacting with the ContentSchema builders.
+	ContentSchema *ContentSchemaClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
 	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
@@ -226,6 +228,7 @@ func (tx *Tx) init() {
 	tx.CartItem = NewCartItemClient(tx.config)
 	tx.Category = NewCategoryClient(tx.config)
 	tx.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(tx.config)
+	tx.ContentSchema = NewContentSchemaClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)

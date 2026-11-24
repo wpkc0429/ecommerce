@@ -14,6 +14,9 @@ import (
 // (Phase 2: products, orders, ...).
 var tenantOwned = map[string]bool{
 	"Page": true,
+	// change retire-hosted-storefront-and-themes (group 1): per-shop content
+	// schema versions carry a direct shop_id column.
+	"ContentSchema": true,
 	// change member-identity-per-shop (design D4): members carries its own
 	// shop_id since customer identity became per-shop, so it is tenant-owned
 	// like everything else. Back-office paths run without tenant context and

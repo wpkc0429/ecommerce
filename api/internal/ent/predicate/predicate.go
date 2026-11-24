@@ -21,6 +21,9 @@ type Category func(*sql.Selector)
 // CheckoutIdempotencyKey is the predicate function for checkoutidempotencykey builders.
 type CheckoutIdempotencyKey func(*sql.Selector)
 
+// ContentSchema is the predicate function for contentschema builders.
+type ContentSchema func(*sql.Selector)
+
 // MediaUpload is the predicate function for mediaupload builders.
 type MediaUpload func(*sql.Selector)
 

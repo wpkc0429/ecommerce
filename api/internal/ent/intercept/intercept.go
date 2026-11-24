@@ -12,6 +12,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -239,6 +240,33 @@ func (f TraverseCheckoutIdempotencyKey) Traverse(ctx context.Context, q ent.Quer
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CheckoutIdempotencyKeyQuery", q)
+}
+
+// The ContentSchemaFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentSchemaFunc func(context.Context, *ent.ContentSchemaQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentSchemaFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentSchemaQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentSchemaQuery", q)
+}
+
+// The TraverseContentSchema type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentSchema func(context.Context, *ent.ContentSchemaQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentSchema) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentSchema) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentSchemaQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentSchemaQuery", q)
 }
 
 // The MediaUploadFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1145,6 +1173,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
 	case *ent.CheckoutIdempotencyKeyQuery:
 		return &query[*ent.CheckoutIdempotencyKeyQuery, predicate.CheckoutIdempotencyKey, checkoutidempotencykey.OrderOption]{typ: ent.TypeCheckoutIdempotencyKey, tq: q}, nil
+	case *ent.ContentSchemaQuery:
+		return &query[*ent.ContentSchemaQuery, predicate.ContentSchema, contentschema.OrderOption]{typ: ent.TypeContentSchema, tq: q}, nil
 	case *ent.MediaUploadQuery:
 		return &query[*ent.MediaUploadQuery, predicate.MediaUpload, mediaupload.OrderOption]{typ: ent.TypeMediaUpload, tq: q}, nil
 	case *ent.MemberQuery:

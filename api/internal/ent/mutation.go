@@ -12,6 +12,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -68,6 +69,7 @@ const (
 	TypeCartItem                      = "CartItem"
 	TypeCategory                      = "Category"
 	TypeCheckoutIdempotencyKey        = "CheckoutIdempotencyKey"
+	TypeContentSchema                 = "ContentSchema"
 	TypeMediaUpload                   = "MediaUpload"
 	TypeMember                        = "Member"
 	TypeMemberRefreshToken            = "MemberRefreshToken"
@@ -4839,6 +4841,708 @@ func (m *CheckoutIdempotencyKeyMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown CheckoutIdempotencyKey edge %s", name)
+}
+
+// ContentSchemaMutation represents an operation that mutates the ContentSchema nodes in the graph.
+type ContentSchemaMutation struct {
+	config
+	op                Op
+	typ               string
+	id                *int
+	version           *int
+	addversion        *int
+	schema_json       *json.RawMessage
+	appendschema_json json.RawMessage
+	sha256            *string
+	source            *string
+	created_at        *time.Time
+	clearedFields     map[string]struct{}
+	shop              *int
+	clearedshop       bool
+	done              bool
+	oldValue          func(context.Context) (*ContentSchema, error)
+	predicates        []predicate.ContentSchema
+}
+
+var _ ent.Mutation = (*ContentSchemaMutation)(nil)
+
+// contentschemaOption allows management of the mutation configuration using functional options.
+type contentschemaOption func(*ContentSchemaMutation)
+
+// newContentSchemaMutation creates new mutation for the ContentSchema entity.
+func newContentSchemaMutation(c config, op Op, opts ...contentschemaOption) *ContentSchemaMutation {
+	m := &ContentSchemaMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeContentSchema,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withContentSchemaID sets the ID field of the mutation.
+func withContentSchemaID(id int) contentschemaOption {
+	return func(m *ContentSchemaMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ContentSchema
+		)
+		m.oldValue = func(ctx context.Context) (*ContentSchema, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ContentSchema.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withContentSchema sets the old ContentSchema of the mutation.
+func withContentSchema(node *ContentSchema) contentschemaOption {
+	return func(m *ContentSchemaMutation) {
+		m.oldValue = func(context.Context) (*ContentSchema, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ContentSchemaMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ContentSchemaMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ContentSchemaMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ContentSchemaMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ContentSchema.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *ContentSchemaMutation) SetShopID(i int) {
+	m.shop = &i
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *ContentSchemaMutation) ShopID() (r int, exists bool) {
+	v := m.shop
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *ContentSchemaMutation) ResetShopID() {
+	m.shop = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *ContentSchemaMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *ContentSchemaMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *ContentSchemaMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *ContentSchemaMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *ContentSchemaMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
+// SetSchemaJSON sets the "schema_json" field.
+func (m *ContentSchemaMutation) SetSchemaJSON(jm json.RawMessage) {
+	m.schema_json = &jm
+	m.appendschema_json = nil
+}
+
+// SchemaJSON returns the value of the "schema_json" field in the mutation.
+func (m *ContentSchemaMutation) SchemaJSON() (r json.RawMessage, exists bool) {
+	v := m.schema_json
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSchemaJSON returns the old "schema_json" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldSchemaJSON(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSchemaJSON is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSchemaJSON requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSchemaJSON: %w", err)
+	}
+	return oldValue.SchemaJSON, nil
+}
+
+// AppendSchemaJSON adds jm to the "schema_json" field.
+func (m *ContentSchemaMutation) AppendSchemaJSON(jm json.RawMessage) {
+	m.appendschema_json = append(m.appendschema_json, jm...)
+}
+
+// AppendedSchemaJSON returns the list of values that were appended to the "schema_json" field in this mutation.
+func (m *ContentSchemaMutation) AppendedSchemaJSON() (json.RawMessage, bool) {
+	if len(m.appendschema_json) == 0 {
+		return nil, false
+	}
+	return m.appendschema_json, true
+}
+
+// ResetSchemaJSON resets all changes to the "schema_json" field.
+func (m *ContentSchemaMutation) ResetSchemaJSON() {
+	m.schema_json = nil
+	m.appendschema_json = nil
+}
+
+// SetSha256 sets the "sha256" field.
+func (m *ContentSchemaMutation) SetSha256(s string) {
+	m.sha256 = &s
+}
+
+// Sha256 returns the value of the "sha256" field in the mutation.
+func (m *ContentSchemaMutation) Sha256() (r string, exists bool) {
+	v := m.sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSha256 returns the old "sha256" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSha256: %w", err)
+	}
+	return oldValue.Sha256, nil
+}
+
+// ResetSha256 resets all changes to the "sha256" field.
+func (m *ContentSchemaMutation) ResetSha256() {
+	m.sha256 = nil
+}
+
+// SetSource sets the "source" field.
+func (m *ContentSchemaMutation) SetSource(s string) {
+	m.source = &s
+}
+
+// Source returns the value of the "source" field in the mutation.
+func (m *ContentSchemaMutation) Source() (r string, exists bool) {
+	v := m.source
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSource returns the old "source" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldSource(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSource is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSource requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSource: %w", err)
+	}
+	return oldValue.Source, nil
+}
+
+// ResetSource resets all changes to the "source" field.
+func (m *ContentSchemaMutation) ResetSource() {
+	m.source = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ContentSchemaMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ContentSchemaMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ContentSchema entity.
+// If the ContentSchema object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentSchemaMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ContentSchemaMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// ClearShop clears the "shop" edge to the Shop entity.
+func (m *ContentSchemaMutation) ClearShop() {
+	m.clearedshop = true
+	m.clearedFields[contentschema.FieldShopID] = struct{}{}
+}
+
+// ShopCleared reports if the "shop" edge to the Shop entity was cleared.
+func (m *ContentSchemaMutation) ShopCleared() bool {
+	return m.clearedshop
+}
+
+// ShopIDs returns the "shop" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ShopID instead. It exists only for internal usage by the builders.
+func (m *ContentSchemaMutation) ShopIDs() (ids []int) {
+	if id := m.shop; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetShop resets all changes to the "shop" edge.
+func (m *ContentSchemaMutation) ResetShop() {
+	m.shop = nil
+	m.clearedshop = false
+}
+
+// Where appends a list predicates to the ContentSchemaMutation builder.
+func (m *ContentSchemaMutation) Where(ps ...predicate.ContentSchema) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ContentSchemaMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ContentSchemaMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ContentSchema, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ContentSchemaMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ContentSchemaMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ContentSchema).
+func (m *ContentSchemaMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ContentSchemaMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.shop != nil {
+		fields = append(fields, contentschema.FieldShopID)
+	}
+	if m.version != nil {
+		fields = append(fields, contentschema.FieldVersion)
+	}
+	if m.schema_json != nil {
+		fields = append(fields, contentschema.FieldSchemaJSON)
+	}
+	if m.sha256 != nil {
+		fields = append(fields, contentschema.FieldSha256)
+	}
+	if m.source != nil {
+		fields = append(fields, contentschema.FieldSource)
+	}
+	if m.created_at != nil {
+		fields = append(fields, contentschema.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ContentSchemaMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case contentschema.FieldShopID:
+		return m.ShopID()
+	case contentschema.FieldVersion:
+		return m.Version()
+	case contentschema.FieldSchemaJSON:
+		return m.SchemaJSON()
+	case contentschema.FieldSha256:
+		return m.Sha256()
+	case contentschema.FieldSource:
+		return m.Source()
+	case contentschema.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ContentSchemaMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case contentschema.FieldShopID:
+		return m.OldShopID(ctx)
+	case contentschema.FieldVersion:
+		return m.OldVersion(ctx)
+	case contentschema.FieldSchemaJSON:
+		return m.OldSchemaJSON(ctx)
+	case contentschema.FieldSha256:
+		return m.OldSha256(ctx)
+	case contentschema.FieldSource:
+		return m.OldSource(ctx)
+	case contentschema.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ContentSchema field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentSchemaMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case contentschema.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case contentschema.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
+	case contentschema.FieldSchemaJSON:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSchemaJSON(v)
+		return nil
+	case contentschema.FieldSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSha256(v)
+		return nil
+	case contentschema.FieldSource:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSource(v)
+		return nil
+	case contentschema.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchema field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ContentSchemaMutation) AddedFields() []string {
+	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, contentschema.FieldVersion)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ContentSchemaMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case contentschema.FieldVersion:
+		return m.AddedVersion()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentSchemaMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case contentschema.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchema numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ContentSchemaMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ContentSchemaMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ContentSchemaMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown ContentSchema nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ContentSchemaMutation) ResetField(name string) error {
+	switch name {
+	case contentschema.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case contentschema.FieldVersion:
+		m.ResetVersion()
+		return nil
+	case contentschema.FieldSchemaJSON:
+		m.ResetSchemaJSON()
+		return nil
+	case contentschema.FieldSha256:
+		m.ResetSha256()
+		return nil
+	case contentschema.FieldSource:
+		m.ResetSource()
+		return nil
+	case contentschema.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchema field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ContentSchemaMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.shop != nil {
+		edges = append(edges, contentschema.EdgeShop)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ContentSchemaMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case contentschema.EdgeShop:
+		if id := m.shop; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ContentSchemaMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ContentSchemaMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ContentSchemaMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedshop {
+		edges = append(edges, contentschema.EdgeShop)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ContentSchemaMutation) EdgeCleared(name string) bool {
+	switch name {
+	case contentschema.EdgeShop:
+		return m.clearedshop
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ContentSchemaMutation) ClearEdge(name string) error {
+	switch name {
+	case contentschema.EdgeShop:
+		m.ClearShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchema unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ContentSchemaMutation) ResetEdge(name string) error {
+	switch name {
+	case contentschema.EdgeShop:
+		m.ResetShop()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchema edge %s", name)
 }
 
 // MediaUploadMutation represents an operation that mutates the MediaUpload nodes in the graph.

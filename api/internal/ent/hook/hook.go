@@ -68,6 +68,18 @@ func (f CheckoutIdempotencyKeyFunc) Mutate(ctx context.Context, m ent.Mutation) 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CheckoutIdempotencyKeyMutation", m)
 }
 
+// The ContentSchemaFunc type is an adapter to allow the use of ordinary
+// function as ContentSchema mutator.
+type ContentSchemaFunc func(context.Context, *ent.ContentSchemaMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentSchemaFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentSchemaMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentSchemaMutation", m)
+}
+
 // The MediaUploadFunc type is an adapter to allow the use of ordinary
 // function as MediaUpload mutator.
 type MediaUploadFunc func(context.Context, *ent.MediaUploadMutation) (ent.Value, error)

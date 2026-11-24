@@ -232,6 +232,37 @@ var (
 			},
 		},
 	}
+	// ContentSchemasColumns holds the columns for the "content_schemas" table.
+	ContentSchemasColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "version", Type: field.TypeInt},
+		{Name: "schema_json", Type: field.TypeJSON},
+		{Name: "sha256", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "source", Type: field.TypeString, Size: 30, SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ContentSchemasTable holds the schema information for the "content_schemas" table.
+	ContentSchemasTable = &schema.Table{
+		Name:       "content_schemas",
+		Columns:    ContentSchemasColumns,
+		PrimaryKey: []*schema.Column{ContentSchemasColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "content_schemas_shops_shop",
+				Columns:    []*schema.Column{ContentSchemasColumns[6]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentschema_shop_id_version",
+				Unique:  true,
+				Columns: []*schema.Column{ContentSchemasColumns[6], ContentSchemasColumns[1]},
+			},
+		},
+	}
 	// MediaUploadsColumns holds the columns for the "media_uploads" table.
 	MediaUploadsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1436,6 +1467,7 @@ var (
 		CartItemsTable,
 		CategoriesTable,
 		CheckoutIdempotencyKeysTable,
+		ContentSchemasTable,
 		MediaUploadsTable,
 		MembersTable,
 		MemberRefreshTokensTable,
@@ -1508,6 +1540,13 @@ func init() {
 	CheckoutIdempotencyKeysTable.Annotation.Checks = map[string]string{
 		"checkout_idempotency_keys_order_id_check": "(status = 0 AND order_id IS NULL) OR (status = 1 AND order_id IS NOT NULL)",
 		"checkout_idempotency_keys_status_check":   "status IN (0, 1)",
+	}
+	ContentSchemasTable.ForeignKeys[0].RefTable = ShopsTable
+	ContentSchemasTable.Annotation = &entsql.Annotation{
+		Table: "content_schemas",
+	}
+	ContentSchemasTable.Annotation.Checks = map[string]string{
+		"content_schemas_version_check": "version >= 1",
 	}
 	MediaUploadsTable.ForeignKeys[0].RefTable = ShopsTable
 	MediaUploadsTable.Annotation = &entsql.Annotation{}
