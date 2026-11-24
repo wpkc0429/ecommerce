@@ -1133,28 +1133,12 @@ var (
 		{Name: "meta", Type: field.TypeJSON},
 		{Name: "timezone", Type: field.TypeString, Nullable: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
 		{Name: "admin_branding", Type: field.TypeJSON, Default: "{}"},
-		{Name: "theme_id", Type: field.TypeInt, Nullable: true},
 	}
 	// ShopsTable holds the schema information for the "shops" table.
 	ShopsTable = &schema.Table{
 		Name:       "shops",
 		Columns:    ShopsColumns,
 		PrimaryKey: []*schema.Column{ShopsColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "shops_themes_theme",
-				Columns:    []*schema.Column{ShopsColumns[9]},
-				RefColumns: []*schema.Column{ThemesColumns[0]},
-				OnDelete:   schema.SetNull,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "shop_theme_id",
-				Unique:  false,
-				Columns: []*schema.Column{ShopsColumns[9]},
-			},
-		},
 	}
 	// ShopAllowedOriginsColumns holds the columns for the "shop_allowed_origins" table.
 	ShopAllowedOriginsColumns = []*schema.Column{
@@ -1255,120 +1239,6 @@ var (
 				Name:    "shopuser_user_id",
 				Unique:  false,
 				Columns: []*schema.Column{ShopUserColumns[4]},
-			},
-		},
-	}
-	// SitesColumns holds the columns for the "sites" table.
-	SitesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "domain", Type: field.TypeString, Unique: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
-		{Name: "ssl_status", Type: field.TypeInt16, Default: 0},
-		{Name: "meta", Type: field.TypeJSON},
-	}
-	// SitesTable holds the schema information for the "sites" table.
-	SitesTable = &schema.Table{
-		Name:       "sites",
-		Columns:    SitesColumns,
-		PrimaryKey: []*schema.Column{SitesColumns[0]},
-	}
-	// SiteShopColumns holds the columns for the "site_shop" table.
-	SiteShopColumns = []*schema.Column{
-		{Name: "path_prefix", Type: field.TypeString, Nullable: true, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
-		{Name: "is_primary", Type: field.TypeBool, Default: false},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "site_id", Type: field.TypeInt},
-		{Name: "shop_id", Type: field.TypeInt},
-	}
-	// SiteShopTable holds the schema information for the "site_shop" table.
-	SiteShopTable = &schema.Table{
-		Name:       "site_shop",
-		Columns:    SiteShopColumns,
-		PrimaryKey: []*schema.Column{SiteShopColumns[3], SiteShopColumns[4]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "site_shop_sites_site",
-				Columns:    []*schema.Column{SiteShopColumns[3]},
-				RefColumns: []*schema.Column{SitesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-			{
-				Symbol:     "site_shop_shops_shop",
-				Columns:    []*schema.Column{SiteShopColumns[4]},
-				RefColumns: []*schema.Column{ShopsColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "siteshop_site_id_path_prefix",
-				Unique:  true,
-				Columns: []*schema.Column{SiteShopColumns[3], SiteShopColumns[0]},
-			},
-			{
-				Name:    "site_shop_default_shop_per_site",
-				Unique:  true,
-				Columns: []*schema.Column{SiteShopColumns[3]},
-				Annotation: &entsql.IndexAnnotation{
-					Where: "path_prefix IS NULL",
-				},
-			},
-			{
-				Name:    "site_shop_primary_domain_per_shop",
-				Unique:  true,
-				Columns: []*schema.Column{SiteShopColumns[4]},
-				Annotation: &entsql.IndexAnnotation{
-					Where: "is_primary",
-				},
-			},
-		},
-	}
-	// ThemesColumns holds the columns for the "themes" table.
-	ThemesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "code", Type: field.TypeString, Unique: true, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
-		{Name: "name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
-		{Name: "layout_key", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
-		{Name: "config_schema", Type: field.TypeJSON},
-		{Name: "is_active", Type: field.TypeBool, Default: true},
-	}
-	// ThemesTable holds the schema information for the "themes" table.
-	ThemesTable = &schema.Table{
-		Name:       "themes",
-		Columns:    ThemesColumns,
-		PrimaryKey: []*schema.Column{ThemesColumns[0]},
-	}
-	// ThemePagesColumns holds the columns for the "theme_pages" table.
-	ThemePagesColumns = []*schema.Column{
-		{Name: "id", Type: field.TypeInt, Increment: true},
-		{Name: "created_at", Type: field.TypeTime},
-		{Name: "updated_at", Type: field.TypeTime},
-		{Name: "type_key", Type: field.TypeString, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
-		{Name: "component_key", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
-		{Name: "page_schema", Type: field.TypeJSON},
-		{Name: "theme_id", Type: field.TypeInt},
-	}
-	// ThemePagesTable holds the schema information for the "theme_pages" table.
-	ThemePagesTable = &schema.Table{
-		Name:       "theme_pages",
-		Columns:    ThemePagesColumns,
-		PrimaryKey: []*schema.Column{ThemePagesColumns[0]},
-		ForeignKeys: []*schema.ForeignKey{
-			{
-				Symbol:     "theme_pages_themes_pages",
-				Columns:    []*schema.Column{ThemePagesColumns[6]},
-				RefColumns: []*schema.Column{ThemesColumns[0]},
-				OnDelete:   schema.NoAction,
-			},
-		},
-		Indexes: []*schema.Index{
-			{
-				Name:    "themepage_theme_id_type_key",
-				Unique:  true,
-				Columns: []*schema.Column{ThemePagesColumns[6], ThemePagesColumns[3]},
 			},
 		},
 	}
@@ -1494,10 +1364,6 @@ var (
 		ShopAllowedOriginsTable,
 		ShopPaymentProviderCredentialsTable,
 		ShopUserTable,
-		SitesTable,
-		SiteShopTable,
-		ThemesTable,
-		ThemePagesTable,
 		UsersTable,
 		UserPermissionTable,
 		UserRefreshTokensTable,
@@ -1696,7 +1562,6 @@ func init() {
 	ShippingMethodsTable.Annotation.Checks = map[string]string{
 		"shipping_methods_flat_rate_check": "flat_rate >= 0",
 	}
-	ShopsTable.ForeignKeys[0].RefTable = ThemesTable
 	ShopsTable.Annotation = &entsql.Annotation{}
 	ShopsTable.Annotation.Checks = map[string]string{
 		"shops_status_check": "status IN (0, 1, 2)",
@@ -1720,16 +1585,6 @@ func init() {
 	ShopUserTable.Annotation.Checks = map[string]string{
 		"shop_user_status_check": "status IN (0, 1)",
 	}
-	SitesTable.Annotation = &entsql.Annotation{}
-	SitesTable.Annotation.Checks = map[string]string{
-		"sites_ssl_status_check": "ssl_status IN (0, 1, 2)",
-	}
-	SiteShopTable.ForeignKeys[0].RefTable = SitesTable
-	SiteShopTable.ForeignKeys[1].RefTable = ShopsTable
-	SiteShopTable.Annotation = &entsql.Annotation{
-		Table: "site_shop",
-	}
-	ThemePagesTable.ForeignKeys[0].RefTable = ThemesTable
 	UsersTable.Annotation = &entsql.Annotation{}
 	UsersTable.Annotation.Checks = map[string]string{
 		"users_status_check": "status IN (0, 1)",

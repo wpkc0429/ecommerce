@@ -392,54 +392,6 @@ func (f ShopUserFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, er
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ShopUserMutation", m)
 }
 
-// The SiteFunc type is an adapter to allow the use of ordinary
-// function as Site mutator.
-type SiteFunc func(context.Context, *ent.SiteMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f SiteFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.SiteMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SiteMutation", m)
-}
-
-// The SiteShopFunc type is an adapter to allow the use of ordinary
-// function as SiteShop mutator.
-type SiteShopFunc func(context.Context, *ent.SiteShopMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f SiteShopFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.SiteShopMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SiteShopMutation", m)
-}
-
-// The ThemeFunc type is an adapter to allow the use of ordinary
-// function as Theme mutator.
-type ThemeFunc func(context.Context, *ent.ThemeMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f ThemeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.ThemeMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ThemeMutation", m)
-}
-
-// The ThemePageFunc type is an adapter to allow the use of ordinary
-// function as ThemePage mutator.
-type ThemePageFunc func(context.Context, *ent.ThemePageMutation) (ent.Value, error)
-
-// Mutate calls f(ctx, m).
-func (f ThemePageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
-	if mv, ok := m.(*ent.ThemePageMutation); ok {
-		return f(ctx, mv)
-	}
-	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ThemePageMutation", m)
-}
-
 // The UserFunc type is an adapter to allow the use of ordinary
 // function as User mutator.
 type UserFunc func(context.Context, *ent.UserMutation) (ent.Value, error)

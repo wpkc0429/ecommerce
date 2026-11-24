@@ -323,8 +323,8 @@ func (OrderItem) Indexes() []ent.Index {
 //
 // The unique index is Postgres's default NULLS DISTINCT, which is immaterial
 // here because both columns are NOT NULL. Stated explicitly because this
-// codebase has two handwritten NULLS NOT DISTINCT constraints (site_shop,
-// role_user) that must NOT be copied onto this table.
+// codebase has handwritten NULLS NOT DISTINCT constraints (role_user,
+// user_permission) that must NOT be copied onto this table.
 //
 // shop_id scopes the key: shop A can never replay shop B's key, because a key
 // string used by both is simply two rows. That is a tenant-isolation

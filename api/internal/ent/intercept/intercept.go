@@ -40,10 +40,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userpermission"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
@@ -971,114 +967,6 @@ func (f TraverseShopUser) Traverse(ctx context.Context, q ent.Query) error {
 	return fmt.Errorf("unexpected query type %T. expect *ent.ShopUserQuery", q)
 }
 
-// The SiteFunc type is an adapter to allow the use of ordinary function as a Querier.
-type SiteFunc func(context.Context, *ent.SiteQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f SiteFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.SiteQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.SiteQuery", q)
-}
-
-// The TraverseSite type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseSite func(context.Context, *ent.SiteQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseSite) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseSite) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.SiteQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.SiteQuery", q)
-}
-
-// The SiteShopFunc type is an adapter to allow the use of ordinary function as a Querier.
-type SiteShopFunc func(context.Context, *ent.SiteShopQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f SiteShopFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.SiteShopQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.SiteShopQuery", q)
-}
-
-// The TraverseSiteShop type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseSiteShop func(context.Context, *ent.SiteShopQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseSiteShop) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseSiteShop) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.SiteShopQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.SiteShopQuery", q)
-}
-
-// The ThemeFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ThemeFunc func(context.Context, *ent.ThemeQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ThemeFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ThemeQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ThemeQuery", q)
-}
-
-// The TraverseTheme type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseTheme func(context.Context, *ent.ThemeQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseTheme) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseTheme) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ThemeQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ThemeQuery", q)
-}
-
-// The ThemePageFunc type is an adapter to allow the use of ordinary function as a Querier.
-type ThemePageFunc func(context.Context, *ent.ThemePageQuery) (ent.Value, error)
-
-// Query calls f(ctx, q).
-func (f ThemePageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
-	if q, ok := q.(*ent.ThemePageQuery); ok {
-		return f(ctx, q)
-	}
-	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ThemePageQuery", q)
-}
-
-// The TraverseThemePage type is an adapter to allow the use of ordinary function as Traverser.
-type TraverseThemePage func(context.Context, *ent.ThemePageQuery) error
-
-// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
-func (f TraverseThemePage) Intercept(next ent.Querier) ent.Querier {
-	return next
-}
-
-// Traverse calls f(ctx, q).
-func (f TraverseThemePage) Traverse(ctx context.Context, q ent.Query) error {
-	if q, ok := q.(*ent.ThemePageQuery); ok {
-		return f(ctx, q)
-	}
-	return fmt.Errorf("unexpected query type %T. expect *ent.ThemePageQuery", q)
-}
-
 // The UserFunc type is an adapter to allow the use of ordinary function as a Querier.
 type UserFunc func(context.Context, *ent.UserQuery) (ent.Value, error)
 
@@ -1227,14 +1115,6 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ShopPaymentProviderCredentialQuery, predicate.ShopPaymentProviderCredential, shoppaymentprovidercredential.OrderOption]{typ: ent.TypeShopPaymentProviderCredential, tq: q}, nil
 	case *ent.ShopUserQuery:
 		return &query[*ent.ShopUserQuery, predicate.ShopUser, shopuser.OrderOption]{typ: ent.TypeShopUser, tq: q}, nil
-	case *ent.SiteQuery:
-		return &query[*ent.SiteQuery, predicate.Site, site.OrderOption]{typ: ent.TypeSite, tq: q}, nil
-	case *ent.SiteShopQuery:
-		return &query[*ent.SiteShopQuery, predicate.SiteShop, siteshop.OrderOption]{typ: ent.TypeSiteShop, tq: q}, nil
-	case *ent.ThemeQuery:
-		return &query[*ent.ThemeQuery, predicate.Theme, theme.OrderOption]{typ: ent.TypeTheme, tq: q}, nil
-	case *ent.ThemePageQuery:
-		return &query[*ent.ThemePageQuery, predicate.ThemePage, themepage.OrderOption]{typ: ent.TypeThemePage, tq: q}, nil
 	case *ent.UserQuery:
 		return &query[*ent.UserQuery, predicate.User, user.OrderOption]{typ: ent.TypeUser, tq: q}, nil
 	case *ent.UserPermissionQuery:

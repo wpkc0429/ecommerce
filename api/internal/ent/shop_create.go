@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -50,20 +48,6 @@ func (_c *ShopCreate) SetUpdatedAt(v time.Time) *ShopCreate {
 func (_c *ShopCreate) SetNillableUpdatedAt(v *time.Time) *ShopCreate {
 	if v != nil {
 		_c.SetUpdatedAt(*v)
-	}
-	return _c
-}
-
-// SetThemeID sets the "theme_id" field.
-func (_c *ShopCreate) SetThemeID(v int) *ShopCreate {
-	_c.mutation.SetThemeID(v)
-	return _c
-}
-
-// SetNillableThemeID sets the "theme_id" field if the given value is not nil.
-func (_c *ShopCreate) SetNillableThemeID(v *int) *ShopCreate {
-	if v != nil {
-		_c.SetThemeID(*v)
 	}
 	return _c
 }
@@ -120,11 +104,6 @@ func (_c *ShopCreate) SetAdminBranding(v json.RawMessage) *ShopCreate {
 	return _c
 }
 
-// SetTheme sets the "theme" edge to the Theme entity.
-func (_c *ShopCreate) SetTheme(v *Theme) *ShopCreate {
-	return _c.SetThemeID(v.ID)
-}
-
 // AddPageIDs adds the "pages" edge to the Page entity by IDs.
 func (_c *ShopCreate) AddPageIDs(ids ...int) *ShopCreate {
 	_c.mutation.AddPageIDs(ids...)
@@ -138,21 +117,6 @@ func (_c *ShopCreate) AddPages(v ...*Page) *ShopCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddPageIDs(ids...)
-}
-
-// AddSiteIDs adds the "sites" edge to the Site entity by IDs.
-func (_c *ShopCreate) AddSiteIDs(ids ...int) *ShopCreate {
-	_c.mutation.AddSiteIDs(ids...)
-	return _c
-}
-
-// AddSites adds the "sites" edges to the Site entity.
-func (_c *ShopCreate) AddSites(v ...*Site) *ShopCreate {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _c.AddSiteIDs(ids...)
 }
 
 // Mutation returns the ShopMutation object of the builder.
@@ -308,23 +272,6 @@ func (_c *ShopCreate) createSpec() (*Shop, *sqlgraph.CreateSpec) {
 		_spec.SetField(shop.FieldAdminBranding, field.TypeJSON, value)
 		_node.AdminBranding = value
 	}
-	if nodes := _c.mutation.ThemeIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shop.ThemeTable,
-			Columns: []string{shop.ThemeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(theme.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_node.ThemeID = &nodes[0]
-		_spec.Edges = append(_spec.Edges, edge)
-	}
 	if nodes := _c.mutation.PagesIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -339,26 +286,6 @@ func (_c *ShopCreate) createSpec() (*Shop, *sqlgraph.CreateSpec) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges = append(_spec.Edges, edge)
-	}
-	if nodes := _c.mutation.SitesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &SiteShopCreate{config: _c.config, mutation: newSiteShopMutation(_c.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
@@ -422,24 +349,6 @@ func (u *ShopUpsert) SetUpdatedAt(v time.Time) *ShopUpsert {
 // UpdateUpdatedAt sets the "updated_at" field to the value that was provided on create.
 func (u *ShopUpsert) UpdateUpdatedAt() *ShopUpsert {
 	u.SetExcluded(shop.FieldUpdatedAt)
-	return u
-}
-
-// SetThemeID sets the "theme_id" field.
-func (u *ShopUpsert) SetThemeID(v int) *ShopUpsert {
-	u.Set(shop.FieldThemeID, v)
-	return u
-}
-
-// UpdateThemeID sets the "theme_id" field to the value that was provided on create.
-func (u *ShopUpsert) UpdateThemeID() *ShopUpsert {
-	u.SetExcluded(shop.FieldThemeID)
-	return u
-}
-
-// ClearThemeID clears the value of the "theme_id" field.
-func (u *ShopUpsert) ClearThemeID() *ShopUpsert {
-	u.SetNull(shop.FieldThemeID)
 	return u
 }
 
@@ -583,27 +492,6 @@ func (u *ShopUpsertOne) SetUpdatedAt(v time.Time) *ShopUpsertOne {
 func (u *ShopUpsertOne) UpdateUpdatedAt() *ShopUpsertOne {
 	return u.Update(func(s *ShopUpsert) {
 		s.UpdateUpdatedAt()
-	})
-}
-
-// SetThemeID sets the "theme_id" field.
-func (u *ShopUpsertOne) SetThemeID(v int) *ShopUpsertOne {
-	return u.Update(func(s *ShopUpsert) {
-		s.SetThemeID(v)
-	})
-}
-
-// UpdateThemeID sets the "theme_id" field to the value that was provided on create.
-func (u *ShopUpsertOne) UpdateThemeID() *ShopUpsertOne {
-	return u.Update(func(s *ShopUpsert) {
-		s.UpdateThemeID()
-	})
-}
-
-// ClearThemeID clears the value of the "theme_id" field.
-func (u *ShopUpsertOne) ClearThemeID() *ShopUpsertOne {
-	return u.Update(func(s *ShopUpsert) {
-		s.ClearThemeID()
 	})
 }
 
@@ -927,27 +815,6 @@ func (u *ShopUpsertBulk) SetUpdatedAt(v time.Time) *ShopUpsertBulk {
 func (u *ShopUpsertBulk) UpdateUpdatedAt() *ShopUpsertBulk {
 	return u.Update(func(s *ShopUpsert) {
 		s.UpdateUpdatedAt()
-	})
-}
-
-// SetThemeID sets the "theme_id" field.
-func (u *ShopUpsertBulk) SetThemeID(v int) *ShopUpsertBulk {
-	return u.Update(func(s *ShopUpsert) {
-		s.SetThemeID(v)
-	})
-}
-
-// UpdateThemeID sets the "theme_id" field to the value that was provided on create.
-func (u *ShopUpsertBulk) UpdateThemeID() *ShopUpsertBulk {
-	return u.Update(func(s *ShopUpsert) {
-		s.UpdateThemeID()
-	})
-}
-
-// ClearThemeID clears the value of the "theme_id" field.
-func (u *ShopUpsertBulk) ClearThemeID() *ShopUpsertBulk {
-	return u.Update(func(s *ShopUpsert) {
-		s.ClearThemeID()
 	})
 }
 

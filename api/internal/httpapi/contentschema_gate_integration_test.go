@@ -2,122 +2,30 @@ package httpapi_test
 
 import (
 	"context"
-	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 
 	"ksdevworks/ecommerce/api/internal/contentschema"
-	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
 )
 
 // Gate tests of change retire-hosted-storefront-and-themes group 1 (tasks
 // 1.7), kept after the removal: they prove that nothing which validates,
-// publishes or renders content depends on themes, and that the one-time
-// backfill SQL of the add_content_schemas migration copies a theme's schemas
-// faithfully. (The backfill test is deleted together with the theme tables.)
-
-func normalizeJSON(t *testing.T, raw []byte) any {
-	t.Helper()
-	var v any
-	if err := json.Unmarshal(raw, &v); err != nil {
-		t.Fatalf("normalize json: %v", err)
-	}
-	return v
-}
-
-// 1.7 (1): the data backfill in the migration produces, for a database that has
-// themed shops but no content_schemas rows, exactly one version 1 per shop
-// whose content equals the theme's schemas.
-func TestContentSchemaBackfillMigrationEquivalence(t *testing.T) {
-	e := newCMSEnv(t)
-	ctx := context.Background()
-
-	// A legacy theme with two page types, applied to the demo shop.
-	pageSchemaA := json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"sections":{"type":"array","default":[]}}}`)
-	pageSchemaB := json.RawMessage(`{"type":"object","properties":{"body":{"type":"string","default":""}}}`)
-	cfg := json.RawMessage(`{"type":"object","properties":{"tokens":{"type":"object"}}}`)
-	th := e.client.Theme.Create().SetCode("legacy").SetName("Legacy").SetLayoutKey("legacy/main").SetConfigSchema(cfg).SaveX(ctx)
-	e.client.ThemePage.Create().SetThemeID(th.ID).SetTypeKey("home").SetComponentKey("legacy/home").SetPageSchema(pageSchemaA).SaveX(ctx)
-	e.client.ThemePage.Create().SetThemeID(th.ID).SetTypeKey("about").SetComponentKey("legacy/about").SetPageSchema(pageSchemaB).SaveX(ctx)
-	e.client.Shop.UpdateOneID(e.shopID).SetThemeID(th.ID).ExecX(ctx)
-
-	// Simulate a pre-migration database: themed shop, no schema rows.
-	if _, err := e.client.ContentSchema.Delete().Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-
-	sqlText, err := os.ReadFile(filepath.Join("..", "..", "migrations", "20261124155743_add_content_schemas.up.sql"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	idx := strings.Index(string(sqlText), `INSERT INTO "content_schemas"`)
-	if idx < 0 {
-		t.Fatal("backfill INSERT not found in migration")
-	}
-	backfill := string(sqlText)[idx:]
-
-	db, err := sql.Open("pgx", os.Getenv("TEST_DATABASE_URL"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = db.Close() }()
-	for i := 0; i < 2; i++ { // second run proves idempotency
-		if _, err := db.Exec(backfill); err != nil {
-			t.Fatalf("backfill run %d: %v", i+1, err)
-		}
-	}
-
-	rows := e.client.ContentSchema.Query().Where(entcs.ShopIDEQ(e.shopID)).AllX(ctx)
-	if len(rows) != 1 || rows[0].Version != 1 || rows[0].Source != contentschema.SourceThemeBackfill {
-		t.Fatalf("want exactly one version-1 theme_backfill row, got %d rows: %+v", len(rows), rows)
-	}
-	want := map[string]any{
-		"format":         1,
-		"types":          map[string]any{"home": normalizeJSON(t, pageSchemaA), "about": normalizeJSON(t, pageSchemaB)},
-		"type_order":     []any{"home", "about"},
-		"global":         normalizeJSON(t, cfg),
-		"component_keys": map[string]any{"home": "legacy/home", "about": "legacy/about"},
-	}
-	wantRaw, _ := json.Marshal(want)
-	if !reflect.DeepEqual(normalizeJSON(t, rows[0].SchemaJSON), normalizeJSON(t, wantRaw)) {
-		t.Fatalf("backfilled schema differs from the theme's schemas: got %s want %s", rows[0].SchemaJSON, wantRaw)
-	}
-
-	// The store reads it back with the theme's page type order.
-	types, err := (&contentschema.Store{Client: e.client}).Types(ctx, e.shopID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var got []string
-	for _, ti := range types {
-		got = append(got, ti.TypeKey)
-	}
-	if strings.Join(got, ",") != "home,about" {
-		t.Fatalf("page types after backfill: %v", got)
-	}
-}
+// publishes or renders content depends on themes. (The test of the one-time
+// backfill SQL of the add_content_schemas migration lived here until the theme
+// tables were dropped; the migration test in internal/testutil covers it.)
 
 // 1.7 (2): with no theme anywhere, page validation, publish, global content,
 // public render, preview and page-types all work from the shop's own schema.
 func TestContentWorksWithoutThemes(t *testing.T) {
 	e := newCMSEnv(t)
-	ctx := context.Background()
 
 	// The seeded demo shop has no theme at all: its schema is its own version.
-	if n := e.client.Theme.Query().CountX(ctx); n != 0 {
-		t.Fatalf("seed must not create themes any more: %d", n)
-	}
-
 	// page-types comes from the shop's own schema.
 	code, body, raw := e.admin1(t, "GET", e.shopPath("/page-types"), nil)
 	types, _ := body["page_types"].([]any)
-	if code != 200 || len(types) != 3 {
+	if code != 200 || len(types) != 3 || strings.Contains(raw, "component_key") {
 		t.Fatalf("page-types: %d %s", code, raw)
 	}
 

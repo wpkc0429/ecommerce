@@ -19,8 +19,6 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
-	// FieldThemeID holds the string denoting the theme_id field in the database.
-	FieldThemeID = "theme_id"
 	// FieldName holds the string denoting the name field in the database.
 	FieldName = "name"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -33,23 +31,10 @@ const (
 	FieldTimezone = "timezone"
 	// FieldAdminBranding holds the string denoting the admin_branding field in the database.
 	FieldAdminBranding = "admin_branding"
-	// EdgeTheme holds the string denoting the theme edge name in mutations.
-	EdgeTheme = "theme"
 	// EdgePages holds the string denoting the pages edge name in mutations.
 	EdgePages = "pages"
-	// EdgeSites holds the string denoting the sites edge name in mutations.
-	EdgeSites = "sites"
-	// EdgeSiteMappings holds the string denoting the site_mappings edge name in mutations.
-	EdgeSiteMappings = "site_mappings"
 	// Table holds the table name of the shop in the database.
 	Table = "shops"
-	// ThemeTable is the table that holds the theme relation/edge.
-	ThemeTable = "shops"
-	// ThemeInverseTable is the table name for the Theme entity.
-	// It exists in this package in order to avoid circular dependency with the "theme" package.
-	ThemeInverseTable = "themes"
-	// ThemeColumn is the table column denoting the theme relation/edge.
-	ThemeColumn = "theme_id"
 	// PagesTable is the table that holds the pages relation/edge.
 	PagesTable = "pages"
 	// PagesInverseTable is the table name for the Page entity.
@@ -57,18 +42,6 @@ const (
 	PagesInverseTable = "pages"
 	// PagesColumn is the table column denoting the pages relation/edge.
 	PagesColumn = "shop_id"
-	// SitesTable is the table that holds the sites relation/edge. The primary key declared below.
-	SitesTable = "site_shop"
-	// SitesInverseTable is the table name for the Site entity.
-	// It exists in this package in order to avoid circular dependency with the "site" package.
-	SitesInverseTable = "sites"
-	// SiteMappingsTable is the table that holds the site_mappings relation/edge.
-	SiteMappingsTable = "site_shop"
-	// SiteMappingsInverseTable is the table name for the SiteShop entity.
-	// It exists in this package in order to avoid circular dependency with the "siteshop" package.
-	SiteMappingsInverseTable = "site_shop"
-	// SiteMappingsColumn is the table column denoting the site_mappings relation/edge.
-	SiteMappingsColumn = "shop_id"
 )
 
 // Columns holds all SQL columns for shop fields.
@@ -76,7 +49,6 @@ var Columns = []string{
 	FieldID,
 	FieldCreatedAt,
 	FieldUpdatedAt,
-	FieldThemeID,
 	FieldName,
 	FieldStatus,
 	FieldContentJSON,
@@ -84,12 +56,6 @@ var Columns = []string{
 	FieldTimezone,
 	FieldAdminBranding,
 }
-
-var (
-	// SitesPrimaryKey and SitesColumn2 are the table columns denoting the
-	// primary key for the sites relation (M2M).
-	SitesPrimaryKey = []string{"site_id", "shop_id"}
-)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -140,11 +106,6 @@ func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
 }
 
-// ByThemeID orders the results by the theme_id field.
-func ByThemeID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldThemeID, opts...).ToFunc()
-}
-
 // ByName orders the results by the name field.
 func ByName(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldName, opts...).ToFunc()
@@ -160,13 +121,6 @@ func ByTimezone(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTimezone, opts...).ToFunc()
 }
 
-// ByThemeField orders the results by theme field.
-func ByThemeField(field string, opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newThemeStep(), sql.OrderByField(field, opts...))
-	}
-}
-
 // ByPagesCount orders the results by pages count.
 func ByPagesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -180,59 +134,10 @@ func ByPages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newPagesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
-
-// BySitesCount orders the results by sites count.
-func BySitesCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newSitesStep(), opts...)
-	}
-}
-
-// BySites orders the results by sites terms.
-func BySites(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSitesStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-
-// BySiteMappingsCount orders the results by site_mappings count.
-func BySiteMappingsCount(opts ...sql.OrderTermOption) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborsCount(s, newSiteMappingsStep(), opts...)
-	}
-}
-
-// BySiteMappings orders the results by site_mappings terms.
-func BySiteMappings(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
-	return func(s *sql.Selector) {
-		sqlgraph.OrderByNeighborTerms(s, newSiteMappingsStep(), append([]sql.OrderTerm{term}, terms...)...)
-	}
-}
-func newThemeStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(ThemeInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2O, false, ThemeTable, ThemeColumn),
-	)
-}
 func newPagesStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(PagesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, PagesTable, PagesColumn),
-	)
-}
-func newSitesStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(SitesInverseTable, FieldID),
-		sqlgraph.Edge(sqlgraph.M2M, true, SitesTable, SitesPrimaryKey...),
-	)
-}
-func newSiteMappingsStep() *sqlgraph.Step {
-	return sqlgraph.NewStep(
-		sqlgraph.From(Table, FieldID),
-		sqlgraph.To(SiteMappingsInverseTable, SiteMappingsColumn),
-		sqlgraph.Edge(sqlgraph.O2M, true, SiteMappingsTable, SiteMappingsColumn),
 	)
 }

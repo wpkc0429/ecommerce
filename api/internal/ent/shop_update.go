@@ -10,8 +10,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -37,26 +35,6 @@ func (_u *ShopUpdate) Where(ps ...predicate.Shop) *ShopUpdate {
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ShopUpdate) SetUpdatedAt(v time.Time) *ShopUpdate {
 	_u.mutation.SetUpdatedAt(v)
-	return _u
-}
-
-// SetThemeID sets the "theme_id" field.
-func (_u *ShopUpdate) SetThemeID(v int) *ShopUpdate {
-	_u.mutation.SetThemeID(v)
-	return _u
-}
-
-// SetNillableThemeID sets the "theme_id" field if the given value is not nil.
-func (_u *ShopUpdate) SetNillableThemeID(v *int) *ShopUpdate {
-	if v != nil {
-		_u.SetThemeID(*v)
-	}
-	return _u
-}
-
-// ClearThemeID clears the value of the "theme_id" field.
-func (_u *ShopUpdate) ClearThemeID() *ShopUpdate {
-	_u.mutation.ClearThemeID()
 	return _u
 }
 
@@ -151,11 +129,6 @@ func (_u *ShopUpdate) AppendAdminBranding(v json.RawMessage) *ShopUpdate {
 	return _u
 }
 
-// SetTheme sets the "theme" edge to the Theme entity.
-func (_u *ShopUpdate) SetTheme(v *Theme) *ShopUpdate {
-	return _u.SetThemeID(v.ID)
-}
-
 // AddPageIDs adds the "pages" edge to the Page entity by IDs.
 func (_u *ShopUpdate) AddPageIDs(ids ...int) *ShopUpdate {
 	_u.mutation.AddPageIDs(ids...)
@@ -171,30 +144,9 @@ func (_u *ShopUpdate) AddPages(v ...*Page) *ShopUpdate {
 	return _u.AddPageIDs(ids...)
 }
 
-// AddSiteIDs adds the "sites" edge to the Site entity by IDs.
-func (_u *ShopUpdate) AddSiteIDs(ids ...int) *ShopUpdate {
-	_u.mutation.AddSiteIDs(ids...)
-	return _u
-}
-
-// AddSites adds the "sites" edges to the Site entity.
-func (_u *ShopUpdate) AddSites(v ...*Site) *ShopUpdate {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddSiteIDs(ids...)
-}
-
 // Mutation returns the ShopMutation object of the builder.
 func (_u *ShopUpdate) Mutation() *ShopMutation {
 	return _u.mutation
-}
-
-// ClearTheme clears the "theme" edge to the Theme entity.
-func (_u *ShopUpdate) ClearTheme() *ShopUpdate {
-	_u.mutation.ClearTheme()
-	return _u
 }
 
 // ClearPages clears all "pages" edges to the Page entity.
@@ -216,27 +168,6 @@ func (_u *ShopUpdate) RemovePages(v ...*Page) *ShopUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePageIDs(ids...)
-}
-
-// ClearSites clears all "sites" edges to the Site entity.
-func (_u *ShopUpdate) ClearSites() *ShopUpdate {
-	_u.mutation.ClearSites()
-	return _u
-}
-
-// RemoveSiteIDs removes the "sites" edge to Site entities by IDs.
-func (_u *ShopUpdate) RemoveSiteIDs(ids ...int) *ShopUpdate {
-	_u.mutation.RemoveSiteIDs(ids...)
-	return _u
-}
-
-// RemoveSites removes "sites" edges to Site entities.
-func (_u *ShopUpdate) RemoveSites(v ...*Site) *ShopUpdate {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveSiteIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -350,35 +281,6 @@ func (_u *ShopUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			sqljson.Append(u, shop.FieldAdminBranding, value)
 		})
 	}
-	if _u.mutation.ThemeCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shop.ThemeTable,
-			Columns: []string{shop.ThemeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(theme.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ThemeIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shop.ThemeTable,
-			Columns: []string{shop.ThemeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(theme.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	if _u.mutation.PagesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -424,63 +326,6 @@ func (_u *ShopUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if _u.mutation.SitesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedSitesIDs(); len(nodes) > 0 && !_u.mutation.SitesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SitesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -506,26 +351,6 @@ type ShopUpdateOne struct {
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *ShopUpdateOne) SetUpdatedAt(v time.Time) *ShopUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
-	return _u
-}
-
-// SetThemeID sets the "theme_id" field.
-func (_u *ShopUpdateOne) SetThemeID(v int) *ShopUpdateOne {
-	_u.mutation.SetThemeID(v)
-	return _u
-}
-
-// SetNillableThemeID sets the "theme_id" field if the given value is not nil.
-func (_u *ShopUpdateOne) SetNillableThemeID(v *int) *ShopUpdateOne {
-	if v != nil {
-		_u.SetThemeID(*v)
-	}
-	return _u
-}
-
-// ClearThemeID clears the value of the "theme_id" field.
-func (_u *ShopUpdateOne) ClearThemeID() *ShopUpdateOne {
-	_u.mutation.ClearThemeID()
 	return _u
 }
 
@@ -620,11 +445,6 @@ func (_u *ShopUpdateOne) AppendAdminBranding(v json.RawMessage) *ShopUpdateOne {
 	return _u
 }
 
-// SetTheme sets the "theme" edge to the Theme entity.
-func (_u *ShopUpdateOne) SetTheme(v *Theme) *ShopUpdateOne {
-	return _u.SetThemeID(v.ID)
-}
-
 // AddPageIDs adds the "pages" edge to the Page entity by IDs.
 func (_u *ShopUpdateOne) AddPageIDs(ids ...int) *ShopUpdateOne {
 	_u.mutation.AddPageIDs(ids...)
@@ -640,30 +460,9 @@ func (_u *ShopUpdateOne) AddPages(v ...*Page) *ShopUpdateOne {
 	return _u.AddPageIDs(ids...)
 }
 
-// AddSiteIDs adds the "sites" edge to the Site entity by IDs.
-func (_u *ShopUpdateOne) AddSiteIDs(ids ...int) *ShopUpdateOne {
-	_u.mutation.AddSiteIDs(ids...)
-	return _u
-}
-
-// AddSites adds the "sites" edges to the Site entity.
-func (_u *ShopUpdateOne) AddSites(v ...*Site) *ShopUpdateOne {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.AddSiteIDs(ids...)
-}
-
 // Mutation returns the ShopMutation object of the builder.
 func (_u *ShopUpdateOne) Mutation() *ShopMutation {
 	return _u.mutation
-}
-
-// ClearTheme clears the "theme" edge to the Theme entity.
-func (_u *ShopUpdateOne) ClearTheme() *ShopUpdateOne {
-	_u.mutation.ClearTheme()
-	return _u
 }
 
 // ClearPages clears all "pages" edges to the Page entity.
@@ -685,27 +484,6 @@ func (_u *ShopUpdateOne) RemovePages(v ...*Page) *ShopUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemovePageIDs(ids...)
-}
-
-// ClearSites clears all "sites" edges to the Site entity.
-func (_u *ShopUpdateOne) ClearSites() *ShopUpdateOne {
-	_u.mutation.ClearSites()
-	return _u
-}
-
-// RemoveSiteIDs removes the "sites" edge to Site entities by IDs.
-func (_u *ShopUpdateOne) RemoveSiteIDs(ids ...int) *ShopUpdateOne {
-	_u.mutation.RemoveSiteIDs(ids...)
-	return _u
-}
-
-// RemoveSites removes "sites" edges to Site entities.
-func (_u *ShopUpdateOne) RemoveSites(v ...*Site) *ShopUpdateOne {
-	ids := make([]int, len(v))
-	for i := range v {
-		ids[i] = v[i].ID
-	}
-	return _u.RemoveSiteIDs(ids...)
 }
 
 // Where appends a list predicates to the ShopUpdate builder.
@@ -849,35 +627,6 @@ func (_u *ShopUpdateOne) sqlSave(ctx context.Context) (_node *Shop, err error) {
 			sqljson.Append(u, shop.FieldAdminBranding, value)
 		})
 	}
-	if _u.mutation.ThemeCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shop.ThemeTable,
-			Columns: []string{shop.ThemeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(theme.FieldID, field.TypeInt),
-			},
-		}
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.ThemeIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2O,
-			Inverse: false,
-			Table:   shop.ThemeTable,
-			Columns: []string{shop.ThemeColumn},
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(theme.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
 	if _u.mutation.PagesCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -921,63 +670,6 @@ func (_u *ShopUpdateOne) sqlSave(ctx context.Context) (_node *Shop, err error) {
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_spec.Edges.Add = append(_spec.Edges.Add, edge)
-	}
-	if _u.mutation.SitesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.RemovedSitesIDs(); len(nodes) > 0 && !_u.mutation.SitesCleared() {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
-		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
-	}
-	if nodes := _u.mutation.SitesIDs(); len(nodes) > 0 {
-		edge := &sqlgraph.EdgeSpec{
-			Rel:     sqlgraph.M2M,
-			Inverse: true,
-			Table:   shop.SitesTable,
-			Columns: shop.SitesPrimaryKey,
-			Bidi:    false,
-			Target: &sqlgraph.EdgeTarget{
-				IDSpec: sqlgraph.NewFieldSpec(site.FieldID, field.TypeInt),
-			},
-		}
-		for _, k := range nodes {
-			edge.Target.Nodes = append(edge.Target.Nodes, k)
-		}
-		createE := &SiteShopCreate{config: _u.config, mutation: newSiteShopMutation(_u.config, OpCreate)}
-		createE.defaults()
-		_, specE := createE.createSpec()
-		edge.Target.Fields = specE.Fields
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_spec.AddModifiers(_u.modifiers...)

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"strings"
 	"time"
 
@@ -23,8 +22,6 @@ type Shop struct {
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
 	UpdatedAt time.Time `json:"updated_at,omitempty"`
-	// ThemeID holds the value of the "theme_id" field.
-	ThemeID *int `json:"theme_id,omitempty"`
 	// Name holds the value of the "name" field.
 	Name string `json:"name,omitempty"`
 	// Status holds the value of the "status" field.
@@ -45,55 +42,20 @@ type Shop struct {
 
 // ShopEdges holds the relations/edges for other nodes in the graph.
 type ShopEdges struct {
-	// Theme holds the value of the theme edge.
-	Theme *Theme `json:"theme,omitempty"`
 	// Pages holds the value of the pages edge.
 	Pages []*Page `json:"pages,omitempty"`
-	// Sites holds the value of the sites edge.
-	Sites []*Site `json:"sites,omitempty"`
-	// SiteMappings holds the value of the site_mappings edge.
-	SiteMappings []*SiteShop `json:"site_mappings,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
-}
-
-// ThemeOrErr returns the Theme value or an error if the edge
-// was not loaded in eager-loading, or loaded but was not found.
-func (e ShopEdges) ThemeOrErr() (*Theme, error) {
-	if e.Theme != nil {
-		return e.Theme, nil
-	} else if e.loadedTypes[0] {
-		return nil, &NotFoundError{label: theme.Label}
-	}
-	return nil, &NotLoadedError{edge: "theme"}
+	loadedTypes [1]bool
 }
 
 // PagesOrErr returns the Pages value or an error if the edge
 // was not loaded in eager-loading.
 func (e ShopEdges) PagesOrErr() ([]*Page, error) {
-	if e.loadedTypes[1] {
+	if e.loadedTypes[0] {
 		return e.Pages, nil
 	}
 	return nil, &NotLoadedError{edge: "pages"}
-}
-
-// SitesOrErr returns the Sites value or an error if the edge
-// was not loaded in eager-loading.
-func (e ShopEdges) SitesOrErr() ([]*Site, error) {
-	if e.loadedTypes[2] {
-		return e.Sites, nil
-	}
-	return nil, &NotLoadedError{edge: "sites"}
-}
-
-// SiteMappingsOrErr returns the SiteMappings value or an error if the edge
-// was not loaded in eager-loading.
-func (e ShopEdges) SiteMappingsOrErr() ([]*SiteShop, error) {
-	if e.loadedTypes[3] {
-		return e.SiteMappings, nil
-	}
-	return nil, &NotLoadedError{edge: "site_mappings"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -103,7 +65,7 @@ func (*Shop) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case shop.FieldContentJSON, shop.FieldMeta, shop.FieldAdminBranding:
 			values[i] = new([]byte)
-		case shop.FieldID, shop.FieldThemeID, shop.FieldStatus:
+		case shop.FieldID, shop.FieldStatus:
 			values[i] = new(sql.NullInt64)
 		case shop.FieldName, shop.FieldTimezone:
 			values[i] = new(sql.NullString)
@@ -141,13 +103,6 @@ func (_m *Shop) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field updated_at", values[i])
 			} else if value.Valid {
 				_m.UpdatedAt = value.Time
-			}
-		case shop.FieldThemeID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field theme_id", values[i])
-			} else if value.Valid {
-				_m.ThemeID = new(int)
-				*_m.ThemeID = int(value.Int64)
 			}
 		case shop.FieldName:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -205,24 +160,9 @@ func (_m *Shop) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
-// QueryTheme queries the "theme" edge of the Shop entity.
-func (_m *Shop) QueryTheme() *ThemeQuery {
-	return NewShopClient(_m.config).QueryTheme(_m)
-}
-
 // QueryPages queries the "pages" edge of the Shop entity.
 func (_m *Shop) QueryPages() *PageQuery {
 	return NewShopClient(_m.config).QueryPages(_m)
-}
-
-// QuerySites queries the "sites" edge of the Shop entity.
-func (_m *Shop) QuerySites() *SiteQuery {
-	return NewShopClient(_m.config).QuerySites(_m)
-}
-
-// QuerySiteMappings queries the "site_mappings" edge of the Shop entity.
-func (_m *Shop) QuerySiteMappings() *SiteShopQuery {
-	return NewShopClient(_m.config).QuerySiteMappings(_m)
 }
 
 // Update returns a builder for updating this Shop.
@@ -253,11 +193,6 @@ func (_m *Shop) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("updated_at=")
 	builder.WriteString(_m.UpdatedAt.Format(time.ANSIC))
-	builder.WriteString(", ")
-	if v := _m.ThemeID; v != nil {
-		builder.WriteString("theme_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
-	}
 	builder.WriteString(", ")
 	builder.WriteString("name=")
 	builder.WriteString(_m.Name)

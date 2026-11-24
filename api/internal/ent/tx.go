@@ -78,14 +78,6 @@ type Tx struct {
 	ShopPaymentProviderCredential *ShopPaymentProviderCredentialClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
-	// Site is the client for interacting with the Site builders.
-	Site *SiteClient
-	// SiteShop is the client for interacting with the SiteShop builders.
-	SiteShop *SiteShopClient
-	// Theme is the client for interacting with the Theme builders.
-	Theme *ThemeClient
-	// ThemePage is the client for interacting with the ThemePage builders.
-	ThemePage *ThemePageClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 	// UserPermission is the client for interacting with the UserPermission builders.
@@ -255,10 +247,6 @@ func (tx *Tx) init() {
 	tx.ShopAllowedOrigin = NewShopAllowedOriginClient(tx.config)
 	tx.ShopPaymentProviderCredential = NewShopPaymentProviderCredentialClient(tx.config)
 	tx.ShopUser = NewShopUserClient(tx.config)
-	tx.Site = NewSiteClient(tx.config)
-	tx.SiteShop = NewSiteShopClient(tx.config)
-	tx.Theme = NewThemeClient(tx.config)
-	tx.ThemePage = NewThemePageClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 	tx.UserPermission = NewUserPermissionClient(tx.config)
 	tx.UserRefreshToken = NewUserRefreshTokenClient(tx.config)

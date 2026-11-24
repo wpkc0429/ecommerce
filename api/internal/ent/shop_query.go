@@ -9,9 +9,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/page"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"math"
 
 	"entgo.io/ent"
@@ -24,15 +21,12 @@ import (
 // ShopQuery is the builder for querying Shop entities.
 type ShopQuery struct {
 	config
-	ctx              *QueryContext
-	order            []shop.OrderOption
-	inters           []Interceptor
-	predicates       []predicate.Shop
-	withTheme        *ThemeQuery
-	withPages        *PageQuery
-	withSites        *SiteQuery
-	withSiteMappings *SiteShopQuery
-	modifiers        []func(*sql.Selector)
+	ctx        *QueryContext
+	order      []shop.OrderOption
+	inters     []Interceptor
+	predicates []predicate.Shop
+	withPages  *PageQuery
+	modifiers  []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -69,28 +63,6 @@ func (_q *ShopQuery) Order(o ...shop.OrderOption) *ShopQuery {
 	return _q
 }
 
-// QueryTheme chains the current query on the "theme" edge.
-func (_q *ShopQuery) QueryTheme() *ThemeQuery {
-	query := (&ThemeClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, selector),
-			sqlgraph.To(theme.Table, theme.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shop.ThemeTable, shop.ThemeColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
 // QueryPages chains the current query on the "pages" edge.
 func (_q *ShopQuery) QueryPages() *PageQuery {
 	query := (&PageClient{config: _q.config}).Query()
@@ -106,50 +78,6 @@ func (_q *ShopQuery) QueryPages() *PageQuery {
 			sqlgraph.From(shop.Table, shop.FieldID, selector),
 			sqlgraph.To(page.Table, page.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, shop.PagesTable, shop.PagesColumn),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QuerySites chains the current query on the "sites" edge.
-func (_q *ShopQuery) QuerySites() *SiteQuery {
-	query := (&SiteClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, selector),
-			sqlgraph.To(site.Table, site.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, shop.SitesTable, shop.SitesPrimaryKey...),
-		)
-		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
-		return fromU, nil
-	}
-	return query
-}
-
-// QuerySiteMappings chains the current query on the "site_mappings" edge.
-func (_q *ShopQuery) QuerySiteMappings() *SiteShopQuery {
-	query := (&SiteShopClient{config: _q.config}).Query()
-	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
-		if err := _q.prepareQuery(ctx); err != nil {
-			return nil, err
-		}
-		selector := _q.sqlQuery(ctx)
-		if err := selector.Err(); err != nil {
-			return nil, err
-		}
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, selector),
-			sqlgraph.To(siteshop.Table, siteshop.ShopColumn),
-			sqlgraph.Edge(sqlgraph.O2M, true, shop.SiteMappingsTable, shop.SiteMappingsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -344,31 +272,17 @@ func (_q *ShopQuery) Clone() *ShopQuery {
 		return nil
 	}
 	return &ShopQuery{
-		config:           _q.config,
-		ctx:              _q.ctx.Clone(),
-		order:            append([]shop.OrderOption{}, _q.order...),
-		inters:           append([]Interceptor{}, _q.inters...),
-		predicates:       append([]predicate.Shop{}, _q.predicates...),
-		withTheme:        _q.withTheme.Clone(),
-		withPages:        _q.withPages.Clone(),
-		withSites:        _q.withSites.Clone(),
-		withSiteMappings: _q.withSiteMappings.Clone(),
+		config:     _q.config,
+		ctx:        _q.ctx.Clone(),
+		order:      append([]shop.OrderOption{}, _q.order...),
+		inters:     append([]Interceptor{}, _q.inters...),
+		predicates: append([]predicate.Shop{}, _q.predicates...),
+		withPages:  _q.withPages.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
 		modifiers: append([]func(*sql.Selector){}, _q.modifiers...),
 	}
-}
-
-// WithTheme tells the query-builder to eager-load the nodes that are connected to
-// the "theme" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopQuery) WithTheme(opts ...func(*ThemeQuery)) *ShopQuery {
-	query := (&ThemeClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withTheme = query
-	return _q
 }
 
 // WithPages tells the query-builder to eager-load the nodes that are connected to
@@ -379,28 +293,6 @@ func (_q *ShopQuery) WithPages(opts ...func(*PageQuery)) *ShopQuery {
 		opt(query)
 	}
 	_q.withPages = query
-	return _q
-}
-
-// WithSites tells the query-builder to eager-load the nodes that are connected to
-// the "sites" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopQuery) WithSites(opts ...func(*SiteQuery)) *ShopQuery {
-	query := (&SiteClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withSites = query
-	return _q
-}
-
-// WithSiteMappings tells the query-builder to eager-load the nodes that are connected to
-// the "site_mappings" edge. The optional arguments are used to configure the query builder of the edge.
-func (_q *ShopQuery) WithSiteMappings(opts ...func(*SiteShopQuery)) *ShopQuery {
-	query := (&SiteShopClient{config: _q.config}).Query()
-	for _, opt := range opts {
-		opt(query)
-	}
-	_q.withSiteMappings = query
 	return _q
 }
 
@@ -482,11 +374,8 @@ func (_q *ShopQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shop, e
 	var (
 		nodes       = []*Shop{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
-			_q.withTheme != nil,
+		loadedTypes = [1]bool{
 			_q.withPages != nil,
-			_q.withSites != nil,
-			_q.withSiteMappings != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -510,12 +399,6 @@ func (_q *ShopQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shop, e
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
-	if query := _q.withTheme; query != nil {
-		if err := _q.loadTheme(ctx, query, nodes, nil,
-			func(n *Shop, e *Theme) { n.Edges.Theme = e }); err != nil {
-			return nil, err
-		}
-	}
 	if query := _q.withPages; query != nil {
 		if err := _q.loadPages(ctx, query, nodes,
 			func(n *Shop) { n.Edges.Pages = []*Page{} },
@@ -523,55 +406,9 @@ func (_q *ShopQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Shop, e
 			return nil, err
 		}
 	}
-	if query := _q.withSites; query != nil {
-		if err := _q.loadSites(ctx, query, nodes,
-			func(n *Shop) { n.Edges.Sites = []*Site{} },
-			func(n *Shop, e *Site) { n.Edges.Sites = append(n.Edges.Sites, e) }); err != nil {
-			return nil, err
-		}
-	}
-	if query := _q.withSiteMappings; query != nil {
-		if err := _q.loadSiteMappings(ctx, query, nodes,
-			func(n *Shop) { n.Edges.SiteMappings = []*SiteShop{} },
-			func(n *Shop, e *SiteShop) { n.Edges.SiteMappings = append(n.Edges.SiteMappings, e) }); err != nil {
-			return nil, err
-		}
-	}
 	return nodes, nil
 }
 
-func (_q *ShopQuery) loadTheme(ctx context.Context, query *ThemeQuery, nodes []*Shop, init func(*Shop), assign func(*Shop, *Theme)) error {
-	ids := make([]int, 0, len(nodes))
-	nodeids := make(map[int][]*Shop)
-	for i := range nodes {
-		if nodes[i].ThemeID == nil {
-			continue
-		}
-		fk := *nodes[i].ThemeID
-		if _, ok := nodeids[fk]; !ok {
-			ids = append(ids, fk)
-		}
-		nodeids[fk] = append(nodeids[fk], nodes[i])
-	}
-	if len(ids) == 0 {
-		return nil
-	}
-	query.Where(theme.IDIn(ids...))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nodeids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected foreign-key "theme_id" returned %v`, n.ID)
-		}
-		for i := range nodes {
-			assign(nodes[i], n)
-		}
-	}
-	return nil
-}
 func (_q *ShopQuery) loadPages(ctx context.Context, query *PageQuery, nodes []*Shop, init func(*Shop), assign func(*Shop, *Page)) error {
 	fks := make([]driver.Value, 0, len(nodes))
 	nodeids := make(map[int]*Shop)
@@ -597,97 +434,6 @@ func (_q *ShopQuery) loadPages(ctx context.Context, query *PageQuery, nodes []*S
 		node, ok := nodeids[fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "shop_id" returned %v for node %v`, fk, n.ID)
-		}
-		assign(node, n)
-	}
-	return nil
-}
-func (_q *ShopQuery) loadSites(ctx context.Context, query *SiteQuery, nodes []*Shop, init func(*Shop), assign func(*Shop, *Site)) error {
-	edgeIDs := make([]driver.Value, len(nodes))
-	byID := make(map[int]*Shop)
-	nids := make(map[int]map[*Shop]struct{})
-	for i, node := range nodes {
-		edgeIDs[i] = node.ID
-		byID[node.ID] = node
-		if init != nil {
-			init(node)
-		}
-	}
-	query.Where(func(s *sql.Selector) {
-		joinT := sql.Table(shop.SitesTable)
-		s.Join(joinT).On(s.C(site.FieldID), joinT.C(shop.SitesPrimaryKey[0]))
-		s.Where(sql.InValues(joinT.C(shop.SitesPrimaryKey[1]), edgeIDs...))
-		columns := s.SelectedColumns()
-		s.Select(joinT.C(shop.SitesPrimaryKey[1]))
-		s.AppendSelect(columns...)
-		s.SetDistinct(false)
-	})
-	if err := query.prepareQuery(ctx); err != nil {
-		return err
-	}
-	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
-		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
-			assign := spec.Assign
-			values := spec.ScanValues
-			spec.ScanValues = func(columns []string) ([]any, error) {
-				values, err := values(columns[1:])
-				if err != nil {
-					return nil, err
-				}
-				return append([]any{new(sql.NullInt64)}, values...), nil
-			}
-			spec.Assign = func(columns []string, values []any) error {
-				outValue := int(values[0].(*sql.NullInt64).Int64)
-				inValue := int(values[1].(*sql.NullInt64).Int64)
-				if nids[inValue] == nil {
-					nids[inValue] = map[*Shop]struct{}{byID[outValue]: {}}
-					return assign(columns[1:], values[1:])
-				}
-				nids[inValue][byID[outValue]] = struct{}{}
-				return nil
-			}
-		})
-	})
-	neighbors, err := withInterceptors[[]*Site](ctx, query, qr, query.inters)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		nodes, ok := nids[n.ID]
-		if !ok {
-			return fmt.Errorf(`unexpected "sites" node returned %v`, n.ID)
-		}
-		for kn := range nodes {
-			assign(kn, n)
-		}
-	}
-	return nil
-}
-func (_q *ShopQuery) loadSiteMappings(ctx context.Context, query *SiteShopQuery, nodes []*Shop, init func(*Shop), assign func(*Shop, *SiteShop)) error {
-	fks := make([]driver.Value, 0, len(nodes))
-	nodeids := make(map[int]*Shop)
-	for i := range nodes {
-		fks = append(fks, nodes[i].ID)
-		nodeids[nodes[i].ID] = nodes[i]
-		if init != nil {
-			init(nodes[i])
-		}
-	}
-	if len(query.ctx.Fields) > 0 {
-		query.ctx.AppendFieldOnce(siteshop.FieldShopID)
-	}
-	query.Where(predicate.SiteShop(func(s *sql.Selector) {
-		s.Where(sql.InValues(s.C(shop.SiteMappingsColumn), fks...))
-	}))
-	neighbors, err := query.All(ctx)
-	if err != nil {
-		return err
-	}
-	for _, n := range neighbors {
-		fk := n.ShopID
-		node, ok := nodeids[fk]
-		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "shop_id" returned %v for node %v`, fk, n)
 		}
 		assign(node, n)
 	}
@@ -721,9 +467,6 @@ func (_q *ShopQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != shop.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
-		}
-		if _q.withTheme != nil {
-			_spec.Node.AddColumnOnce(shop.FieldThemeID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

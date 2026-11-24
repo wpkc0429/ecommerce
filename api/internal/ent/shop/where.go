@@ -65,11 +65,6 @@ func UpdatedAt(v time.Time) predicate.Shop {
 	return predicate.Shop(sql.FieldEQ(FieldUpdatedAt, v))
 }
 
-// ThemeID applies equality check predicate on the "theme_id" field. It's identical to ThemeIDEQ.
-func ThemeID(v int) predicate.Shop {
-	return predicate.Shop(sql.FieldEQ(FieldThemeID, v))
-}
-
 // Name applies equality check predicate on the "name" field. It's identical to NameEQ.
 func Name(v string) predicate.Shop {
 	return predicate.Shop(sql.FieldEQ(FieldName, v))
@@ -163,36 +158,6 @@ func UpdatedAtLT(v time.Time) predicate.Shop {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.Shop {
 	return predicate.Shop(sql.FieldLTE(FieldUpdatedAt, v))
-}
-
-// ThemeIDEQ applies the EQ predicate on the "theme_id" field.
-func ThemeIDEQ(v int) predicate.Shop {
-	return predicate.Shop(sql.FieldEQ(FieldThemeID, v))
-}
-
-// ThemeIDNEQ applies the NEQ predicate on the "theme_id" field.
-func ThemeIDNEQ(v int) predicate.Shop {
-	return predicate.Shop(sql.FieldNEQ(FieldThemeID, v))
-}
-
-// ThemeIDIn applies the In predicate on the "theme_id" field.
-func ThemeIDIn(vs ...int) predicate.Shop {
-	return predicate.Shop(sql.FieldIn(FieldThemeID, vs...))
-}
-
-// ThemeIDNotIn applies the NotIn predicate on the "theme_id" field.
-func ThemeIDNotIn(vs ...int) predicate.Shop {
-	return predicate.Shop(sql.FieldNotIn(FieldThemeID, vs...))
-}
-
-// ThemeIDIsNil applies the IsNil predicate on the "theme_id" field.
-func ThemeIDIsNil() predicate.Shop {
-	return predicate.Shop(sql.FieldIsNull(FieldThemeID))
-}
-
-// ThemeIDNotNil applies the NotNil predicate on the "theme_id" field.
-func ThemeIDNotNil() predicate.Shop {
-	return predicate.Shop(sql.FieldNotNull(FieldThemeID))
 }
 
 // NameEQ applies the EQ predicate on the "name" field.
@@ -375,29 +340,6 @@ func TimezoneContainsFold(v string) predicate.Shop {
 	return predicate.Shop(sql.FieldContainsFold(FieldTimezone, v))
 }
 
-// HasTheme applies the HasEdge predicate on the "theme" edge.
-func HasTheme() predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, ThemeTable, ThemeColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasThemeWith applies the HasEdge predicate on the "theme" edge with a given conditions (other predicates).
-func HasThemeWith(preds ...predicate.Theme) predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := newThemeStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
 // HasPages applies the HasEdge predicate on the "pages" edge.
 func HasPages() predicate.Shop {
 	return predicate.Shop(func(s *sql.Selector) {
@@ -413,52 +355,6 @@ func HasPages() predicate.Shop {
 func HasPagesWith(preds ...predicate.Page) predicate.Shop {
 	return predicate.Shop(func(s *sql.Selector) {
 		step := newPagesStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasSites applies the HasEdge predicate on the "sites" edge.
-func HasSites() predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, SitesTable, SitesPrimaryKey...),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasSitesWith applies the HasEdge predicate on the "sites" edge with a given conditions (other predicates).
-func HasSitesWith(preds ...predicate.Site) predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := newSitesStep()
-		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
-			for _, p := range preds {
-				p(s)
-			}
-		})
-	})
-}
-
-// HasSiteMappings applies the HasEdge predicate on the "site_mappings" edge.
-func HasSiteMappings() predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := sqlgraph.NewStep(
-			sqlgraph.From(Table, FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, SiteMappingsTable, SiteMappingsColumn),
-		)
-		sqlgraph.HasNeighbors(s, step)
-	})
-}
-
-// HasSiteMappingsWith applies the HasEdge predicate on the "site_mappings" edge with a given conditions (other predicates).
-func HasSiteMappingsWith(preds ...predicate.SiteShop) predicate.Shop {
-	return predicate.Shop(func(s *sql.Selector) {
-		step := newSiteMappingsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

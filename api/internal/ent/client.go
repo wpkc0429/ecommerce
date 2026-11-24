@@ -43,10 +43,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userpermission"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
@@ -129,14 +125,6 @@ type Client struct {
 	ShopPaymentProviderCredential *ShopPaymentProviderCredentialClient
 	// ShopUser is the client for interacting with the ShopUser builders.
 	ShopUser *ShopUserClient
-	// Site is the client for interacting with the Site builders.
-	Site *SiteClient
-	// SiteShop is the client for interacting with the SiteShop builders.
-	SiteShop *SiteShopClient
-	// Theme is the client for interacting with the Theme builders.
-	Theme *ThemeClient
-	// ThemePage is the client for interacting with the ThemePage builders.
-	ThemePage *ThemePageClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 	// UserPermission is the client for interacting with the UserPermission builders.
@@ -186,10 +174,6 @@ func (c *Client) init() {
 	c.ShopAllowedOrigin = NewShopAllowedOriginClient(c.config)
 	c.ShopPaymentProviderCredential = NewShopPaymentProviderCredentialClient(c.config)
 	c.ShopUser = NewShopUserClient(c.config)
-	c.Site = NewSiteClient(c.config)
-	c.SiteShop = NewSiteShopClient(c.config)
-	c.Theme = NewThemeClient(c.config)
-	c.ThemePage = NewThemePageClient(c.config)
 	c.User = NewUserClient(c.config)
 	c.UserPermission = NewUserPermissionClient(c.config)
 	c.UserRefreshToken = NewUserRefreshTokenClient(c.config)
@@ -317,10 +301,6 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
 		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
 		ShopUser:                      NewShopUserClient(cfg),
-		Site:                          NewSiteClient(cfg),
-		SiteShop:                      NewSiteShopClient(cfg),
-		Theme:                         NewThemeClient(cfg),
-		ThemePage:                     NewThemePageClient(cfg),
 		User:                          NewUserClient(cfg),
 		UserPermission:                NewUserPermissionClient(cfg),
 		UserRefreshToken:              NewUserRefreshTokenClient(cfg),
@@ -375,10 +355,6 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ShopAllowedOrigin:             NewShopAllowedOriginClient(cfg),
 		ShopPaymentProviderCredential: NewShopPaymentProviderCredentialClient(cfg),
 		ShopUser:                      NewShopUserClient(cfg),
-		Site:                          NewSiteClient(cfg),
-		SiteShop:                      NewSiteShopClient(cfg),
-		Theme:                         NewThemeClient(cfg),
-		ThemePage:                     NewThemePageClient(cfg),
 		User:                          NewUserClient(cfg),
 		UserPermission:                NewUserPermissionClient(cfg),
 		UserRefreshToken:              NewUserRefreshTokenClient(cfg),
@@ -418,8 +394,7 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
 		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
 		c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser,
-		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -436,8 +411,7 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
 		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
 		c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser,
-		c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -510,14 +484,6 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ShopPaymentProviderCredential.mutate(ctx, m)
 	case *ShopUserMutation:
 		return c.ShopUser.mutate(ctx, m)
-	case *SiteMutation:
-		return c.Site.mutate(ctx, m)
-	case *SiteShopMutation:
-		return c.SiteShop.mutate(ctx, m)
-	case *ThemeMutation:
-		return c.Theme.mutate(ctx, m)
-	case *ThemePageMutation:
-		return c.ThemePage.mutate(ctx, m)
 	case *UserMutation:
 		return c.User.mutate(ctx, m)
 	case *UserPermissionMutation:
@@ -5310,22 +5276,6 @@ func (c *ShopClient) GetX(ctx context.Context, id int) *Shop {
 	return obj
 }
 
-// QueryTheme queries the theme edge of a Shop.
-func (c *ShopClient) QueryTheme(_m *Shop) *ThemeQuery {
-	query := (&ThemeClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, id),
-			sqlgraph.To(theme.Table, theme.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, false, shop.ThemeTable, shop.ThemeColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
 // QueryPages queries the pages edge of a Shop.
 func (c *ShopClient) QueryPages(_m *Shop) *PageQuery {
 	query := (&PageClient{config: c.config}).Query()
@@ -5335,38 +5285,6 @@ func (c *ShopClient) QueryPages(_m *Shop) *PageQuery {
 			sqlgraph.From(shop.Table, shop.FieldID, id),
 			sqlgraph.To(page.Table, page.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, shop.PagesTable, shop.PagesColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QuerySites queries the sites edge of a Shop.
-func (c *ShopClient) QuerySites(_m *Shop) *SiteQuery {
-	query := (&SiteClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, id),
-			sqlgraph.To(site.Table, site.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, true, shop.SitesTable, shop.SitesPrimaryKey...),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QuerySiteMappings queries the site_mappings edge of a Shop.
-func (c *ShopClient) QuerySiteMappings(_m *Shop) *SiteShopQuery {
-	query := (&SiteShopClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(shop.Table, shop.FieldID, id),
-			sqlgraph.To(siteshop.Table, siteshop.ShopColumn),
-			sqlgraph.Edge(sqlgraph.O2M, true, shop.SiteMappingsTable, shop.SiteMappingsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -5859,601 +5777,6 @@ func (c *ShopUserClient) mutate(ctx context.Context, m *ShopUserMutation) (Value
 		return (&ShopUserDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ShopUser mutation op: %q", m.Op())
-	}
-}
-
-// SiteClient is a client for the Site schema.
-type SiteClient struct {
-	config
-}
-
-// NewSiteClient returns a client for the Site from the given config.
-func NewSiteClient(c config) *SiteClient {
-	return &SiteClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `site.Hooks(f(g(h())))`.
-func (c *SiteClient) Use(hooks ...Hook) {
-	c.hooks.Site = append(c.hooks.Site, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `site.Intercept(f(g(h())))`.
-func (c *SiteClient) Intercept(interceptors ...Interceptor) {
-	c.inters.Site = append(c.inters.Site, interceptors...)
-}
-
-// Create returns a builder for creating a Site entity.
-func (c *SiteClient) Create() *SiteCreate {
-	mutation := newSiteMutation(c.config, OpCreate)
-	return &SiteCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of Site entities.
-func (c *SiteClient) CreateBulk(builders ...*SiteCreate) *SiteCreateBulk {
-	return &SiteCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *SiteClient) MapCreateBulk(slice any, setFunc func(*SiteCreate, int)) *SiteCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &SiteCreateBulk{err: fmt.Errorf("calling to SiteClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*SiteCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &SiteCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for Site.
-func (c *SiteClient) Update() *SiteUpdate {
-	mutation := newSiteMutation(c.config, OpUpdate)
-	return &SiteUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *SiteClient) UpdateOne(_m *Site) *SiteUpdateOne {
-	mutation := newSiteMutation(c.config, OpUpdateOne, withSite(_m))
-	return &SiteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *SiteClient) UpdateOneID(id int) *SiteUpdateOne {
-	mutation := newSiteMutation(c.config, OpUpdateOne, withSiteID(id))
-	return &SiteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for Site.
-func (c *SiteClient) Delete() *SiteDelete {
-	mutation := newSiteMutation(c.config, OpDelete)
-	return &SiteDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *SiteClient) DeleteOne(_m *Site) *SiteDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *SiteClient) DeleteOneID(id int) *SiteDeleteOne {
-	builder := c.Delete().Where(site.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &SiteDeleteOne{builder}
-}
-
-// Query returns a query builder for Site.
-func (c *SiteClient) Query() *SiteQuery {
-	return &SiteQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeSite},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a Site entity by its id.
-func (c *SiteClient) Get(ctx context.Context, id int) (*Site, error) {
-	return c.Query().Where(site.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *SiteClient) GetX(ctx context.Context, id int) *Site {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryShops queries the shops edge of a Site.
-func (c *SiteClient) QueryShops(_m *Site) *ShopQuery {
-	query := (&ShopClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(site.Table, site.FieldID, id),
-			sqlgraph.To(shop.Table, shop.FieldID),
-			sqlgraph.Edge(sqlgraph.M2M, false, site.ShopsTable, site.ShopsPrimaryKey...),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QuerySiteMappings queries the site_mappings edge of a Site.
-func (c *SiteClient) QuerySiteMappings(_m *Site) *SiteShopQuery {
-	query := (&SiteShopClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(site.Table, site.FieldID, id),
-			sqlgraph.To(siteshop.Table, siteshop.SiteColumn),
-			sqlgraph.Edge(sqlgraph.O2M, true, site.SiteMappingsTable, site.SiteMappingsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *SiteClient) Hooks() []Hook {
-	return c.hooks.Site
-}
-
-// Interceptors returns the client interceptors.
-func (c *SiteClient) Interceptors() []Interceptor {
-	return c.inters.Site
-}
-
-func (c *SiteClient) mutate(ctx context.Context, m *SiteMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&SiteCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&SiteUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&SiteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&SiteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown Site mutation op: %q", m.Op())
-	}
-}
-
-// SiteShopClient is a client for the SiteShop schema.
-type SiteShopClient struct {
-	config
-}
-
-// NewSiteShopClient returns a client for the SiteShop from the given config.
-func NewSiteShopClient(c config) *SiteShopClient {
-	return &SiteShopClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `siteshop.Hooks(f(g(h())))`.
-func (c *SiteShopClient) Use(hooks ...Hook) {
-	c.hooks.SiteShop = append(c.hooks.SiteShop, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `siteshop.Intercept(f(g(h())))`.
-func (c *SiteShopClient) Intercept(interceptors ...Interceptor) {
-	c.inters.SiteShop = append(c.inters.SiteShop, interceptors...)
-}
-
-// Create returns a builder for creating a SiteShop entity.
-func (c *SiteShopClient) Create() *SiteShopCreate {
-	mutation := newSiteShopMutation(c.config, OpCreate)
-	return &SiteShopCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of SiteShop entities.
-func (c *SiteShopClient) CreateBulk(builders ...*SiteShopCreate) *SiteShopCreateBulk {
-	return &SiteShopCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *SiteShopClient) MapCreateBulk(slice any, setFunc func(*SiteShopCreate, int)) *SiteShopCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &SiteShopCreateBulk{err: fmt.Errorf("calling to SiteShopClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*SiteShopCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &SiteShopCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for SiteShop.
-func (c *SiteShopClient) Update() *SiteShopUpdate {
-	mutation := newSiteShopMutation(c.config, OpUpdate)
-	return &SiteShopUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *SiteShopClient) UpdateOne(_m *SiteShop) *SiteShopUpdateOne {
-	mutation := newSiteShopMutation(c.config, OpUpdateOne)
-	mutation.site = &_m.SiteID
-	mutation.shop = &_m.ShopID
-	return &SiteShopUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for SiteShop.
-func (c *SiteShopClient) Delete() *SiteShopDelete {
-	mutation := newSiteShopMutation(c.config, OpDelete)
-	return &SiteShopDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Query returns a query builder for SiteShop.
-func (c *SiteShopClient) Query() *SiteShopQuery {
-	return &SiteShopQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeSiteShop},
-		inters: c.Interceptors(),
-	}
-}
-
-// QuerySite queries the site edge of a SiteShop.
-func (c *SiteShopClient) QuerySite(_m *SiteShop) *SiteQuery {
-	return c.Query().
-		Where(siteshop.SiteID(_m.SiteID), siteshop.ShopID(_m.ShopID)).
-		QuerySite()
-}
-
-// QueryShop queries the shop edge of a SiteShop.
-func (c *SiteShopClient) QueryShop(_m *SiteShop) *ShopQuery {
-	return c.Query().
-		Where(siteshop.SiteID(_m.SiteID), siteshop.ShopID(_m.ShopID)).
-		QueryShop()
-}
-
-// Hooks returns the client hooks.
-func (c *SiteShopClient) Hooks() []Hook {
-	return c.hooks.SiteShop
-}
-
-// Interceptors returns the client interceptors.
-func (c *SiteShopClient) Interceptors() []Interceptor {
-	return c.inters.SiteShop
-}
-
-func (c *SiteShopClient) mutate(ctx context.Context, m *SiteShopMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&SiteShopCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&SiteShopUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&SiteShopUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&SiteShopDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown SiteShop mutation op: %q", m.Op())
-	}
-}
-
-// ThemeClient is a client for the Theme schema.
-type ThemeClient struct {
-	config
-}
-
-// NewThemeClient returns a client for the Theme from the given config.
-func NewThemeClient(c config) *ThemeClient {
-	return &ThemeClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `theme.Hooks(f(g(h())))`.
-func (c *ThemeClient) Use(hooks ...Hook) {
-	c.hooks.Theme = append(c.hooks.Theme, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `theme.Intercept(f(g(h())))`.
-func (c *ThemeClient) Intercept(interceptors ...Interceptor) {
-	c.inters.Theme = append(c.inters.Theme, interceptors...)
-}
-
-// Create returns a builder for creating a Theme entity.
-func (c *ThemeClient) Create() *ThemeCreate {
-	mutation := newThemeMutation(c.config, OpCreate)
-	return &ThemeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of Theme entities.
-func (c *ThemeClient) CreateBulk(builders ...*ThemeCreate) *ThemeCreateBulk {
-	return &ThemeCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *ThemeClient) MapCreateBulk(slice any, setFunc func(*ThemeCreate, int)) *ThemeCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &ThemeCreateBulk{err: fmt.Errorf("calling to ThemeClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*ThemeCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &ThemeCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for Theme.
-func (c *ThemeClient) Update() *ThemeUpdate {
-	mutation := newThemeMutation(c.config, OpUpdate)
-	return &ThemeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *ThemeClient) UpdateOne(_m *Theme) *ThemeUpdateOne {
-	mutation := newThemeMutation(c.config, OpUpdateOne, withTheme(_m))
-	return &ThemeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *ThemeClient) UpdateOneID(id int) *ThemeUpdateOne {
-	mutation := newThemeMutation(c.config, OpUpdateOne, withThemeID(id))
-	return &ThemeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for Theme.
-func (c *ThemeClient) Delete() *ThemeDelete {
-	mutation := newThemeMutation(c.config, OpDelete)
-	return &ThemeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *ThemeClient) DeleteOne(_m *Theme) *ThemeDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *ThemeClient) DeleteOneID(id int) *ThemeDeleteOne {
-	builder := c.Delete().Where(theme.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &ThemeDeleteOne{builder}
-}
-
-// Query returns a query builder for Theme.
-func (c *ThemeClient) Query() *ThemeQuery {
-	return &ThemeQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeTheme},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a Theme entity by its id.
-func (c *ThemeClient) Get(ctx context.Context, id int) (*Theme, error) {
-	return c.Query().Where(theme.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *ThemeClient) GetX(ctx context.Context, id int) *Theme {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryPages queries the pages edge of a Theme.
-func (c *ThemeClient) QueryPages(_m *Theme) *ThemePageQuery {
-	query := (&ThemePageClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(theme.Table, theme.FieldID, id),
-			sqlgraph.To(themepage.Table, themepage.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, false, theme.PagesTable, theme.PagesColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// QueryShops queries the shops edge of a Theme.
-func (c *ThemeClient) QueryShops(_m *Theme) *ShopQuery {
-	query := (&ShopClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(theme.Table, theme.FieldID, id),
-			sqlgraph.To(shop.Table, shop.FieldID),
-			sqlgraph.Edge(sqlgraph.O2M, true, theme.ShopsTable, theme.ShopsColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *ThemeClient) Hooks() []Hook {
-	return c.hooks.Theme
-}
-
-// Interceptors returns the client interceptors.
-func (c *ThemeClient) Interceptors() []Interceptor {
-	return c.inters.Theme
-}
-
-func (c *ThemeClient) mutate(ctx context.Context, m *ThemeMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&ThemeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&ThemeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&ThemeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&ThemeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown Theme mutation op: %q", m.Op())
-	}
-}
-
-// ThemePageClient is a client for the ThemePage schema.
-type ThemePageClient struct {
-	config
-}
-
-// NewThemePageClient returns a client for the ThemePage from the given config.
-func NewThemePageClient(c config) *ThemePageClient {
-	return &ThemePageClient{config: c}
-}
-
-// Use adds a list of mutation hooks to the hooks stack.
-// A call to `Use(f, g, h)` equals to `themepage.Hooks(f(g(h())))`.
-func (c *ThemePageClient) Use(hooks ...Hook) {
-	c.hooks.ThemePage = append(c.hooks.ThemePage, hooks...)
-}
-
-// Intercept adds a list of query interceptors to the interceptors stack.
-// A call to `Intercept(f, g, h)` equals to `themepage.Intercept(f(g(h())))`.
-func (c *ThemePageClient) Intercept(interceptors ...Interceptor) {
-	c.inters.ThemePage = append(c.inters.ThemePage, interceptors...)
-}
-
-// Create returns a builder for creating a ThemePage entity.
-func (c *ThemePageClient) Create() *ThemePageCreate {
-	mutation := newThemePageMutation(c.config, OpCreate)
-	return &ThemePageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// CreateBulk returns a builder for creating a bulk of ThemePage entities.
-func (c *ThemePageClient) CreateBulk(builders ...*ThemePageCreate) *ThemePageCreateBulk {
-	return &ThemePageCreateBulk{config: c.config, builders: builders}
-}
-
-// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
-// a builder and applies setFunc on it.
-func (c *ThemePageClient) MapCreateBulk(slice any, setFunc func(*ThemePageCreate, int)) *ThemePageCreateBulk {
-	rv := reflect.ValueOf(slice)
-	if rv.Kind() != reflect.Slice {
-		return &ThemePageCreateBulk{err: fmt.Errorf("calling to ThemePageClient.MapCreateBulk with wrong type %T, need slice", slice)}
-	}
-	builders := make([]*ThemePageCreate, rv.Len())
-	for i := 0; i < rv.Len(); i++ {
-		builders[i] = c.Create()
-		setFunc(builders[i], i)
-	}
-	return &ThemePageCreateBulk{config: c.config, builders: builders}
-}
-
-// Update returns an update builder for ThemePage.
-func (c *ThemePageClient) Update() *ThemePageUpdate {
-	mutation := newThemePageMutation(c.config, OpUpdate)
-	return &ThemePageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOne returns an update builder for the given entity.
-func (c *ThemePageClient) UpdateOne(_m *ThemePage) *ThemePageUpdateOne {
-	mutation := newThemePageMutation(c.config, OpUpdateOne, withThemePage(_m))
-	return &ThemePageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// UpdateOneID returns an update builder for the given id.
-func (c *ThemePageClient) UpdateOneID(id int) *ThemePageUpdateOne {
-	mutation := newThemePageMutation(c.config, OpUpdateOne, withThemePageID(id))
-	return &ThemePageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// Delete returns a delete builder for ThemePage.
-func (c *ThemePageClient) Delete() *ThemePageDelete {
-	mutation := newThemePageMutation(c.config, OpDelete)
-	return &ThemePageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
-}
-
-// DeleteOne returns a builder for deleting the given entity.
-func (c *ThemePageClient) DeleteOne(_m *ThemePage) *ThemePageDeleteOne {
-	return c.DeleteOneID(_m.ID)
-}
-
-// DeleteOneID returns a builder for deleting the given entity by its id.
-func (c *ThemePageClient) DeleteOneID(id int) *ThemePageDeleteOne {
-	builder := c.Delete().Where(themepage.ID(id))
-	builder.mutation.id = &id
-	builder.mutation.op = OpDeleteOne
-	return &ThemePageDeleteOne{builder}
-}
-
-// Query returns a query builder for ThemePage.
-func (c *ThemePageClient) Query() *ThemePageQuery {
-	return &ThemePageQuery{
-		config: c.config,
-		ctx:    &QueryContext{Type: TypeThemePage},
-		inters: c.Interceptors(),
-	}
-}
-
-// Get returns a ThemePage entity by its id.
-func (c *ThemePageClient) Get(ctx context.Context, id int) (*ThemePage, error) {
-	return c.Query().Where(themepage.ID(id)).Only(ctx)
-}
-
-// GetX is like Get, but panics if an error occurs.
-func (c *ThemePageClient) GetX(ctx context.Context, id int) *ThemePage {
-	obj, err := c.Get(ctx, id)
-	if err != nil {
-		panic(err)
-	}
-	return obj
-}
-
-// QueryTheme queries the theme edge of a ThemePage.
-func (c *ThemePageClient) QueryTheme(_m *ThemePage) *ThemeQuery {
-	query := (&ThemeClient{config: c.config}).Query()
-	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
-		id := _m.ID
-		step := sqlgraph.NewStep(
-			sqlgraph.From(themepage.Table, themepage.FieldID, id),
-			sqlgraph.To(theme.Table, theme.FieldID),
-			sqlgraph.Edge(sqlgraph.M2O, true, themepage.ThemeTable, themepage.ThemeColumn),
-		)
-		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
-		return fromV, nil
-	}
-	return query
-}
-
-// Hooks returns the client hooks.
-func (c *ThemePageClient) Hooks() []Hook {
-	return c.hooks.ThemePage
-}
-
-// Interceptors returns the client interceptors.
-func (c *ThemePageClient) Interceptors() []Interceptor {
-	return c.inters.ThemePage
-}
-
-func (c *ThemePageClient) mutate(ctx context.Context, m *ThemePageMutation) (Value, error) {
-	switch m.Op() {
-	case OpCreate:
-		return (&ThemePageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdate:
-		return (&ThemePageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpUpdateOne:
-		return (&ThemePageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
-	case OpDelete, OpDeleteOne:
-		return (&ThemePageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
-	default:
-		return nil, fmt.Errorf("ent: unknown ThemePage mutation op: %q", m.Op())
 	}
 }
 
@@ -7008,8 +6331,8 @@ type (
 		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
 		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
-		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, User,
+		UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
@@ -7017,8 +6340,8 @@ type (
 		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
 		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
 		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
-		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, User,
+		UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

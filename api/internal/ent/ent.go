@@ -38,10 +38,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userpermission"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
@@ -143,10 +139,6 @@ func checkColumn(t, c string) error {
 			shopallowedorigin.Table:             shopallowedorigin.ValidColumn,
 			shoppaymentprovidercredential.Table: shoppaymentprovidercredential.ValidColumn,
 			shopuser.Table:                      shopuser.ValidColumn,
-			site.Table:                          site.ValidColumn,
-			siteshop.Table:                      siteshop.ValidColumn,
-			theme.Table:                         theme.ValidColumn,
-			themepage.Table:                     themepage.ValidColumn,
 			user.Table:                          user.ValidColumn,
 			userpermission.Table:                userpermission.ValidColumn,
 			userrefreshtoken.Table:              userrefreshtoken.ValidColumn,

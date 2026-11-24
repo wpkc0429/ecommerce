@@ -102,18 +102,6 @@ type ShopPaymentProviderCredential func(*sql.Selector)
 // ShopUser is the predicate function for shopuser builders.
 type ShopUser func(*sql.Selector)
 
-// Site is the predicate function for site builders.
-type Site func(*sql.Selector)
-
-// SiteShop is the predicate function for siteshop builders.
-type SiteShop func(*sql.Selector)
-
-// Theme is the predicate function for theme builders.
-type Theme func(*sql.Selector)
-
-// ThemePage is the predicate function for themepage builders.
-type ThemePage func(*sql.Selector)
-
 // User is the predicate function for user builders.
 type User func(*sql.Selector)
 

@@ -35,10 +35,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
 	"time"
@@ -1220,7 +1216,7 @@ func init() {
 	// shop.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	shop.UpdateDefaultUpdatedAt = shopDescUpdatedAt.UpdateDefault.(func() time.Time)
 	// shopDescName is the schema descriptor for name field.
-	shopDescName := shopFields[1].Descriptor()
+	shopDescName := shopFields[0].Descriptor()
 	// shop.NameValidator is a validator for the "name" field. It is called by the builders before save.
 	shop.NameValidator = func() func(string) error {
 		validators := shopDescName.Validators
@@ -1238,23 +1234,23 @@ func init() {
 		}
 	}()
 	// shopDescStatus is the schema descriptor for status field.
-	shopDescStatus := shopFields[2].Descriptor()
+	shopDescStatus := shopFields[1].Descriptor()
 	// shop.DefaultStatus holds the default value on creation for the status field.
 	shop.DefaultStatus = shopDescStatus.Default.(int16)
 	// shopDescContentJSON is the schema descriptor for content_json field.
-	shopDescContentJSON := shopFields[3].Descriptor()
+	shopDescContentJSON := shopFields[2].Descriptor()
 	// shop.DefaultContentJSON holds the default value on creation for the content_json field.
 	shop.DefaultContentJSON = shopDescContentJSON.Default.(json.RawMessage)
 	// shopDescMeta is the schema descriptor for meta field.
-	shopDescMeta := shopFields[4].Descriptor()
+	shopDescMeta := shopFields[3].Descriptor()
 	// shop.DefaultMeta holds the default value on creation for the meta field.
 	shop.DefaultMeta = shopDescMeta.Default.(json.RawMessage)
 	// shopDescTimezone is the schema descriptor for timezone field.
-	shopDescTimezone := shopFields[5].Descriptor()
+	shopDescTimezone := shopFields[4].Descriptor()
 	// shop.TimezoneValidator is a validator for the "timezone" field. It is called by the builders before save.
 	shop.TimezoneValidator = shopDescTimezone.Validators[0].(func(string) error)
 	// shopDescAdminBranding is the schema descriptor for admin_branding field.
-	shopDescAdminBranding := shopFields[6].Descriptor()
+	shopDescAdminBranding := shopFields[5].Descriptor()
 	// shop.DefaultAdminBranding holds the default value on creation for the admin_branding field.
 	shop.DefaultAdminBranding = shopDescAdminBranding.Default.(json.RawMessage)
 	shopallowedoriginFields := schema.ShopAllowedOrigin{}.Fields()
@@ -1352,193 +1348,6 @@ func init() {
 	shopuserDescCreatedAt := shopuserFields[3].Descriptor()
 	// shopuser.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shopuser.DefaultCreatedAt = shopuserDescCreatedAt.Default.(func() time.Time)
-	siteMixin := schema.Site{}.Mixin()
-	siteMixinFields0 := siteMixin[0].Fields()
-	_ = siteMixinFields0
-	siteFields := schema.Site{}.Fields()
-	_ = siteFields
-	// siteDescCreatedAt is the schema descriptor for created_at field.
-	siteDescCreatedAt := siteMixinFields0[0].Descriptor()
-	// site.DefaultCreatedAt holds the default value on creation for the created_at field.
-	site.DefaultCreatedAt = siteDescCreatedAt.Default.(func() time.Time)
-	// siteDescUpdatedAt is the schema descriptor for updated_at field.
-	siteDescUpdatedAt := siteMixinFields0[1].Descriptor()
-	// site.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	site.DefaultUpdatedAt = siteDescUpdatedAt.Default.(func() time.Time)
-	// site.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	site.UpdateDefaultUpdatedAt = siteDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// siteDescDomain is the schema descriptor for domain field.
-	siteDescDomain := siteFields[0].Descriptor()
-	// site.DomainValidator is a validator for the "domain" field. It is called by the builders before save.
-	site.DomainValidator = func() func(string) error {
-		validators := siteDescDomain.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(domain string) error {
-			for _, fn := range fns {
-				if err := fn(domain); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// siteDescSslStatus is the schema descriptor for ssl_status field.
-	siteDescSslStatus := siteFields[1].Descriptor()
-	// site.DefaultSslStatus holds the default value on creation for the ssl_status field.
-	site.DefaultSslStatus = siteDescSslStatus.Default.(int16)
-	// siteDescMeta is the schema descriptor for meta field.
-	siteDescMeta := siteFields[2].Descriptor()
-	// site.DefaultMeta holds the default value on creation for the meta field.
-	site.DefaultMeta = siteDescMeta.Default.(json.RawMessage)
-	siteshopFields := schema.SiteShop{}.Fields()
-	_ = siteshopFields
-	// siteshopDescPathPrefix is the schema descriptor for path_prefix field.
-	siteshopDescPathPrefix := siteshopFields[2].Descriptor()
-	// siteshop.PathPrefixValidator is a validator for the "path_prefix" field. It is called by the builders before save.
-	siteshop.PathPrefixValidator = siteshopDescPathPrefix.Validators[0].(func(string) error)
-	// siteshopDescIsPrimary is the schema descriptor for is_primary field.
-	siteshopDescIsPrimary := siteshopFields[3].Descriptor()
-	// siteshop.DefaultIsPrimary holds the default value on creation for the is_primary field.
-	siteshop.DefaultIsPrimary = siteshopDescIsPrimary.Default.(bool)
-	// siteshopDescCreatedAt is the schema descriptor for created_at field.
-	siteshopDescCreatedAt := siteshopFields[4].Descriptor()
-	// siteshop.DefaultCreatedAt holds the default value on creation for the created_at field.
-	siteshop.DefaultCreatedAt = siteshopDescCreatedAt.Default.(func() time.Time)
-	themeMixin := schema.Theme{}.Mixin()
-	themeMixinFields0 := themeMixin[0].Fields()
-	_ = themeMixinFields0
-	themeFields := schema.Theme{}.Fields()
-	_ = themeFields
-	// themeDescCreatedAt is the schema descriptor for created_at field.
-	themeDescCreatedAt := themeMixinFields0[0].Descriptor()
-	// theme.DefaultCreatedAt holds the default value on creation for the created_at field.
-	theme.DefaultCreatedAt = themeDescCreatedAt.Default.(func() time.Time)
-	// themeDescUpdatedAt is the schema descriptor for updated_at field.
-	themeDescUpdatedAt := themeMixinFields0[1].Descriptor()
-	// theme.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	theme.DefaultUpdatedAt = themeDescUpdatedAt.Default.(func() time.Time)
-	// theme.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	theme.UpdateDefaultUpdatedAt = themeDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// themeDescCode is the schema descriptor for code field.
-	themeDescCode := themeFields[0].Descriptor()
-	// theme.CodeValidator is a validator for the "code" field. It is called by the builders before save.
-	theme.CodeValidator = func() func(string) error {
-		validators := themeDescCode.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(code string) error {
-			for _, fn := range fns {
-				if err := fn(code); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// themeDescName is the schema descriptor for name field.
-	themeDescName := themeFields[1].Descriptor()
-	// theme.NameValidator is a validator for the "name" field. It is called by the builders before save.
-	theme.NameValidator = func() func(string) error {
-		validators := themeDescName.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(name string) error {
-			for _, fn := range fns {
-				if err := fn(name); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// themeDescLayoutKey is the schema descriptor for layout_key field.
-	themeDescLayoutKey := themeFields[2].Descriptor()
-	// theme.LayoutKeyValidator is a validator for the "layout_key" field. It is called by the builders before save.
-	theme.LayoutKeyValidator = func() func(string) error {
-		validators := themeDescLayoutKey.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(layout_key string) error {
-			for _, fn := range fns {
-				if err := fn(layout_key); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// themeDescConfigSchema is the schema descriptor for config_schema field.
-	themeDescConfigSchema := themeFields[3].Descriptor()
-	// theme.DefaultConfigSchema holds the default value on creation for the config_schema field.
-	theme.DefaultConfigSchema = themeDescConfigSchema.Default.(json.RawMessage)
-	// themeDescIsActive is the schema descriptor for is_active field.
-	themeDescIsActive := themeFields[4].Descriptor()
-	// theme.DefaultIsActive holds the default value on creation for the is_active field.
-	theme.DefaultIsActive = themeDescIsActive.Default.(bool)
-	themepageMixin := schema.ThemePage{}.Mixin()
-	themepageMixinFields0 := themepageMixin[0].Fields()
-	_ = themepageMixinFields0
-	themepageFields := schema.ThemePage{}.Fields()
-	_ = themepageFields
-	// themepageDescCreatedAt is the schema descriptor for created_at field.
-	themepageDescCreatedAt := themepageMixinFields0[0].Descriptor()
-	// themepage.DefaultCreatedAt holds the default value on creation for the created_at field.
-	themepage.DefaultCreatedAt = themepageDescCreatedAt.Default.(func() time.Time)
-	// themepageDescUpdatedAt is the schema descriptor for updated_at field.
-	themepageDescUpdatedAt := themepageMixinFields0[1].Descriptor()
-	// themepage.DefaultUpdatedAt holds the default value on creation for the updated_at field.
-	themepage.DefaultUpdatedAt = themepageDescUpdatedAt.Default.(func() time.Time)
-	// themepage.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
-	themepage.UpdateDefaultUpdatedAt = themepageDescUpdatedAt.UpdateDefault.(func() time.Time)
-	// themepageDescTypeKey is the schema descriptor for type_key field.
-	themepageDescTypeKey := themepageFields[1].Descriptor()
-	// themepage.TypeKeyValidator is a validator for the "type_key" field. It is called by the builders before save.
-	themepage.TypeKeyValidator = func() func(string) error {
-		validators := themepageDescTypeKey.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(type_key string) error {
-			for _, fn := range fns {
-				if err := fn(type_key); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// themepageDescComponentKey is the schema descriptor for component_key field.
-	themepageDescComponentKey := themepageFields[2].Descriptor()
-	// themepage.ComponentKeyValidator is a validator for the "component_key" field. It is called by the builders before save.
-	themepage.ComponentKeyValidator = func() func(string) error {
-		validators := themepageDescComponentKey.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(component_key string) error {
-			for _, fn := range fns {
-				if err := fn(component_key); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
-	// themepageDescPageSchema is the schema descriptor for page_schema field.
-	themepageDescPageSchema := themepageFields[3].Descriptor()
-	// themepage.DefaultPageSchema holds the default value on creation for the page_schema field.
-	themepage.DefaultPageSchema = themepageDescPageSchema.Default.(json.RawMessage)
 	userMixin := schema.User{}.Mixin()
 	userMixinFields0 := userMixin[0].Fields()
 	_ = userMixinFields0

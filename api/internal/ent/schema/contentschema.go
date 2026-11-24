@@ -24,14 +24,12 @@ import (
 //	{"format":1,
 //	 "types":{"<type_key>":<JSON Schema>},
 //	 "type_order":["<type_key>", ...],
-//	 "global":<JSON Schema>,
-//	 "component_keys":{"<type_key>":"<component key>"}}
+//	 "global":<JSON Schema>}
 //
-// component_keys and type_order exist only so the pre-removal behaviour of the
-// theme system stays byte-identical until the theme code is removed; they are
-// dropped by the removal stage.
-//
-// source: "theme_backfill" (copied from the shop's theme) or "registered".
+// type_order keeps the page types in their registered order (admin page-types
+// listing). Rows written by the one-time backfill (source "theme_backfill") may
+// also carry a "component_keys" object copied from the removed theme system;
+// readers ignore it. source: "theme_backfill" or "registered".
 type ContentSchema struct {
 	ent.Schema
 }

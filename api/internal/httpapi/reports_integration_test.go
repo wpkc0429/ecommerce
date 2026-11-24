@@ -327,9 +327,6 @@ func TestUpdateShopTimezoneTouchesNothingElse(t *testing.T) {
 	if after.Status != before.Status {
 		t.Errorf("status changed: %d → %d", before.Status, after.Status)
 	}
-	if (after.ThemeID == nil) != (before.ThemeID == nil) {
-		t.Error("theme_id changed")
-	}
 	if string(after.ContentJSON) != string(before.ContentJSON) {
 		t.Errorf("content_json changed: %s → %s", before.ContentJSON, after.ContentJSON)
 	}
