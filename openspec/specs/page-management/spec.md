@@ -1,5 +1,5 @@
 # page-management Specification
-> **已棄用（ADR 0001，2026-11-24）**：平台改為 headless 商務 API，商家前端由 merchant template 建立；本 capability 描述的租戶渲染功能仍可運作但不再演進，將由草稿 change `retire-tenant-rendering`（未核准）退役。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
+> **保留並改造（ADR 0001 的修正，2026-11-24）**：頁面內容與全域內容的管理（草稿／發佈、slug、`home`、全域內容、CMS 圖片欄位）是 headless 內容儲存的一部分，**不棄用**，將由 change `headless-content-store`（提案、未實作）改造成以穩定 `key` 定位的內容文件；改造期間本 capability 的行為不變。其中**依賴主題的部分**（頁型來自目前主題的 `theme_pages`、換版後「不受新主題支援」的標示與預檢）已棄用，隨主題一起退役（草稿 change `retire-hosted-storefront-and-themes`）。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
 
 ## Purpose
 TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purpose after archive.

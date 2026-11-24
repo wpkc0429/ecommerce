@@ -6,8 +6,10 @@
 
 > **這是唯一支援的店面路徑**（ADR [`docs/decisions/0001-headless-platform-and-merchant-template.md`](decisions/0001-headless-platform-and-merchant-template.md)，2026-11-24）：
 > 商家的店面一律是 headless——由 merchant template repo 建立、以 `X-Publishable-Key` 呼叫 `/api/v1/shop/*`。
-> 平台**不再提供**託管店面：repo 內的 Next.js 租戶渲染店面（`web/`）、渲染 bundle 端點（`/api/v1/render/page`、`/api/v1/render/preview`）、
-> CMS 頁面／主題／site 網域對應都**已棄用**（仍可運作，但新商家不要使用，之後會移除）。本文件**不描述**那些端點，也請不要接它們。
+> 平台**不再提供**託管店面：repo 內的 Next.js 租戶渲染店面（`web/`）、**主題**、site 網域對應（Host 解析）都**已棄用**（仍可運作，但新商家不要使用，之後會移除）。
+> **CMS 的內容功能沒有棄用**：商家用後台表單編輯的文字、banner、FAQ 等會存在平台的 headless 內容儲存，由你的前端以 publishable key 讀取
+> （`GET /api/v1/render/page` 今天已可用 publishable key 讀取；內容儲存的正式讀取契約與改造見 OpenSpec change `headless-content-store`，**尚未實作**）。
+> 因此本文件**暫不描述**內容端點：在 `headless-content-store` 實作並更新 `openapi.yaml` 之前，請不要在新前端依賴現有的 render bundle 格式（它含主題欄位，會改變）。
 
 **分工，請先讀這一段：**
 
@@ -87,7 +89,7 @@ POST /api/v1/admin/shops/{shopID}/allowed-origins   { "origin": "https://ondo.ex
 
 | 用途 | 拿得到 CORS 的路徑 | 備註 |
 |---|---|---|
-| `storefront`（預設） | 非後台路徑（`/api/v1/shop/*`…；已棄用的 `/api/v1/render/*` 也受此規則） | **在任何 `/api/v1/admin/*` 上都拿不到** `Access-Control-Allow-Origin` |
+| `storefront`（預設） | 非後台路徑（`/api/v1/shop/*`…；公開讀取的 `/api/v1/render/*` 也受此規則） | **在任何 `/api/v1/admin/*` 上都拿不到** `Access-Control-Allow-Origin` |
 | `admin` | 只有**該商家**的 `/api/v1/admin/shops/{id}/…`，加上共用的 `auth`／`me`／`branding`／`invitations/accept`／`media/config` | **拿不到店面 API 的 CORS**；伺服器端另把該網域綁定在這家商家上 |
 
 你是做**店面**的前端，登記的就是 `storefront`。如果你也自己做後台前端，後台網域另外登記成 `admin`

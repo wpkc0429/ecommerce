@@ -1,5 +1,5 @@
 # content-rendering Specification
-> **已棄用（ADR 0001，2026-11-24）**：平台改為 headless 商務 API，商家前端由 merchant template 建立；本 capability 描述的租戶渲染功能仍可運作但不再演進，將由草稿 change `retire-tenant-rendering`（未核准）退役。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
+> **部分保留並改造（ADR 0001 的修正，2026-11-24）**：已發佈內容的公開讀取、bundle 組裝、Redis 讀穿快取與事件失效、preview token 是 headless 內容儲存的讀取面，**不棄用**，將由 change `headless-content-store`（提案、未實作）改造。**已棄用**的是：bundle 內的主題與元件欄位（`theme`、`component_key`、`layout_key`）、以 Host／`X-Site-Domain` 解析商家，以及消費它們的 `web/` 託管渲染店面（草稿 change `retire-hosted-storefront-and-themes`，未核准）。見 `docs/decisions/0001-headless-platform-and-merchant-template.md`。
 
 ## Purpose
 TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purpose after archive.
