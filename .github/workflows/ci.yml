@@ -55,25 +55,3 @@ jobs:
       - name: Unit + integration tests
         working-directory: api
         run: INTEGRATION=1 go test -p 1 -count=1 ./...
-
-  web:
-    name: Web (typecheck + build)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-          cache-dependency-path: web/package-lock.json
-      - name: Install
-        working-directory: web
-        run: npm ci
-      - name: Generated types are current
-        working-directory: web
-        run: |
-          npm run gen:types
-          git diff --exit-code themes/starter/schema-types.ts
-      - name: Build (includes type checking)
-        working-directory: web
-        run: npm run build

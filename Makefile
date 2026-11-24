@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content web-dev admin-dev openapi openapi-mock openapi-ui
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -59,14 +59,11 @@ ecpay-sim: ## Local stand-in for 綠界's cashier (:8090); point ECPAY_CHECKOUT_
 seed: ## Seed permissions catalog, platform roles, super admin, starter theme
 	cd api && go run ./cmd/seed
 
-seed-demo: ## Seed everything plus a demo shop bound to demo.localhost
+seed-demo: ## Seed everything plus a demo shop (publishable key pk_demoseedstorefrontkeynotsecret)
 	cd api && go run ./cmd/seed -demo
 
 sanitize-content: ## DRY RUN: report CMS rich text that needs re-sanitizing (writes nothing; add -apply manually)
 	cd api && go run ./cmd/sanitize-content
-
-web-dev: ## Run the storefront SSR dev server
-	cd web && npm run dev
 
 admin-dev: ## Run the admin SPA dev server
 	cd admin && npm run dev

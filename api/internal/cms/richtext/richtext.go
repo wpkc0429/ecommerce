@@ -1,11 +1,10 @@
 // Package richtext sanitizes merchant-authored rich text HTML against a single
 // allowlist (change cms-rich-text-sanitization, design D4–D6).
 //
-// The allowlist lives in allowlist.json and is the ONLY definition: the web
-// renderer consumes a copy of the same file (web/lib/richtext-allowlist.json,
-// written by `npm run gen:types`), so the write-side authority and the
-// render-side defense in depth can never disagree about what is allowed —
-// at most the render side removes again what the write side already removed.
+// The allowlist lives in allowlist.json and is the ONLY definition: a client
+// that renders the stored markup (a merchant storefront) is expected to use a
+// copy of the same file for its own defense in depth, so the write-side
+// authority and the render side can never disagree about what is allowed.
 //
 // Sanitization is a rewrite, never a rejection (design D2): disallowed tags
 // are unwrapped (their text kept), disallowed attributes and URLs are dropped,

@@ -1,5 +1,5 @@
 {
-  "$comment": "Single source of truth for rich text HTML sanitization (change cms-rich-text-sanitization, design D4/D5). Consumed by the API (go:embed, internal/cms/richtext) and copied to web/lib/richtext-allowlist.json by `npm run gen:types`. Edit here only. No h1 (the theme owns the page title); no style/class/id/on* anywhere.",
+  "$comment": "Single source of truth for rich text HTML sanitization (change cms-rich-text-sanitization, design D4/D5). Consumed by the API (go:embed, internal/cms/richtext); a merchant storefront that renders the markup should keep its own copy of this file for defense in depth. Edit here only. No h1 (the theme owns the page title); no style/class/id/on* anywhere.",
   "elements": {
     "p": [],
     "br": [],
