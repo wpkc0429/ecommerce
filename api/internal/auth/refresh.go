@@ -137,6 +137,21 @@ func (s *RefreshService) RevokeUser(ctx context.Context, plain string) error {
 	return err
 }
 
+// RevokeAllUser revokes every live refresh token of a user inside tx — the
+// "kick all sessions" step of disabling an account and of completing a
+// password setup/reset (change platform-account-provisioning, design D2/D5).
+// Already-revoked rows are left alone, so calling it twice is harmless.
+func (s *RefreshService) RevokeAllUser(ctx context.Context, tx *ent.Tx, userID int) error {
+	_, err := tx.UserRefreshToken.Update().
+		Where(userrefreshtoken.UserIDEQ(userID), userrefreshtoken.RevokedAtIsNil()).
+		SetRevokedAt(s.now()).
+		Save(ctx)
+	if err != nil {
+		return fmt.Errorf("auth: revoke all refresh tokens: %w", err)
+	}
+	return nil
+}
+
 // revokeUserChain revokes every token linked to row through rotated_from
 // lineage (ancestors and descendants).
 func (s *RefreshService) revokeUserChain(ctx context.Context, row *ent.UserRefreshToken) error {

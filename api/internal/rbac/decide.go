@@ -20,10 +20,20 @@ type Snapshot struct {
 	HasPlatformRole bool `json:"has_platform_role"`
 	// IsShopMember: user has a shop_user row for this shop.
 	IsShopMember bool `json:"is_shop_member"`
+	// Disabled: the account's users.status is not 1 (or the user no longer
+	// exists). A disabled user holds no permission at all — including
+	// platform roles and personal overrides — and is a non-member of every
+	// shop (change platform-account-provisioning, design D5). This is what
+	// makes disabling an account take effect on its already-issued access
+	// tokens at the next request.
+	Disabled bool `json:"disabled,omitempty"`
 }
 
 // Allows runs the three-tier decision for one permission node.
 func (s *Snapshot) Allows(perm string) bool {
+	if s.Disabled {
+		return false
+	}
 	if granted, ok := s.ShopOverrides[perm]; ok {
 		return granted
 	}
@@ -36,5 +46,14 @@ func (s *Snapshot) Allows(perm string) bool {
 // CanAccessShop is the cross-shop guard (design D4): before any permission
 // decision, a non-platform user must be a member of the target shop.
 func (s *Snapshot) CanAccessShop() bool {
+	if s.Disabled {
+		return false
+	}
 	return s.HasPlatformRole || s.IsShopMember
+}
+
+// IsPlatformAdmin reports whether the user holds a platform-scope role and is
+// not disabled. Prefer it over reading HasPlatformRole directly.
+func (s *Snapshot) IsPlatformAdmin() bool {
+	return !s.Disabled && s.HasPlatformRole
 }

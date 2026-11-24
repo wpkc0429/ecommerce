@@ -35,6 +35,8 @@ const (
 	EdgeUserPermissions = "user_permissions"
 	// EdgeRefreshTokens holds the string denoting the refresh_tokens edge name in mutations.
 	EdgeRefreshTokens = "refresh_tokens"
+	// EdgeCredentialTokens holds the string denoting the credential_tokens edge name in mutations.
+	EdgeCredentialTokens = "credential_tokens"
 	// Table holds the table name of the user in the database.
 	Table = "users"
 	// ShopUsersTable is the table that holds the shop_users relation/edge.
@@ -65,6 +67,13 @@ const (
 	RefreshTokensInverseTable = "user_refresh_tokens"
 	// RefreshTokensColumn is the table column denoting the refresh_tokens relation/edge.
 	RefreshTokensColumn = "user_id"
+	// CredentialTokensTable is the table that holds the credential_tokens relation/edge.
+	CredentialTokensTable = "admin_credential_tokens"
+	// CredentialTokensInverseTable is the table name for the AdminCredentialToken entity.
+	// It exists in this package in order to avoid circular dependency with the "admincredentialtoken" package.
+	CredentialTokensInverseTable = "admin_credential_tokens"
+	// CredentialTokensColumn is the table column denoting the credential_tokens relation/edge.
+	CredentialTokensColumn = "user_id"
 )
 
 // Columns holds all SQL columns for user fields.
@@ -193,6 +202,20 @@ func ByRefreshTokens(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newRefreshTokensStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByCredentialTokensCount orders the results by credential_tokens count.
+func ByCredentialTokensCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCredentialTokensStep(), opts...)
+	}
+}
+
+// ByCredentialTokens orders the results by credential_tokens terms.
+func ByCredentialTokens(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCredentialTokensStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newShopUsersStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -219,5 +242,12 @@ func newRefreshTokensStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(RefreshTokensInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, true, RefreshTokensTable, RefreshTokensColumn),
+	)
+}
+func newCredentialTokensStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CredentialTokensInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, true, CredentialTokensTable, CredentialTokensColumn),
 	)
 }

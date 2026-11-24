@@ -111,7 +111,7 @@ func (a *AuthzMW) RequirePlatformPermission(node string) func(http.Handler) http
 				httpx.Internal(w)
 				return
 			}
-			if !snap.HasPlatformRole || !snap.Allows(node) {
+			if !snap.IsPlatformAdmin() || !snap.Allows(node) {
 				httpx.Forbidden(w)
 				return
 			}

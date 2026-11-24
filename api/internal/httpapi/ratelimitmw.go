@@ -205,3 +205,13 @@ func NewMemberRefreshRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig)
 		shopIPRule("member_refresh", cfg.RefreshLimit, cfg.RefreshWindow),
 	})
 }
+
+// NewAdminPasswordSetupRateLimit builds the rate limit middleware for the two
+// unauthenticated password setup endpoints (change platform-account-provisioning).
+// IP-scoped only: the body carries a 256-bit token, not an email, so there is
+// no per-account key to brute-force. Reuses the login "broad" thresholds.
+func NewAdminPasswordSetupRateLimit(l *ratelimit.Limiter, cfg config.RateLimitConfig) func(http.Handler) http.Handler {
+	return newAuthRateLimitMW(l, []rateLimitRule{
+		ipRule("admin_password_setup", cfg.LoginBroadLimit, cfg.LoginBroadWindow),
+	})
+}

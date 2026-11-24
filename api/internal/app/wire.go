@@ -7,10 +7,12 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"ksdevworks/ecommerce/api/internal/account"
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/cart"
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/cms"
+	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
@@ -24,6 +26,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 	"ksdevworks/ecommerce/api/internal/points"
+	"ksdevworks/ecommerce/api/internal/provision"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/render"
@@ -70,7 +73,6 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	}
 	refresh := auth.NewRefreshService(client, cfg.RefreshTokenTTL)
 
-	deps.AdminAuth = &httpapi.AdminAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: a.log}
 	deps.MemberAuth = &httpapi.MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: a.log}
 	deps.AdminMW = httpapi.NewAdminMiddleware(issuer)
 	deps.MemberMW = httpapi.NewMemberMiddleware(issuer)
@@ -88,9 +90,23 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.MemberRegisterRateLimit = httpapi.NewMemberRegisterRateLimit(limiter, cfg.RateLimit)
 	deps.MemberRefreshRateLimit = httpapi.NewMemberRefreshRateLimit(limiter, cfg.RateLimit)
 	deps.GuestCheckoutRateLimit = httpapi.NewGuestCheckoutRateLimit(limiter, cfg.RateLimit)
+	deps.AdminPasswordSetupRateLimit = httpapi.NewAdminPasswordSetupRateLimit(limiter, cfg.RateLimit)
 
 	engine := rbac.NewEngine(client, rdb, a.log)
 	authz := &httpapi.AuthzMW{Engine: engine}
+	deps.AdminAuth = &httpapi.AdminAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Engine: engine, Log: a.log}
+
+	// Back-office account provisioning (change platform-account-provisioning).
+	// Until the VPS move there is no outbound mail for admin accounts, so links
+	// are always delivered manually (design D4).
+	if cfg.Env == config.EnvProduction && cfg.AdminPublicURL == "http://localhost:3001" {
+		a.log.Warn("ADMIN_PUBLIC_URL is the localhost default - password setup links will point at localhost; set it to the shared merchant admin origin")
+	}
+	accountService := &account.Service{
+		Client: client, Engine: engine, Refresh: refresh, Delivery: account.ManualDelivery{},
+		PublicURL: cfg.AdminPublicURL, SetupTTL: cfg.AdminSetupTokenTTL, ResetTTL: cfg.AdminResetTokenTTL,
+	}
+	deps.Accounts = &httpapi.AccountsHandler{Service: accountService, Authz: authz, Log: a.log}
 	deps.Roles = &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: a.log}
 
 	// Domain events → cache invalidation (design D8: 失效集中於領域事件層).
@@ -145,6 +161,10 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	}
 	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
+	deps.Provisioning = &httpapi.ProvisioningHandler{
+		Service: &provision.Service{Client: client, CMS: cmsService, Accounts: accountService, Dispatcher: dispatcher},
+		Engine:  engine, Authz: authz, Log: a.log,
+	}
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 
 	// Product catalog (change product-catalog): no cache/events involved

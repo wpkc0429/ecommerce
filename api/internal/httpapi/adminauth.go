@@ -1,15 +1,18 @@
 package httpapi
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/rbac"
 )
 
 // AdminAuthHandler implements the back-office auth API (task 3.4):
@@ -19,7 +22,10 @@ type AdminAuthHandler struct {
 	Client  *ent.Client
 	Issuer  *auth.TokenIssuer
 	Refresh *auth.RefreshService
-	Log     *slog.Logger
+	// Engine backs GET /admin/me's platform_permissions (change
+	// platform-account-provisioning, design D9). nil → always [].
+	Engine *rbac.Engine
+	Log    *slog.Logger
 }
 
 type tokenResponse struct {
@@ -55,7 +61,14 @@ func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		httpx.Unauthorized(w)
 		return
 	}
-	if !auth.VerifyPassword(req.Password, u.PasswordHash) || u.Status != 1 {
+	if u.PasswordHash == nil {
+		// Password not set yet (provisioned account): same answer and same
+		// timing as an unknown account.
+		auth.EqualizeVerifyTiming()
+		httpx.Unauthorized(w)
+		return
+	}
+	if !auth.VerifyPassword(req.Password, *u.PasswordHash) || u.Status != 1 {
 		httpx.Unauthorized(w)
 		return
 	}
@@ -138,13 +151,47 @@ func (h *AdminAuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := h.Client.User.Get(r.Context(), id.UserID)
-	if err != nil {
+	if err != nil || u.Status != 1 {
+		// A disabled account's still-valid access token gets no identity back.
 		httpx.Unauthorized(w)
 		return
 	}
+	perms, err := h.platformPermissions(r.Context(), u.ID)
+	if err != nil {
+		h.Log.Error("me: platform permissions", "err", err)
+		httpx.Internal(w)
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
-		"id":    u.ID,
-		"email": u.Email,
-		"sids":  id.SIDs,
+		"id":                   u.ID,
+		"email":                u.Email,
+		"sids":                 id.SIDs,
+		"platform_permissions": perms,
 	})
+}
+
+// platformPermissions is the decided permission set at platform ctx, sorted by
+// name; [] without a platform role. UI visibility only — server guards decide.
+func (h *AdminAuthHandler) platformPermissions(ctx context.Context, userID int) ([]string, error) {
+	out := []string{}
+	if h.Engine == nil {
+		return out, nil
+	}
+	snap, err := h.Engine.Snapshot(ctx, userID, rbac.PlatformCtx)
+	if err != nil {
+		return nil, err
+	}
+	if !snap.IsPlatformAdmin() {
+		return out, nil
+	}
+	names, err := h.Client.Permission.Query().Order(permission.ByName()).Select(permission.FieldName).Strings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, n := range names {
+		if snap.Allows(n) {
+			out = append(out, n)
+		}
+	}
+	return out, nil
 }

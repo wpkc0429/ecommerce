@@ -254,6 +254,12 @@ components:
       required: true
       description: 目標商家。後台的授權判定一律以這個值為準，不看任何 payload。
       schema: { type: integer, minimum: 1 }
+    AccountUserIDPath:
+      name: userID
+      in: path
+      required: true
+      description: 目標後台帳號（`users.id`）。
+      schema: { type: integer, minimum: 1 }
     Page:
       name: page
       in: query
@@ -1495,6 +1501,152 @@ components:
         meta:
           type: object
         updated_at: { type: string, format: date-time }
+
+    # ── 帳號與開店 (change platform-account-provisioning) ──────────────
+    PasswordSetupInspection:
+      type: object
+      additionalProperties: false
+      required: [email, kind, expires_at]
+      properties:
+        email: { type: string }
+        kind: { type: string, enum: [setup, reset] }
+        expires_at: { type: string, format: date-time }
+
+    CredentialLink:
+      type: object
+      description: |
+        一次性密碼連結的交付結果。**`delivery` 必填，消費端 MUST 先看它**：
+        `manual` 表示連結在這份回應裡（`setup_url` 或 `reset_url`，只顯示這一次）；
+        `email` 表示已寄出，**回應不含連結**。
+      required: [delivery, expires_at]
+      properties:
+        delivery: { type: string, enum: [manual, email] }
+        setup_url: { type: string, description: 新帳號的設定連結（僅 manual）。 }
+        reset_url: { type: string, description: 重設連結（僅 manual）。 }
+        expires_at: { type: string, format: date-time }
+
+    AccountCreated:
+      allOf:
+        - $ref: '#/components/schemas/CredentialLink'
+        - type: object
+          required: [user_id, email]
+          properties:
+            user_id: { type: integer }
+            email: { type: string }
+
+    AccountResetLink:
+      allOf:
+        - $ref: '#/components/schemas/CredentialLink'
+        - type: object
+          required: [user_id]
+          properties:
+            user_id: { type: integer }
+
+    Account:
+      type: object
+      additionalProperties: false
+      required: [id, email, status, has_password, created_at]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        status: { type: integer, enum: [0, 1], description: "`0` 停用／`1` 啟用。" }
+        has_password: { type: boolean, description: 密碼是否已設定（未設定者無法登入）。 }
+        created_at: { type: string, format: date-time }
+
+    AccountPage:
+      type: object
+      additionalProperties: false
+      required: [accounts, page, page_size, total]
+      properties:
+        accounts:
+          type: array
+          items: { $ref: '#/components/schemas/Account' }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+
+    AccountRoleRef:
+      type: object
+      additionalProperties: false
+      required: [id, name]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+
+    AccountDetail:
+      type: object
+      additionalProperties: false
+      required: [id, email, status, has_password, created_at, memberships, platform_roles]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        status: { type: integer, enum: [0, 1] }
+        has_password: { type: boolean }
+        created_at: { type: string, format: date-time }
+        memberships:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [shop_id, shop_name, roles]
+            properties:
+              shop_id: { type: integer }
+              shop_name: { type: string }
+              roles:
+                type: array
+                items: { $ref: '#/components/schemas/AccountRoleRef' }
+        platform_roles:
+          type: array
+          items: { $ref: '#/components/schemas/AccountRoleRef' }
+
+    ProvisionResult:
+      type: object
+      additionalProperties: false
+      required: [shop, binding, owner, storefront_origins]
+      properties:
+        shop: { $ref: '#/components/schemas/Shop' }
+        binding:
+          oneOf:
+            - type: 'null'
+            - type: object
+              additionalProperties: false
+              required: [site_id, domain, path_prefix, is_primary]
+              properties:
+                site_id: { type: integer }
+                domain: { type: string }
+                path_prefix:
+                  oneOf: [{ type: string }, { type: 'null' }]
+                is_primary: { type: boolean }
+        owner:
+          type: object
+          description: |
+            `created` 為 false（既有帳號被加入）時沒有 `delivery`／`setup_url`／`expires_at`，且其密碼不變。
+          required: [user_id, email, created]
+          properties:
+            user_id: { type: integer }
+            email: { type: string }
+            created: { type: boolean }
+            delivery: { type: string, enum: [manual, email] }
+            setup_url: { type: string }
+            expires_at: { type: string, format: date-time }
+        storefront_origins:
+          type: array
+          items: { type: string }
+
+    SetupStatus:
+      type: object
+      additionalProperties: false
+      required: [shop_id, theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active]
+      properties:
+        shop_id: { type: integer }
+        theme_applied: { type: boolean }
+        domain_bound: { type: boolean }
+        owner_assigned: { type: boolean }
+        owner_password_set: { type: boolean }
+        home_published: { type: boolean }
+        shipping_method_active: { type: boolean }
+        payment_credentials_set: { type: boolean }
+        publishable_key_active: { type: boolean }
 
     # ── 商家設定與時區 (change merchant-reports) ──────────────
     EffectiveTimezone:
@@ -3067,7 +3219,7 @@ paths:
       operationId: adminLogin
       summary: 後台登入
       description: |
-        失敗一律是同一個 401，**不區分**帳號不存在／密碼錯誤／帳號停用。
+        失敗一律是同一個 401，**不區分**帳號不存在／密碼錯誤／帳號停用／尚未設定密碼。
       security: []
       requestBody:
         required: true
@@ -3142,6 +3294,7 @@ paths:
       tags: [admin-auth]
       operationId: adminMe
       summary: 目前登入的後台使用者
+      description: 帳號已被停用時回 401（即使 access token 尚未過期）。
       security: [{ adminJWT: [] }]
       responses:
         "200":
@@ -3151,10 +3304,16 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [id, email, sids]
+                required: [id, email, sids, platform_permissions]
                 properties:
                   id: { type: integer }
                   email: { type: string }
+                  platform_permissions:
+                    type: array
+                    items: { type: string }
+                    description: |
+                      平台層的有效權限節點（依名稱排序）；沒有平台角色者為 `[]`。**僅供介面可見性使用**，
+                      伺服器端授權不讀它。
                   sids:
                     oneOf:
                       - type: array
@@ -3162,6 +3321,311 @@ paths:
                       - type: 'null'
                     description: 該使用者具有成員資格的商家 id 集合。
         "401": { $ref: '#/components/responses/Unauthorized' }
+
+  # ═══════════════════════ 平台層：帳號與開店 (change platform-account-provisioning) ═══════════════════════
+  /api/v1/admin/auth/password-setup/inspect:
+    post:
+      tags: [admin-auth]
+      operationId: adminPasswordSetupInspect
+      summary: 檢視密碼設定／重設連結
+      description: |
+        **未認證**，依來源 IP 限流。回傳 token 對應的帳號 email、種類與到期時間，**不消耗 token**。
+        無效、過期、已使用的 token 一律是**同一個 404**（不區分原因）。
+        連結形如 `{ADMIN_PUBLIC_URL}/#/set-password/{token}`，每個後台前端都必須在根路徑處理它，
+        見 `docs/admin-frontend-integration.md`。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: token 有效。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PasswordSetupInspection' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/auth/password-setup:
+    post:
+      tags: [admin-auth]
+      operationId: adminPasswordSetup
+      summary: 以一次性連結設定後台密碼
+      description: |
+        **未認證**，依來源 IP 限流。密碼至少 12 字元（不足回 422，**且不消耗 token**）。
+        成功後 token 立即失效，且該帳號全部 refresh token 被撤銷；**不會自動登入**，
+        前端應導回登入頁。無效／過期／已使用的 token 一律 404。
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 12 }
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/accounts:
+    get:
+      tags: [admin-platform]
+      operationId: listAccounts
+      summary: 列出後台帳號
+      description: 需要平台層 `account.view`。依 id 遞增；`q` 對 email 做子字串比對（為數字時另比對 id）。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: q
+          in: query
+          required: false
+          schema: { type: string }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 帳號的一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [admin-platform]
+      operationId: createAccount
+      summary: 建立後台帳號（不設密碼）
+      description: |
+        需要平台層 `account.manage`。帳號建立時**沒有密碼**，回應帶一次性的密碼設定連結。
+        可同時以 `shop_id` ＋ `role_id`（merchant scope 角色）建立成員資格；兩者須一起給。
+        **此 API 不接受由管理員提供的密碼**（多餘的 `password` 欄位被忽略）。
+        email 已存在回 409。
+
+        **消費端 MUST 先看 `delivery`**：`manual` 時回應含 `setup_url`；日後改為 `email` 時**不再回傳連結**。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string }
+                shop_id: { type: integer, minimum: 1 }
+                role_id: { type: integer, minimum: 1 }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountCreated' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/accounts/{userID}:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+    get:
+      tags: [admin-platform]
+      operationId: getAccount
+      summary: 帳號詳情（含成員資格與角色）
+      description: 需要平台層 `account.view`。回應**永不含密碼雜湊**，只有 `has_password` 布林。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 帳號。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountDetail' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/accounts/{userID}/memberships:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+    post:
+      tags: [admin-platform]
+      operationId: addAccountMembership
+      summary: 加入商家並指派商家層角色
+      description: 需要平台層 `account.manage`。已是成員時只補角色（冪等）。立即清除該帳號的授權快取。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [shop_id, role_id]
+              properties:
+                shop_id: { type: integer, minimum: 1 }
+                role_id: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已加入。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [user_id, shop_id, role_id]
+                properties:
+                  user_id: { type: integer }
+                  shop_id: { type: integer }
+                  role_id: { type: integer }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/accounts/{userID}/memberships/{shopID}:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+      - $ref: '#/components/parameters/ShopIDPath'
+    delete:
+      tags: [admin-platform]
+      operationId: removeAccountMembership
+      summary: 移除成員資格
+      description: 需要平台層 `account.manage`。同時移除該店全部角色指派與個人權限覆蓋。不是成員回 404。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/accounts/{userID}/disable:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+    post:
+      tags: [admin-platform]
+      operationId: disableAccount
+      summary: 停用帳號
+      description: |
+        需要平台層 `account.manage`。撤銷全部 refresh token，且該帳號**已簽發的 access token 在下一個請求即被拒絕**。
+        不可停用自己、不可停用最後一位啟用中的 `super_admin`（皆 409）。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/accounts/{userID}/enable:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+    post:
+      tags: [admin-platform]
+      operationId: enableAccount
+      summary: 重新啟用帳號
+      description: 需要平台層 `account.manage`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/accounts/{userID}/password-reset:
+    parameters:
+      - $ref: '#/components/parameters/AccountUserIDPath'
+    post:
+      tags: [admin-platform]
+      operationId: issueAccountPasswordReset
+      summary: 產生一次性密碼重設連結
+      description: |
+        需要平台層 `account.manage`。同一帳號先前未使用的重設連結立即失效。
+        **消費端 MUST 先看 `delivery`**：`manual` 時含 `reset_url`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已產生。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AccountResetLink' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shop-provisioning:
+    post:
+      tags: [admin-platform]
+      operationId: provisionShop
+      summary: 一次開好一家店
+      description: |
+        需要平台層 `shop.create` ＋ `account.manage`；帶 `domain` 時另需 `shop.manage_domains`，
+        帶 `storefront_origins` 時另需 `shop.manage_client_origins`（缺任一 → 403）。
+
+        單一交易：商家（含自動首頁）、主題、網域（不存在則建立、存在則綁定）、owner（新 email 建立無密碼帳號並產生設定連結；
+        既有 email 直接加入並授予 `merchant_owner`，不動其密碼）、origin。任一步驟失敗整筆回滾（衝突回 409）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, owner_email]
+              properties:
+                name: { type: string }
+                owner_email: { type: string }
+                theme_id: { type: integer, minimum: 1 }
+                status: { type: integer, enum: [0, 1, 2] }
+                domain: { type: string }
+                path_prefix: { type: string }
+                storefront_origins:
+                  type: array
+                  items: { type: string }
+      responses:
+        "201":
+          description: 已開店。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProvisionResult' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/setup-status:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-platform]
+      operationId: getShopSetupStatus
+      summary: 開店檢查清單（由資料推導）
+      description: 需要平台層 `shop.view`。每一項都是當下事實的存在性查詢，系統不儲存開店進度。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 檢查清單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SetupStatus' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
 
   # ═══════════════════════ 平台層：權限與角色 ═══════════════════════
   /api/v1/admin/permissions:

@@ -4,6 +4,7 @@ package ent
 
 import (
 	"encoding/json"
+	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
@@ -48,6 +49,48 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	admincredentialtokenFields := schema.AdminCredentialToken{}.Fields()
+	_ = admincredentialtokenFields
+	// admincredentialtokenDescKind is the schema descriptor for kind field.
+	admincredentialtokenDescKind := admincredentialtokenFields[1].Descriptor()
+	// admincredentialtoken.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	admincredentialtoken.KindValidator = func() func(string) error {
+		validators := admincredentialtokenDescKind.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(kind string) error {
+			for _, fn := range fns {
+				if err := fn(kind); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// admincredentialtokenDescTokenHash is the schema descriptor for token_hash field.
+	admincredentialtokenDescTokenHash := admincredentialtokenFields[2].Descriptor()
+	// admincredentialtoken.TokenHashValidator is a validator for the "token_hash" field. It is called by the builders before save.
+	admincredentialtoken.TokenHashValidator = func() func(string) error {
+		validators := admincredentialtokenDescTokenHash.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(token_hash string) error {
+			for _, fn := range fns {
+				if err := fn(token_hash); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// admincredentialtokenDescCreatedAt is the schema descriptor for created_at field.
+	admincredentialtokenDescCreatedAt := admincredentialtokenFields[6].Descriptor()
+	// admincredentialtoken.DefaultCreatedAt holds the default value on creation for the created_at field.
+	admincredentialtoken.DefaultCreatedAt = admincredentialtokenDescCreatedAt.Default.(func() time.Time)
 	cartMixin := schema.Cart{}.Mixin()
 	cartMixinFields0 := cartMixin[0].Fields()
 	_ = cartMixinFields0
@@ -1467,21 +1510,7 @@ func init() {
 	// userDescPasswordHash is the schema descriptor for password_hash field.
 	userDescPasswordHash := userFields[1].Descriptor()
 	// user.PasswordHashValidator is a validator for the "password_hash" field. It is called by the builders before save.
-	user.PasswordHashValidator = func() func(string) error {
-		validators := userDescPasswordHash.Validators
-		fns := [...]func(string) error{
-			validators[0].(func(string) error),
-			validators[1].(func(string) error),
-		}
-		return func(password_hash string) error {
-			for _, fn := range fns {
-				if err := fn(password_hash); err != nil {
-					return err
-				}
-			}
-			return nil
-		}
-	}()
+	user.PasswordHashValidator = userDescPasswordHash.Validators[0].(func(string) error)
 	// userDescStatus is the schema descriptor for status field.
 	userDescStatus := userFields[2].Descriptor()
 	// user.DefaultStatus holds the default value on creation for the status field.

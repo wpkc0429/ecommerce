@@ -11,6 +11,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent/migrate"
 
+	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
@@ -63,6 +64,8 @@ type Client struct {
 	config
 	// Schema is the client for creating, migrating and dropping schema.
 	Schema *migrate.Schema
+	// AdminCredentialToken is the client for interacting with the AdminCredentialToken builders.
+	AdminCredentialToken *AdminCredentialTokenClient
 	// Cart is the client for interacting with the Cart builders.
 	Cart *CartClient
 	// CartItem is the client for interacting with the CartItem builders.
@@ -148,6 +151,7 @@ func NewClient(opts ...Option) *Client {
 
 func (c *Client) init() {
 	c.Schema = migrate.NewSchema(c.driver)
+	c.AdminCredentialToken = NewAdminCredentialTokenClient(c.config)
 	c.Cart = NewCartClient(c.config)
 	c.CartItem = NewCartItemClient(c.config)
 	c.Category = NewCategoryClient(c.config)
@@ -277,6 +281,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 	return &Tx{
 		ctx:                           ctx,
 		config:                        cfg,
+		AdminCredentialToken:          NewAdminCredentialTokenClient(cfg),
 		Cart:                          NewCartClient(cfg),
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
@@ -333,6 +338,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 	return &Tx{
 		ctx:                           ctx,
 		config:                        cfg,
+		AdminCredentialToken:          NewAdminCredentialTokenClient(cfg),
 		Cart:                          NewCartClient(cfg),
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
@@ -376,7 +382,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 // Debug returns a new debug-client. It's used to get verbose logging on specific operations.
 //
 //	client.Debug().
-//		Cart.
+//		AdminCredentialToken.
 //		Query().
 //		Count(ctx)
 func (c *Client) Debug() *Client {
@@ -399,14 +405,14 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.MediaUpload,
-		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
-		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
-		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential,
-		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
+		c.CheckoutIdempotencyKey, c.MediaUpload, c.Member, c.MemberRefreshToken,
+		c.MemberTier, c.Order, c.OrderItem, c.OrderNotification, c.Page, c.Payment,
+		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage,
+		c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission, c.RoleUser,
+		c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopPaymentProviderCredential, c.ShopUser, c.Site, c.SiteShop, c.Theme,
+		c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -416,14 +422,14 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.MediaUpload,
-		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
-		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
-		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential,
-		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
+		c.CheckoutIdempotencyKey, c.MediaUpload, c.Member, c.MemberRefreshToken,
+		c.MemberTier, c.Order, c.OrderItem, c.OrderNotification, c.Page, c.Payment,
+		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage,
+		c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission, c.RoleUser,
+		c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopPaymentProviderCredential, c.ShopUser, c.Site, c.SiteShop, c.Theme,
+		c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -432,6 +438,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 // Mutate implements the ent.Mutator interface.
 func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 	switch m := m.(type) {
+	case *AdminCredentialTokenMutation:
+		return c.AdminCredentialToken.mutate(ctx, m)
 	case *CartMutation:
 		return c.Cart.mutate(ctx, m)
 	case *CartItemMutation:
@@ -508,6 +516,155 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.UserRefreshToken.mutate(ctx, m)
 	default:
 		return nil, fmt.Errorf("ent: unknown mutation type %T", m)
+	}
+}
+
+// AdminCredentialTokenClient is a client for the AdminCredentialToken schema.
+type AdminCredentialTokenClient struct {
+	config
+}
+
+// NewAdminCredentialTokenClient returns a client for the AdminCredentialToken from the given config.
+func NewAdminCredentialTokenClient(c config) *AdminCredentialTokenClient {
+	return &AdminCredentialTokenClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `admincredentialtoken.Hooks(f(g(h())))`.
+func (c *AdminCredentialTokenClient) Use(hooks ...Hook) {
+	c.hooks.AdminCredentialToken = append(c.hooks.AdminCredentialToken, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `admincredentialtoken.Intercept(f(g(h())))`.
+func (c *AdminCredentialTokenClient) Intercept(interceptors ...Interceptor) {
+	c.inters.AdminCredentialToken = append(c.inters.AdminCredentialToken, interceptors...)
+}
+
+// Create returns a builder for creating a AdminCredentialToken entity.
+func (c *AdminCredentialTokenClient) Create() *AdminCredentialTokenCreate {
+	mutation := newAdminCredentialTokenMutation(c.config, OpCreate)
+	return &AdminCredentialTokenCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of AdminCredentialToken entities.
+func (c *AdminCredentialTokenClient) CreateBulk(builders ...*AdminCredentialTokenCreate) *AdminCredentialTokenCreateBulk {
+	return &AdminCredentialTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *AdminCredentialTokenClient) MapCreateBulk(slice any, setFunc func(*AdminCredentialTokenCreate, int)) *AdminCredentialTokenCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &AdminCredentialTokenCreateBulk{err: fmt.Errorf("calling to AdminCredentialTokenClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*AdminCredentialTokenCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &AdminCredentialTokenCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for AdminCredentialToken.
+func (c *AdminCredentialTokenClient) Update() *AdminCredentialTokenUpdate {
+	mutation := newAdminCredentialTokenMutation(c.config, OpUpdate)
+	return &AdminCredentialTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *AdminCredentialTokenClient) UpdateOne(_m *AdminCredentialToken) *AdminCredentialTokenUpdateOne {
+	mutation := newAdminCredentialTokenMutation(c.config, OpUpdateOne, withAdminCredentialToken(_m))
+	return &AdminCredentialTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *AdminCredentialTokenClient) UpdateOneID(id int) *AdminCredentialTokenUpdateOne {
+	mutation := newAdminCredentialTokenMutation(c.config, OpUpdateOne, withAdminCredentialTokenID(id))
+	return &AdminCredentialTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for AdminCredentialToken.
+func (c *AdminCredentialTokenClient) Delete() *AdminCredentialTokenDelete {
+	mutation := newAdminCredentialTokenMutation(c.config, OpDelete)
+	return &AdminCredentialTokenDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *AdminCredentialTokenClient) DeleteOne(_m *AdminCredentialToken) *AdminCredentialTokenDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *AdminCredentialTokenClient) DeleteOneID(id int) *AdminCredentialTokenDeleteOne {
+	builder := c.Delete().Where(admincredentialtoken.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &AdminCredentialTokenDeleteOne{builder}
+}
+
+// Query returns a query builder for AdminCredentialToken.
+func (c *AdminCredentialTokenClient) Query() *AdminCredentialTokenQuery {
+	return &AdminCredentialTokenQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeAdminCredentialToken},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a AdminCredentialToken entity by its id.
+func (c *AdminCredentialTokenClient) Get(ctx context.Context, id int) (*AdminCredentialToken, error) {
+	return c.Query().Where(admincredentialtoken.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *AdminCredentialTokenClient) GetX(ctx context.Context, id int) *AdminCredentialToken {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryUser queries the user edge of a AdminCredentialToken.
+func (c *AdminCredentialTokenClient) QueryUser(_m *AdminCredentialToken) *UserQuery {
+	query := (&UserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(admincredentialtoken.Table, admincredentialtoken.FieldID, id),
+			sqlgraph.To(user.Table, user.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, admincredentialtoken.UserTable, admincredentialtoken.UserColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *AdminCredentialTokenClient) Hooks() []Hook {
+	return c.hooks.AdminCredentialToken
+}
+
+// Interceptors returns the client interceptors.
+func (c *AdminCredentialTokenClient) Interceptors() []Interceptor {
+	return c.inters.AdminCredentialToken
+}
+
+func (c *AdminCredentialTokenClient) mutate(ctx context.Context, m *AdminCredentialTokenMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&AdminCredentialTokenCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&AdminCredentialTokenUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&AdminCredentialTokenUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&AdminCredentialTokenDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown AdminCredentialToken mutation op: %q", m.Op())
 	}
 }
 
@@ -6297,6 +6454,22 @@ func (c *UserClient) QueryRefreshTokens(_m *User) *UserRefreshTokenQuery {
 	return query
 }
 
+// QueryCredentialTokens queries the credential_tokens edge of a User.
+func (c *UserClient) QueryCredentialTokens(_m *User) *AdminCredentialTokenQuery {
+	query := (&AdminCredentialTokenClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, id),
+			sqlgraph.To(admincredentialtoken.Table, admincredentialtoken.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, user.CredentialTokensTable, user.CredentialTokensColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *UserClient) Hooks() []Hook {
 	return c.hooks.User
@@ -6655,22 +6828,22 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Cart, CartItem, Category, CheckoutIdempotencyKey, MediaUpload, Member,
-		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
-		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
-		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
-		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
-		ShopPaymentProviderCredential, ShopUser, Site, SiteShop, Theme, ThemePage,
-		User, UserPermission, UserRefreshToken []ent.Hook
+		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
+		MediaUpload, Member, MemberRefreshToken, MemberTier, Order, OrderItem,
+		OrderNotification, Page, Payment, Permission, PointTransaction, Product,
+		ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
-		Cart, CartItem, Category, CheckoutIdempotencyKey, MediaUpload, Member,
-		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
-		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
-		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
-		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
-		ShopPaymentProviderCredential, ShopUser, Site, SiteShop, Theme, ThemePage,
-		User, UserPermission, UserRefreshToken []ent.Interceptor
+		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
+		MediaUpload, Member, MemberRefreshToken, MemberTier, Order, OrderItem,
+		OrderNotification, Page, Payment, Permission, PointTransaction, Product,
+		ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
+		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
+		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

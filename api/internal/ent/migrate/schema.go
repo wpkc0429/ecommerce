@@ -9,6 +9,38 @@ import (
 )
 
 var (
+	// AdminCredentialTokensColumns holds the columns for the "admin_credential_tokens" table.
+	AdminCredentialTokensColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "kind", Type: field.TypeString, Size: 16, SchemaType: map[string]string{"postgres": "varchar(16)"}},
+		{Name: "token_hash", Type: field.TypeString, Unique: true, Size: 64, SchemaType: map[string]string{"postgres": "varchar(64)"}},
+		{Name: "created_by", Type: field.TypeInt, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "user_id", Type: field.TypeInt},
+	}
+	// AdminCredentialTokensTable holds the schema information for the "admin_credential_tokens" table.
+	AdminCredentialTokensTable = &schema.Table{
+		Name:       "admin_credential_tokens",
+		Columns:    AdminCredentialTokensColumns,
+		PrimaryKey: []*schema.Column{AdminCredentialTokensColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "admin_credential_tokens_users_user",
+				Columns:    []*schema.Column{AdminCredentialTokensColumns[7]},
+				RefColumns: []*schema.Column{UsersColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "admincredentialtoken_user_id_kind",
+				Unique:  false,
+				Columns: []*schema.Column{AdminCredentialTokensColumns[7], AdminCredentialTokensColumns[1]},
+			},
+		},
+	}
 	// CartsColumns holds the columns for the "carts" table.
 	CartsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1296,7 +1328,7 @@ var (
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 		{Name: "email", Type: field.TypeString, Unique: true, Size: 150, SchemaType: map[string]string{"postgres": "varchar(150)"}},
-		{Name: "password_hash", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "password_hash", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
 		{Name: "status", Type: field.TypeInt16, Default: 1},
 		{Name: "meta", Type: field.TypeJSON},
 	}
@@ -1380,6 +1412,7 @@ var (
 	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		AdminCredentialTokensTable,
 		CartsTable,
 		CartItemsTable,
 		CategoriesTable,
@@ -1421,6 +1454,13 @@ var (
 )
 
 func init() {
+	AdminCredentialTokensTable.ForeignKeys[0].RefTable = UsersTable
+	AdminCredentialTokensTable.Annotation = &entsql.Annotation{
+		Table: "admin_credential_tokens",
+	}
+	AdminCredentialTokensTable.Annotation.Checks = map[string]string{
+		"admin_credential_tokens_kind_check": "kind IN ('setup', 'reset')",
+	}
 	CartsTable.ForeignKeys[0].RefTable = ShopsTable
 	CartsTable.ForeignKeys[1].RefTable = MembersTable
 	CartsTable.Annotation = &entsql.Annotation{}

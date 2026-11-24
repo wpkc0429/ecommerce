@@ -617,9 +617,44 @@ func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
 // without a theme and have one applied later via the existing theme-switch
 // flow.
 func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, error) {
+	name, status, err := s.validateShopInput(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("cms: begin tx: %w", err)
+	}
+	shop, err := createShopTx(ctx, tx, name, status, in.ThemeID)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("cms: commit shop creation: %w", err)
+	}
+	return shop, nil
+}
+
+// CreateShopTx is CreateShop inside a transaction the caller owns (change
+// platform-account-provisioning, design D8): the shop and its home page are
+// written on tx, and committing or rolling back is the caller's job. Input is
+// validated exactly as CreateShop does. It is the only other entry to the
+// shop-creation body, so shop provisioning cannot drift from POST /admin/shops.
+func (s *Service) CreateShopTx(ctx context.Context, tx *ent.Tx, in ShopInput) (*ent.Shop, error) {
+	name, status, err := s.validateShopInput(ctx, in)
+	if err != nil {
+		return nil, err
+	}
+	return createShopTx(ctx, tx, name, status, in.ThemeID)
+}
+
+// validateShopInput returns the normalized name and status of a ShopInput, or a
+// *ValidationError.
+func (s *Service) validateShopInput(ctx context.Context, in ShopInput) (string, int16, error) {
 	name := strings.TrimSpace(in.Name)
 	if name == "" {
-		return nil, &ValidationError{
+		return "", 0, &ValidationError{
 			Message: "name is required",
 			Details: []Detail{{Pointer: "/name", Message: "required"}},
 		}
@@ -627,7 +662,7 @@ func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, erro
 	status := int16(1)
 	if in.Status != nil {
 		if !validShopStatus(*in.Status) {
-			return nil, &ValidationError{
+			return "", 0, &ValidationError{
 				Message: "invalid status",
 				Details: []Detail{{Pointer: "/status", Message: "must be 0, 1 or 2"}},
 			}
@@ -636,35 +671,30 @@ func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, erro
 	}
 	if in.ThemeID != nil {
 		if _, err := s.Client.Theme.Get(ctx, *in.ThemeID); err != nil {
-			return nil, &ValidationError{
+			return "", 0, &ValidationError{
 				Message: "theme does not exist",
 				Details: []Detail{{Pointer: "/theme_id", Message: "unknown theme"}},
 			}
 		}
 	}
+	return name, status, nil
+}
 
-	tx, err := s.Client.Tx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cms: begin tx: %w", err)
-	}
+// createShopTx is the transactional body shared by CreateShop and CreateShopTx.
+func createShopTx(ctx context.Context, tx *ent.Tx, name string, status int16, themeID *int) (*ent.Shop, error) {
 	create := tx.Shop.Create().SetName(name).SetStatus(status)
-	if in.ThemeID != nil {
-		create.SetThemeID(*in.ThemeID)
+	if themeID != nil {
+		create.SetThemeID(*themeID)
 	}
 	shop, err := create.Save(ctx)
 	if err != nil {
-		_ = tx.Rollback()
 		if ent.IsConstraintError(err) {
 			return nil, &ValidationError{Message: "shop could not be created"}
 		}
 		return nil, err
 	}
 	if err := createHomePage(ctx, tx, shop.ID); err != nil {
-		_ = tx.Rollback()
 		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("cms: commit shop creation: %w", err)
 	}
 	return shop, nil
 }

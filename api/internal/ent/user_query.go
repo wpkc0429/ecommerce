@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql/driver"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -24,15 +25,16 @@ import (
 // UserQuery is the builder for querying User entities.
 type UserQuery struct {
 	config
-	ctx                 *QueryContext
-	order               []user.OrderOption
-	inters              []Interceptor
-	predicates          []predicate.User
-	withShopUsers       *ShopUserQuery
-	withRoleUsers       *RoleUserQuery
-	withUserPermissions *UserPermissionQuery
-	withRefreshTokens   *UserRefreshTokenQuery
-	modifiers           []func(*sql.Selector)
+	ctx                  *QueryContext
+	order                []user.OrderOption
+	inters               []Interceptor
+	predicates           []predicate.User
+	withShopUsers        *ShopUserQuery
+	withRoleUsers        *RoleUserQuery
+	withUserPermissions  *UserPermissionQuery
+	withRefreshTokens    *UserRefreshTokenQuery
+	withCredentialTokens *AdminCredentialTokenQuery
+	modifiers            []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -150,6 +152,28 @@ func (_q *UserQuery) QueryRefreshTokens() *UserRefreshTokenQuery {
 			sqlgraph.From(user.Table, user.FieldID, selector),
 			sqlgraph.To(userrefreshtoken.Table, userrefreshtoken.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, user.RefreshTokensTable, user.RefreshTokensColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryCredentialTokens chains the current query on the "credential_tokens" edge.
+func (_q *UserQuery) QueryCredentialTokens() *AdminCredentialTokenQuery {
+	query := (&AdminCredentialTokenClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(user.Table, user.FieldID, selector),
+			sqlgraph.To(admincredentialtoken.Table, admincredentialtoken.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, true, user.CredentialTokensTable, user.CredentialTokensColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -344,15 +368,16 @@ func (_q *UserQuery) Clone() *UserQuery {
 		return nil
 	}
 	return &UserQuery{
-		config:              _q.config,
-		ctx:                 _q.ctx.Clone(),
-		order:               append([]user.OrderOption{}, _q.order...),
-		inters:              append([]Interceptor{}, _q.inters...),
-		predicates:          append([]predicate.User{}, _q.predicates...),
-		withShopUsers:       _q.withShopUsers.Clone(),
-		withRoleUsers:       _q.withRoleUsers.Clone(),
-		withUserPermissions: _q.withUserPermissions.Clone(),
-		withRefreshTokens:   _q.withRefreshTokens.Clone(),
+		config:               _q.config,
+		ctx:                  _q.ctx.Clone(),
+		order:                append([]user.OrderOption{}, _q.order...),
+		inters:               append([]Interceptor{}, _q.inters...),
+		predicates:           append([]predicate.User{}, _q.predicates...),
+		withShopUsers:        _q.withShopUsers.Clone(),
+		withRoleUsers:        _q.withRoleUsers.Clone(),
+		withUserPermissions:  _q.withUserPermissions.Clone(),
+		withRefreshTokens:    _q.withRefreshTokens.Clone(),
+		withCredentialTokens: _q.withCredentialTokens.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -401,6 +426,17 @@ func (_q *UserQuery) WithRefreshTokens(opts ...func(*UserRefreshTokenQuery)) *Us
 		opt(query)
 	}
 	_q.withRefreshTokens = query
+	return _q
+}
+
+// WithCredentialTokens tells the query-builder to eager-load the nodes that are connected to
+// the "credential_tokens" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *UserQuery) WithCredentialTokens(opts ...func(*AdminCredentialTokenQuery)) *UserQuery {
+	query := (&AdminCredentialTokenClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withCredentialTokens = query
 	return _q
 }
 
@@ -482,11 +518,12 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 	var (
 		nodes       = []*User{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withShopUsers != nil,
 			_q.withRoleUsers != nil,
 			_q.withUserPermissions != nil,
 			_q.withRefreshTokens != nil,
+			_q.withCredentialTokens != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -535,6 +572,13 @@ func (_q *UserQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*User, e
 		if err := _q.loadRefreshTokens(ctx, query, nodes,
 			func(n *User) { n.Edges.RefreshTokens = []*UserRefreshToken{} },
 			func(n *User, e *UserRefreshToken) { n.Edges.RefreshTokens = append(n.Edges.RefreshTokens, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withCredentialTokens; query != nil {
+		if err := _q.loadCredentialTokens(ctx, query, nodes,
+			func(n *User) { n.Edges.CredentialTokens = []*AdminCredentialToken{} },
+			func(n *User, e *AdminCredentialToken) { n.Edges.CredentialTokens = append(n.Edges.CredentialTokens, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -646,6 +690,36 @@ func (_q *UserQuery) loadRefreshTokens(ctx context.Context, query *UserRefreshTo
 	}
 	query.Where(predicate.UserRefreshToken(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(user.RefreshTokensColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.UserID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "user_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *UserQuery) loadCredentialTokens(ctx context.Context, query *AdminCredentialTokenQuery, nodes []*User, init func(*User), assign func(*User, *AdminCredentialToken)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*User)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(admincredentialtoken.FieldUserID)
+	}
+	query.Where(predicate.AdminCredentialToken(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(user.CredentialTokensColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

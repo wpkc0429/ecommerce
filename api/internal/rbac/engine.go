@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/rolepermission"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
+	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userpermission"
 )
 
@@ -80,6 +81,22 @@ func (e *Engine) load(ctx context.Context, userID, shopID int) (*Snapshot, error
 		ShopOverrides:     map[string]bool{},
 		PlatformOverrides: map[string]bool{},
 		RolePerms:         map[string]bool{},
+	}
+
+	// Account status (change platform-account-provisioning, design D5): one
+	// primary-key read. A disabled (or vanished) account gets an empty,
+	// Disabled snapshot, so no tier below can grant it anything.
+	status, err := e.client.User.Query().Where(user.IDEQ(userID)).Select(user.FieldStatus).Int(ctx)
+	if err != nil && !ent.IsNotFound(err) {
+		return nil, fmt.Errorf("rbac: load account status: %w", err)
+	}
+	if err != nil || status != 1 {
+		return &Snapshot{
+			ShopOverrides:     map[string]bool{},
+			PlatformOverrides: map[string]bool{},
+			RolePerms:         map[string]bool{},
+			Disabled:          true,
+		}, nil
 	}
 
 	// Tier 1 inputs: per-user overrides at shop ctx and platform level.

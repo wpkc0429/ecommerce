@@ -15,6 +15,10 @@ import (
 
 // User is a back-office account (platform staff or merchant staff).
 // email is stored lowercase-normalized. status: 0 停用 / 1 啟用.
+//
+// password_hash NULL = the password has not been set yet (change
+// platform-account-provisioning, design D1): the account cannot log in until
+// its owner consumes a setup link. Same expression as members.password_hash.
 type User struct {
 	ent.Schema
 }
@@ -26,7 +30,7 @@ func (User) Mixin() []ent.Mixin {
 func (User) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("email").MaxLen(150).SchemaType(map[string]string{dialect.Postgres: "varchar(150)"}).NotEmpty().Unique(),
-		field.String("password_hash").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).NotEmpty().Sensitive(),
+		field.String("password_hash").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).Optional().Nillable().Sensitive(),
 		field.Int16("status").Default(1),
 		field.JSON("meta", json.RawMessage{}).Default(json.RawMessage("{}")),
 	}
@@ -38,6 +42,7 @@ func (User) Edges() []ent.Edge {
 		edge.From("role_users", RoleUser.Type).Ref("user"),
 		edge.From("user_permissions", UserPermission.Type).Ref("user"),
 		edge.From("refresh_tokens", UserRefreshToken.Type).Ref("user"),
+		edge.From("credential_tokens", AdminCredentialToken.Type).Ref("user"),
 	}
 }
 

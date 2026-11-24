@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"ksdevworks/ecommerce/api/internal/account"
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
@@ -405,10 +406,42 @@ func (h *RolesHandler) removePlatformRole(w http.ResponseWriter, r *http.Request
 		return
 	}
 	ctx := r.Context()
-	n, err := h.Client.RoleUser.Delete().
+	rl, err := h.Client.Role.Get(ctx, roleID)
+	if err != nil && !ent.IsNotFound(err) {
+		httpx.Internal(w)
+		return
+	}
+	tx, err := h.Client.Tx(ctx)
+	if err != nil {
+		httpx.Internal(w)
+		return
+	}
+	// Removing super_admin must never leave the platform without an active
+	// one (change platform-account-provisioning, design D6). The check runs
+	// under row locks so two concurrent removals cannot both pass.
+	if rl != nil && rl.Name == account.SuperAdminRole {
+		sa, err := account.LockSuperAdmins(ctx, tx)
+		if err != nil {
+			_ = tx.Rollback()
+			h.Log.Error("remove platform role: lock super_admins", "err", err)
+			httpx.Internal(w)
+			return
+		}
+		if sa.WouldLoseLast(targetID) {
+			_ = tx.Rollback()
+			httpx.Conflict(w, "this would leave no active super_admin")
+			return
+		}
+	}
+	n, err := tx.RoleUser.Delete().
 		Where(roleuser.UserIDEQ(targetID), roleuser.RoleIDEQ(roleID), roleuser.ShopIDIsNil()).
 		Exec(ctx)
 	if err != nil {
+		_ = tx.Rollback()
+		httpx.Internal(w)
+		return
+	}
+	if err := tx.Commit(); err != nil {
 		httpx.Internal(w)
 		return
 	}

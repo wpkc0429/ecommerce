@@ -72,3 +72,22 @@ func TestLoadDefaultsPaymentCredentialsEncryptionKeyToAValidDevKey(t *testing.T)
 		t.Fatal("unset PAYMENT_CREDENTIALS_ENCRYPTION_KEY produced an empty value")
 	}
 }
+
+func TestParseAdminPublicURL(t *testing.T) {
+	good := map[string]string{
+		"http://localhost:3001":      "http://localhost:3001",
+		"https://admin.example.com/": "https://admin.example.com",
+		" https://a.example.com ":    "https://a.example.com",
+	}
+	for in, want := range good {
+		got, err := parseAdminPublicURL(in)
+		if err != nil || got != want {
+			t.Errorf("parseAdminPublicURL(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "admin.example.com", "ftp://x.test", "https://x.test/app", "https://x.test/#/y", "https://x.test?a=1", "https://u:p@x.test"} {
+		if _, err := parseAdminPublicURL(in); err == nil {
+			t.Errorf("parseAdminPublicURL(%q) should fail", in)
+		}
+	}
+}

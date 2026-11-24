@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"net/netip"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -128,6 +129,20 @@ type Config struct {
 	// peer. For a Cloudflare Tunnel whose cloudflared runs on this host, set
 	// 127.0.0.1/32,::1/128. X-Forwarded-For is never consulted.
 	TrustedProxies []netip.Prefix
+
+	// AdminPublicURL is the base of the password setup / reset links handed to
+	// back-office users: {AdminPublicURL}/#/set-password/{token} (change
+	// platform-account-provisioning, design D3). It MUST be the shared
+	// merchant admin SPA's origin, NOT the platform administrator's own admin
+	// domain: the latter sits behind an access policy that only admits the
+	// platform owner, so a merchant owner opening the link there is turned
+	// away. No trailing slash, no path, no fragment. Default
+	// http://localhost:3001 (the local admin dev server).
+	AdminPublicURL string
+	// AdminSetupTokenTTL / AdminResetTokenTTL bound how long a one-time
+	// password setup (new account) / reset link stays valid. 72h / 24h.
+	AdminSetupTokenTTL time.Duration
+	AdminResetTokenTTL time.Duration
 
 	// CORSAllowedOrigins may call the API from a browser (admin SPA, web dev).
 	CORSAllowedOrigins []string
@@ -323,6 +338,15 @@ func Load() (*Config, error) {
 	if cfg.PreviewTokenTTL, err = parseDuration("PREVIEW_TOKEN_TTL", 10*time.Minute); err != nil {
 		return nil, err
 	}
+	if cfg.AdminSetupTokenTTL, err = parseDuration("ADMIN_SETUP_TOKEN_TTL", 72*time.Hour); err != nil {
+		return nil, err
+	}
+	if cfg.AdminResetTokenTTL, err = parseDuration("ADMIN_RESET_TOKEN_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
+	if cfg.AdminPublicURL, err = parseAdminPublicURL(getenv("ADMIN_PUBLIC_URL", "http://localhost:3001")); err != nil {
+		return nil, err
+	}
 	if cfg.OrderAccessTokenTTL, err = parseDuration("ORDER_ACCESS_TOKEN_TTL", 24*time.Hour); err != nil {
 		return nil, err
 	}
@@ -515,4 +539,16 @@ func loadDotEnv() {
 		}
 		return
 	}
+}
+
+// parseAdminPublicURL validates ADMIN_PUBLIC_URL and strips a trailing slash.
+// A malformed base would silently produce broken links, so boot fails instead.
+func parseAdminPublicURL(raw string) (string, error) {
+	raw = strings.TrimRight(strings.TrimSpace(raw), "/")
+	u, err := url.Parse(raw)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" ||
+		u.Fragment != "" || u.RawQuery != "" || u.Path != "" || u.User != nil {
+		return "", fmt.Errorf("config: ADMIN_PUBLIC_URL must be an http(s) origin without path, query or fragment, got %q", raw)
+	}
+	return raw, nil
 }

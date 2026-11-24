@@ -25,7 +25,7 @@ type User struct {
 	// Email holds the value of the "email" field.
 	Email string `json:"email,omitempty"`
 	// PasswordHash holds the value of the "password_hash" field.
-	PasswordHash string `json:"-"`
+	PasswordHash *string `json:"-"`
 	// Status holds the value of the "status" field.
 	Status int16 `json:"status,omitempty"`
 	// Meta holds the value of the "meta" field.
@@ -46,9 +46,11 @@ type UserEdges struct {
 	UserPermissions []*UserPermission `json:"user_permissions,omitempty"`
 	// RefreshTokens holds the value of the refresh_tokens edge.
 	RefreshTokens []*UserRefreshToken `json:"refresh_tokens,omitempty"`
+	// CredentialTokens holds the value of the credential_tokens edge.
+	CredentialTokens []*AdminCredentialToken `json:"credential_tokens,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // ShopUsersOrErr returns the ShopUsers value or an error if the edge
@@ -85,6 +87,15 @@ func (e UserEdges) RefreshTokensOrErr() ([]*UserRefreshToken, error) {
 		return e.RefreshTokens, nil
 	}
 	return nil, &NotLoadedError{edge: "refresh_tokens"}
+}
+
+// CredentialTokensOrErr returns the CredentialTokens value or an error if the edge
+// was not loaded in eager-loading.
+func (e UserEdges) CredentialTokensOrErr() ([]*AdminCredentialToken, error) {
+	if e.loadedTypes[4] {
+		return e.CredentialTokens, nil
+	}
+	return nil, &NotLoadedError{edge: "credential_tokens"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -143,7 +154,8 @@ func (_m *User) assignValues(columns []string, values []any) error {
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field password_hash", values[i])
 			} else if value.Valid {
-				_m.PasswordHash = value.String
+				_m.PasswordHash = new(string)
+				*_m.PasswordHash = value.String
 			}
 		case user.FieldStatus:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -190,6 +202,11 @@ func (_m *User) QueryUserPermissions() *UserPermissionQuery {
 // QueryRefreshTokens queries the "refresh_tokens" edge of the User entity.
 func (_m *User) QueryRefreshTokens() *UserRefreshTokenQuery {
 	return NewUserClient(_m.config).QueryRefreshTokens(_m)
+}
+
+// QueryCredentialTokens queries the "credential_tokens" edge of the User entity.
+func (_m *User) QueryCredentialTokens() *AdminCredentialTokenQuery {
+	return NewUserClient(_m.config).QueryCredentialTokens(_m)
 }
 
 // Update returns a builder for updating this User.

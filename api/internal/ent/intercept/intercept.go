@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"ksdevworks/ecommerce/api/internal/ent"
+	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/cart"
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
@@ -103,6 +104,33 @@ func (f TraverseFunc) Traverse(ctx context.Context, q ent.Query) error {
 		return err
 	}
 	return f(ctx, query)
+}
+
+// The AdminCredentialTokenFunc type is an adapter to allow the use of ordinary function as a Querier.
+type AdminCredentialTokenFunc func(context.Context, *ent.AdminCredentialTokenQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f AdminCredentialTokenFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.AdminCredentialTokenQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.AdminCredentialTokenQuery", q)
+}
+
+// The TraverseAdminCredentialToken type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseAdminCredentialToken func(context.Context, *ent.AdminCredentialTokenQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseAdminCredentialToken) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseAdminCredentialToken) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.AdminCredentialTokenQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.AdminCredentialTokenQuery", q)
 }
 
 // The CartFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1107,6 +1135,8 @@ func (f TraverseUserRefreshToken) Traverse(ctx context.Context, q ent.Query) err
 // NewQuery returns the generic Query interface for the given typed query.
 func NewQuery(q ent.Query) (Query, error) {
 	switch q := q.(type) {
+	case *ent.AdminCredentialTokenQuery:
+		return &query[*ent.AdminCredentialTokenQuery, predicate.AdminCredentialToken, admincredentialtoken.OrderOption]{typ: ent.TypeAdminCredentialToken, tq: q}, nil
 	case *ent.CartQuery:
 		return &query[*ent.CartQuery, predicate.Cart, cart.OrderOption]{typ: ent.TypeCart, tq: q}, nil
 	case *ent.CartItemQuery:

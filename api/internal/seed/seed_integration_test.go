@@ -510,3 +510,27 @@ func TestDemoSeedProvisionsNewArrivalsCategory(t *testing.T) {
 		t.Fatalf("floral subtitles: n=%d err=%v", n, err)
 	}
 }
+
+// Scenario: 新節點只屬於 super_admin (change platform-account-provisioning,
+// design D10): account.view / account.manage exist, super_admin holds them via
+// the "*" grant, and no merchant role does.
+func TestSeedAccountNodesBelongToSuperAdminOnly(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	for _, name := range []string{"account.view", "account.manage"} {
+		node, err := client.Permission.Query().Where(entpermission.NameEQ(name)).Only(ctx)
+		if err != nil {
+			t.Fatalf("%s must be in the permission catalog: %v", name, err)
+		}
+		holders, err := client.RolePermission.Query().
+			Where(entrolepermission.PermissionIDEQ(node.ID)).QueryRole().Select(entrole.FieldName).Strings(ctx)
+		if err != nil {
+			t.Fatalf("holders of %s: %v", name, err)
+		}
+		if len(holders) != 1 || holders[0] != "super_admin" {
+			t.Errorf("%s must be held by super_admin only, got %v", name, holders)
+		}
+	}
+}

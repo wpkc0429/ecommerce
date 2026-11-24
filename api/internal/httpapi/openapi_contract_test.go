@@ -371,6 +371,7 @@ var moneyExemptions = map[string]string{
 	"/components/schemas/ShopPage/properties/total":             "pagination count",
 	"/components/schemas/PointTransactionPage/properties/total": "pagination count",
 	"/components/schemas/MemberPage/properties/total":           "pagination count",
+	"/components/schemas/AccountPage/properties/total":          "pagination count",
 	"/components/schemas/PaymentPage/properties/total":          "pagination count",
 }
 

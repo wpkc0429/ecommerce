@@ -52,6 +52,10 @@ type Deps struct {
 	// production: with storage unconfigured its routes stay mounted and answer
 	// 503 media_not_configured (the route table never depends on settings).
 	Media *MediaHandler
+	// Accounts / Provisioning: change platform-account-provisioning (platform
+	// account management, password setup endpoints, one-call shop opening).
+	Accounts     *AccountsHandler
+	Provisioning *ProvisioningHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
@@ -72,6 +76,9 @@ type Deps struct {
 	MemberRegisterRateLimit func(http.Handler) http.Handler
 	MemberRefreshRateLimit  func(http.Handler) http.Handler
 	GuestCheckoutRateLimit  func(http.Handler) http.Handler
+	// AdminPasswordSetupRateLimit guards the two unauthenticated password
+	// setup endpoints (IP-scoped).
+	AdminPasswordSetupRateLimit func(http.Handler) http.Handler
 }
 
 // New assembles the full router.
@@ -115,6 +122,9 @@ func New(d Deps) http.Handler {
 				ar.With(orPassthrough(d.AdminLoginRateLimit)).Post("/auth/login", d.AdminAuth.Login)
 				ar.With(orPassthrough(d.AdminRefreshRateLimit)).Post("/auth/refresh", d.AdminAuth.RefreshToken)
 				ar.Post("/auth/logout", d.AdminAuth.Logout)
+			}
+			if d.Accounts != nil {
+				d.Accounts.MountAuth(ar, d.AdminPasswordSetupRateLimit)
 			}
 			if d.AdminMW != nil {
 				ar.Group(func(pr chi.Router) {
@@ -171,6 +181,9 @@ func New(d Deps) http.Handler {
 						if d.Media != nil {
 							d.Media.MountShopAdmin(sh)
 						}
+						if d.Provisioning != nil {
+							d.Provisioning.MountShop(sh)
+						}
 					})
 					if d.Media != nil {
 						d.Media.MountAdmin(pr)
@@ -187,6 +200,12 @@ func New(d Deps) http.Handler {
 					}
 					if d.Themes != nil {
 						d.Themes.MountPlatform(pr)
+					}
+					if d.Accounts != nil {
+						d.Accounts.MountPlatform(pr)
+					}
+					if d.Provisioning != nil {
+						d.Provisioning.MountPlatform(pr)
 					}
 				})
 			}

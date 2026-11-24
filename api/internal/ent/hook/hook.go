@@ -8,6 +8,18 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 )
 
+// The AdminCredentialTokenFunc type is an adapter to allow the use of ordinary
+// function as AdminCredentialToken mutator.
+type AdminCredentialTokenFunc func(context.Context, *ent.AdminCredentialTokenMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f AdminCredentialTokenFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.AdminCredentialTokenMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.AdminCredentialTokenMutation", m)
+}
+
 // The CartFunc type is an adapter to allow the use of ordinary
 // function as Cart mutator.
 type CartFunc func(context.Context, *ent.CartMutation) (ent.Value, error)

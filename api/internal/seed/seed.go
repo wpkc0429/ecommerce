@@ -66,6 +66,10 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"shop.create", "建立商家（平台層）"},
 	{"shop.list", "列出所有商家（平台層）"},
 	{"shop.update", "更新商家全域內容與切換主題"},
+	// change platform-account-provisioning (design D10): platform-level, held
+	// only by super_admin (the "*" grant); never given to a merchant role.
+	{"account.view", "檢視後台帳號與其成員資格（平台層）"},
+	{"account.manage", "建立後台帳號、指派成員資格、停用與重設密碼（平台層）"},
 	{"shop.manage_domains", "管理站點網域與 site-shop 綁定（平台層）"},
 	// change storefront-client-auth (design D11): allowed origins are a
 	// contested global namespace like bound domains, hence platform-scoped;

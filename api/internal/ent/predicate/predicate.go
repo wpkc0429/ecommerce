@@ -6,6 +6,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// AdminCredentialToken is the predicate function for admincredentialtoken builders.
+type AdminCredentialToken func(*sql.Selector)
+
 // Cart is the predicate function for cart builders.
 type Cart func(*sql.Selector)
 

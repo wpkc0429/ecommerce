@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"ksdevworks/ecommerce/api/internal/ent/admincredentialtoken"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/roleuser"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -66,6 +67,12 @@ func (_u *UserUpdate) SetNillablePasswordHash(v *string) *UserUpdate {
 	if v != nil {
 		_u.SetPasswordHash(*v)
 	}
+	return _u
+}
+
+// ClearPasswordHash clears the value of the "password_hash" field.
+func (_u *UserUpdate) ClearPasswordHash() *UserUpdate {
+	_u.mutation.ClearPasswordHash()
 	return _u
 }
 
@@ -162,6 +169,21 @@ func (_u *UserUpdate) AddRefreshTokens(v ...*UserRefreshToken) *UserUpdate {
 	return _u.AddRefreshTokenIDs(ids...)
 }
 
+// AddCredentialTokenIDs adds the "credential_tokens" edge to the AdminCredentialToken entity by IDs.
+func (_u *UserUpdate) AddCredentialTokenIDs(ids ...int) *UserUpdate {
+	_u.mutation.AddCredentialTokenIDs(ids...)
+	return _u
+}
+
+// AddCredentialTokens adds the "credential_tokens" edges to the AdminCredentialToken entity.
+func (_u *UserUpdate) AddCredentialTokens(v ...*AdminCredentialToken) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCredentialTokenIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdate) Mutation() *UserMutation {
 	return _u.mutation
@@ -251,6 +273,27 @@ func (_u *UserUpdate) RemoveRefreshTokens(v ...*UserRefreshToken) *UserUpdate {
 	return _u.RemoveRefreshTokenIDs(ids...)
 }
 
+// ClearCredentialTokens clears all "credential_tokens" edges to the AdminCredentialToken entity.
+func (_u *UserUpdate) ClearCredentialTokens() *UserUpdate {
+	_u.mutation.ClearCredentialTokens()
+	return _u
+}
+
+// RemoveCredentialTokenIDs removes the "credential_tokens" edge to AdminCredentialToken entities by IDs.
+func (_u *UserUpdate) RemoveCredentialTokenIDs(ids ...int) *UserUpdate {
+	_u.mutation.RemoveCredentialTokenIDs(ids...)
+	return _u
+}
+
+// RemoveCredentialTokens removes "credential_tokens" edges to AdminCredentialToken entities.
+func (_u *UserUpdate) RemoveCredentialTokens(v ...*AdminCredentialToken) *UserUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCredentialTokenIDs(ids...)
+}
+
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *UserUpdate) Save(ctx context.Context) (int, error) {
 	_u.defaults()
@@ -328,6 +371,9 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(user.FieldPasswordHash, field.TypeString, value)
+	}
+	if _u.mutation.PasswordHashCleared() {
+		_spec.ClearField(user.FieldPasswordHash, field.TypeString)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeInt16, value)
@@ -523,6 +569,51 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.CredentialTokensCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCredentialTokensIDs(); len(nodes) > 0 && !_u.mutation.CredentialTokensCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CredentialTokensIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -576,6 +667,12 @@ func (_u *UserUpdateOne) SetNillablePasswordHash(v *string) *UserUpdateOne {
 	if v != nil {
 		_u.SetPasswordHash(*v)
 	}
+	return _u
+}
+
+// ClearPasswordHash clears the value of the "password_hash" field.
+func (_u *UserUpdateOne) ClearPasswordHash() *UserUpdateOne {
+	_u.mutation.ClearPasswordHash()
 	return _u
 }
 
@@ -672,6 +769,21 @@ func (_u *UserUpdateOne) AddRefreshTokens(v ...*UserRefreshToken) *UserUpdateOne
 	return _u.AddRefreshTokenIDs(ids...)
 }
 
+// AddCredentialTokenIDs adds the "credential_tokens" edge to the AdminCredentialToken entity by IDs.
+func (_u *UserUpdateOne) AddCredentialTokenIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.AddCredentialTokenIDs(ids...)
+	return _u
+}
+
+// AddCredentialTokens adds the "credential_tokens" edges to the AdminCredentialToken entity.
+func (_u *UserUpdateOne) AddCredentialTokens(v ...*AdminCredentialToken) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCredentialTokenIDs(ids...)
+}
+
 // Mutation returns the UserMutation object of the builder.
 func (_u *UserUpdateOne) Mutation() *UserMutation {
 	return _u.mutation
@@ -759,6 +871,27 @@ func (_u *UserUpdateOne) RemoveRefreshTokens(v ...*UserRefreshToken) *UserUpdate
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveRefreshTokenIDs(ids...)
+}
+
+// ClearCredentialTokens clears all "credential_tokens" edges to the AdminCredentialToken entity.
+func (_u *UserUpdateOne) ClearCredentialTokens() *UserUpdateOne {
+	_u.mutation.ClearCredentialTokens()
+	return _u
+}
+
+// RemoveCredentialTokenIDs removes the "credential_tokens" edge to AdminCredentialToken entities by IDs.
+func (_u *UserUpdateOne) RemoveCredentialTokenIDs(ids ...int) *UserUpdateOne {
+	_u.mutation.RemoveCredentialTokenIDs(ids...)
+	return _u
+}
+
+// RemoveCredentialTokens removes "credential_tokens" edges to AdminCredentialToken entities.
+func (_u *UserUpdateOne) RemoveCredentialTokens(v ...*AdminCredentialToken) *UserUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCredentialTokenIDs(ids...)
 }
 
 // Where appends a list predicates to the UserUpdate builder.
@@ -869,6 +1002,9 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 	if value, ok := _u.mutation.PasswordHash(); ok {
 		_spec.SetField(user.FieldPasswordHash, field.TypeString, value)
 	}
+	if _u.mutation.PasswordHashCleared() {
+		_spec.ClearField(user.FieldPasswordHash, field.TypeString)
+	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(user.FieldStatus, field.TypeInt16, value)
 	}
@@ -1056,6 +1192,51 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(userrefreshtoken.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CredentialTokensCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCredentialTokensIDs(); len(nodes) > 0 && !_u.mutation.CredentialTokensCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CredentialTokensIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: true,
+			Table:   user.CredentialTokensTable,
+			Columns: []string{user.CredentialTokensColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(admincredentialtoken.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

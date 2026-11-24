@@ -103,3 +103,32 @@ func TestCrossShopGuard(t *testing.T) {
 		t.Fatal("platform admin must pass the guard for any shop")
 	}
 }
+
+// A disabled account holds nothing: roles, overrides and platform standing are
+// all void, and it is a non-member of every shop (change
+// platform-account-provisioning, design D5).
+func TestDisabledSnapshotGrantsNothing(t *testing.T) {
+	s := Snapshot{
+		ShopOverrides:     map[string]bool{"a": true},
+		PlatformOverrides: map[string]bool{"b": true},
+		RolePerms:         map[string]bool{"c": true},
+		HasPlatformRole:   true,
+		IsShopMember:      true,
+		Disabled:          true,
+	}
+	for _, p := range []string{"a", "b", "c", "unknown"} {
+		if s.Allows(p) {
+			t.Errorf("disabled snapshot allows %q", p)
+		}
+	}
+	if s.CanAccessShop() {
+		t.Error("disabled snapshot can access a shop")
+	}
+	if s.IsPlatformAdmin() {
+		t.Error("disabled snapshot is a platform admin")
+	}
+	s.Disabled = false
+	if !s.Allows("a") || !s.CanAccessShop() || !s.IsPlatformAdmin() {
+		t.Error("the same snapshot, enabled, must grant")
+	}
+}

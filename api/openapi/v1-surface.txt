@@ -25,6 +25,24 @@
 # 本鎖**不**記錄參數的型別／pattern／長度／值域／敘述／範例：改敘述、補範例、放寬
 # 值域都不該轉紅（假警報是防腐機制最快的死法）。代價是「把約束改嚴」本鎖沉默，
 # 那一段的防線是 code review，見 openapi_contract_test.go 的檔頭。
+Account.created_at
+Account.email
+Account.has_password
+Account.id
+Account.status
+AccountDetail.created_at
+AccountDetail.email
+AccountDetail.has_password
+AccountDetail.id
+AccountDetail.memberships
+AccountDetail.platform_roles
+AccountDetail.status
+AccountPage.accounts
+AccountPage.page
+AccountPage.page_size
+AccountPage.total
+AccountRoleRef.id
+AccountRoleRef.name
 AllowedOrigin.created_at
 AllowedOrigin.id
 AllowedOrigin.origin
@@ -65,6 +83,13 @@ CategorySummary.slug
 ContentImage.height
 ContentImage.urls
 ContentImage.width
+CredentialLink.delivery
+CredentialLink.expires_at
+CredentialLink.reset_url
+CredentialLink.setup_url
+DELETE /api/v1/admin/accounts/{userID}/memberships/{shopID}
+DELETE /api/v1/admin/accounts/{userID}/memberships/{shopID} path shopID
+DELETE /api/v1/admin/accounts/{userID}/memberships/{shopID} path userID
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID}
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path originID
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
@@ -123,6 +148,15 @@ ECPayCredentials.updated_at
 EffectiveTimezone.name
 EffectiveTimezone.source
 Error.error
+GET /api/v1/admin/accounts
+GET /api/v1/admin/accounts query page
+GET /api/v1/admin/accounts query page optional
+GET /api/v1/admin/accounts query page_size
+GET /api/v1/admin/accounts query page_size optional
+GET /api/v1/admin/accounts query q
+GET /api/v1/admin/accounts query q optional
+GET /api/v1/admin/accounts/{userID}
+GET /api/v1/admin/accounts/{userID} path userID
 GET /api/v1/admin/me
 GET /api/v1/admin/media/config
 GET /api/v1/admin/permissions
@@ -259,6 +293,8 @@ GET /api/v1/admin/shops/{shopID}/reports/sales query group_by optional
 GET /api/v1/admin/shops/{shopID}/reports/sales query to
 GET /api/v1/admin/shops/{shopID}/roles
 GET /api/v1/admin/shops/{shopID}/roles path shopID
+GET /api/v1/admin/shops/{shopID}/setup-status
+GET /api/v1/admin/shops/{shopID}/setup-status path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods
 GET /api/v1/admin/shops/{shopID}/shipping-methods path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
@@ -444,13 +480,27 @@ OrderPage.orders
 OrderPage.page
 OrderPage.page_size
 OrderPage.total
+POST /api/v1/admin/accounts
+POST /api/v1/admin/accounts/{userID}/disable
+POST /api/v1/admin/accounts/{userID}/disable path userID
+POST /api/v1/admin/accounts/{userID}/enable
+POST /api/v1/admin/accounts/{userID}/enable path userID
+POST /api/v1/admin/accounts/{userID}/memberships
+POST /api/v1/admin/accounts/{userID}/memberships path userID
+POST /api/v1/admin/accounts/{userID}/password-reset
+POST /api/v1/admin/accounts/{userID}/password-reset path userID
 POST /api/v1/admin/auth/login
 POST /api/v1/admin/auth/login response 429 Retry-After
 POST /api/v1/admin/auth/logout
+POST /api/v1/admin/auth/password-setup
+POST /api/v1/admin/auth/password-setup response 429 Retry-After
+POST /api/v1/admin/auth/password-setup/inspect
+POST /api/v1/admin/auth/password-setup/inspect response 429 Retry-After
 POST /api/v1/admin/auth/refresh
 POST /api/v1/admin/auth/refresh response 429 Retry-After
 POST /api/v1/admin/permissions
 POST /api/v1/admin/roles
+POST /api/v1/admin/shop-provisioning
 POST /api/v1/admin/shops
 POST /api/v1/admin/shops/{shopID}/allowed-origins
 POST /api/v1/admin/shops/{shopID}/allowed-origins path shopID
@@ -617,6 +667,9 @@ PageListEntry.status
 PageListEntry.title
 PageListEntry.type_key
 PageListEntry.updated_at
+PasswordSetupInspection.email
+PasswordSetupInspection.expires_at
+PasswordSetupInspection.kind
 Payment.amount
 Payment.created_at
 Payment.currency
@@ -705,6 +758,10 @@ ProductSalesRow.gross_amount
 ProductSalesRow.product_title
 ProductSalesRow.quantity
 ProductSalesRow.sku_code
+ProvisionResult.binding
+ProvisionResult.owner
+ProvisionResult.shop
+ProvisionResult.storefront_origins
 PublicShippingMethod.carrier
 PublicShippingMethod.flat_rate
 PublicShippingMethod.id
@@ -750,6 +807,15 @@ SalesReport.to
 SalesReportCurrency.buckets
 SalesReportCurrency.currency
 SalesReportCurrency.summary
+SetupStatus.domain_bound
+SetupStatus.home_published
+SetupStatus.owner_assigned
+SetupStatus.owner_password_set
+SetupStatus.payment_credentials_set
+SetupStatus.publishable_key_active
+SetupStatus.shipping_method_active
+SetupStatus.shop_id
+SetupStatus.theme_applied
 Shipment.carrier
 Shipment.created_at
 Shipment.delivered_at

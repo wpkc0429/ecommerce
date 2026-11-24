@@ -3,7 +3,6 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
-	"regexp"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,11 +23,6 @@ type SitesHandler struct {
 	Log        *slog.Logger
 	Authz      *AuthzMW
 }
-
-var (
-	domainRe = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
-	prefixRe = regexp.MustCompile(`^/[a-z0-9-]+(/[a-z0-9-]+)*$`)
-)
 
 // MountPlatform registers routes under /admin (platform guard).
 func (h *SitesHandler) MountPlatform(r chi.Router) {
@@ -77,7 +71,7 @@ func (h *SitesHandler) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domain := tenant.NormalizeHost(req.Domain)
-	if domain == "" || !domainRe.MatchString(domain) {
+	if !tenant.ValidDomain(domain) {
 		httpx.Unprocessable(w, "invalid domain", []httpx.ValidationDetail{{Pointer: "/domain", Message: "must be a lowercase hostname"}})
 		return
 	}
@@ -276,7 +270,7 @@ func normalizePrefixInput(in *string) (*string, []httpx.ValidationDetail) {
 	if norm == "" {
 		return nil, nil
 	}
-	if !prefixRe.MatchString(norm) {
+	if !tenant.ValidPathPrefix(norm) {
 		return nil, []httpx.ValidationDetail{{Pointer: "/path_prefix", Message: "must match ^/[a-z0-9-]+$ segments"}}
 	}
 	return &norm, nil
