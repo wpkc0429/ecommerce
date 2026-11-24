@@ -45,7 +45,7 @@ curl -s -X POST "${auth[@]}" "$API/api/v1/admin/shop-provisioning" -d '{
 curl -s "${auth[@]}" "$API/api/v1/admin/shops/$SHOP/setup-status"
 ```
 
-Returns booleans derived from live data (nothing stored): `theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `theme_applied`, `domain_bound` and `home_published` belong to the deprecated hosted storefront and stay false for every headless shop: ignore them. The other five are the real onboarding gates. Re-read after every step.
+Returns booleans derived from live data (nothing stored): `theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active`. `theme_applied` and `domain_bound` belong to the hosted storefront that is being removed and stay false for every headless shop: ignore them; `home_published` reflects the CMS home page and is only meaningful once the content store ships. The other five are the real onboarding gates. Re-read after every step.
 
 ## 4. Owner password link
 
