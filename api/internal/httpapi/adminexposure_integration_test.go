@@ -687,7 +687,7 @@ func TestAdminCookieRefreshFlow(t *testing.T) {
 	}
 
 	// Body mode needs no header and still works exactly as before.
-	var tr map[string]any = decodeBody(t, def)
+	tr := decodeBody(t, def)
 	bodyRefresh := e.do(t, exReq{method: "POST", path: "/api/v1/admin/auth/refresh", body: map[string]any{"refresh_token": tr["refresh_token"]}})
 	if bodyRefresh.Code != 200 || keys(decodeBody(t, bodyRefresh)) != "access_token,expires_in,refresh_token,token_type" || len(bodyRefresh.Result().Cookies()) != 0 {
 		t.Fatalf("body-mode refresh changed: %d %s", bodyRefresh.Code, bodyRefresh.Body.String())
