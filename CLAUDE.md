@@ -37,7 +37,7 @@ make openapi-ui    # 由契約起 Redocly 可瀏覽文件（:8081，npx）
 make ecpay-sim     # 本機模擬綠界收銀台（:8090）——手動走完整付款流程用，測試不需要它
 
 cd web && npm run gen:types   # 由 starter schema JSON 重新產生 TS 型別
-cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 營運後台 ＋ 電商鏈（需三個服務 + seed-demo 後的乾淨狀態；目前 261 項斷言）
+cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 營運後台 ＋ 電商鏈（需三個服務 + seed-demo 後的乾淨狀態；目前 268 項斷言）
 cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API；153 項斷言，可重複執行）
 ```
 
@@ -90,6 +90,7 @@ cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API�
 - **顧客詳情不擁有點數**（change member-directory design D9）：`#/members/{id}` 只顯示唯讀餘額與等級加一顆連往 `#/points/{id}` 的按鈕。**調整表單與流水帳只在點數視圖**——複製過去會是同一個小元件的第三次重寫（tripwire #2），而調整後要同步餘額／等級／流水帳三處正是 tripwire #1 描述的東西；產品上點數也只該有一條寫入路徑與一條稽核軌跡。E2E 有一條斷言驗「顧客詳情 panel 內零個 `input`、零個 `form`」。
 - **商品 PUT 是全量語意，UI 必須永遠送完整 `skus`**（design D8）：`catalog.upsertSKUs` 會**刪除未出現在酬載中的既有 SKU**，`category_ids` 同樣全量取代。漏送一列＝靜默刪掉它的價格與庫存。因此商品編輯器只有一顆儲存鍵，不提供「只存基本資料」；任何日後新增的「快速編輯」入口動手前先讀 design D8。E2E 第 ⑪ 節專門守著它。
 - **UI 的權限來源是 `GET /api/v1/admin/shops/{shopID}/me`**（design D5）：回傳呼叫者在該商家**三層判定後**的有效權限節點。它的守衛只有「已認證 ＋ 跨店存取守衛」，**不要求任何權限節點**——以任一既有節點當守衛，只被授予 `product.view` 的自訂角色就會拿到 403 而看到空白後台。**這是體驗層不是安全層**，伺服器的 `RequireShopPermission` 永遠是唯一權威。切換商家必須重新取得。
+- **rich text 在寫入時消毒，寫入端是權威**（change cms-rich-text-sanitization）：`cms.Service` 的三個寫入點（`CreatePage`／`UpdatePage`／`UpdateShopContent`）一律走 `validateAndSanitize`——先 `ValidatePayload`（仍回帶 pointer 的 422），再 `SanitizeRichText` 依 schema 走訪，把 **`x-editor: richtext` 標註**的字串改寫成 allowlist 版本（觸發條件是 schema 標註**不是欄位名**，新主題／日後 content-field schema 不必改 Go）；有改寫時再驗一次 schema（消毒可能讓字串變長）。**是改寫不是拒絕**，回應帶實際存下的值，admin 編輯器儲存後以回應重建表單。沒改寫時原位元組原樣回存（`UseNumber`＋`SetEscapeHTML(false)`，不會把 `<` 存成 `<`）。`PublishPage` 不消毒（複製已消毒的草稿）。allowlist **只有一份**：`api/internal/cms/richtext/allowlist.json`（Go `go:embed` → bluemonday），`npm run gen:types` 複製成 `web/lib/richtext-allowlist.json`（產生檔，勿手改），`RichText.tsx` 以 `sanitize-html` 依同一份再消毒一次（縱深防禦；因為渲染 bundle 也給 native app、日後也會烘成靜態 HTML，只消毒渲染端是不夠的）。允許表格、**不允許 `h1`**（主題負責頁面標題）、`img[src]` 只收 `https`、`target=_blank` 一律補 `rel="noopener noreferrer"`、`script/style/iframe/svg/...` 連內容移除。既有資料用 `make sanitize-content`（**dry run**）檢視、`cd api && go run ./cmd/sanitize-content -apply` 寫回（冪等、只印 id、改到 `published_json` 時發 `PagePublished` 讓渲染快取失效）。**#4′ 誠實記錄**：本 change `admin/lib/`＋`app.js` 淨增 6 行、`views/` 淨增 8 行（75%，帳面響了）——那 6 行是 `schemaform.js` 的一行 rich text 說明文字，不是抽象層壓力；絕對量小到這個比例沒有資訊，但照規則仍要報。
 - **主題 schema 來源**：`api/internal/seed/schemas/starter/*.json` 同時驅動後端驗證/hydration 與 `web` 的 TS 型別（`npm run gen:types`）。
 - 注意：Postgres jsonb 不保留物件鍵順序——admin 的 **CMS** 表單欄位順序非 schema 撰寫順序（Phase 1 已知現象；商品等固定形狀表單不受影響，見上方 design D3）。
 - **ECPay 憑證改成每商家一份，解掉的正是 `ecpay-payment-provider` 自己記下的那條已知限制**（change ecpay-per-shop-credentials）：`MerchantID`/`HashKey`/`HashIV`/`ChoosePayment` 不再是 `ECPAY_*` 環境變數，而是每個商家自己在 `PUT /api/v1/admin/shops/{shopID}/ecpay-credentials` 設定、加密存進新表 `shop_payment_provider_credentials`（`UNIQUE(shop_id, provider)`）。**查證後發現今天的 `ECPAY_*` 預設值本來就是綠界官方公開的沙盒範例憑證**（`3002607`/`pwFHCqoQZGmho4w6`/`EkRm7iFT261dpevs`——`CheckMacValue` 官方範例向量測試用的就是它們），沒有任何商家在正式環境用 `ecpay` provider 收過真錢，所以這是一塊乾淨的地：**webhook 路由對 `ecpay` 直接乾淨切齊，不維護新舊並存的 provider 特判分支**；`mock` 完全不受影響，行為與路由逐位元組不變。

@@ -116,6 +116,12 @@ function buildField(key, ps, value, root, pointer) {
   input.dataset.pointer = pointer;
   input.dataset.jsonType = type || "string";
   wrap.append(input, el("span", { class: "field-error" }));
+  if (editor === "richtext") {
+    // change cms-rich-text-sanitization：伺服器在儲存時依 allowlist 改寫 HTML，
+    // 儲存後重新載入即看到實際存下的值。
+    wrap.append(el("span", { class: "hint" },
+      "支援段落、h2–h4、粗斜體、清單、引言、連結、https 圖片與表格；其他標籤（含 h1）、樣式與腳本會在儲存時移除。"));
+  }
   return wrap;
 }
 

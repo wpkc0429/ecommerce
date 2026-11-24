@@ -117,7 +117,7 @@ export function createPagesView(ctx) {
     const errBox = $("#editor-error");
     errBox.hidden = true;
     try {
-      await api("PUT", `/admin/shops/${ctx.getShopID()}/pages/${p.id}`, {
+      const saved = await api("PUT", `/admin/shops/${ctx.getShopID()}/pages/${p.id}`, {
         content: collectForm(form),
         meta: {
           seo_title: $("#seo-title").value,
@@ -125,6 +125,12 @@ export function createPagesView(ctx) {
           seo_description: $("#seo-description").value,
         },
       });
+      // 以伺服器實際存下的值重建表單：rich text 會在儲存時被消毒改寫
+      // （change cms-rich-text-sanitization design D2），畫面必須顯示存下的那一份。
+      if (p.page_schema && saved?.content_json) {
+        p.content_json = saved.content_json;
+        buildForm(p.page_schema, saved.content_json, form, p.page_schema);
+      }
       $("#editor-status").textContent = "草稿已儲存 ✓（發佈後才會反映到前台）";
     } catch (err) {
       showValidationErrors(form, errBox, err);

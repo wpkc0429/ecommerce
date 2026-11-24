@@ -1372,7 +1372,7 @@ components:
           description: "`0` 停用（前台回 503）／`1` 啟用／`2` 審核中（前台回 404）。"
         content_json:
           type: object
-          description: 全站內容，依當前主題的 `config_schema` 驗證。
+          description: 全站內容，依當前主題的 `config_schema` 驗證。schema 中 `x-editor` 標註為 `richtext` 的字串欄位於寫入時依單一 allowlist 消毒（改寫而非拒絕），回應為實際儲存的值。
         meta:
           type: object
         updated_at: { type: string, format: date-time }
@@ -1750,7 +1750,7 @@ components:
           description: "`0` 草稿／`1` 已發佈。"
         content_json:
           type: object
-          description: 工作副本（草稿）。
+          description: 工作副本（草稿）。schema 中 `x-editor` 標註為 `richtext` 的字串欄位於寫入時依單一 allowlist 消毒（改寫而非拒絕），回應為實際儲存的值。
         published_json:
           oneOf: [{ type: object }, { type: 'null' }]
           description: 線上內容；從未發佈過為 `null`。

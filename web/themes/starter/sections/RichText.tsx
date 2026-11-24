@@ -1,8 +1,9 @@
+import { sanitizeRichText } from "@/lib/sanitize";
 import type { RichTextSection } from "../schema-types";
 
-// Rich text authored by merchant staff in the admin editor. Phase 1 trusts
-// back-office authors; HTML sanitization belongs with the Phase 2 editor
-// hardening if authorship ever widens.
+// Rich text authored in the admin editor. The API sanitizes it on write
+// against the shared allowlist (change cms-rich-text-sanitization); it is
+// sanitized again here with the same allowlist before it reaches the DOM.
 export function RichText({ html }: RichTextSection) {
   return (
     <section
@@ -12,7 +13,7 @@ export function RichText({ html }: RichTextSection) {
         padding: "calc(var(--spacing-unit) * 2)",
         lineHeight: 1.7,
       }}
-      dangerouslySetInnerHTML={{ __html: html ?? "" }}
+      dangerouslySetInnerHTML={{ __html: sanitizeRichText(html) }}
     />
   );
 }

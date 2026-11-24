@@ -12,12 +12,14 @@
   "dependencies": {
     "next": "^15.3.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "sanitize-html": "^2.18.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
+    "@types/sanitize-html": "^2.16.2",
     "json-schema-to-typescript": "^15.0.0",
     "typescript": "^5.8.0"
   }

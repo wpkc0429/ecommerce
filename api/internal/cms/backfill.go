@@ -1,0 +1,186 @@
+package cms
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"ksdevworks/ecommerce/api/internal/ent"
+	entpage "ksdevworks/ecommerce/api/internal/ent/page"
+	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
+	"ksdevworks/ecommerce/api/internal/ent/themepage"
+	"ksdevworks/ecommerce/api/internal/events"
+)
+
+// BackfillItem is one line of the rich text backfill report. It deliberately
+// carries ids and a verdict only — never content, which may hold merchant
+// data (change cms-rich-text-sanitization, design D7).
+type BackfillItem struct {
+	Kind    string // "page" | "shop"
+	ID      int    // page id or shop id
+	ShopID  int
+	Field   string // "content_json" | "published_json"
+	Changed bool
+	Skipped string // non-empty: why the row could not be checked
+}
+
+// BackfillSummary totals a backfill run.
+type BackfillSummary struct {
+	Checked, Changed, Skipped int
+}
+
+// BackfillRichText re-sanitizes every stored CMS payload against the schema of
+// the shop's CURRENT theme: pages.content_json, pages.published_json and
+// shops.content_json (design D7). It is idempotent — a second run reports zero
+// changes — and writes nothing unless apply is true.
+//
+// Why rows can need it even after the write path sanitizes: content written
+// before this change, and content written under a theme whose schema did not
+// yet mark a field `x-editor: richtext` (a theme update or switch can turn a
+// stored plain string into rendered HTML without any new write).
+//
+// After writing, cache invalidation goes through the existing domain events
+// (PagePublished for a changed published_json, ShopContentUpdated for shop
+// content) — never a direct Redis call (project rule). The dispatcher may be
+// nil (dry runs, tests that do not care), in which case nothing is published.
+//
+// Runs outside any tenant context, so every query here names shop_id
+// explicitly where it matters and the interceptor does not apply.
+func (s *Service) BackfillRichText(ctx context.Context, apply bool, report func(BackfillItem)) (BackfillSummary, error) {
+	var sum BackfillSummary
+	emit := func(it BackfillItem) {
+		switch {
+		case it.Skipped != "":
+			sum.Skipped++
+		default:
+			sum.Checked++
+			if it.Changed {
+				sum.Changed++
+			}
+		}
+		if report != nil {
+			report(it)
+		}
+	}
+
+	shops, err := s.Client.Shop.Query().Order(entshop.ByID()).All(ctx)
+	if err != nil {
+		return sum, fmt.Errorf("cms: backfill: list shops: %w", err)
+	}
+	for _, sh := range shops {
+		if err := s.backfillShop(ctx, sh, apply, emit); err != nil {
+			return sum, err
+		}
+	}
+	return sum, nil
+}
+
+func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, emit func(BackfillItem)) error {
+	pages, err := s.Client.Page.Query().
+		Where(entpage.ShopIDEQ(sh.ID)).
+		Order(entpage.ByID()).
+		All(ctx)
+	if err != nil {
+		return fmt.Errorf("cms: backfill: list pages of shop %d: %w", sh.ID, err)
+	}
+	if sh.ThemeID == nil {
+		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "no theme applied"})
+		for _, p := range pages {
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "shop has no theme applied"})
+		}
+		return nil
+	}
+	theme, err := s.Client.Theme.Get(ctx, *sh.ThemeID)
+	if err != nil {
+		return fmt.Errorf("cms: backfill: load theme %d: %w", *sh.ThemeID, err)
+	}
+
+	// Shop global content.
+	clean, changed, err := SanitizeRichText(theme.ConfigSchema, sh.ContentJSON)
+	if err != nil {
+		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "unparseable content"})
+	} else {
+		if changed && apply {
+			if _, err := s.Client.Shop.UpdateOneID(sh.ID).SetContentJSON(clean).Save(ctx); err != nil {
+				return fmt.Errorf("cms: backfill: write shop %d: %w", sh.ID, err)
+			}
+			s.publish(ctx, events.ShopContentUpdated{ShopID: sh.ID})
+		}
+		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Changed: changed})
+	}
+
+	schemas := map[string]json.RawMessage{}
+	for _, p := range pages {
+		schema, ok := schemas[p.TypeKey]
+		if !ok {
+			tp, err := s.Client.ThemePage.Query().
+				Where(themepage.ThemeIDEQ(theme.ID), themepage.TypeKeyEQ(p.TypeKey)).
+				Only(ctx)
+			switch {
+			case ent.IsNotFound(err):
+				schema = nil
+			case err != nil:
+				return fmt.Errorf("cms: backfill: load theme page %s: %w", p.TypeKey, err)
+			default:
+				schema = tp.PageSchema
+			}
+			schemas[p.TypeKey] = schema
+		}
+		if schema == nil {
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "type_key not in current theme"})
+			continue
+		}
+		if err := s.backfillPage(ctx, p, schema, apply, emit); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) backfillPage(ctx context.Context, p *ent.Page, schema json.RawMessage, apply bool, emit func(BackfillItem)) error {
+	draft, draftChanged, err := SanitizeRichText(schema, p.ContentJSON)
+	if err != nil {
+		emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: p.ShopID, Field: "content_json", Skipped: "unparseable content"})
+		draftChanged = false
+	} else {
+		emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: p.ShopID, Field: "content_json", Changed: draftChanged})
+	}
+
+	var published json.RawMessage
+	publishedChanged := false
+	if len(p.PublishedJSON) > 0 && string(p.PublishedJSON) != "null" {
+		published, publishedChanged, err = SanitizeRichText(schema, p.PublishedJSON)
+		if err != nil {
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: p.ShopID, Field: "published_json", Skipped: "unparseable content"})
+			publishedChanged = false
+		} else {
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: p.ShopID, Field: "published_json", Changed: publishedChanged})
+		}
+	}
+
+	if !apply || (!draftChanged && !publishedChanged) {
+		return nil
+	}
+	upd := s.Client.Page.UpdateOneID(p.ID).Where(entpage.ShopIDEQ(p.ShopID))
+	if draftChanged {
+		upd.SetContentJSON(draft)
+	}
+	if publishedChanged {
+		upd.SetPublishedJSON(published)
+	}
+	if _, err := upd.Save(ctx); err != nil {
+		return fmt.Errorf("cms: backfill: write page %d: %w", p.ID, err)
+	}
+	if publishedChanged {
+		// Same event a publish emits: the render invalidator deletes the
+		// page's cache key, so the next render serves the sanitized snapshot.
+		s.publish(ctx, events.PagePublished{ShopID: p.ShopID, Slug: p.Slug})
+	}
+	return nil
+}
+
+func (s *Service) publish(ctx context.Context, e events.Event) {
+	if s.Dispatcher != nil {
+		s.Dispatcher.Publish(ctx, e)
+	}
+}

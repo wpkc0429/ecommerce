@@ -22,6 +22,7 @@ export function createContentView(ctx) {
     errBox.hidden = true;
     try {
       await api("PUT", `/admin/shops/${ctx.getShopID()}/content`, { content: collectForm(form) });
+      await load(); // 重新載入實際存下的值（rich text 可能已被消毒改寫）
       alert("已儲存，前台立即生效。");
     } catch (err) {
       showValidationErrors(form, errBox, err);

@@ -120,6 +120,46 @@ try {
   const headerText = await page.textContent("header");
   check("storefront header shows updated site title", headerText?.includes("E2E 招牌"), headerText ?? "");
 
+  // ── change cms-rich-text-sanitization：rich text 於寫入時消毒，前台不執行注入 ──
+  console.log("⑥b Rich text is sanitized on write and never executes on the storefront");
+  {
+    const tok = (await req("POST", "/api/v1/admin/auth/login", {
+      body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    })).json.access_token;
+    const list = await req("GET", "/api/v1/admin/shops/1/pages", { token: tok });
+    const home = (list.json?.pages ?? []).find((p) => p.slug === "home");
+    const cur = await req("GET", `/api/v1/admin/shops/1/pages/${home?.id}`, { token: tok });
+    const sections = [...(cur.json?.content_json?.sections ?? [])].filter((s) => s.type !== "rich_text");
+    sections.push({
+      type: "rich_text",
+      html: '<p id="rt-e2e">安全段落</p><img src="https://img.invalid/x.png" onerror="window.__xss=1">' +
+        '<script>window.__xss=2</script><a href="javascript:window.__xss=3">連結</a>' +
+        '<table><tr><td colspan="2">表格</td></tr></table>',
+    });
+    const put = await req("PUT", `/api/v1/admin/shops/1/pages/${home?.id}`, {
+      token: tok, body: { content: { sections } },
+    });
+    const stored = (put.json?.content_json?.sections ?? []).find((s) => s.type === "rich_text")?.html ?? "";
+    check("rich text save succeeds (rewrite, not reject)", put.status === 200, brief(put));
+    check("stored rich text has no onerror/script/javascript:",
+      !/onerror|<script|javascript:/i.test(stored), stored);
+    check("stored rich text keeps the table", stored.includes('colspan="2"'), stored);
+    const pub = await req("POST", `/api/v1/admin/shops/1/pages/${home?.id}/publish`, { token: tok });
+    check("publish after rich text edit", pub.status === 200, brief(pub));
+
+    await page.goto(`${WEB}/`);
+    await page.waitForSelector("table");
+    check("storefront renders the sanitized table", (await page.locator("td[colspan='2']").count()) === 1);
+    const injected = await page.evaluate(() => ({
+      xss: window.__xss,
+      onerror: document.querySelectorAll("[onerror]").length,
+      jsLinks: [...document.querySelectorAll("a[href]")].filter((a) => /^javascript:/i.test(a.getAttribute("href"))).length,
+    }));
+    check("no injected handler ran on the storefront", injected.xss === undefined, JSON.stringify(injected));
+    check("storefront DOM has no onerror attributes or javascript: links",
+      injected.onerror === 0 && injected.jsLinks === 0, JSON.stringify(injected));
+  }
+
   // ── 換版 → 前台反映新主題 ──
   console.log("⑦ Theme switch reflected on the storefront");
   // Create a second theme via the API (admin UI has no theme manager — 平台端).

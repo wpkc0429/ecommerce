@@ -300,9 +300,11 @@ func (s *Service) CreatePage(ctx context.Context, shopID int, in PageInput) (*en
 	if len(in.Content) == 0 {
 		in.Content = json.RawMessage("{}")
 	}
-	if err := ValidatePayload(schema, in.Content); err != nil {
+	content, err := validateAndSanitize(schema, in.Content)
+	if err != nil {
 		return nil, err
 	}
+	in.Content = content
 	if len(in.Meta) == 0 {
 		in.Meta = json.RawMessage("{}")
 	}
@@ -360,10 +362,11 @@ func (s *Service) UpdatePage(ctx context.Context, shopID, pageID int, in PageUpd
 		if err != nil {
 			return nil, err
 		}
-		if err := ValidatePayload(schema, in.Content); err != nil {
+		content, err := validateAndSanitize(schema, in.Content)
+		if err != nil {
 			return nil, err
 		}
-		upd.SetContentJSON(in.Content)
+		upd.SetContentJSON(content)
 	}
 	if len(in.Meta) > 0 {
 		upd.SetMeta(in.Meta)
@@ -388,6 +391,10 @@ func (s *Service) PublishPage(ctx context.Context, shopID, pageID int) (*ent.Pag
 	if err != nil {
 		return nil, err
 	}
+	// No sanitization here: content_json was sanitized when it was written
+	// (CreatePage/UpdatePage), and publishing copies it verbatim — publish is
+	// not new user input (change cms-rich-text-sanitization, task 2.3). Rows
+	// written before that change are covered by cmd/sanitize-content.
 	if err := ValidatePayload(schema, p.ContentJSON); err != nil {
 		return nil, err
 	}
@@ -511,7 +518,8 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 	if len(content) == 0 {
 		content = json.RawMessage("{}")
 	}
-	if err := ValidatePayload(theme.ConfigSchema, content); err != nil {
+	content, err = validateAndSanitize(theme.ConfigSchema, content)
+	if err != nil {
 		return nil, err
 	}
 	shop, err = shop.Update().SetContentJSON(content).Save(ctx)
