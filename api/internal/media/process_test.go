@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
+	"math"
 	"testing"
 
+	gwebp "github.com/gen2brain/webp"
 	xwebp "golang.org/x/image/webp"
 )
 
@@ -160,5 +163,70 @@ func TestProcessAcceptsWebPInput(t *testing.T) {
 	}
 	if variantMap(t, again)["large"].Width != 500 {
 		t.Error("WebP round trip changed size")
+	}
+}
+
+// Regression: x/image/webp returns raw studio-swing VP8 planes in a Go
+// (full-range) YCbCr, so decoding a WebP and re-encoding it used to squeeze the
+// tonal range (black 0 -> 16, white 255 -> ~235): every uploaded WebP came out
+// visibly grayer. The check compares the raw planes of input and output, which
+// is independent of how a decoder converts to RGB: a faithful re-encode keeps
+// the Y/Cb/Cr statistics, the bug scaled Y by 219/255.
+func TestProcessWebPInputKeepsTonalRange(t *testing.T) {
+	src := image.NewNRGBA(image.Rect(0, 0, 256, 256))
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 256; x++ {
+			var c color.NRGBA
+			switch {
+			case x < 64:
+				c = color.NRGBA{0, 0, 0, 255}
+			case x < 128:
+				c = color.NRGBA{255, 255, 255, 255}
+			case x < 192:
+				c = color.NRGBA{200, 60, 60, 255}
+			default:
+				c = color.NRGBA{uint8(y), uint8(y), uint8(y), 255}
+			}
+			src.SetNRGBA(x, y, c)
+		}
+	}
+	var in bytes.Buffer
+	if err := gwebp.Encode(&in, src, gwebp.Options{Quality: 95}); err != nil {
+		t.Fatal(err)
+	}
+	vs, err := Process(in.Bytes(), testOpt)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rawStats := func(b []byte) (y, cb, cr float64, ymax uint8) {
+		img, err := xwebp.Decode(bytes.NewReader(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		p, ok := img.(*image.YCbCr)
+		if !ok {
+			t.Fatalf("decoded %T, want *image.YCbCr", img)
+		}
+		for _, v := range p.Y {
+			y += float64(v)
+			if v > ymax {
+				ymax = v
+			}
+		}
+		for i := range p.Cb {
+			cb += float64(p.Cb[i])
+			cr += float64(p.Cr[i])
+		}
+		return y / float64(len(p.Y)), cb / float64(len(p.Cb)), cr / float64(len(p.Cr)), ymax
+	}
+	iy, icb, icr, imax := rawStats(in.Bytes())
+	for _, v := range vs {
+		oy, ocb, ocr, omax := rawStats(v.Data)
+		if math.Abs(oy-iy) > 3 || math.Abs(ocb-icb) > 3 || math.Abs(ocr-icr) > 3 {
+			t.Errorf("%s: mean Y/Cb/Cr %.1f/%.1f/%.1f, input %.1f/%.1f/%.1f (tonal range shifted)", v.Name, oy, ocb, ocr, iy, icb, icr)
+		}
+		if int(imax)-int(omax) > 4 {
+			t.Errorf("%s: max Y %d, input %d (highlights clipped down)", v.Name, omax, imax)
+		}
 	}
 }

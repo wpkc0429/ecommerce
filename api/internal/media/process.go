@@ -127,8 +127,67 @@ func decode(kind string, data []byte) (image.Image, error) {
 	case "png":
 		return png.Decode(r)
 	default:
-		return xwebp.Decode(r)
+		img, err := xwebp.Decode(r)
+		if err != nil {
+			return nil, err
+		}
+		return webpToNRGBA(img), nil
 	}
+}
+
+// webpToNRGBA converts the planes golang.org/x/image/webp hands back into RGB
+// with the range VP8 actually uses. x/image/webp returns the raw VP8 planes in
+// an image.YCbCr / image.NYCbCrA, but those Go types are defined as full-range
+// (JFIF) while VP8 is studio swing (BT.601, Y 16-235, C 16-240). Calling At()
+// on them skips the range expansion: blacks sit at 16, whites at ~235 and
+// everything looks gray. Re-encoding that result bakes the compression in, so
+// every WebP upload came out grayer than the original. Lossless WebPs already
+// decode to NRGBA and pass through untouched.
+func webpToNRGBA(img image.Image) image.Image {
+	var y *image.YCbCr
+	var alpha []uint8
+	var astride int
+	switch v := img.(type) {
+	case *image.YCbCr:
+		y = v
+	case *image.NYCbCrA:
+		y = &v.YCbCr
+		alpha, astride = v.A, v.AStride
+	default:
+		return img
+	}
+	b := y.Rect
+	dst := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	const ky, kc = 255.0 / 219.0, 255.0 / 224.0
+	for py := 0; py < b.Dy(); py++ {
+		for px := 0; px < b.Dx(); px++ {
+			yi := y.YOffset(b.Min.X+px, b.Min.Y+py)
+			ci := y.COffset(b.Min.X+px, b.Min.Y+py)
+			yy := (float64(y.Y[yi]) - 16) * ky
+			cb := (float64(y.Cb[ci]) - 128) * kc
+			cr := (float64(y.Cr[ci]) - 128) * kc
+			a := uint8(255)
+			if alpha != nil {
+				a = alpha[py*astride+px]
+			}
+			o := dst.PixOffset(px, py)
+			dst.Pix[o+0] = clamp8(yy + 1.402*cr)
+			dst.Pix[o+1] = clamp8(yy - 0.344136*cb - 0.714136*cr)
+			dst.Pix[o+2] = clamp8(yy + 1.772*cb)
+			dst.Pix[o+3] = a
+		}
+	}
+	return dst
+}
+
+func clamp8(v float64) uint8 {
+	switch {
+	case v <= 0:
+		return 0
+	case v >= 255:
+		return 255
+	}
+	return uint8(v + 0.5)
 }
 
 // fitWithin returns src scaled so its long edge is at most max (never
