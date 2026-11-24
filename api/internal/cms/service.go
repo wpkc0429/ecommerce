@@ -34,6 +34,28 @@ var reservedSlugs = map[string]bool{
 type Service struct {
 	Client     *ent.Client
 	Dispatcher *events.Dispatcher
+
+	// imagePrefixes are the URL prefixes (each ending in "/") that CMS image
+	// fields and rich text <img src> may use (change product-images-r2, design
+	// D7). Empty = media not configured = rule not applied. Unexported on
+	// purpose: it is legitimately empty in a deployment without media, which
+	// the wiring audit would otherwise report as an unwired dependency.
+	imagePrefixes []string
+}
+
+// RestrictImageDomain turns on the image-domain rule with the given prefixes
+// (a trailing "/" is added when missing). Call once at wiring time.
+func (s *Service) RestrictImageDomain(prefixes ...string) {
+	s.imagePrefixes = nil
+	for _, p := range prefixes {
+		if p == "" {
+			continue
+		}
+		if !strings.HasSuffix(p, "/") {
+			p += "/"
+		}
+		s.imagePrefixes = append(s.imagePrefixes, p)
+	}
 }
 
 // ── themes (platform) ─────────────────────────────────────────────
@@ -300,7 +322,7 @@ func (s *Service) CreatePage(ctx context.Context, shopID int, in PageInput) (*en
 	if len(in.Content) == 0 {
 		in.Content = json.RawMessage("{}")
 	}
-	content, err := validateAndSanitize(schema, in.Content)
+	content, err := s.validateAndSanitize(schema, in.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +384,7 @@ func (s *Service) UpdatePage(ctx context.Context, shopID, pageID int, in PageUpd
 		if err != nil {
 			return nil, err
 		}
-		content, err := validateAndSanitize(schema, in.Content)
+		content, err := s.validateAndSanitize(schema, in.Content)
 		if err != nil {
 			return nil, err
 		}
@@ -518,7 +540,7 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 	if len(content) == 0 {
 		content = json.RawMessage("{}")
 	}
-	content, err = validateAndSanitize(theme.ConfigSchema, content)
+	content, err = s.validateAndSanitize(theme.ConfigSchema, content)
 	if err != nil {
 		return nil, err
 	}

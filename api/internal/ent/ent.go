@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -22,6 +23,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -111,6 +113,7 @@ func checkColumn(t, c string) error {
 			cartitem.Table:                      cartitem.ValidColumn,
 			category.Table:                      category.ValidColumn,
 			checkoutidempotencykey.Table:        checkoutidempotencykey.ValidColumn,
+			mediaupload.Table:                   mediaupload.ValidColumn,
 			member.Table:                        member.ValidColumn,
 			memberrefreshtoken.Table:            memberrefreshtoken.ValidColumn,
 			membertier.Table:                    membertier.ValidColumn,
@@ -123,6 +126,7 @@ func checkColumn(t, c string) error {
 			pointtransaction.Table:              pointtransaction.ValidColumn,
 			product.Table:                       product.ValidColumn,
 			productcategory.Table:               productcategory.ValidColumn,
+			productimage.Table:                  productimage.ValidColumn,
 			productsku.Table:                    productsku.ValidColumn,
 			publishablekey.Table:                publishablekey.ValidColumn,
 			role.Table:                          role.ValidColumn,

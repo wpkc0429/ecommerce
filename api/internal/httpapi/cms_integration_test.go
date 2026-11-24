@@ -34,6 +34,7 @@ type cmsEnv struct {
 	router http.Handler
 	issuer *auth.TokenIssuer
 
+	cms    *cms.Service
 	admin  int // platform super admin (from seed)
 	shopID int // demo shop bound to demo.localhost
 	homeID int // auto-created draft home page
@@ -82,6 +83,7 @@ func newCMSEnv(t *testing.T) *cmsEnv {
 	engine := rbac.NewEngine(client, rdb, log)
 	authz := &httpapi.AuthzMW{Engine: engine}
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
+	e.cms = cmsService
 
 	e.router = httpapi.New(httpapi.Deps{
 		Cfg:     cfg,

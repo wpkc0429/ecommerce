@@ -49,13 +49,15 @@ type ProductEdges struct {
 	Shop *Shop `json:"shop,omitempty"`
 	// Skus holds the value of the skus edge.
 	Skus []*ProductSKU `json:"skus,omitempty"`
+	// Images holds the value of the images edge.
+	Images []*ProductImage `json:"images,omitempty"`
 	// Categories holds the value of the categories edge.
 	Categories []*Category `json:"categories,omitempty"`
 	// ProductCategories holds the value of the product_categories edge.
 	ProductCategories []*ProductCategory `json:"product_categories,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // ShopOrErr returns the Shop value or an error if the edge
@@ -78,10 +80,19 @@ func (e ProductEdges) SkusOrErr() ([]*ProductSKU, error) {
 	return nil, &NotLoadedError{edge: "skus"}
 }
 
+// ImagesOrErr returns the Images value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductEdges) ImagesOrErr() ([]*ProductImage, error) {
+	if e.loadedTypes[2] {
+		return e.Images, nil
+	}
+	return nil, &NotLoadedError{edge: "images"}
+}
+
 // CategoriesOrErr returns the Categories value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductEdges) CategoriesOrErr() ([]*Category, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[3] {
 		return e.Categories, nil
 	}
 	return nil, &NotLoadedError{edge: "categories"}
@@ -90,7 +101,7 @@ func (e ProductEdges) CategoriesOrErr() ([]*Category, error) {
 // ProductCategoriesOrErr returns the ProductCategories value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductEdges) ProductCategoriesOrErr() ([]*ProductCategory, error) {
-	if e.loadedTypes[3] {
+	if e.loadedTypes[4] {
 		return e.ProductCategories, nil
 	}
 	return nil, &NotLoadedError{edge: "product_categories"}
@@ -207,6 +218,11 @@ func (_m *Product) QueryShop() *ShopQuery {
 // QuerySkus queries the "skus" edge of the Product entity.
 func (_m *Product) QuerySkus() *ProductSKUQuery {
 	return NewProductClient(_m.config).QuerySkus(_m)
+}
+
+// QueryImages queries the "images" edge of the Product entity.
+func (_m *Product) QueryImages() *ProductImageQuery {
+	return NewProductClient(_m.config).QueryImages(_m)
 }
 
 // QueryCategories queries the "categories" edge of the Product entity.

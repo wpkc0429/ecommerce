@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -27,6 +28,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -51,6 +53,7 @@ import (
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/google/uuid"
 
 	stdsql "database/sql"
 )
@@ -68,6 +71,8 @@ type Client struct {
 	Category *CategoryClient
 	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
 	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
+	// MediaUpload is the client for interacting with the MediaUpload builders.
+	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
@@ -92,6 +97,8 @@ type Client struct {
 	Product *ProductClient
 	// ProductCategory is the client for interacting with the ProductCategory builders.
 	ProductCategory *ProductCategoryClient
+	// ProductImage is the client for interacting with the ProductImage builders.
+	ProductImage *ProductImageClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
 	// PublishableKey is the client for interacting with the PublishableKey builders.
@@ -145,6 +152,7 @@ func (c *Client) init() {
 	c.CartItem = NewCartItemClient(c.config)
 	c.Category = NewCategoryClient(c.config)
 	c.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(c.config)
+	c.MediaUpload = NewMediaUploadClient(c.config)
 	c.Member = NewMemberClient(c.config)
 	c.MemberRefreshToken = NewMemberRefreshTokenClient(c.config)
 	c.MemberTier = NewMemberTierClient(c.config)
@@ -157,6 +165,7 @@ func (c *Client) init() {
 	c.PointTransaction = NewPointTransactionClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductCategory = NewProductCategoryClient(c.config)
+	c.ProductImage = NewProductImageClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
 	c.PublishableKey = NewPublishableKeyClient(c.config)
 	c.Role = NewRoleClient(c.config)
@@ -272,6 +281,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
 		MemberTier:                    NewMemberTierClient(cfg),
@@ -284,6 +294,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PointTransaction:              NewPointTransactionClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductCategory:               NewProductCategoryClient(cfg),
+		ProductImage:                  NewProductImageClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		PublishableKey:                NewPublishableKeyClient(cfg),
 		Role:                          NewRoleClient(cfg),
@@ -326,6 +337,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
 		MemberTier:                    NewMemberTierClient(cfg),
@@ -338,6 +350,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PointTransaction:              NewPointTransactionClient(cfg),
 		Product:                       NewProductClient(cfg),
 		ProductCategory:               NewProductCategoryClient(cfg),
+		ProductImage:                  NewProductImageClient(cfg),
 		ProductSKU:                    NewProductSKUClient(cfg),
 		PublishableKey:                NewPublishableKeyClient(cfg),
 		Role:                          NewRoleClient(cfg),
@@ -386,13 +399,14 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
-		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
-		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop,
-		c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser, c.Site,
-		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.MediaUpload,
+		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
+		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
+		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
+		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential,
+		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -402,13 +416,14 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
-		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
-		c.ProductCategory, c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission,
-		c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop,
-		c.ShopAllowedOrigin, c.ShopPaymentProviderCredential, c.ShopUser, c.Site,
-		c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission, c.UserRefreshToken,
+		c.Cart, c.CartItem, c.Category, c.CheckoutIdempotencyKey, c.MediaUpload,
+		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
+		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
+		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
+		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopPaymentProviderCredential,
+		c.ShopUser, c.Site, c.SiteShop, c.Theme, c.ThemePage, c.User, c.UserPermission,
+		c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -425,6 +440,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Category.mutate(ctx, m)
 	case *CheckoutIdempotencyKeyMutation:
 		return c.CheckoutIdempotencyKey.mutate(ctx, m)
+	case *MediaUploadMutation:
+		return c.MediaUpload.mutate(ctx, m)
 	case *MemberMutation:
 		return c.Member.mutate(ctx, m)
 	case *MemberRefreshTokenMutation:
@@ -449,6 +466,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Product.mutate(ctx, m)
 	case *ProductCategoryMutation:
 		return c.ProductCategory.mutate(ctx, m)
+	case *ProductImageMutation:
+		return c.ProductImage.mutate(ctx, m)
 	case *ProductSKUMutation:
 		return c.ProductSKU.mutate(ctx, m)
 	case *PublishableKeyMutation:
@@ -1213,6 +1232,155 @@ func (c *CheckoutIdempotencyKeyClient) mutate(ctx context.Context, m *CheckoutId
 		return (&CheckoutIdempotencyKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CheckoutIdempotencyKey mutation op: %q", m.Op())
+	}
+}
+
+// MediaUploadClient is a client for the MediaUpload schema.
+type MediaUploadClient struct {
+	config
+}
+
+// NewMediaUploadClient returns a client for the MediaUpload from the given config.
+func NewMediaUploadClient(c config) *MediaUploadClient {
+	return &MediaUploadClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `mediaupload.Hooks(f(g(h())))`.
+func (c *MediaUploadClient) Use(hooks ...Hook) {
+	c.hooks.MediaUpload = append(c.hooks.MediaUpload, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `mediaupload.Intercept(f(g(h())))`.
+func (c *MediaUploadClient) Intercept(interceptors ...Interceptor) {
+	c.inters.MediaUpload = append(c.inters.MediaUpload, interceptors...)
+}
+
+// Create returns a builder for creating a MediaUpload entity.
+func (c *MediaUploadClient) Create() *MediaUploadCreate {
+	mutation := newMediaUploadMutation(c.config, OpCreate)
+	return &MediaUploadCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of MediaUpload entities.
+func (c *MediaUploadClient) CreateBulk(builders ...*MediaUploadCreate) *MediaUploadCreateBulk {
+	return &MediaUploadCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *MediaUploadClient) MapCreateBulk(slice any, setFunc func(*MediaUploadCreate, int)) *MediaUploadCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &MediaUploadCreateBulk{err: fmt.Errorf("calling to MediaUploadClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*MediaUploadCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &MediaUploadCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for MediaUpload.
+func (c *MediaUploadClient) Update() *MediaUploadUpdate {
+	mutation := newMediaUploadMutation(c.config, OpUpdate)
+	return &MediaUploadUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *MediaUploadClient) UpdateOne(_m *MediaUpload) *MediaUploadUpdateOne {
+	mutation := newMediaUploadMutation(c.config, OpUpdateOne, withMediaUpload(_m))
+	return &MediaUploadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *MediaUploadClient) UpdateOneID(id uuid.UUID) *MediaUploadUpdateOne {
+	mutation := newMediaUploadMutation(c.config, OpUpdateOne, withMediaUploadID(id))
+	return &MediaUploadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for MediaUpload.
+func (c *MediaUploadClient) Delete() *MediaUploadDelete {
+	mutation := newMediaUploadMutation(c.config, OpDelete)
+	return &MediaUploadDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *MediaUploadClient) DeleteOne(_m *MediaUpload) *MediaUploadDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *MediaUploadClient) DeleteOneID(id uuid.UUID) *MediaUploadDeleteOne {
+	builder := c.Delete().Where(mediaupload.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &MediaUploadDeleteOne{builder}
+}
+
+// Query returns a query builder for MediaUpload.
+func (c *MediaUploadClient) Query() *MediaUploadQuery {
+	return &MediaUploadQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeMediaUpload},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a MediaUpload entity by its id.
+func (c *MediaUploadClient) Get(ctx context.Context, id uuid.UUID) (*MediaUpload, error) {
+	return c.Query().Where(mediaupload.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *MediaUploadClient) GetX(ctx context.Context, id uuid.UUID) *MediaUpload {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a MediaUpload.
+func (c *MediaUploadClient) QueryShop(_m *MediaUpload) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(mediaupload.Table, mediaupload.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, mediaupload.ShopTable, mediaupload.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *MediaUploadClient) Hooks() []Hook {
+	return c.hooks.MediaUpload
+}
+
+// Interceptors returns the client interceptors.
+func (c *MediaUploadClient) Interceptors() []Interceptor {
+	return c.inters.MediaUpload
+}
+
+func (c *MediaUploadClient) mutate(ctx context.Context, m *MediaUploadMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&MediaUploadCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&MediaUploadUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&MediaUploadUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&MediaUploadDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown MediaUpload mutation op: %q", m.Op())
 	}
 }
 
@@ -3038,6 +3206,22 @@ func (c *ProductClient) QuerySkus(_m *Product) *ProductSKUQuery {
 	return query
 }
 
+// QueryImages queries the images edge of a Product.
+func (c *ProductClient) QueryImages(_m *Product) *ProductImageQuery {
+	query := (&ProductImageClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, id),
+			sqlgraph.To(productimage.Table, productimage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.ImagesTable, product.ImagesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryCategories queries the categories edge of a Product.
 func (c *ProductClient) QueryCategories(_m *Product) *CategoryQuery {
 	query := (&CategoryClient{config: c.config}).Query()
@@ -3215,6 +3399,171 @@ func (c *ProductCategoryClient) mutate(ctx context.Context, m *ProductCategoryMu
 		return (&ProductCategoryDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ProductCategory mutation op: %q", m.Op())
+	}
+}
+
+// ProductImageClient is a client for the ProductImage schema.
+type ProductImageClient struct {
+	config
+}
+
+// NewProductImageClient returns a client for the ProductImage from the given config.
+func NewProductImageClient(c config) *ProductImageClient {
+	return &ProductImageClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productimage.Hooks(f(g(h())))`.
+func (c *ProductImageClient) Use(hooks ...Hook) {
+	c.hooks.ProductImage = append(c.hooks.ProductImage, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productimage.Intercept(f(g(h())))`.
+func (c *ProductImageClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductImage = append(c.inters.ProductImage, interceptors...)
+}
+
+// Create returns a builder for creating a ProductImage entity.
+func (c *ProductImageClient) Create() *ProductImageCreate {
+	mutation := newProductImageMutation(c.config, OpCreate)
+	return &ProductImageCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductImage entities.
+func (c *ProductImageClient) CreateBulk(builders ...*ProductImageCreate) *ProductImageCreateBulk {
+	return &ProductImageCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductImageClient) MapCreateBulk(slice any, setFunc func(*ProductImageCreate, int)) *ProductImageCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductImageCreateBulk{err: fmt.Errorf("calling to ProductImageClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductImageCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductImageCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductImage.
+func (c *ProductImageClient) Update() *ProductImageUpdate {
+	mutation := newProductImageMutation(c.config, OpUpdate)
+	return &ProductImageUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductImageClient) UpdateOne(_m *ProductImage) *ProductImageUpdateOne {
+	mutation := newProductImageMutation(c.config, OpUpdateOne, withProductImage(_m))
+	return &ProductImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductImageClient) UpdateOneID(id int) *ProductImageUpdateOne {
+	mutation := newProductImageMutation(c.config, OpUpdateOne, withProductImageID(id))
+	return &ProductImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductImage.
+func (c *ProductImageClient) Delete() *ProductImageDelete {
+	mutation := newProductImageMutation(c.config, OpDelete)
+	return &ProductImageDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductImageClient) DeleteOne(_m *ProductImage) *ProductImageDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductImageClient) DeleteOneID(id int) *ProductImageDeleteOne {
+	builder := c.Delete().Where(productimage.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductImageDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductImage.
+func (c *ProductImageClient) Query() *ProductImageQuery {
+	return &ProductImageQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductImage},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductImage entity by its id.
+func (c *ProductImageClient) Get(ctx context.Context, id int) (*ProductImage, error) {
+	return c.Query().Where(productimage.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductImageClient) GetX(ctx context.Context, id int) *ProductImage {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryShop queries the shop edge of a ProductImage.
+func (c *ProductImageClient) QueryShop(_m *ProductImage) *ShopQuery {
+	query := (&ShopClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productimage.Table, productimage.FieldID, id),
+			sqlgraph.To(shop.Table, shop.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productimage.ShopTable, productimage.ShopColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProduct queries the product edge of a ProductImage.
+func (c *ProductImageClient) QueryProduct(_m *ProductImage) *ProductQuery {
+	query := (&ProductClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productimage.Table, productimage.FieldID, id),
+			sqlgraph.To(product.Table, product.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productimage.ProductTable, productimage.ProductColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductImageClient) Hooks() []Hook {
+	return c.hooks.ProductImage
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductImageClient) Interceptors() []Interceptor {
+	return c.inters.ProductImage
+}
+
+func (c *ProductImageClient) mutate(ctx context.Context, m *ProductImageMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductImageCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductImageUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductImageUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductImageDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductImage mutation op: %q", m.Op())
 	}
 }
 
@@ -6306,20 +6655,22 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Cart, CartItem, Category, CheckoutIdempotencyKey, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
-		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
-		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Hook
+		Cart, CartItem, Category, CheckoutIdempotencyKey, MediaUpload, Member,
+		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
+		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
+		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
+		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopPaymentProviderCredential, ShopUser, Site, SiteShop, Theme, ThemePage,
+		User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
-		Cart, CartItem, Category, CheckoutIdempotencyKey, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
-		PointTransaction, Product, ProductCategory, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopPaymentProviderCredential, ShopUser, Site, SiteShop,
-		Theme, ThemePage, User, UserPermission, UserRefreshToken []ent.Interceptor
+		Cart, CartItem, Category, CheckoutIdempotencyKey, MediaUpload, Member,
+		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
+		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
+		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
+		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopPaymentProviderCredential, ShopUser, Site, SiteShop, Theme, ThemePage,
+		User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

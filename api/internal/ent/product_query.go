@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"math"
@@ -30,6 +31,7 @@ type ProductQuery struct {
 	predicates            []predicate.Product
 	withShop              *ShopQuery
 	withSkus              *ProductSKUQuery
+	withImages            *ProductImageQuery
 	withCategories        *CategoryQuery
 	withProductCategories *ProductCategoryQuery
 	modifiers             []func(*sql.Selector)
@@ -106,6 +108,28 @@ func (_q *ProductQuery) QuerySkus() *ProductSKUQuery {
 			sqlgraph.From(product.Table, product.FieldID, selector),
 			sqlgraph.To(productsku.Table, productsku.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, product.SkusTable, product.SkusColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryImages chains the current query on the "images" edge.
+func (_q *ProductQuery) QueryImages() *ProductImageQuery {
+	query := (&ProductImageClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(product.Table, product.FieldID, selector),
+			sqlgraph.To(productimage.Table, productimage.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, product.ImagesTable, product.ImagesColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -351,6 +375,7 @@ func (_q *ProductQuery) Clone() *ProductQuery {
 		predicates:            append([]predicate.Product{}, _q.predicates...),
 		withShop:              _q.withShop.Clone(),
 		withSkus:              _q.withSkus.Clone(),
+		withImages:            _q.withImages.Clone(),
 		withCategories:        _q.withCategories.Clone(),
 		withProductCategories: _q.withProductCategories.Clone(),
 		// clone intermediate query.
@@ -379,6 +404,17 @@ func (_q *ProductQuery) WithSkus(opts ...func(*ProductSKUQuery)) *ProductQuery {
 		opt(query)
 	}
 	_q.withSkus = query
+	return _q
+}
+
+// WithImages tells the query-builder to eager-load the nodes that are connected to
+// the "images" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductQuery) WithImages(opts ...func(*ProductImageQuery)) *ProductQuery {
+	query := (&ProductImageClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withImages = query
 	return _q
 }
 
@@ -482,9 +518,10 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 	var (
 		nodes       = []*Product{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withShop != nil,
 			_q.withSkus != nil,
+			_q.withImages != nil,
 			_q.withCategories != nil,
 			_q.withProductCategories != nil,
 		}
@@ -520,6 +557,13 @@ func (_q *ProductQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Prod
 		if err := _q.loadSkus(ctx, query, nodes,
 			func(n *Product) { n.Edges.Skus = []*ProductSKU{} },
 			func(n *Product, e *ProductSKU) { n.Edges.Skus = append(n.Edges.Skus, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withImages; query != nil {
+		if err := _q.loadImages(ctx, query, nodes,
+			func(n *Product) { n.Edges.Images = []*ProductImage{} },
+			func(n *Product, e *ProductImage) { n.Edges.Images = append(n.Edges.Images, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -584,6 +628,36 @@ func (_q *ProductQuery) loadSkus(ctx context.Context, query *ProductSKUQuery, no
 	}
 	query.Where(predicate.ProductSKU(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(product.SkusColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "product_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductQuery) loadImages(ctx context.Context, query *ProductImageQuery, nodes []*Product, init func(*Product), assign func(*Product, *ProductImage)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*Product)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productimage.FieldProductID)
+	}
+	query.Where(predicate.ProductImage(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(product.ImagesColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

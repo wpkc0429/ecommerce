@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"time"
@@ -138,6 +139,21 @@ func (_c *ProductCreate) AddSkus(v ...*ProductSKU) *ProductCreate {
 		ids[i] = v[i].ID
 	}
 	return _c.AddSkuIDs(ids...)
+}
+
+// AddImageIDs adds the "images" edge to the ProductImage entity by IDs.
+func (_c *ProductCreate) AddImageIDs(ids ...int) *ProductCreate {
+	_c.mutation.AddImageIDs(ids...)
+	return _c
+}
+
+// AddImages adds the "images" edges to the ProductImage entity.
+func (_c *ProductCreate) AddImages(v ...*ProductImage) *ProductCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddImageIDs(ids...)
 }
 
 // AddCategoryIDs adds the "categories" edge to the Category entity by IDs.
@@ -343,6 +359,22 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ImagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

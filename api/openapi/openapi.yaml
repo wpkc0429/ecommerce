@@ -140,6 +140,8 @@ tags:
     description: 商家層交易（訂單、付款紀錄、運送方式、出貨、會員等級與點數）。
   - name: admin-client
     description: 商家層前端接入（publishable keys、允許的瀏覽器 origin）。
+  - name: admin-media
+    description: 商家層媒體（上傳意圖、商品圖片、CMS 內容圖片）。
   - name: admin-rbac
     description: 商家層使用者與角色指派。
 
@@ -323,6 +325,11 @@ components:
                   details:
                     - pointer: /items/1/gift_message
                       message: "must be at most 500 characters"
+    MediaNotConfigured:
+      description: 媒體儲存（R2／MinIO）未設定。`code = media_not_configured`；路由照常存在，只是不可用。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     TooManyRequests:
       description: |
         超過速率限制。`code = rate_limited`，附 `Retry-After`（整數秒，最小 1）。
@@ -497,7 +504,7 @@ components:
     Product:
       type: object
       additionalProperties: false
-      required: [id, shop_id, title, slug, subtitle, description, status, meta, updated_at]
+      required: [id, shop_id, title, slug, subtitle, description, status, meta, updated_at, images]
       description: |
         商品。公開端點與後台端點回傳**同一個形狀**，差別只在公開端點僅回傳
         `status = 1`（已發佈）的商品。
@@ -540,6 +547,79 @@ components:
             `category_ids` 的展開（`{id, slug, name}`），同樣依分類 `position`、`id` 遞增。
             前台用它顯示分類名稱與連結，不必另外查分類樹。
           items: { $ref: '#/components/schemas/CategorySummary' }
+        images:
+          type: array
+          description: |
+            商品圖片，**依 `position`、`id` 遞增**。**永遠存在**：無圖片或媒體未設定時為 `[]`
+            （不會缺鍵或為 `null`）。圖片是子資源，不能經由商品 PUT 修改。
+          items: { $ref: '#/components/schemas/ProductImage' }
+
+    ProductImage:
+      type: object
+      additionalProperties: false
+      required: [id, alt, position, width, height, urls]
+      description: |
+        商品圖片。`urls` 於回應時由 `IMAGE_PUBLIC_BASE_URL` 與儲存鍵組成（資料庫只存鍵），
+        內容不可變，可長期快取（`Cache-Control: immutable`）。
+      properties:
+        id: { type: integer }
+        alt: { type: string, maxLength: 300 }
+        position: { type: integer, minimum: 0 }
+        width: { type: integer, description: "`large` 變體的實際寬度（像素）。" }
+        height: { type: integer, description: "`large` 變體的實際高度（像素）。" }
+        urls: { $ref: '#/components/schemas/ImageUrls' }
+
+    ImageUrls:
+      type: object
+      additionalProperties: false
+      required: [thumb, large]
+      properties:
+        thumb: { type: string, format: uri, description: 長邊 ≤ 480 的 WebP。 }
+        large: { type: string, format: uri, description: 長邊 ≤ 1600 的 WebP。 }
+
+    ProductImageList:
+      type: object
+      additionalProperties: false
+      required: [images]
+      properties:
+        images:
+          type: array
+          items: { $ref: '#/components/schemas/ProductImage' }
+
+    MediaUpload:
+      type: object
+      additionalProperties: false
+      required: [upload_id, upload_url, headers, expires_at]
+      properties:
+        upload_id: { type: string, format: uuid }
+        upload_url: { type: string, format: uri, description: Presigned PUT 網址（簽入 Content-Type 與 Content-Length）。 }
+        headers:
+          type: object
+          additionalProperties: { type: string }
+          description: PUT 時必須原樣帶上的標頭（至少 `Content-Type`）。
+        expires_at: { type: string, format: date-time }
+
+    ContentImage:
+      type: object
+      additionalProperties: false
+      required: [urls, width, height]
+      properties:
+        urls: { $ref: '#/components/schemas/ImageUrls' }
+        width: { type: integer }
+        height: { type: integer }
+
+    MediaConfig:
+      type: object
+      additionalProperties: false
+      required: [enabled, public_base_url, max_bytes, accepted_types, max_images_per_product]
+      properties:
+        enabled: { type: boolean }
+        public_base_url: { type: string, description: 影像網域（無結尾斜線）；未啟用時為空字串。 }
+        max_bytes: { type: integer, description: 單檔位元組上限（預設 15 MiB）。 }
+        accepted_types:
+          type: array
+          items: { type: string }
+        max_images_per_product: { type: integer }
 
     ProductPage:
       type: object
@@ -4722,6 +4802,251 @@ paths:
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  # ═══════════════════════ 商家層：商品圖片與媒體（change product-images-r2）═══════════════════════
+  /api/v1/admin/media/config:
+    get:
+      tags: [admin-media]
+      operationId: getMediaConfig
+      summary: 媒體儲存是否已設定
+      description: |
+        已認證即可。admin 前端依 `enabled` 決定是否顯示上傳控件。未設定時 `enabled=false`、
+        `public_base_url=""`；此端點本身永遠是 200。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 媒體設定摘要。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaConfig' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/admin/shops/{shopID}/media/uploads:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [admin-media]
+      operationId: createMediaUpload
+      summary: 建立上傳意圖並取得 presigned PUT 網址
+      description: |
+        `purpose=product_image` 需要 `product.edit`，`content_image` 需要 `page.edit`（在處理器內依 body 判定）。
+
+        流程：本端點 → 瀏覽器以 `headers` 原樣 `PUT upload_url`（body 為檔案本身，
+        大小必須等於 `size_bytes`）→ `POST .../products/{productID}/images` 或
+        `POST .../media/content-images`。網址 10 分鐘內有效。
+
+        伺服器只接受 `image/jpeg`、`image/png`、`image/webp`；**HEIC/HEIF 回 422**，
+        前端必須先在瀏覽器內轉成 JPEG。未設定媒體儲存時回 503 `media_not_configured`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [content_type, size_bytes, purpose]
+              properties:
+                content_type: { type: string, enum: [image/jpeg, image/png, image/webp] }
+                size_bytes: { type: integer, minimum: 1, description: 檔案位元組數；上限 15 MiB。 }
+                purpose: { type: string, enum: [product_image, content_image] }
+      responses:
+        "201":
+          description: 上傳意圖。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MediaUpload' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+
+  /api/v1/admin/shops/{shopID}/media/content-images:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [admin-media]
+      operationId: createContentImage
+      summary: 把已上傳的檔案轉成 CMS 內容圖片
+      description: |
+        需要 `page.edit`。與商品圖片相同的轉檔管線（thumb 480／large 1600，WebP），
+        但不建立資料列；回傳的 `urls.large` 就是填進 CMS `x-editor: image` 欄位的值。
+        `upload_id` 必須是 `purpose=content_image` 的意圖；重用回 409。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [upload_id]
+              properties:
+                upload_id: { type: string, format: uuid }
+      responses:
+        "201":
+          description: 兩個變體的公開網址與 large 的實際尺寸。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentImage' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+
+  /api/v1/admin/shops/{shopID}/products/{productID}/images:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: productID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-media]
+      operationId: listProductImages
+      summary: 列出商品圖片
+      description: 需要 `product.view`。依 `position`、`id` 遞增。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 圖片集合。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImageList' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+    post:
+      tags: [admin-media]
+      operationId: createProductImage
+      summary: 由上傳意圖建立商品圖片（伺服器轉檔）
+      description: |
+        需要 `product.edit`。伺服器讀回已 PUT 的原檔，**以實際內容**驗證為 JPEG/PNG/WebP 且像素
+        不超過上限，依 EXIF 轉正、轉成 WebP 並產生 `thumb`（長邊 480）與 `large`（長邊 1600）兩個
+        變體（只縮不放），寫入後刪除原檔。回 201 時圖片已可由公開網址讀取。
+        新圖排在最後；每商品上限 20 張（超過回 409）。`upload_id` 重用回 409；他店、過期、
+        purpose 不符或內容不符一律 422。圖片是商品的子資源，**不經由商品 PUT**。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [upload_id]
+              properties:
+                upload_id: { type: string, format: uuid }
+                alt: { type: string, maxLength: 300, description: 替代文字；上限 300 字元，預設空字串。 }
+      responses:
+        "201":
+          description: 新建立的圖片。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImage' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+
+  /api/v1/admin/shops/{shopID}/products/{productID}/images/order:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: productID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    put:
+      tags: [admin-media]
+      operationId: reorderProductImages
+      summary: 整批重排商品圖片
+      description: |
+        需要 `product.edit`。`image_ids` 必須**恰好**是該商品目前全部圖片 id 的一個排列，
+        否則 422 且不做任何變更（不允許部分排序）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [image_ids]
+              properties:
+                image_ids:
+                  type: array
+                  items: { type: integer }
+      responses:
+        "200":
+          description: 重排後的圖片集合。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImageList' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+
+  /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: productID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+      - name: imageID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    put:
+      tags: [admin-media]
+      operationId: updateProductImage
+      summary: 修改圖片的替代文字
+      description: 需要 `product.edit`。只能改 `alt`（≤ 300 字元）。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [alt]
+              properties:
+                alt: { type: string, maxLength: 300 }
+      responses:
+        "200":
+          description: 修改後的圖片。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductImage' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
+    delete:
+      tags: [admin-media]
+      operationId: deleteProductImage
+      summary: 刪除商品圖片
+      description: 需要 `product.edit`。資料列於交易內刪除，物件於提交後 best-effort 刪除。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "503": { $ref: '#/components/responses/MediaNotConfigured' }
 
   # ═══════════════════════ 商家層：訂單與金流 ═══════════════════════
   /api/v1/admin/shops/{shopID}/orders:

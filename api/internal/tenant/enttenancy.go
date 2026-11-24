@@ -27,6 +27,9 @@ var tenantOwned = map[string]bool{
 	"Product":         true,
 	"ProductSKU":      true,
 	"ProductCategory": true,
+	// change product-images-r2: both carry a direct shop_id column.
+	"ProductImage": true,
+	"MediaUpload":  true,
 	// change shopping-cart: both tables carry a direct shop_id column
 	// (design D1/D9 — Cart stores shop_id+member_id directly rather than
 	// indirecting through ShopMember, mirroring ShopMember's own shape).

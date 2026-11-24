@@ -186,6 +186,40 @@ var (
 			},
 		},
 	}
+	// MediaUploadsColumns holds the columns for the "media_uploads" table.
+	MediaUploadsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "object_key", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "content_type", Type: field.TypeString, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
+		{Name: "size_bytes", Type: field.TypeInt64},
+		{Name: "purpose", Type: field.TypeString, Size: 20, SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "created_by", Type: field.TypeInt},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "consumed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// MediaUploadsTable holds the schema information for the "media_uploads" table.
+	MediaUploadsTable = &schema.Table{
+		Name:       "media_uploads",
+		Columns:    MediaUploadsColumns,
+		PrimaryKey: []*schema.Column{MediaUploadsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "media_uploads_shops_shop",
+				Columns:    []*schema.Column{MediaUploadsColumns[9]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "mediaupload_shop_id_id",
+				Unique:  false,
+				Columns: []*schema.Column{MediaUploadsColumns[9], MediaUploadsColumns[0]},
+			},
+		},
+	}
 	// MembersColumns holds the columns for the "members" table.
 	MembersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -675,6 +709,45 @@ var (
 				Name:    "productcategory_category_id_position_product_id",
 				Unique:  false,
 				Columns: []*schema.Column{ProductCategoryColumns[3], ProductCategoryColumns[0], ProductCategoryColumns[2]},
+			},
+		},
+	}
+	// ProductImagesColumns holds the columns for the "product_images" table.
+	ProductImagesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "image_key", Type: field.TypeString, Unique: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "position", Type: field.TypeInt32, Default: 0},
+		{Name: "alt", Type: field.TypeString, Default: "", SchemaType: map[string]string{"postgres": "varchar(300)"}},
+		{Name: "width", Type: field.TypeInt32},
+		{Name: "height", Type: field.TypeInt32},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "product_id", Type: field.TypeInt},
+		{Name: "shop_id", Type: field.TypeInt},
+	}
+	// ProductImagesTable holds the schema information for the "product_images" table.
+	ProductImagesTable = &schema.Table{
+		Name:       "product_images",
+		Columns:    ProductImagesColumns,
+		PrimaryKey: []*schema.Column{ProductImagesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "product_images_products_images",
+				Columns:    []*schema.Column{ProductImagesColumns[7]},
+				RefColumns: []*schema.Column{ProductsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+			{
+				Symbol:     "product_images_shops_shop",
+				Columns:    []*schema.Column{ProductImagesColumns[8]},
+				RefColumns: []*schema.Column{ShopsColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "productimage_product_id_position_id",
+				Unique:  false,
+				Columns: []*schema.Column{ProductImagesColumns[7], ProductImagesColumns[2], ProductImagesColumns[0]},
 			},
 		},
 	}
@@ -1311,6 +1384,7 @@ var (
 		CartItemsTable,
 		CategoriesTable,
 		CheckoutIdempotencyKeysTable,
+		MediaUploadsTable,
 		MembersTable,
 		MemberRefreshTokensTable,
 		MemberTiersTable,
@@ -1323,6 +1397,7 @@ var (
 		PointTransactionsTable,
 		ProductsTable,
 		ProductCategoryTable,
+		ProductImagesTable,
 		ProductSkusTable,
 		PublishableKeysTable,
 		RolesTable,
@@ -1371,6 +1446,12 @@ func init() {
 	CheckoutIdempotencyKeysTable.Annotation.Checks = map[string]string{
 		"checkout_idempotency_keys_order_id_check": "(status = 0 AND order_id IS NULL) OR (status = 1 AND order_id IS NOT NULL)",
 		"checkout_idempotency_keys_status_check":   "status IN (0, 1)",
+	}
+	MediaUploadsTable.ForeignKeys[0].RefTable = ShopsTable
+	MediaUploadsTable.Annotation = &entsql.Annotation{}
+	MediaUploadsTable.Annotation.Checks = map[string]string{
+		"media_uploads_purpose_check": "purpose IN ('product_image', 'content_image')",
+		"media_uploads_size_check":    "size_bytes > 0",
 	}
 	MembersTable.ForeignKeys[0].RefTable = ShopsTable
 	MembersTable.ForeignKeys[1].RefTable = MemberTiersTable
@@ -1457,6 +1538,12 @@ func init() {
 	}
 	ProductCategoryTable.Annotation.Checks = map[string]string{
 		"product_category_position_check": "position >= 0",
+	}
+	ProductImagesTable.ForeignKeys[0].RefTable = ProductsTable
+	ProductImagesTable.ForeignKeys[1].RefTable = ShopsTable
+	ProductImagesTable.Annotation = &entsql.Annotation{}
+	ProductImagesTable.Annotation.Checks = map[string]string{
+		"product_images_position_check": "position >= 0",
 	}
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = ShopsTable

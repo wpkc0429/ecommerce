@@ -96,6 +96,10 @@ type Config struct {
 	// overridden before any real ECPay credential is ever stored.
 	PaymentCredentialsEncryptionKey string
 
+	// Media is the object storage + image pipeline config (change
+	// product-images-r2). Zero value / !Enabled() means media is off.
+	Media MediaConfig
+
 	// SMTP carries the outbound mail credentials for order notification emails
 	// (change order-notification-email).
 	SMTP SMTPConfig
@@ -323,6 +327,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.CheckoutIdempotencyTTL, err = parseDuration("CHECKOUT_IDEMPOTENCY_TTL", 24*time.Hour); err != nil {
+		return nil, err
+	}
+
+	// Media storage (change product-images-r2, design D2): all-or-nothing.
+	if cfg.Media, err = loadMedia(cfg.Env); err != nil {
 		return nil, err
 	}
 

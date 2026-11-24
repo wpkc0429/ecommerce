@@ -9,7 +9,7 @@ endif
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
-up: ## Start PostgreSQL 16 + Redis 7 (waits for healthchecks)
+up: ## Start PostgreSQL 16 + Redis 7 + MinIO (waits for healthchecks)
 	docker compose up -d --wait
 
 down: ## Stop infra containers

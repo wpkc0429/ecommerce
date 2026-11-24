@@ -74,6 +74,13 @@ func Conflict(w http.ResponseWriter, message string) {
 	WriteError(w, http.StatusConflict, "conflict", message, nil)
 }
 
+// MediaNotConfigured reports that object storage is not configured (503,
+// change product-images-r2). Media routes are always mounted; this is their
+// answer when R2/MinIO settings are absent.
+func MediaNotConfigured(w http.ResponseWriter) {
+	WriteError(w, http.StatusServiceUnavailable, "media_not_configured", "media storage is not configured on this server", nil)
+}
+
 // Unprocessable reports schema/constraint validation failures (422).
 func Unprocessable(w http.ResponseWriter, message string, details any) {
 	WriteError(w, http.StatusUnprocessableEntity, "validation_failed", message, details)

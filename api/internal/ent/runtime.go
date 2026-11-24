@@ -8,6 +8,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -20,6 +21,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/pointtransaction"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -38,6 +40,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/ent/userrefreshtoken"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // The init function reads all schema descriptors with runtime code
@@ -228,6 +232,70 @@ func init() {
 	checkoutidempotencykeyDescStatus := checkoutidempotencykeyFields[3].Descriptor()
 	// checkoutidempotencykey.DefaultStatus holds the default value on creation for the status field.
 	checkoutidempotencykey.DefaultStatus = checkoutidempotencykeyDescStatus.Default.(int16)
+	mediauploadFields := schema.MediaUpload{}.Fields()
+	_ = mediauploadFields
+	// mediauploadDescObjectKey is the schema descriptor for object_key field.
+	mediauploadDescObjectKey := mediauploadFields[2].Descriptor()
+	// mediaupload.ObjectKeyValidator is a validator for the "object_key" field. It is called by the builders before save.
+	mediaupload.ObjectKeyValidator = func() func(string) error {
+		validators := mediauploadDescObjectKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(object_key string) error {
+			for _, fn := range fns {
+				if err := fn(object_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// mediauploadDescContentType is the schema descriptor for content_type field.
+	mediauploadDescContentType := mediauploadFields[3].Descriptor()
+	// mediaupload.ContentTypeValidator is a validator for the "content_type" field. It is called by the builders before save.
+	mediaupload.ContentTypeValidator = func() func(string) error {
+		validators := mediauploadDescContentType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(content_type string) error {
+			for _, fn := range fns {
+				if err := fn(content_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// mediauploadDescPurpose is the schema descriptor for purpose field.
+	mediauploadDescPurpose := mediauploadFields[5].Descriptor()
+	// mediaupload.PurposeValidator is a validator for the "purpose" field. It is called by the builders before save.
+	mediaupload.PurposeValidator = func() func(string) error {
+		validators := mediauploadDescPurpose.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(purpose string) error {
+			for _, fn := range fns {
+				if err := fn(purpose); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// mediauploadDescCreatedAt is the schema descriptor for created_at field.
+	mediauploadDescCreatedAt := mediauploadFields[7].Descriptor()
+	// mediaupload.DefaultCreatedAt holds the default value on creation for the created_at field.
+	mediaupload.DefaultCreatedAt = mediauploadDescCreatedAt.Default.(func() time.Time)
+	// mediauploadDescID is the schema descriptor for id field.
+	mediauploadDescID := mediauploadFields[0].Descriptor()
+	// mediaupload.DefaultID holds the default value on creation for the id field.
+	mediaupload.DefaultID = mediauploadDescID.Default.(func() uuid.UUID)
 	memberMixin := schema.Member{}.Mixin()
 	memberMixinFields0 := memberMixin[0].Fields()
 	_ = memberMixinFields0
@@ -785,6 +853,38 @@ func init() {
 	productcategoryDescPosition := productcategoryFields[3].Descriptor()
 	// productcategory.DefaultPosition holds the default value on creation for the position field.
 	productcategory.DefaultPosition = productcategoryDescPosition.Default.(int32)
+	productimageFields := schema.ProductImage{}.Fields()
+	_ = productimageFields
+	// productimageDescImageKey is the schema descriptor for image_key field.
+	productimageDescImageKey := productimageFields[2].Descriptor()
+	// productimage.ImageKeyValidator is a validator for the "image_key" field. It is called by the builders before save.
+	productimage.ImageKeyValidator = func() func(string) error {
+		validators := productimageDescImageKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(image_key string) error {
+			for _, fn := range fns {
+				if err := fn(image_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// productimageDescPosition is the schema descriptor for position field.
+	productimageDescPosition := productimageFields[3].Descriptor()
+	// productimage.DefaultPosition holds the default value on creation for the position field.
+	productimage.DefaultPosition = productimageDescPosition.Default.(int32)
+	// productimageDescAlt is the schema descriptor for alt field.
+	productimageDescAlt := productimageFields[4].Descriptor()
+	// productimage.DefaultAlt holds the default value on creation for the alt field.
+	productimage.DefaultAlt = productimageDescAlt.Default.(string)
+	// productimageDescCreatedAt is the schema descriptor for created_at field.
+	productimageDescCreatedAt := productimageFields[7].Descriptor()
+	// productimage.DefaultCreatedAt holds the default value on creation for the created_at field.
+	productimage.DefaultCreatedAt = productimageDescCreatedAt.Default.(func() time.Time)
 	productskuMixin := schema.ProductSKU{}.Mixin()
 	productskuMixinFields0 := productskuMixin[0].Fields()
 	_ = productskuMixinFields0

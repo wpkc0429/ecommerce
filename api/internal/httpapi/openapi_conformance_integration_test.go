@@ -52,6 +52,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/idempotency"
+	"ksdevworks/ecommerce/api/internal/media"
 	"ksdevworks/ecommerce/api/internal/order"
 	"ksdevworks/ecommerce/api/internal/payment"
 	"ksdevworks/ecommerce/api/internal/payment/ecpay"
@@ -86,6 +87,8 @@ var requiredSchemas = []string{
 	"ProductSalesReport", "ProductSalesCurrency", "ProductSalesRow",
 	// change ecpay-per-shop-credentials.
 	"ECPayCredentials",
+	// change product-images-r2.
+	"ProductImage", "ImageUrls", "ProductImageList", "MediaUpload", "ContentImage", "MediaConfig",
 }
 
 // ── 契約驅動的回應驗證 ────────────────────────────────────────────────
@@ -257,6 +260,11 @@ type conformanceEnv struct {
 	adminUserID int
 	issuer      *auth.TokenIssuer
 
+	// change product-images-r2: the sampled product and an in-memory object
+	// store, so the full presign -> PUT -> attach flow runs against the contract.
+	productID  int
+	mediaStore *media.FakeStore
+
 	shippingSvc   *shipping.Service
 	idemSvc       *idempotency.Service
 	webhookSecret string
@@ -305,6 +313,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		SetShopID(e.shopID).SetName("本季新品").SetSlug("new-arrivals").SaveX(ctx)
 	client.ProductCategory.Create().
 		SetShopID(e.shopID).SetProductID(product.ID).SetCategoryID(conformanceCat.ID).SaveX(ctx)
+	e.productID = product.ID
 	e.skuID = client.ProductSKU.Create().
 		SetShopID(e.shopID).SetProductID(product.ID).SetSkuCode("CONF-M").
 		SetPriceAmount(3400).SetCurrency("TWD").SetStockQty(50).SetIsActive(true).
@@ -333,6 +342,11 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	// the credentials endpoint is guarded by.
 	credentialPerm := client.Permission.Create().SetName("payment_credential.manage").SaveX(ctx).ID
 	ownerRole := client.Role.Create().SetName("merchant_owner").SetScope("merchant").SaveX(ctx)
+	// change product-images-r2: the nodes the media routes are guarded by.
+	for _, n := range []string{"product.view", "product.edit", "page.edit"} {
+		pid := client.Permission.Create().SetName(n).SaveX(ctx).ID
+		client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(pid).SaveX(ctx)
+	}
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(reportPerm).SaveX(ctx)
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(updatePerm).SaveX(ctx)
 	client.RolePermission.Create().SetRoleID(ownerRole.ID).SetPermissionID(credentialPerm).SaveX(ctx)
@@ -382,7 +396,16 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 	cfg := &config.Config{OrderAccessTokenTTL: time.Hour}
 
 	authz := &AuthzMW{Engine: rbac.NewEngine(client, rdb, log)}
+	e.mediaStore = media.NewFakeStore()
+	t.Cleanup(e.mediaStore.Close)
+	mediaSvc := media.NewService(client, config.MediaConfig{
+		AccountID: "a", AccessKeyID: "k", SecretAccessKey: "s", Bucket: "b",
+		PublicBaseURL: "https://img.example.test", Endpoint: "http://unused.test",
+		MaxBytes: 15 << 20, MaxPixels: 40_000_000, ProcessConcurrency: 2,
+		WebPQuality: 80, UploadURLTTL: 10 * time.Minute,
+	}, e.mediaStore, log)
 	e.router = New(Deps{
+		Media: &MediaHandler{Client: client, Service: mediaSvc, Authz: authz, Log: log},
 		Cfg: cfg, Log: log,
 		AdminMW: NewAdminMiddleware(issuer),
 		// change merchant-reports.
@@ -401,7 +424,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		MemberMW:      NewMemberMiddleware(issuer),
 		OrderAccessMW: NewOrderAccessMiddleware(issuer),
 		MemberAuth:    &MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: log},
-		Products:      &ProductsHandler{Client: client, Service: &catalog.Service{Client: client}, Log: log},
+		Products:      &ProductsHandler{Client: client, Service: &catalog.Service{Client: client}, Media: mediaSvc, Authz: authz, Log: log},
 		Categories:    &CategoriesHandler{Client: client, Service: &catalog.Service{Client: client}, Authz: authz, Log: log},
 		Cart:          &CartHandler{Client: client, Service: cartSvc, Log: log},
 		Orders:        &OrderHandler{Client: client, Service: orderSvc, Log: log},
@@ -800,6 +823,73 @@ func TestOpenAPIResponsesMatchImplementation(t *testing.T) {
 	code, body = e.do(t, http.MethodGet, shopPrefix+"/ecpay-credentials", adminTok, nil)
 	requireStatus(t, code, http.StatusOK, body)
 	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/ecpay-credentials", http.MethodGet, http.StatusOK, body)
+
+	// ── 商品圖片（change product-images-r2）──────────────────────────
+	//
+	// The whole flow against the contract: presign -> browser PUT -> attach ->
+	// list -> reorder -> alt -> admin product read -> content image -> config ->
+	// 503 shape. Two images, so ordering and the ProductImage item schema are
+	// exercised on non-empty data.
+	imgPrefix := shopPrefix + fmt.Sprintf("/products/%d/images", e.productID)
+	var imageIDs []int
+	for i := 0; i < 2; i++ {
+		data := conformanceJPEG(900+i*100, 600)
+		upID := conformanceUpload(t, e, v, adminTok, shopPrefix, "product_image", data)
+		code, body = e.do(t, http.MethodPost, imgPrefix, adminTok, map[string]any{"upload_id": upID, "alt": fmt.Sprintf("image %d", i)})
+		requireStatus(t, code, http.StatusCreated, body)
+		v.assertResponse(t, "/api/v1/admin/shops/{shopID}/products/{productID}/images", http.MethodPost, http.StatusCreated, body)
+		var im struct {
+			ID int `json:"id"`
+		}
+		decodeInto(t, body, &im)
+		imageIDs = append(imageIDs, im.ID)
+	}
+	code, body = e.do(t, http.MethodGet, imgPrefix, adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/products/{productID}/images", http.MethodGet, http.StatusOK, body)
+
+	code, body = e.do(t, http.MethodPut, imgPrefix+"/order", adminTok, map[string]any{"image_ids": []int{imageIDs[1], imageIDs[0]}})
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/products/{productID}/images/order", http.MethodPut, http.StatusOK, body)
+
+	code, body = e.do(t, http.MethodPut, imgPrefix+fmt.Sprintf("/%d", imageIDs[0]), adminTok, map[string]any{"alt": "renamed"})
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID}", http.MethodPut, http.StatusOK, body)
+
+	// The product (admin and public) now carries images, validated against Product.
+	code, body = e.do(t, http.MethodGet, shopPrefix+fmt.Sprintf("/products/%d", e.productID), adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/products/{productID}", http.MethodGet, http.StatusOK, body)
+	code, body = e.do(t, http.MethodGet, "/api/v1/shop/products/"+e.slug, "", nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/shop/products/{slug}", http.MethodGet, http.StatusOK, body)
+	if !bytes.Contains(body, []byte(`"thumb"`)) {
+		t.Errorf("public product has no image urls: %s", truncate(body))
+	}
+
+	code, body = e.do(t, http.MethodDelete, imgPrefix+fmt.Sprintf("/%d", imageIDs[1]), adminTok, nil)
+	requireStatus(t, code, http.StatusNoContent, body)
+
+	// Content image + config.
+	cdata := conformanceJPEG(700, 300)
+	cUp := conformanceUpload(t, e, v, adminTok, shopPrefix, "content_image", cdata)
+	code, body = e.do(t, http.MethodPost, shopPrefix+"/media/content-images", adminTok, map[string]any{"upload_id": cUp})
+	requireStatus(t, code, http.StatusCreated, body)
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/media/content-images", http.MethodPost, http.StatusCreated, body)
+
+	code, body = e.do(t, http.MethodGet, "/api/v1/admin/media/config", adminTok, nil)
+	requireStatus(t, code, http.StatusOK, body)
+	v.assertResponse(t, "/api/v1/admin/media/config", http.MethodGet, http.StatusOK, body)
+
+	// 503 media_not_configured has the standard envelope shape.
+	disabled := media.NewService(e.client, config.MediaConfig{}, nil, nil)
+	rec503 := httptest.NewRecorder()
+	(&MediaHandler{Client: e.client, Service: disabled, Log: slog.Default()}).createUpload(rec503, httptest.NewRequest(http.MethodPost, "/", nil))
+	if rec503.Code != http.StatusServiceUnavailable {
+		t.Fatalf("disabled media: %d", rec503.Code)
+	}
+	v.assertResponse(t, "/api/v1/admin/shops/{shopID}/media/uploads", http.MethodPost, http.StatusServiceUnavailable, rec503.Body.Bytes())
+	assertErrorCode(t, rec503.Body.Bytes(), "media_not_configured")
 
 	// ── 規則 2：共用 schema 覆蓋 ──────────────────────────────────────
 	var uncovered []string

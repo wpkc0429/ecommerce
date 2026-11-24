@@ -25,6 +25,7 @@ import (
 	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
 	entproduct "ksdevworks/ecommerce/api/internal/ent/product"
 	entproductcategory "ksdevworks/ecommerce/api/internal/ent/productcategory"
+	entproductimage "ksdevworks/ecommerce/api/internal/ent/productimage"
 	entproductsku "ksdevworks/ecommerce/api/internal/ent/productsku"
 )
 
@@ -786,11 +787,16 @@ func orderSkusByID(q *ent.ProductSKUQuery) { q.Order(entproductsku.ByID()) }
 // `categories` / `category_ids` have a defined order (design D2).
 func orderCategories(q *ent.CategoryQuery) { q.Order(entcategory.ByPosition(), entcategory.ByID()) }
 
+// orderImages pins eager-loaded product images to (position, id) (change
+// product-images-r2): the array order IS the gallery order.
+func orderImages(q *ent.ProductImageQuery) { q.Order(entproductimage.ByPosition(), entproductimage.ByID()) }
+
 func (s *Service) GetProduct(ctx context.Context, shopID, productID int) (*ent.Product, error) {
 	p, err := s.Client.Product.Query().
 		Where(entproduct.IDEQ(productID), entproduct.ShopIDEQ(shopID)).
 		WithSkus(orderSkusByID).
 		WithCategories(orderCategories).
+		WithImages(orderImages).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound
@@ -863,6 +869,7 @@ func (s *Service) ListProducts(ctx context.Context, shopID int, params ProductLi
 	products, err := q.
 		WithSkus(orderSkusByID).
 		WithCategories(orderCategories).
+		WithImages(orderImages).
 		Order(entproduct.ByID()).
 		Limit(pageSize).
 		Offset((page - 1) * pageSize).
@@ -943,7 +950,7 @@ func (s *Service) ListPublishedProducts(ctx context.Context, shopID int, params 
 	if err != nil {
 		return nil, err
 	}
-	q = q.WithSkus(orderSkusByID).WithCategories(orderCategories).Limit(pageSize).Offset((page - 1) * pageSize)
+	q = q.WithSkus(orderSkusByID).WithCategories(orderCategories).WithImages(orderImages).Limit(pageSize).Offset((page - 1) * pageSize)
 	if requestedCat == 0 {
 		q = q.Order(entproduct.ByID())
 	} else {
@@ -980,6 +987,7 @@ func (s *Service) GetPublishedProductBySlug(ctx context.Context, shopID int, slu
 		Where(entproduct.ShopIDEQ(shopID), entproduct.SlugEQ(strings.ToLower(strings.TrimSpace(slug))), entproduct.StatusEQ(1)).
 		WithSkus(orderSkusByID).
 		WithCategories(orderCategories).
+		WithImages(orderImages).
 		Only(ctx)
 	if err != nil {
 		return nil, ErrNotFound

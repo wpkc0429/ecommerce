@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/product"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"time"
@@ -163,6 +164,21 @@ func (_u *ProductUpdate) AddSkus(v ...*ProductSKU) *ProductUpdate {
 	return _u.AddSkuIDs(ids...)
 }
 
+// AddImageIDs adds the "images" edge to the ProductImage entity by IDs.
+func (_u *ProductUpdate) AddImageIDs(ids ...int) *ProductUpdate {
+	_u.mutation.AddImageIDs(ids...)
+	return _u
+}
+
+// AddImages adds the "images" edges to the ProductImage entity.
+func (_u *ProductUpdate) AddImages(v ...*ProductImage) *ProductUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddImageIDs(ids...)
+}
+
 // AddCategoryIDs adds the "categories" edge to the Category entity by IDs.
 func (_u *ProductUpdate) AddCategoryIDs(ids ...int) *ProductUpdate {
 	_u.mutation.AddCategoryIDs(ids...)
@@ -208,6 +224,27 @@ func (_u *ProductUpdate) RemoveSkus(v ...*ProductSKU) *ProductUpdate {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveSkuIDs(ids...)
+}
+
+// ClearImages clears all "images" edges to the ProductImage entity.
+func (_u *ProductUpdate) ClearImages() *ProductUpdate {
+	_u.mutation.ClearImages()
+	return _u
+}
+
+// RemoveImageIDs removes the "images" edge to ProductImage entities by IDs.
+func (_u *ProductUpdate) RemoveImageIDs(ids ...int) *ProductUpdate {
+	_u.mutation.RemoveImageIDs(ids...)
+	return _u
+}
+
+// RemoveImages removes "images" edges to ProductImage entities.
+func (_u *ProductUpdate) RemoveImages(v ...*ProductImage) *ProductUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveImageIDs(ids...)
 }
 
 // ClearCategories clears all "categories" edges to the Category entity.
@@ -399,6 +436,51 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ImagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedImagesIDs(); len(nodes) > 0 && !_u.mutation.ImagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ImagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -614,6 +696,21 @@ func (_u *ProductUpdateOne) AddSkus(v ...*ProductSKU) *ProductUpdateOne {
 	return _u.AddSkuIDs(ids...)
 }
 
+// AddImageIDs adds the "images" edge to the ProductImage entity by IDs.
+func (_u *ProductUpdateOne) AddImageIDs(ids ...int) *ProductUpdateOne {
+	_u.mutation.AddImageIDs(ids...)
+	return _u
+}
+
+// AddImages adds the "images" edges to the ProductImage entity.
+func (_u *ProductUpdateOne) AddImages(v ...*ProductImage) *ProductUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddImageIDs(ids...)
+}
+
 // AddCategoryIDs adds the "categories" edge to the Category entity by IDs.
 func (_u *ProductUpdateOne) AddCategoryIDs(ids ...int) *ProductUpdateOne {
 	_u.mutation.AddCategoryIDs(ids...)
@@ -659,6 +756,27 @@ func (_u *ProductUpdateOne) RemoveSkus(v ...*ProductSKU) *ProductUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveSkuIDs(ids...)
+}
+
+// ClearImages clears all "images" edges to the ProductImage entity.
+func (_u *ProductUpdateOne) ClearImages() *ProductUpdateOne {
+	_u.mutation.ClearImages()
+	return _u
+}
+
+// RemoveImageIDs removes the "images" edge to ProductImage entities by IDs.
+func (_u *ProductUpdateOne) RemoveImageIDs(ids ...int) *ProductUpdateOne {
+	_u.mutation.RemoveImageIDs(ids...)
+	return _u
+}
+
+// RemoveImages removes "images" edges to ProductImage entities.
+func (_u *ProductUpdateOne) RemoveImages(v ...*ProductImage) *ProductUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveImageIDs(ids...)
 }
 
 // ClearCategories clears all "categories" edges to the Category entity.
@@ -880,6 +998,51 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productsku.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ImagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedImagesIDs(); len(nodes) > 0 && !_u.mutation.ImagesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ImagesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   product.ImagesTable,
+			Columns: []string{product.ImagesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productimage.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -11,6 +11,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
 	"ksdevworks/ecommerce/api/internal/ent/membertier"
@@ -24,6 +25,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 	"ksdevworks/ecommerce/api/internal/ent/product"
 	"ksdevworks/ecommerce/api/internal/ent/productcategory"
+	"ksdevworks/ecommerce/api/internal/ent/productimage"
 	"ksdevworks/ecommerce/api/internal/ent/productsku"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
 	"ksdevworks/ecommerce/api/internal/ent/role"
@@ -209,6 +211,33 @@ func (f TraverseCheckoutIdempotencyKey) Traverse(ctx context.Context, q ent.Quer
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CheckoutIdempotencyKeyQuery", q)
+}
+
+// The MediaUploadFunc type is an adapter to allow the use of ordinary function as a Querier.
+type MediaUploadFunc func(context.Context, *ent.MediaUploadQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f MediaUploadFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.MediaUploadQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.MediaUploadQuery", q)
+}
+
+// The TraverseMediaUpload type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseMediaUpload func(context.Context, *ent.MediaUploadQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseMediaUpload) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseMediaUpload) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.MediaUploadQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.MediaUploadQuery", q)
 }
 
 // The MemberFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -533,6 +562,33 @@ func (f TraverseProductCategory) Traverse(ctx context.Context, q ent.Query) erro
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.ProductCategoryQuery", q)
+}
+
+// The ProductImageFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ProductImageFunc func(context.Context, *ent.ProductImageQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ProductImageFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ProductImageQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ProductImageQuery", q)
+}
+
+// The TraverseProductImage type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseProductImage func(context.Context, *ent.ProductImageQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseProductImage) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseProductImage) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ProductImageQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ProductImageQuery", q)
 }
 
 // The ProductSKUFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1059,6 +1115,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
 	case *ent.CheckoutIdempotencyKeyQuery:
 		return &query[*ent.CheckoutIdempotencyKeyQuery, predicate.CheckoutIdempotencyKey, checkoutidempotencykey.OrderOption]{typ: ent.TypeCheckoutIdempotencyKey, tq: q}, nil
+	case *ent.MediaUploadQuery:
+		return &query[*ent.MediaUploadQuery, predicate.MediaUpload, mediaupload.OrderOption]{typ: ent.TypeMediaUpload, tq: q}, nil
 	case *ent.MemberQuery:
 		return &query[*ent.MemberQuery, predicate.Member, member.OrderOption]{typ: ent.TypeMember, tq: q}, nil
 	case *ent.MemberRefreshTokenQuery:
@@ -1083,6 +1141,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ProductQuery, predicate.Product, product.OrderOption]{typ: ent.TypeProduct, tq: q}, nil
 	case *ent.ProductCategoryQuery:
 		return &query[*ent.ProductCategoryQuery, predicate.ProductCategory, productcategory.OrderOption]{typ: ent.TypeProductCategory, tq: q}, nil
+	case *ent.ProductImageQuery:
+		return &query[*ent.ProductImageQuery, predicate.ProductImage, productimage.OrderOption]{typ: ent.TypeProductImage, tq: q}, nil
 	case *ent.ProductSKUQuery:
 		return &query[*ent.ProductSKUQuery, predicate.ProductSKU, productsku.OrderOption]{typ: ent.TypeProductSKU, tq: q}, nil
 	case *ent.PublishableKeyQuery:

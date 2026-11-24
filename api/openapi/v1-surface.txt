@@ -62,6 +62,9 @@ CategoryProductOrder.products
 CategorySummary.id
 CategorySummary.name
 CategorySummary.slug
+ContentImage.height
+ContentImage.urls
+ContentImage.width
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID}
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path originID
 DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
@@ -77,6 +80,10 @@ DELETE /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/products/{productID}
 DELETE /api/v1/admin/shops/{shopID}/products/{productID} path productID
 DELETE /api/v1/admin/shops/{shopID}/products/{productID} path shopID
+DELETE /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID}
+DELETE /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path imageID
+DELETE /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path productID
+DELETE /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID}
 DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID} path keyID
 DELETE /api/v1/admin/shops/{shopID}/publishable-keys/{keyID} path shopID
@@ -117,6 +124,7 @@ EffectiveTimezone.name
 EffectiveTimezone.source
 Error.error
 GET /api/v1/admin/me
+GET /api/v1/admin/media/config
 GET /api/v1/admin/permissions
 GET /api/v1/admin/roles
 GET /api/v1/admin/shops
@@ -232,6 +240,9 @@ GET /api/v1/admin/shops/{shopID}/products query status optional
 GET /api/v1/admin/shops/{shopID}/products/{productID}
 GET /api/v1/admin/shops/{shopID}/products/{productID} path productID
 GET /api/v1/admin/shops/{shopID}/products/{productID} path shopID
+GET /api/v1/admin/shops/{shopID}/products/{productID}/images
+GET /api/v1/admin/shops/{shopID}/products/{productID}/images path productID
+GET /api/v1/admin/shops/{shopID}/products/{productID}/images path shopID
 GET /api/v1/admin/shops/{shopID}/publishable-keys
 GET /api/v1/admin/shops/{shopID}/publishable-keys path shopID
 GET /api/v1/admin/shops/{shopID}/reports/products
@@ -351,6 +362,17 @@ GuestCheckoutResult.order
 GuestCheckoutResult.order_access_token
 GuestCheckoutResult.token_type
 HealthStatus.status
+ImageUrls.large
+ImageUrls.thumb
+MediaConfig.accepted_types
+MediaConfig.enabled
+MediaConfig.max_bytes
+MediaConfig.max_images_per_product
+MediaConfig.public_base_url
+MediaUpload.expires_at
+MediaUpload.headers
+MediaUpload.upload_id
+MediaUpload.upload_url
 Member.created_at
 Member.email
 Member.id
@@ -434,6 +456,10 @@ POST /api/v1/admin/shops/{shopID}/allowed-origins
 POST /api/v1/admin/shops/{shopID}/allowed-origins path shopID
 POST /api/v1/admin/shops/{shopID}/categories
 POST /api/v1/admin/shops/{shopID}/categories path shopID
+POST /api/v1/admin/shops/{shopID}/media/content-images
+POST /api/v1/admin/shops/{shopID}/media/content-images path shopID
+POST /api/v1/admin/shops/{shopID}/media/uploads
+POST /api/v1/admin/shops/{shopID}/media/uploads path shopID
 POST /api/v1/admin/shops/{shopID}/member-tiers
 POST /api/v1/admin/shops/{shopID}/member-tiers path shopID
 POST /api/v1/admin/shops/{shopID}/members/{memberID}/points/adjust
@@ -455,6 +481,9 @@ POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish path pageID
 POST /api/v1/admin/shops/{shopID}/pages/{pageID}/unpublish path shopID
 POST /api/v1/admin/shops/{shopID}/products
 POST /api/v1/admin/shops/{shopID}/products path shopID
+POST /api/v1/admin/shops/{shopID}/products/{productID}/images
+POST /api/v1/admin/shops/{shopID}/products/{productID}/images path productID
+POST /api/v1/admin/shops/{shopID}/products/{productID}/images path shopID
 POST /api/v1/admin/shops/{shopID}/publishable-keys
 POST /api/v1/admin/shops/{shopID}/publishable-keys path shopID
 POST /api/v1/admin/shops/{shopID}/shipping-methods
@@ -546,6 +575,13 @@ PUT /api/v1/admin/shops/{shopID}/pages/{pageID} path shopID
 PUT /api/v1/admin/shops/{shopID}/products/{productID}
 PUT /api/v1/admin/shops/{shopID}/products/{productID} path productID
 PUT /api/v1/admin/shops/{shopID}/products/{productID} path shopID
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/order
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/order path productID
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/order path shopID
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID}
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path imageID
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path productID
+PUT /api/v1/admin/shops/{shopID}/products/{productID}/images/{imageID} path shopID
 PUT /api/v1/admin/shops/{shopID}/settings
 PUT /api/v1/admin/shops/{shopID}/settings path shopID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
@@ -630,6 +666,7 @@ Product.categories
 Product.category_ids
 Product.description
 Product.id
+Product.images
 Product.meta
 Product.shop_id
 Product.skus
@@ -638,6 +675,13 @@ Product.status
 Product.subtitle
 Product.title
 Product.updated_at
+ProductImage.alt
+ProductImage.height
+ProductImage.id
+ProductImage.position
+ProductImage.urls
+ProductImage.width
+ProductImageList.images
 ProductPage.page
 ProductPage.page_size
 ProductPage.products

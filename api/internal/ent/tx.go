@@ -22,6 +22,8 @@ type Tx struct {
 	Category *CategoryClient
 	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
 	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
+	// MediaUpload is the client for interacting with the MediaUpload builders.
+	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
 	Member *MemberClient
 	// MemberRefreshToken is the client for interacting with the MemberRefreshToken builders.
@@ -46,6 +48,8 @@ type Tx struct {
 	Product *ProductClient
 	// ProductCategory is the client for interacting with the ProductCategory builders.
 	ProductCategory *ProductCategoryClient
+	// ProductImage is the client for interacting with the ProductImage builders.
+	ProductImage *ProductImageClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
 	// PublishableKey is the client for interacting with the PublishableKey builders.
@@ -219,6 +223,7 @@ func (tx *Tx) init() {
 	tx.CartItem = NewCartItemClient(tx.config)
 	tx.Category = NewCategoryClient(tx.config)
 	tx.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(tx.config)
+	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)
 	tx.MemberTier = NewMemberTierClient(tx.config)
@@ -231,6 +236,7 @@ func (tx *Tx) init() {
 	tx.PointTransaction = NewPointTransactionClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductCategory = NewProductCategoryClient(tx.config)
+	tx.ProductImage = NewProductImageClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
 	tx.PublishableKey = NewPublishableKeyClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)

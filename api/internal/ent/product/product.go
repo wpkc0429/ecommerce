@@ -37,6 +37,8 @@ const (
 	EdgeShop = "shop"
 	// EdgeSkus holds the string denoting the skus edge name in mutations.
 	EdgeSkus = "skus"
+	// EdgeImages holds the string denoting the images edge name in mutations.
+	EdgeImages = "images"
 	// EdgeCategories holds the string denoting the categories edge name in mutations.
 	EdgeCategories = "categories"
 	// EdgeProductCategories holds the string denoting the product_categories edge name in mutations.
@@ -57,6 +59,13 @@ const (
 	SkusInverseTable = "product_skus"
 	// SkusColumn is the table column denoting the skus relation/edge.
 	SkusColumn = "product_id"
+	// ImagesTable is the table that holds the images relation/edge.
+	ImagesTable = "product_images"
+	// ImagesInverseTable is the table name for the ProductImage entity.
+	// It exists in this package in order to avoid circular dependency with the "productimage" package.
+	ImagesInverseTable = "product_images"
+	// ImagesColumn is the table column denoting the images relation/edge.
+	ImagesColumn = "product_id"
 	// CategoriesTable is the table that holds the categories relation/edge. The primary key declared below.
 	CategoriesTable = "product_category"
 	// CategoriesInverseTable is the table name for the Category entity.
@@ -191,6 +200,20 @@ func BySkus(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 	}
 }
 
+// ByImagesCount orders the results by images count.
+func ByImagesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newImagesStep(), opts...)
+	}
+}
+
+// ByImages orders the results by images terms.
+func ByImages(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newImagesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByCategoriesCount orders the results by categories count.
 func ByCategoriesCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -230,6 +253,13 @@ func newSkusStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(SkusInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, SkusTable, SkusColumn),
+	)
+}
+func newImagesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ImagesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ImagesTable, ImagesColumn),
 	)
 }
 func newCategoriesStep() *sqlgraph.Step {

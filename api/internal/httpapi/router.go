@@ -47,6 +47,11 @@ type Deps struct {
 	// PaymentCredentials: change ecpay-per-shop-credentials (merchant-scoped
 	// management of its own ecpay MerchantID/HashKey/HashIV/ChoosePayment).
 	PaymentCredentials *PaymentCredentialsHandler
+	// Media: change product-images-r2 (upload intents, product image
+	// sub-resource, CMS content images, media config). Always set in
+	// production: with storage unconfigured its routes stay mounted and answer
+	// 503 media_not_configured (the route table never depends on settings).
+	Media *MediaHandler
 
 	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
 	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
@@ -163,7 +168,13 @@ func New(d Deps) http.Handler {
 						if d.PaymentCredentials != nil {
 							d.PaymentCredentials.MountShopAdmin(sh)
 						}
+						if d.Media != nil {
+							d.Media.MountShopAdmin(sh)
+						}
 					})
+					if d.Media != nil {
+						d.Media.MountAdmin(pr)
+					}
 					// Platform-level resources.
 					if d.Roles != nil {
 						d.Roles.MountPlatform(pr)

@@ -29,6 +29,11 @@ const editorRichText = "richtext"
 // so a save that needs no sanitization is byte-for-byte what the caller sent.
 // Numbers are decoded with UseNumber so a rewrite never alters them.
 func SanitizeRichText(schemaRaw, payloadRaw json.RawMessage) (json.RawMessage, bool, error) {
+	return sanitizeRichText(schemaRaw, payloadRaw, nil)
+}
+
+// sanitizeRichText is SanitizeRichText with the optional image-domain rule.
+func sanitizeRichText(schemaRaw, payloadRaw json.RawMessage, imagePrefixes []string) (json.RawMessage, bool, error) {
 	if len(payloadRaw) == 0 || len(schemaRaw) == 0 {
 		return payloadRaw, false, nil
 	}
@@ -42,7 +47,7 @@ func SanitizeRichText(schemaRaw, payloadRaw json.RawMessage) (json.RawMessage, b
 	if err := dec.Decode(&payload); err != nil {
 		return nil, false, fmt.Errorf("cms: sanitize: payload unmarshal: %w", err)
 	}
-	s := &sanitizer{hydrator: hydrator{root: schema}}
+	s := &sanitizer{hydrator: hydrator{root: schema}, imagePrefixes: imagePrefixes}
 	out := s.walk(schema, payload, 0)
 	if !s.changed {
 		return payloadRaw, false, nil
@@ -60,7 +65,8 @@ func SanitizeRichText(schemaRaw, payloadRaw json.RawMessage) (json.RawMessage, b
 
 type sanitizer struct {
 	hydrator
-	changed bool
+	changed       bool
+	imagePrefixes []string
 }
 
 func (s *sanitizer) walk(node map[string]any, value any, depth int) any {
@@ -72,7 +78,7 @@ func (s *sanitizer) walk(node map[string]any, value any, depth int) any {
 	switch v := value.(type) {
 	case string:
 		if ed, _ := node["x-editor"].(string); ed == editorRichText {
-			clean := richtext.Sanitize(v)
+			clean := richtext.SanitizeWithImagePrefixes(v, s.imagePrefixes)
 			if clean != v {
 				s.changed = true
 			}
@@ -121,11 +127,21 @@ func (s *sanitizer) walk(node map[string]any, value any, depth int) any {
 // sanitized payload is validated once more only when it changed: sanitizing
 // can lengthen a string (entity escaping, an added rel attribute), and a
 // schema maxLength must hold for what is actually stored.
-func validateAndSanitize(schema, payload json.RawMessage) (json.RawMessage, error) {
+func (s *Service) validateAndSanitize(schema, payload json.RawMessage) (json.RawMessage, error) {
 	if err := ValidatePayload(schema, payload); err != nil {
 		return nil, err
 	}
-	clean, changed, err := SanitizeRichText(schema, payload)
+	// change product-images-r2 (design D7): with media configured, image fields
+	// must be empty or on the image domain (422 with a pointer, like any other
+	// field error); rich text <img> outside it is removed by the sanitizer.
+	bad, err := CheckImageFields(schema, payload, s.imagePrefixes)
+	if err != nil {
+		return nil, err
+	}
+	if len(bad) > 0 {
+		return nil, &ValidationError{Message: "image fields must use the configured image domain", Details: bad}
+	}
+	clean, changed, err := sanitizeRichText(schema, payload, s.imagePrefixes)
 	if err != nil {
 		return nil, err
 	}

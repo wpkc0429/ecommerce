@@ -48,6 +48,7 @@ var knownDefaultSecrets = map[string]struct{}{
 	"secret":                                         {},
 	"changeme":                                       {},
 	"change-me":                                      {},
+	"minioadmin":                                     {}, // MinIO default root credentials
 }
 
 // IsDevOrTest reports whether the service runs in a mode that may use the
@@ -121,6 +122,12 @@ func (c *Config) validateSecrets() error {
 	// a placeholder password.
 	if c.SMTP.Username != "" || c.SMTP.Password != "" {
 		weak("SMTP_PASSWORD", c.SMTP.Password)
+	}
+
+	// Media is optional ("unset = off"), but a configured secret key must not be
+	// a known default such as MinIO's minioadmin (change product-images-r2).
+	if c.Media.Enabled() {
+		weak("R2_SECRET_ACCESS_KEY", c.Media.SecretAccessKey)
 	}
 
 	if len(errs) == 0 {

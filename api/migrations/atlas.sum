@@ -1,4 +1,4 @@
-h1:2bQd54kjkwOn7KlnLW9gDpoumd7O4pI3f8USEdW5DfM=
+h1:KL7JFhxJuQ84s64/sR1USeJoXJkrzz1C3wznAvR49rY=
 20260718063844_init_schema.up.sql h1:wv7KzKfeUwzPi6/BwJcp4vrf5O6TNNAtRXO5YhJVxWI=
 20260718063900_rbac_unique_nulls_not_distinct.up.sql h1:yi40MEFUEo5OLvMs7yGfitQ76iHbyaOtoWNuug3VnB0=
 20260718102453_add_product_catalog.up.sql h1:sJopT0LbEaOTx+rd4I3Gwd4VL43iE2EIx0yAi07DV+0=
@@ -18,3 +18,4 @@ h1:2bQd54kjkwOn7KlnLW9gDpoumd7O4pI3f8USEdW5DfM=
 20260802142545_add_shop_timezone.up.sql h1:rketvoUTWtihFoaSyv0An5bkyP91fAiTYW6lFJFQml8=
 20260803150000_add_shop_payment_provider_credentials.up.sql h1:lYnr1QC/m+GTyEIrVsjB5fOMqMMgq20yPNAe8c2ToZs=
 20261124045750_add_product_subtitle_and_category_position.up.sql h1:AjILPeTvYXuyjz4D9bH6C/0J9CJKXdR7wQ0E/4xzDuw=
+20261124053029_add_product_images.up.sql h1:MxVEDLaFPlj25m4t+2xsnd28xJ9xPOBcnOlksItDaec=

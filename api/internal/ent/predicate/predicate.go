@@ -18,6 +18,9 @@ type Category func(*sql.Selector)
 // CheckoutIdempotencyKey is the predicate function for checkoutidempotencykey builders.
 type CheckoutIdempotencyKey func(*sql.Selector)
 
+// MediaUpload is the predicate function for mediaupload builders.
+type MediaUpload func(*sql.Selector)
+
 // Member is the predicate function for member builders.
 type Member func(*sql.Selector)
 
@@ -53,6 +56,9 @@ type Product func(*sql.Selector)
 
 // ProductCategory is the predicate function for productcategory builders.
 type ProductCategory func(*sql.Selector)
+
+// ProductImage is the predicate function for productimage builders.
+type ProductImage func(*sql.Selector)
 
 // ProductSKU is the predicate function for productsku builders.
 type ProductSKU func(*sql.Selector)

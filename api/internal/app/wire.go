@@ -17,6 +17,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/idempotency"
+	"ksdevworks/ecommerce/api/internal/media"
 	"ksdevworks/ecommerce/api/internal/member"
 	"ksdevworks/ecommerce/api/internal/notify"
 	"ksdevworks/ecommerce/api/internal/order"
@@ -136,6 +137,12 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	dispatcher.Subscribe(pointsService.Handle)
 
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
+	// change product-images-r2 (design D7): with media configured, CMS image
+	// fields must be empty or on the image domain, and rich text <img> outside it
+	// is removed. Unconfigured = rule off (nothing could satisfy it).
+	if cfg.Media.Enabled() {
+		cmsService.RestrictImageDomain(append([]string{cfg.Media.PublicBaseURL}, cfg.Media.ExtraAllowedOrigins...)...)
+	}
 	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
@@ -144,8 +151,25 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// (design D8 — the public endpoint reads the DB directly), so the
 	// service only needs the ent client.
 	catalogService := &catalog.Service{Client: client}
+
+	// Media (change product-images-r2). The Service is constructed whether or
+	// not storage is configured (design D2): disabled → NullStore, every media
+	// route still mounts and answers 503, so the route table and the wiring
+	// audit (checks 5 and 6) do not depend on environment variables.
+	var mediaStore media.ObjectStore
+	if cfg.Media.Enabled() {
+		mediaStore = media.NewS3Store(cfg.Media)
+	} else {
+		a.log.Info("media storage not configured - image upload routes answer 503 media_not_configured")
+	}
+	mediaService := media.NewService(client, cfg.Media, mediaStore, a.log)
+	if err := mediaService.WarmUp(); err != nil {
+		return fmt.Errorf("wire: media encoder warm-up: %w", err)
+	}
+	deps.Media = &httpapi.MediaHandler{Client: client, Service: mediaService, Authz: authz, Log: a.log}
+
 	deps.Categories = &httpapi.CategoriesHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
-	deps.Products = &httpapi.ProductsHandler{Client: client, Service: catalogService, Authz: authz, Log: a.log}
+	deps.Products = &httpapi.ProductsHandler{Client: client, Service: catalogService, Media: mediaService, Authz: authz, Log: a.log}
 
 	// Shopping cart (change shopping-cart): member self-service, no RBAC/
 	// events involved (design D9 — no ConflictError, no cache to invalidate).

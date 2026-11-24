@@ -541,6 +541,29 @@ func HasSkusWith(preds ...predicate.ProductSKU) predicate.Product {
 	})
 }
 
+// HasImages applies the HasEdge predicate on the "images" edge.
+func HasImages() predicate.Product {
+	return predicate.Product(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ImagesTable, ImagesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasImagesWith applies the HasEdge predicate on the "images" edge with a given conditions (other predicates).
+func HasImagesWith(preds ...predicate.ProductImage) predicate.Product {
+	return predicate.Product(func(s *sql.Selector) {
+		step := newImagesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasCategories applies the HasEdge predicate on the "categories" edge.
 func HasCategories() predicate.Product {
 	return predicate.Product(func(s *sql.Selector) {

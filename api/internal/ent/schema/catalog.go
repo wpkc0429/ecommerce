@@ -100,6 +100,9 @@ func (Product) Edges() []ent.Edge {
 		// (entc/gen/graph.go skips inverse edges), so an annotation placed
 		// on the inverse side is silently ignored.
 		edge.To("skus", ProductSKU.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
+		// change product-images-r2: images are a sub-resource (never part of the
+		// product PUT payload); cascade lives on this assoc edge, same as skus.
+		edge.To("images", ProductImage.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 		// M2M with Category (design D2). OnDelete(Cascade) on the product
 		// side of the join lives on ProductCategory's "product" edge below —
 		// deleting a product cleans up its category associations.

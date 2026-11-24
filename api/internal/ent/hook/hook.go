@@ -56,6 +56,18 @@ func (f CheckoutIdempotencyKeyFunc) Mutate(ctx context.Context, m ent.Mutation) 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CheckoutIdempotencyKeyMutation", m)
 }
 
+// The MediaUploadFunc type is an adapter to allow the use of ordinary
+// function as MediaUpload mutator.
+type MediaUploadFunc func(context.Context, *ent.MediaUploadMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f MediaUploadFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.MediaUploadMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.MediaUploadMutation", m)
+}
+
 // The MemberFunc type is an adapter to allow the use of ordinary
 // function as Member mutator.
 type MemberFunc func(context.Context, *ent.MemberMutation) (ent.Value, error)
@@ -198,6 +210,18 @@ func (f ProductCategoryFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 		return f(ctx, mv)
 	}
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductCategoryMutation", m)
+}
+
+// The ProductImageFunc type is an adapter to allow the use of ordinary
+// function as ProductImage mutator.
+type ProductImageFunc func(context.Context, *ent.ProductImageMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductImageFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductImageMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductImageMutation", m)
 }
 
 // The ProductSKUFunc type is an adapter to allow the use of ordinary

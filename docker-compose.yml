@@ -42,5 +42,41 @@ services:
       timeout: 3s
       retries: 12
 
+  # S3-compatible object store standing in for Cloudflare R2 in development and
+  # tests (change product-images-r2, design D2): the API runs the same
+  # aws-sdk-go-v2 code path against it, so presigned PUT behaves like R2.
+  #
+  # Image choice: MinIO stopped publishing images to Docker Hub/Quay in late
+  # 2025; bitnamilegacy/minio is the last pinned community build that is still
+  # pullable. It is a throwaway local-dev store, never a production dependency.
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    restart: unless-stopped
+    environment:
+      # No fallbacks, same rule as Postgres/Redis: a missing credential fails
+      # `docker compose` loudly instead of starting with minioadmin.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER in .env (see .env.example)}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD in .env (see .env.example)}
+      # Buckets created at first start; ":download" = anonymous read-only (the
+      # public image domain). The second bucket is for e2e runs, so their
+      # objects can be wiped without touching development images.
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-ecommerce-media}:download,${MINIO_BUCKET_E2E:-ecommerce-media-e2e}:download
+      # MinIO has no bucket-level CORS API; this is its server-wide equivalent.
+      # Browsers PUT presigned uploads straight from the admin origin (design D2).
+      MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:3001,http://127.0.0.1:3001}
+    # Loopback only: reachable from this machine, not from the LAN.
+    ports:
+      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
 volumes:
   pgdata:
+  miniodata:

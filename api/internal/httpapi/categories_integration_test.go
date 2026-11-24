@@ -18,6 +18,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/media"
 	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
@@ -108,7 +109,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 		// decide which catalog buttons to render (change admin-commerce-catalog).
 		Roles:      &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: log},
 		Categories: &httpapi.CategoriesHandler{Client: client, Service: catalogService, Authz: authz, Log: log},
-		Products:   &httpapi.ProductsHandler{Client: client, Service: catalogService, Authz: authz, Log: log},
+		Products:   &httpapi.ProductsHandler{Client: client, Service: catalogService, Media: media.NewService(client, config.MediaConfig{}, nil, log), Authz: authz, Log: log},
 	})
 	return e
 }

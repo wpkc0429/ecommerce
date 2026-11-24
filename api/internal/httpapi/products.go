@@ -10,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/catalog"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/media"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
@@ -19,8 +20,11 @@ import (
 type ProductsHandler struct {
 	Client  *ent.Client
 	Service *catalog.Service
-	Authz   *AuthzMW
-	Log     *slog.Logger
+	// Media composes image URLs and cleans up storage when a product is
+	// deleted (change product-images-r2).
+	Media *media.Service
+	Authz *AuthzMW
+	Log   *slog.Logger
 }
 
 // MountShop: routes under /admin/shops/{shopID}.
@@ -48,7 +52,7 @@ func skuJSON(s *ent.ProductSKU) map[string]any {
 	}
 }
 
-func productJSON(p *ent.Product) map[string]any {
+func (h *ProductsHandler) productJSON(p *ent.Product) map[string]any {
 	out := map[string]any{
 		"id": p.ID, "shop_id": p.ShopID, "title": p.Title, "slug": p.Slug,
 		"subtitle": p.Subtitle, "description": p.Description, "status": p.Status, "meta": p.Meta,
@@ -61,6 +65,10 @@ func productJSON(p *ent.Product) map[string]any {
 		}
 		out["skus"] = skus
 	}
+	// images is always present, never null (change product-images-r2, design
+	// D9): a consumer must not need to tell "no images", "media off" and "key
+	// missing" apart. Images are a sub-resource, so this is read-only here.
+	out["images"] = h.Media.ImagesJSON(p.Edges.Images)
 	if p.Edges.Categories != nil {
 		// category_ids and categories come from the same edge, so they are
 		// always the same set in the same (position, id) order.
@@ -76,10 +84,10 @@ func productJSON(p *ent.Product) map[string]any {
 	return out
 }
 
-func productPageJSON(pp *catalog.ProductPage) map[string]any {
+func (h *ProductsHandler) productPageJSON(pp *catalog.ProductPage) map[string]any {
 	out := make([]map[string]any, 0, len(pp.Products))
 	for _, p := range pp.Products {
-		out = append(out, productJSON(p))
+		out = append(out, h.productJSON(p))
 	}
 	return map[string]any{
 		"products": out, "page": pp.Page, "page_size": pp.PageSize, "total": pp.Total,
@@ -128,7 +136,7 @@ func (h *ProductsHandler) list(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, productPageJSON(pp))
+	httpx.WriteJSON(w, http.StatusOK, h.productPageJSON(pp))
 }
 
 func (h *ProductsHandler) create(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +150,7 @@ func (h *ProductsHandler) create(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusCreated, productJSON(p))
+	httpx.WriteJSON(w, http.StatusCreated, h.productJSON(p))
 }
 
 func (h *ProductsHandler) get(w http.ResponseWriter, r *http.Request) {
@@ -157,7 +165,7 @@ func (h *ProductsHandler) get(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, productJSON(p))
+	httpx.WriteJSON(w, http.StatusOK, h.productJSON(p))
 }
 
 func (h *ProductsHandler) update(w http.ResponseWriter, r *http.Request) {
@@ -176,7 +184,7 @@ func (h *ProductsHandler) update(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, productJSON(p))
+	httpx.WriteJSON(w, http.StatusOK, h.productJSON(p))
 }
 
 func (h *ProductsHandler) delete(w http.ResponseWriter, r *http.Request) {
@@ -190,6 +198,9 @@ func (h *ProductsHandler) delete(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, h.Log, err)
 		return
 	}
+	// Rows went with the product (ON DELETE CASCADE); the objects are removed
+	// best-effort after the commit (change product-images-r2, design D8).
+	h.Media.DeleteProductObjects(r.Context(), shopID, productID)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -213,7 +224,7 @@ func (h *ProductsHandler) publicList(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, productPageJSON(pp))
+	httpx.WriteJSON(w, http.StatusOK, h.productPageJSON(pp))
 }
 
 func (h *ProductsHandler) publicGet(w http.ResponseWriter, r *http.Request) {
@@ -228,5 +239,5 @@ func (h *ProductsHandler) publicGet(w http.ResponseWriter, r *http.Request) {
 		writeCatalogError(w, h.Log, err)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, productJSON(p))
+	httpx.WriteJSON(w, http.StatusOK, h.productJSON(p))
 }

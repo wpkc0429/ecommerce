@@ -39,6 +39,11 @@ func hermeticEnv(t *testing.T, appEnv string) {
 	t.Setenv("SMTP_PASSWORD", "")
 	t.Setenv("TRUSTED_PROXIES", "")
 	t.Setenv("REPORT_DEFAULT_TIMEZONE", "")
+	// Media is optional ("unset = off"); a developer's .env pointing at MinIO
+	// (and an earlier Load copying it into the process env) must not leak in.
+	for _, k := range mediaKeys {
+		t.Setenv(k, "")
+	}
 }
 
 func TestProductionAcceptsStrongSecrets(t *testing.T) {
