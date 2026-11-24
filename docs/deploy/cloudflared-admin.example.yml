@@ -1,0 +1,53 @@
+# EXAMPLE ONLY - change admin-api-public-exposure (design D1).
+#
+# This file is a template shipped in the repo for you to merge BY HAND into your
+# own tunnel config (the real one lives outside the repo, e.g.
+# ~/.cloudflared/<tunnel>.yml). Nothing in this repo reads or applies it.
+# Replace tunnel/credentials values and every *.example.com hostname.
+#
+# Topology: each admin domain is ONE hostname that serves both the static admin
+# SPA and the back-office API, so the browser sees them as the same origin
+# (no CORS needed; cookie-mode refresh tokens work). Cloudflare Access sits in
+# front of every admin hostname. The PUBLIC API hostname keeps blocking
+# /api/v1/admin, exactly as before.
+#
+# cloudflared matches ingress rules TOP TO BOTTOM and takes the first match, so
+# for each hostname the more specific `path` rule MUST come before the
+# catch-all rule for that hostname.
+
+tunnel: <TUNNEL-UUID>
+credentials-file: /path/to/<TUNNEL-UUID>.json
+
+ingress:
+  # --- shop admin domain (one block per shop / per admin front end) ---------
+  - hostname: admin.shop-a.example.com
+    path: ^/api/v1/admin
+    service: http://127.0.0.1:8080          # the API
+  - hostname: admin.shop-a.example.com
+    service: http://127.0.0.1:3001          # the admin static site
+
+  # --- shared merchant admin domain (ADMIN_PUBLIC_URL) ----------------------
+  - hostname: merchant.example.com
+    path: ^/api/v1/admin
+    service: http://127.0.0.1:8080
+  - hostname: merchant.example.com
+    service: http://127.0.0.1:3001
+
+  # --- platform admin domain (listed in PLATFORM_ADMIN_HOSTS) ---------------
+  # Its Access policy admits only the platform owner (set in the Cloudflare
+  # dashboard; see the runbook - the address never goes into this repo).
+  - hostname: platform-admin.example.com
+    path: ^/api/v1/admin
+    service: http://127.0.0.1:8080
+  - hostname: platform-admin.example.com
+    service: http://127.0.0.1:3001
+
+  # --- public API domain: UNCHANGED - the back office stays blocked here ----
+  - hostname: api.example.com
+    path: ^/api/v1/admin
+    service: http_status:404
+  - hostname: api.example.com
+    service: http://127.0.0.1:8080
+
+  # Required final catch-all.
+  - service: http_status:404

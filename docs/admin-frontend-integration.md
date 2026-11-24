@@ -1,7 +1,7 @@
 # 自帶後台前端接入說明
 
 給「不用平台的共用後台 SPA、自己做後台」的前端（例如 Bouquet 的自訂後台）。本文件是**活文件**，
-後台 API 的其他接入說明會陸續加在這裡；目前有「圖片上傳」（change product-images-r2）與「密碼設定連結」（change platform-account-provisioning）兩章。
+後台 API 的其他接入說明會陸續加在這裡；目前有「圖片上傳」（change product-images-r2）、「密碼設定連結」（change platform-account-provisioning）、「成員邀請連結」（change merchant-staff-role）與「任何後台前端都必須實作的契約」（change admin-api-public-exposure，本文末）。
 
 > 完整端點與欄位以 `api/openapi/openapi.yaml` 為準；這裡只講**流程與容易踩的點**。
 
@@ -200,3 +200,90 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 `PUT …/shipments/{shipmentID}` 的 `status = "returned"` 除了 `shipment.update` 另需 `shipment.return`，缺少時回 `403`
 （出貨、訂單、點數皆不變）；`delivered` 只需 `shipment.update`。UI 應依 `GET /shops/{shopID}/me` 的 `permissions`
 決定是否畫「標記退貨」按鈕。
+
+---
+
+## 任何後台前端都必須實作的契約（change admin-api-public-exposure）
+
+**API 不依前端身分分支。** 共用的 merchant admin SPA（依商家換 logo／顏色）與 Bouquet 這類自訂後台前端
+走完全相同的 API；差異只來自**資料**（這個 origin 登記給哪家商家、哪種用途）與**請求本身**
+（例如登入的 `refresh_transport`）。伺服器上沒有任何看 User-Agent 或特定 origin 名稱的程式。
+下面是每個後台前端都要自己做到的事。
+
+### 1. 連結 fragment 路由
+
+設定密碼與邀請連結的 token 在 URL **fragment**（不會被送到任何伺服器、proxy 或 Referer）：
+
+- `{base}/#/set-password/{token}` — 見上文「密碼設定／重設連結」
+- `{base}/#/accept-invite/{token}` — 見上文「商家成員邀請連結」
+
+`{base}` 是**這家商家登記為 `purpose=admin` 的 origin**（有多筆時取 id 最小者）；沒有登記時才是
+`ADMIN_PUBLIC_URL`（共用 merchant admin）。所以 Bouquet 的店員收到的連結指向 Bouquet 自己的前端——
+**你的前端必須處理這兩個路由**。token 只放在記憶體與網址，**絕不寫入 localStorage／cookie／日誌**，
+讀到後立刻用 `history.replaceState` 清掉網址。
+
+### 2. Token 儲存：access 在記憶體，refresh 視拓撲而定
+
+- **access token（15 分鐘）只放 JS 記憶體。** 重新整理頁面後用 refresh 換一枚新的。
+- **refresh token（30 天）：**
+  - **與 API 同源**（正式拓撲，見第 4 節）→ 登入帶 `"refresh_transport": "cookie"`。refresh token 以
+    `__Secure-admin_refresh`（`HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth`）交付，
+    回應 body **沒有** `refresh_token`，JS 讀不到。`POST /auth/refresh` 與 `/auth/logout` 送 `{}` body，
+    並**必須帶 `X-Admin-Refresh: 1`**，否則 401（且 token 不會被輪替）。這個自訂標頭是 CSRF 防線：
+    它迫使跨源請求先做 preflight，而 preflight 只會對該商家自己的 admin origin 放行——
+    `SameSite=Strict` 擋不住「同站不同源」（例如店面 `bouquet.example.com` 對 `admin.bouquet.example.com`）。
+  - **跨源**（本機開發 `:3001 → :8080`，或前端託管在別處）→ 沿用預設的 body 模式
+    （回應含 `refresh_token`，你自己存；`SameSite=Strict` 的 cookie 跨源不會被帶上）。
+    此時 refresh token 在 JS 可及範圍內，所以 **XSS 防線（CSP）更重要**。
+- 不帶 `refresh_transport` 時行為與過去逐位元組相同。
+
+### 3. CORS 與 origin 登記
+
+跨源的後台前端要由**平台**把它的 origin 登記為 `purpose=admin`
+（`POST /admin/shops/{shopID}/allowed-origins`，`{"origin": "...", "purpose": "admin"}`）。
+登記後：
+
+- 它拿得到 CORS 的只有**自己這家商家**的 `/api/v1/admin/shops/{id}/…` 與共用路徑；其他商家的路徑、
+  平台層路徑（`/admin/accounts`、`/admin/shops`、`/admin/sites`…）都拿不到。
+- 伺服器端另有**主機綁定**：從這個 origin（或 `Host` 就是這個網域的同源請求）打來的請求，即使登入者是
+  多家商家的成員、甚至是平台管理員，對其他商家與平台層路徑也一律 **403**。想做平台操作請用平台自己的
+  admin 網域。`auth`／`me`／`branding`／邀請接受不受影響。
+- **CORS 不是授權**：curl 不看 CORS。真正的邊界是 Cloudflare Access ＋ RBAC ＋ 主機綁定。
+
+### 4. 正式拓撲：同源 ＋ Cloudflare Access
+
+每個 admin 網域是一個 Cloudflare Access 應用；tunnel 把該網域的 `^/api/v1/admin` 轉給 API、其餘轉給
+靜態檔，所以 API 與頁面**同源**，正式環境不需要 CORS（見 `docs/deploy/admin-exposure-runbook.md`）。
+你的前端因此：
+
+- API base 用 `location.origin`（本機才是 `http://localhost:8080`）。
+- **處理 Access session 過期**：過期後 XHR 會被 Cloudflare 重導到它的登入頁（跨網域重導讓 `fetch` 丟出
+  `TypeError`，或你拿到 HTML 而不是 JSON）。偵測到時**整頁重新載入**，讓瀏覽器走 Access 登入；
+  加一個防迴圈（例如 30 秒內只重載一次）。
+- 不需要、也不應該自己處理 `Cf-Access-Jwt-Assertion`——那是 Cloudflare 在邊緣加上的。
+
+### 5. 帳號鎖定（429）
+
+同一個 email 在 15 分鐘內失敗 10 次（可設定），之後**即使密碼正確**登入也回 `429` ＋ `Retry-After`，直到視窗滑出。
+請顯示「嘗試次數過多，請稍後再試」，不要把它當成密碼錯誤重試。
+
+### 6. 可見性來源：`GET /api/v1/admin/shops/{shopID}/me`
+
+「這個人在這家商家能做什麼」只看這個端點（三層判定後的有效權限節點）；不要自己從角色名稱推。
+這是體驗層，伺服器的 RBAC 永遠是唯一權威。
+
+### 7. 上傳與 HEIC
+
+見本文「圖片上傳」。HEIC 轉檔是**前端的責任**；presigned PUT 直接打 R2／S3，若你的 CSP 有
+`connect-src`，要把該網域放進去。
+
+### 8. 品牌端點（選用）
+
+共用 SPA 用它依商家換外觀；**自訂前端可以完全忽略**。
+
+- `PUT /api/v1/admin/shops/{shopID}/settings`，body `{"admin_branding": {"logo_url", "primary_color", "accent_color"}}`
+  （`shop.update`；顏色 `#RRGGBB`；`logo_url` 在媒體已設定時須在影像網域；整個物件取代儲存值；
+  省略 `admin_branding` ＝ 不變；只送 `admin_branding` 不會動到時區）。
+- `GET /api/v1/admin/shops/{shopID}/branding`（已登入的成員，不需權限節點）→ `{shop_id, name, branding}`。
+- `GET /api/v1/admin/branding`（**未登入**）：伺服器以請求的 `Origin`（優先）或 `Host` 解析出商家
+  → `{name, branding}`；該主機不是任何商家登記的 admin origin 時 `404`（前端用平台預設）。

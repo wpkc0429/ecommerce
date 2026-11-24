@@ -77,6 +77,17 @@ POST /api/v1/admin/shops/{shopID}/allowed-origins   { "origin": "https://ondo.ex
   Cloudflare Pages 那種隨機 hash 的 preview 網域無法涵蓋。
 - **判別法**：如果 `curl` 帶同一組標頭會成功、瀏覽器卻失敗，那就是 origin 沒登記。
 
+**用途（`purpose`）：storefront 與 admin 不一樣**（change admin-api-public-exposure）。登記時可帶
+`"purpose": "storefront"`（預設）或 `"admin"`：
+
+| 用途 | 拿得到 CORS 的路徑 | 備註 |
+|---|---|---|
+| `storefront`（預設） | 非後台路徑（`/api/v1/shop/*`、`/api/v1/render/*`…） | **在任何 `/api/v1/admin/*` 上都拿不到** `Access-Control-Allow-Origin` |
+| `admin` | 只有**該商家**的 `/api/v1/admin/shops/{id}/…`，加上共用的 `auth`／`me`／`branding`／`invitations/accept`／`media/config` | **拿不到店面 API 的 CORS**；伺服器端另把該網域綁定在這家商家上 |
+
+你是做**店面**的前端，登記的就是 `storefront`。如果你也自己做後台前端，後台網域另外登記成 `admin`
+（同一個 origin 不能同時是兩種用途）；後台前端的接入見 `docs/admin-frontend-integration.md`。
+
 ---
 
 ## 2. 每個請求都要帶的東西

@@ -130,3 +130,13 @@ CORS 只約束瀏覽器讀回應。綁定在授權之前、AdminMW 之後執行�
 - 平台 admin 網域：Access 只放行平台擁有者信箱（runbook，不寫進程式）；伺服器端以 `PLATFORM_ADMIN_HOSTS` 對應（D10）。
 - admin 前端：共用 merchant admin SPA（per-shop 品牌）與 Bouquet 自訂前端並存；API 不假設單一前端（D7–D9）。
 - 鎖定門檻：15 分鐘內 10 次失敗（依建議）。
+
+## Implementation notes（實作時定案，與 proposal 的差異）
+
+- **鎖定 HMAC 的祕密（tasks 5.2 二擇一）**：不新增 `LOGIN_LOCKOUT_KEY_SECRET`；以 `HMAC(AdminJWTSecret, "login-lockout-key-v1")` 衍生鎖定金鑰，再 `HMAC(key, "admin_login_lockout:"+email)` 成為計數鍵。輪替 admin JWT secret 的副作用只是重置計數。
+- **`CF_ACCESS_AUD` 可逗號分隔多個值**（proposal 寫單一值）：決議的拓撲有**兩個** Access 應用（商家網域、平台網域），各有自己的 AUD；單一值會讓其中一個應用的所有後台請求被 API 以 403 拒絕。`aud` 含其中任一即通過。
+- **`PUT /settings` 的欄位語意**：原本「`timezone` 省略＝清除」在長出第二個欄位後不再安全（只更新品牌會洗掉時區）。規則：`timezone` 鍵缺席**且** `admin_branding` 存在 → 時區不動；兩個鍵都沒有（空 body）→ 維持歷史語意（清時區），所以既有呼叫端行為不變。`admin_branding` 是**整個物件取代**（`null`／`{}` 清除全部，空字串清除單鍵）。
+- **主機綁定的 `Host` 只組成 `https://{host}` 查詢**（依 tasks 3.1）：登記為 `http://` 的 admin origin 只能經 `Origin` 標頭被辨識（本機跨源開發的情形），經 `Host` 的同源判定只適用 https（正式拓撲）。
+- **JWKS 未知 `kid` 的重抓**：最多每 10 秒一次（proposal：「重抓一次」），避免不受信任的標頭變成對 Cloudflare 的外送請求放大器。
+- **`GET /admin/branding`（未認證）沒有限流**：每次請求只在 Origin／Host 已登記時才多一次主鍵查詢，未登記主機只花一次 Redis 查詢（含負快取）；回應內容本來就是該網域登入頁公開的東西。若日後觀察到濫用，補一條 IP 規則即可。
+- **e2e 沒有測帳號鎖定**：e2e 的所有請求來自同一個 IP，既有的「IP＋email」規則（5 次／5 分鐘）會先於帳號規則回 429，無法區分兩者；鎖定由整合測試（分散 IP）覆蓋。

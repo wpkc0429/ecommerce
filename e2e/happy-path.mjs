@@ -1247,6 +1247,91 @@ try {
     await ownerCtx2.close();
     await clerkCtx.close();
   }
+  console.log("㉗ 後台 API 對外開放：CORS 依用途分流、admin 主機綁定、branding、cookie 模式 refresh（change admin-api-public-exposure）");
+  {
+    const adminOrigin = `https://admin-${runID}.e2e.example.com`;
+    const storefrontOrigin = `https://front-${runID}.e2e.example.com`;
+    const registered = [];
+    const register = async (origin, purpose) => {
+      const r = await req("POST", "/api/v1/admin/shops/1/allowed-origins", { token: adminToken, body: { origin, purpose } });
+      if (r.status === 201) registered.push(r.json.id);
+      return r;
+    };
+    try {
+      const a = await register(adminOrigin, "admin");
+      check("an admin-purpose origin registers (201, purpose echoed)", a.status === 201 && a.json?.purpose === "admin", brief(a));
+      const sOrig = await register(storefrontOrigin, undefined);
+      check("an origin registered without a purpose is a storefront origin", sOrig.status === 201 && sOrig.json?.purpose === "storefront", brief(sOrig));
+      check("an unknown purpose is rejected (422)", (await register(`https://x-${runID}.e2e.example.com`, "root")).status === 422);
+
+      const preflight = (origin, path) => req("OPTIONS", path, {
+        headers: { Origin: origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,x-admin-refresh" },
+      });
+      const allowedFor = async (origin, path) => (await preflight(origin, path)).headers.get("access-control-allow-origin") === origin;
+      check("a storefront origin gets no CORS on /admin/auth/login", !(await allowedFor(storefrontOrigin, "/api/v1/admin/auth/login")));
+      check("a storefront origin keeps CORS on the storefront API", await allowedFor(storefrontOrigin, "/api/v1/shop/products"));
+      check("an admin origin gets CORS on its own shop's admin path", await allowedFor(adminOrigin, "/api/v1/admin/shops/1/orders"));
+      check("an admin origin gets none on another shop's admin path", !(await allowedFor(adminOrigin, "/api/v1/admin/shops/2/orders")));
+      check("an admin origin gets none on a platform-level path", !(await allowedFor(adminOrigin, "/api/v1/admin/accounts")));
+      check("an admin origin gets none on the storefront API", !(await allowedFor(adminOrigin, "/api/v1/shop/products")));
+      check("an admin origin gets CORS on the shared auth path", await allowedFor(adminOrigin, "/api/v1/admin/auth/refresh"));
+      check("Allow-Headers announces X-Admin-Refresh",
+        (await preflight(adminOrigin, "/api/v1/admin/auth/refresh")).headers.get("access-control-allow-headers")?.includes("X-Admin-Refresh"));
+
+      // Server-side host binding: a request carrying the shop's admin Origin can
+      // only touch that shop, even for the platform administrator.
+      const asAdminOrigin = { Origin: adminOrigin };
+      const own = await req("GET", "/api/v1/admin/shops/1/me", { token: adminToken, headers: asAdminOrigin });
+      check("bound to shop 1: its own /me answers 200", own.status === 200, brief(own));
+      const other = await req("GET", "/api/v1/admin/shops/999999/me", { token: adminToken, headers: asAdminOrigin });
+      check("bound to shop 1: another shop answers 403 even for the platform admin", other.status === 403, brief(other));
+      const plat = await req("GET", "/api/v1/admin/accounts", { token: adminToken, headers: asAdminOrigin });
+      check("bound to shop 1: a platform-level path answers 403", plat.status === 403, brief(plat));
+      check("bound host still reaches /me", (await req("GET", "/api/v1/admin/me", { token: adminToken, headers: asAdminOrigin })).status === 200);
+      check("unbound (no admin origin): the platform path follows RBAC (200)",
+        (await req("GET", "/api/v1/admin/accounts", { token: adminToken })).status === 200);
+
+      // Branding: resolved from the registered admin origin, before login.
+      const set = await req("PUT", "/api/v1/admin/shops/1/settings", {
+        token: adminToken, body: { admin_branding: { primary_color: "#112233", accent_color: "#445566" } },
+      });
+      check("admin_branding written through PUT /settings", set.status === 200 && set.json?.admin_branding?.primary_color === "#112233", brief(set));
+      check("a non-hex color is rejected (422)",
+        (await req("PUT", "/api/v1/admin/shops/1/settings", { token: adminToken, body: { admin_branding: { primary_color: "red" } } })).status === 422);
+      const pub = await req("GET", "/api/v1/admin/branding", { headers: asAdminOrigin });
+      check("GET /admin/branding resolves the shop from the admin origin without a token",
+        pub.status === 200 && pub.json?.branding?.accent_color === "#445566" && pub.json?.shop_id === undefined, brief(pub));
+      check("GET /admin/branding on an unregistered origin is 404",
+        (await req("GET", "/api/v1/admin/branding", { headers: { Origin: `https://nobody-${runID}.e2e.example.com` } })).status === 404);
+      await req("PUT", "/api/v1/admin/shops/1/settings", { token: adminToken, body: { admin_branding: null } });
+
+      // Cookie-mode refresh.
+      const cl = await req("POST", "/api/v1/admin/auth/login", {
+        body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD, refresh_transport: "cookie" },
+      });
+      const setCookie = cl.headers.getSetCookie?.()[0] ?? "";
+      check("cookie-mode login: no refresh_token in the body", cl.status === 200 && cl.json?.refresh_token === undefined && !!cl.json?.access_token, brief(cl));
+      check("cookie-mode login: HttpOnly Secure SameSite=Strict cookie scoped to /api/v1/admin/auth",
+        /^__Secure-admin_refresh=/.test(setCookie) && /HttpOnly/i.test(setCookie) && /Secure/i.test(setCookie) &&
+          /SameSite=Strict/i.test(setCookie) && /Path=\/api\/v1\/admin\/auth/.test(setCookie), setCookie.slice(0, 80));
+      const cookie = setCookie.split(";")[0];
+      const noHeader = await req("POST", "/api/v1/admin/auth/refresh", { headers: { Cookie: cookie }, body: {} });
+      check("cookie refresh without X-Admin-Refresh is 401 and not rotated", noHeader.status === 401 && !noHeader.headers.getSetCookie?.().length, brief(noHeader));
+      const good = await req("POST", "/api/v1/admin/auth/refresh", { headers: { Cookie: cookie, "X-Admin-Refresh": "1" }, body: {} });
+      check("cookie refresh with the header rotates the cookie", good.status === 200 && good.json?.refresh_token === undefined &&
+        (good.headers.getSetCookie?.()[0] ?? "").split(";")[0] !== cookie, brief(good));
+      const logout = await req("POST", "/api/v1/admin/auth/logout", {
+        headers: { Cookie: (good.headers.getSetCookie?.()[0] ?? "").split(";")[0], "X-Admin-Refresh": "1" }, body: {},
+      });
+      check("cookie logout answers 204", logout.status === 204, brief(logout));
+      // The very first login of this run (default mode). Not repeated here: the
+      // per-IP+e-mail login limiter (5 / 5 min) is shared with every admin login above.
+      check("default (body-mode) login is unchanged: refresh_token present, no Set-Cookie",
+        !!login.json?.refresh_token && !(login.headers.getSetCookie?.().length), brief(login));
+    } finally {
+      for (const id of registered) await req("DELETE", `/api/v1/admin/shops/1/allowed-origins/${id}`, { token: adminToken });
+    }
+  }
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce
   // results, which need only the API.
