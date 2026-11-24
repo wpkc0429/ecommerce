@@ -1,4 +1,12 @@
+/* 每商家品牌（change admin-api-public-exposure）：app 以 style.setProperty 覆寫，
+   未設定時就是這兩個預設值。 */
+:root {
+  --brand-primary: #2563eb;
+  --brand-accent: #111827;
+}
+
 * { box-sizing: border-box; margin: 0; }
+.brand-logo { max-height: 2rem; max-width: 10rem; vertical-align: middle; margin-right: 0.5rem; }
 
 body {
   font-family: system-ui, -apple-system, "Noto Sans TC", sans-serif;
@@ -30,7 +38,7 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #111827;
+  background: var(--brand-accent);
   color: #fff;
   padding: 0.6rem 1.25rem;
 }
@@ -71,8 +79,8 @@ button {
   cursor: pointer;
 }
 button:hover { background: #f9fafb; }
-button.primary { background: #2563eb; border-color: #2563eb; color: #fff; }
-button.primary:hover { background: #1d4ed8; }
+button.primary { background: var(--brand-primary); border-color: var(--brand-primary); color: #fff; }
+button.primary:hover { filter: brightness(0.9); }
 button.publish { background: #059669; border-color: #059669; color: #fff; }
 button.danger { color: #b91c1c; border-color: #fca5a5; }
 

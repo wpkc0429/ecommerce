@@ -11,6 +11,7 @@
     <!-- 登入畫面 -->
     <section id="view-login" class="view">
       <div class="card login-card">
+        <img class="brand-logo" alt="" hidden />
         <h1>後台登入</h1>
         <form id="login-form">
           <label>Email <input type="email" id="login-email" required autocomplete="username" /></label>
@@ -71,7 +72,7 @@
     <!-- 主畫面 -->
     <section id="view-main" class="view" hidden>
       <header class="topbar">
-        <strong>Ecommerce Admin</strong>
+        <span><img class="brand-logo" alt="" hidden /><strong>Ecommerce Admin</strong></span>
         <div class="topbar-right">
           <label>商家
             <select id="shop-select"></select>
@@ -524,6 +525,18 @@
           </p>
         </div>
 
+        <!-- 後台品牌（change admin-api-public-exposure）：共用後台 SPA 依商家換 logo 與顏色。 -->
+        <div class="detail-section">
+          <form id="branding-form" class="inline-form" hidden>
+            <label class="inline">Logo 網址 <input type="url" id="branding-logo" placeholder="https://img.example.com/logo.webp" /></label>
+            <label class="inline">主色 <input type="text" id="branding-primary" placeholder="#2563eb" maxlength="7" /></label>
+            <label class="inline">強調色 <input type="text" id="branding-accent" placeholder="#111827" maxlength="7" /></label>
+            <button type="submit">儲存品牌</button>
+            <span class="hint" id="branding-saved" hidden>已儲存。</span>
+          </form>
+          <p class="hint">品牌只影響共用後台（商家自訂的後台前端可以忽略它）。顏色格式 <code>#RRGGBB</code>；留空＝使用平台預設。</p>
+        </div>
+
         <!-- 口徑揭露。刻意是靜態 HTML：它是散文，不是資料，放進 JS 只會讓視圖檔變長
              而不會讓它更正確（design D14 的 #5 事前定調）。 -->
         <div class="detail-section">
@@ -575,13 +588,24 @@
           <p class="hint">
             origin 是全域競爭的命名空間（與綁定網域同性質），因此由平台層權限管理，商家層角色看不到這個區塊。
           </p>
+          <p class="hint">
+            <strong>用途不同，授權範圍不同</strong>：<em>前台</em> origin 只能呼叫前台 API（店面）；<em>後台</em> origin 只能呼叫
+            <strong>本商家</strong>的後台 API，且伺服器端會把該網域綁定在這家商家上（即使登入者同時是其他商家成員也只能操作這家）。
+            前台 origin 在任何後台路徑上都得不到 CORS。
+          </p>
           <form id="allowed-origin-form" class="inline-form">
             <label class="inline">Origin <input type="url" id="allowed-origin-input" placeholder="https://shop.example.com" required /></label>
+            <label class="inline">用途
+              <select id="allowed-origin-purpose">
+                <option value="storefront">前台（商家的店面前端）</option>
+                <option value="admin">後台（商家的後台前端）</option>
+              </select>
+            </label>
             <button type="submit" class="primary">登記</button>
           </form>
           <p id="allowed-origins-error" class="error" hidden></p>
           <table class="table">
-            <thead><tr><th>ID</th><th>Origin</th><th>建立時間</th><th>動作</th></tr></thead>
+            <thead><tr><th>ID</th><th>Origin</th><th>用途</th><th>建立時間</th><th>動作</th></tr></thead>
             <tbody id="allowed-origins-tbody"></tbody>
           </table>
         </div>

@@ -10,7 +10,7 @@
 // change admin-commerce-operations（design D5）把分頁切換換成 hash 路由：
 // showTab() 只負責寫 hash，真正的畫面切換發生在單一的路由處理器裡。兩份真相
 // （「現在在哪個分頁」與「網址說在哪個分頁」）會立刻漂移，所以只留一份。
-import { api, tokens, API_BASE, onUnauthorized } from "./lib/api.js";
+import { api, tokens, login, logoutRequest, canRefresh, refreshTokens, onUnauthorized } from "./lib/api.js";
 import { $, el } from "./lib/dom.js";
 import { loadPermissions, can, canPlatform, setPlatformPermissions, permissionError } from "./lib/rbac.js";
 import { loadMediaConfig, setShopIDSource } from "./lib/upload.js";
@@ -31,6 +31,7 @@ import { createPlatformAccountsView } from "./views/platform-accounts.js";
 import { createSetPasswordView } from "./views/set-password.js";
 import { createAcceptInviteView } from "./views/accept-invite.js";
 import { createTeamView } from "./views/team.js";
+import { applyBranding, loadHostBranding, loadShopBranding } from "./lib/branding.js";
 
 const state = { me: null, shopID: null };
 
@@ -189,15 +190,11 @@ function renderNav() {
 }
 
 function logout() {
-  if (tokens.refresh) {
-    fetch(`${API_BASE}/api/v1/admin/auth/logout`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refresh_token: tokens.refresh }),
-    }).catch(() => {});
-  }
+  logoutRequest();
   tokens.clear();
+  applyBranding(null);
   show("view-login");
+  loadHostBranding();
 }
 onUnauthorized(logout);
 
@@ -208,6 +205,7 @@ onUnauthorized(logout);
 // 所以只保留視圖名稱。
 async function refreshShopContext(honorHash) {
   await loadPermissions(state.shopID);
+  loadShopBranding(state.shopID); // 不阻塞：品牌只是外觀
   // change product-images-r2: whether uploads are available at all (R2 may not be
   // configured yet). Kept in lib/upload.js; controls render only when enabled.
   await loadMediaConfig();
@@ -263,9 +261,14 @@ onRoute(renderRoute);
 setShopIDSource(() => state.shopID);
 
 async function boot() {
+  loadHostBranding(); // 登入頁也要有商家品牌（以請求的 admin 主機解析；未登記＝預設）
   const route = parseHash();
   if (route.name === "set-password") return openSetPassword(route.params[0]);
   if (route.name === "accept-invite") return openAcceptInvite(route.params[0]);
+  // access token 只在記憶體：重新整理後以 refresh（cookie 或儲存的 token）換一枚新的。
+  if (!tokens.access && canRefresh()) {
+    try { await refreshTokens(); } catch { tokens.clear(); }
+  }
   if (tokens.access) {
     try {
       state.me = await api("GET", "/admin/me");
@@ -280,13 +283,7 @@ $("#login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   $("#login-error").hidden = true;
   try {
-    const res = await fetch(`${API_BASE}/api/v1/admin/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: $("#login-email").value, password: $("#login-password").value }),
-    });
-    if (!res.ok) throw new Error("bad credentials");
-    tokens.set(await res.json());
+    await login($("#login-email").value, $("#login-password").value);
     state.me = await api("GET", "/admin/me");
     await enterMain();
   } catch {

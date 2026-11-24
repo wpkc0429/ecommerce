@@ -18,6 +18,7 @@ import { api } from "../lib/api.js";
 import { $, el, clear, rows } from "../lib/dom.js";
 import { formatMoney } from "../lib/money.js";
 import { can } from "../lib/rbac.js";
+import { createBrandingForm } from "./shop-branding.js";
 
 /** 筆數／數量。**不是金額**，所以不帶貨幣符號、不經過 formatMoney。 */
 const groups = new Intl.NumberFormat("zh-Hant-TW");
@@ -184,6 +185,7 @@ export function createReportsView(ctx) {
       return;
     }
     renderTimezone(sales.timezone);
+    branding.load();
 
     const byCurrency = {};
     for (const c of products.currencies ?? []) byCurrency[c.currency] = c;
@@ -201,6 +203,8 @@ export function createReportsView(ctx) {
     }
     for (const c of list) host.append(currencyBlock(c, byCurrency));
   }
+
+  const branding = createBrandingForm(ctx, showError);
 
   // ── 事件接線 ────────────────────────────────────────────────────────
   $("#report-search").addEventListener("click", load);

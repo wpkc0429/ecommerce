@@ -109,9 +109,10 @@ export function createStorefrontClientsView(ctx) {
     rows($("#allowed-origins-tbody"), data.origins, (o) => el("tr", { "data-origin": o.origin },
       el("td", {}, o.id),
       el("td", { class: "mono" }, o.origin),
+      el("td", {}, o.purpose === "admin" ? "後台" : "前台"),
       el("td", {}, formatTime(o.created_at)),
       el("td", {}, el("button", { class: "danger", onclick: () => removeOrigin(o) }, "移除"))),
-    { empty: "尚未登記任何 origin。瀏覽器端的自帶前端會被 CORS 擋下。", colspan: 4 });
+    { empty: "尚未登記任何 origin。瀏覽器端的自帶前端會被 CORS 擋下。", colspan: 5 });
   }
 
   async function addOrigin(e) {
@@ -120,7 +121,7 @@ export function createStorefrontClientsView(ctx) {
     err.hidden = true;
     const origin = $("#allowed-origin-input").value.trim();
     try {
-      await api("POST", `/admin/shops/${ctx.getShopID()}/allowed-origins`, { origin });
+      await api("POST", `/admin/shops/${ctx.getShopID()}/allowed-origins`, { origin, purpose: $("#allowed-origin-purpose").value });
       $("#allowed-origin-input").value = "";
       await loadOrigins();
     } catch (ex) {

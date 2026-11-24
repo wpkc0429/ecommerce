@@ -8,7 +8,7 @@
 //           以那個帳號登入後接受；接受成功後換發 token 並切到該商家。
 //
 // token 只存在於這個函式的 closure 與網址的 hash。**絕不寫入任何持久儲存。**
-import { API_BASE, api, ApiError, tokens, refreshTokens } from "../lib/api.js";
+import { API_BASE, api, ApiError, tokens, refreshTokens, login } from "../lib/api.js";
 import { $ } from "../lib/dom.js";
 
 async function post(path, body) {
@@ -113,9 +113,11 @@ export function createAcceptInviteView({ toLogin, toMain }) {
     e.preventDefault();
     showError("");
     try {
-      const res = await post("/auth/login", { email: info.email, password: $("#ai-login-password").value });
-      if (!res.ok) return showError("登入失敗，請確認密碼。");
-      tokens.set(res.data);
+      try {
+        await login(info.email, $("#ai-login-password").value);
+      } catch {
+        return showError("登入失敗，請確認密碼。");
+      }
       $("#ai-login-password").value = "";
       await acceptAsCurrent();
     } catch {
