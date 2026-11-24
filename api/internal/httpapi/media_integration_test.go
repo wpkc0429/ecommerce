@@ -81,8 +81,7 @@ func newMediaEnv(t *testing.T, enabled bool) *mediaEnv {
 
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
-	site := client.Site.Create().SetDomain(e.domainA).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(site.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.domainA)
 
 	hash, _ := auth.HashPassword("password-123")
 	mk := func(email string, shop int, role *ent.Role) int {
@@ -608,7 +607,7 @@ func TestMediaProductDeleteCascadesAndRemovesObjects(t *testing.T) {
 
 func (e *mediaEnv) public(path string) (int, map[string]any) {
 	req := httptest.NewRequest("GET", path, nil)
-	req.Host = e.domainA
+	testutil.SetTenant(req, e.domainA)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	var parsed map[string]any

@@ -28,6 +28,7 @@ import (
 
 	entidem "ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/httpapi"
+	"ksdevworks/ecommerce/api/internal/testutil"
 )
 
 // ── helpers ────────────────────────────────────────────────────────────
@@ -51,7 +52,7 @@ func (e *guestEnv) idemRequest(domain, method, path, key, bearer string, body an
 		req.Header.Set("Authorization", "Bearer "+bearer)
 	}
 	if domain != "" {
-		req.Host = domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -394,7 +395,7 @@ func TestIdempotentKeyIsFreeAfterMalformedBody(t *testing.T) {
 	req := httptest.NewRequest("POST", "/api/v1/shop/guest/checkout", bytes.NewBufferString("{not json"))
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set(httpapi.IdempotencyKeyHeader, key)
-	req.Host = e.shopADomain
+	testutil.SetTenant(req, e.shopADomain)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusBadRequest {

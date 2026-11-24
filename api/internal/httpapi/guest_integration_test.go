@@ -83,10 +83,8 @@ func newGuestEnv(t *testing.T) *guestEnv {
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
 
-	siteA := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteA.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
-	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.shopADomain)
+	testutil.BindTenant(t, client, e.shopB, e.shopBDomain)
 
 	hash, _ := auth.HashPassword("password-123")
 	e.memberA1 = client.Member.Create().
@@ -209,7 +207,7 @@ func (e *guestEnv) guestRequest(domain, method, path string, body any) (int, str
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Content-Type", "application/json")
 	if domain != "" {
-		req.Host = domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -243,7 +241,7 @@ func (e *guestEnv) tokenCall(t *testing.T, token, domain, method, path string, b
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	if domain != "" {
-		req.Host = domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -843,7 +841,7 @@ func TestGuestAndMemberCheckoutShareOneStockGuard(t *testing.T) {
 			})
 			req := httptest.NewRequest("POST", "/api/v1/shop/checkout", &buf)
 			req.Header.Set("Authorization", "Bearer "+tok)
-			req.Host = e.shopADomain
+			testutil.SetTenant(req, e.shopADomain)
 			rec := httptest.NewRecorder()
 			e.router.ServeHTTP(rec, req)
 			codes[i] = rec.Code

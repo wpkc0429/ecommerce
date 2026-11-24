@@ -40,7 +40,6 @@ type clientAuthEnv struct {
 	issuer   *auth.TokenIssuer
 
 	shopA, shopB   int
-	shopADomain    string
 	ownerA, ownerB int // merchant_owner of shop A / shop B
 	platform       int // platform role holding shop.manage_client_origins
 	memberA        int
@@ -66,12 +65,10 @@ func newClientAuthEnv(t *testing.T) *clientAuthEnv {
 	client := testutil.OpenDB(t)
 	rdb := testutil.OpenRedis(t)
 	ctx := context.Background()
-	e := &clientAuthEnv{client: client, rdb: rdb, shopADomain: "clientauth-a.test"}
+	e := &clientAuthEnv{client: client, rdb: rdb}
 
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
-	siteA := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteA.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
 
 	e.memberA = client.Member.Create().SetShopID(e.shopA).SetEmail("ca-member@t.dev").SetStatus(1).SaveX(ctx).ID
 

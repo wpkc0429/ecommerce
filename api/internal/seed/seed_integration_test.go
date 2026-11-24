@@ -200,7 +200,6 @@ func TestDemoSeedIsIdempotent(t *testing.T) {
 		out := map[string]int{}
 		for name, count := range map[string]func(context.Context) (int, error){
 			"shops":                client.Shop.Query().Count,
-			"sites":                client.Site.Query().Count,
 			"categories":           client.Category.Query().Count,
 			"products":             client.Product.Query().Count,
 			"product_skus":         client.ProductSKU.Query().Count,

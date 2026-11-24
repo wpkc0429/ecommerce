@@ -73,8 +73,7 @@ func newCatalogEnv(t *testing.T) *catalogEnv {
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
 
-	site := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(site.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.shopADomain)
 
 	hash, _ := auth.HashPassword("password-123")
 	e.ownerA = client.User.Create().SetEmail("owner-a@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
@@ -146,7 +145,7 @@ func (e *catalogEnv) callJSON(t *testing.T, userID int, method, path string, bod
 func (e *catalogEnv) public(t *testing.T, method, path, domain string) (int, string) {
 	t.Helper()
 	req := httptest.NewRequest(method, path, nil)
-	req.Host = domain
+	testutil.SetTenant(req, domain)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	return rec.Code, rec.Body.String()

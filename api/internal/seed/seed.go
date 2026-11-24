@@ -33,8 +33,6 @@ import (
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	entpaymentcredential "ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
 	"ksdevworks/ecommerce/api/internal/ent/theme"
 	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -51,7 +49,7 @@ var starterSectionsDefs []byte
 type Options struct {
 	AdminEmail    string
 	AdminPassword string
-	Demo          bool // additionally create a demo shop bound to demo.localhost
+	Demo          bool // additionally create the demo shop (identified by DemoPublishableKey)
 
 	// PaymentCredentialsEncryptionKey encrypts the demo shop's seeded ecpay
 	// credentials (change ecpay-per-shop-credentials, design D9). Only used
@@ -485,22 +483,15 @@ func seedStarterTheme(ctx context.Context, tx *ent.Tx) (int, error) {
 }
 
 func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID, staffRoleID int, box *cryptbox.Box) error {
-	const demoDomain = "demo.localhost"
-
-	s, err := tx.Site.Query().Where(site.DomainEQ(demoDomain)).Only(ctx)
-	if ent.IsNotFound(err) {
-		s, err = tx.Site.Create().SetDomain(demoDomain).Save(ctx)
-	}
-	if err != nil {
-		return fmt.Errorf("seed: demo site: %w", err)
-	}
-
-	// Reuse the shop already mapped to the demo site if present.
+	// The demo shop is identified by its fixed publishable key (it used to be
+	// the shop mapped to the demo.localhost site; sites are being retired).
 	var shopID int
-	mapping, err := tx.SiteShop.Query().Where(siteshop.SiteIDEQ(s.ID)).First(ctx)
+	demoKey, err := tx.PublishableKey.Query().
+		Where(entpublishablekey.KeyEQ(DemoPublishableKey)).
+		Only(ctx)
 	switch {
 	case err == nil:
-		shopID = mapping.ShopID
+		shopID = demoKey.ShopID
 	case ent.IsNotFound(err):
 		content, _ := json.Marshal(map[string]any{
 			"header": map[string]any{
@@ -522,15 +513,8 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID,
 			return fmt.Errorf("seed: demo shop: %w", cerr)
 		}
 		shopID = shop.ID
-		if _, cerr := tx.SiteShop.Create().
-			SetSiteID(s.ID).
-			SetShopID(shopID).
-			SetIsPrimary(true).
-			Save(ctx); cerr != nil { // path_prefix NULL → default shop of the site
-			return fmt.Errorf("seed: demo site_shop: %w", cerr)
-		}
 	default:
-		return fmt.Errorf("seed: query demo mapping: %w", err)
+		return fmt.Errorf("seed: query demo publishable key: %w", err)
 	}
 
 	// The demo shop's content schema (version 1 on first seed).
@@ -1064,10 +1048,9 @@ func seedDemoTiers(ctx context.Context, tx *ent.Tx, shopID int) error {
 //     without first logging into the back office to fetch it.
 //  3. (decisive) It widens nothing. A publishable key is an IDENTIFIER, NOT A
 //     CREDENTIAL (change storefront-client-auth, design D1: "its disclosure is
-//     not a security incident. It grants nothing"), and the demo shop is
-//     already resolvable with no key at all via `Host: demo.localhost`. The
-//     entropy in a generated key exists to stop enumeration of which shops the
-//     platform hosts; "demo.localhost hosts a demo shop" is not a secret.
+//     not a security incident. It grants nothing"), and a demo shop with
+//     sample data is not a secret. The entropy in a generated key exists to
+//     stop enumeration of which shops the platform hosts.
 //
 // The value uses only the random segment's own alphabet (a–z). It deliberately
 // does NOT use an underscore-delimited segment like "pk_demo_…": design D8 of

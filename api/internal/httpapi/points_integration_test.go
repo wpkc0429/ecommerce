@@ -97,10 +97,8 @@ func newPointsEnv(t *testing.T) *pointsEnv {
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
 
-	siteA := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteA.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
-	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.shopADomain)
+	testutil.BindTenant(t, client, e.shopB, e.shopBDomain)
 
 	// Since change member-identity-per-shop the identity row itself carries
 	// shop_id and the loyalty balance — there is no separate membership row
@@ -252,7 +250,7 @@ func (e *pointsEnv) memberRequest(memberID, shopID int, domain, method, path str
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if domain != "" {
-		req.Host = domain // change storefront-client-auth: Host, not X-Site-Domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)

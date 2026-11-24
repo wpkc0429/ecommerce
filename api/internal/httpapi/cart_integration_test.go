@@ -53,10 +53,8 @@ func newCartEnv(t *testing.T) *cartEnv {
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
 
-	siteA := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteA.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
-	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.shopADomain)
+	testutil.BindTenant(t, client, e.shopB, e.shopBDomain)
 
 	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
 	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
@@ -125,7 +123,7 @@ func (e *cartEnv) call(t *testing.T, memberID, shopID int, domain, method, path 
 		// change storefront-client-auth: the storefront group resolves the
 		// tenant from the publishable key or the Host header — X-Site-Domain
 		// is no longer read here.
-		req.Host = domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)

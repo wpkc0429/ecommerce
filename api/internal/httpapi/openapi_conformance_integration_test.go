@@ -294,8 +294,7 @@ func newConformanceEnv(t *testing.T) *conformanceEnv {
 		webhookSecret: "oa-conformance-secret",
 	}
 	e.shopID = client.Shop.Create().SetName("Conformance Shop").SetStatus(1).SaveX(ctx).ID
-	site := client.Site.Create().SetDomain(e.domain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(site.ID).SetShopID(e.shopID).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopID, e.domain)
 	client.PublishableKey.Create().SetShopID(e.shopID).SetKey(e.pubKey).SetLabel("conformance").SaveX(ctx)
 
 	// A published product with a florist-shaped price: 3400 minor units is
@@ -462,7 +461,7 @@ func (e *conformanceEnv) doWithKey(t *testing.T, method, path, bearer, idemKey s
 		reader = bytes.NewReader(raw)
 	}
 	req := httptest.NewRequest(method, path, reader)
-	req.Host = e.domain
+	testutil.SetTenant(req, e.domain)
 	req.Header.Set(PublishableKeyHeader, e.pubKey)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")

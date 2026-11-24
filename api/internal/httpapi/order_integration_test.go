@@ -74,10 +74,8 @@ func newOrderEnv(t *testing.T) *orderEnv {
 	e.shopA = client.Shop.Create().SetName("Shop A").SetStatus(1).SaveX(ctx).ID
 	e.shopB = client.Shop.Create().SetName("Shop B").SetStatus(1).SaveX(ctx).ID
 
-	siteA := client.Site.Create().SetDomain(e.shopADomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteA.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
-	siteB := client.Site.Create().SetDomain(e.shopBDomain).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(siteB.ID).SetShopID(e.shopB).SetIsPrimary(true).SaveX(ctx)
+	testutil.BindTenant(t, client, e.shopA, e.shopADomain)
+	testutil.BindTenant(t, client, e.shopB, e.shopBDomain)
 
 	e.memberA1 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a1@t.dev").SetStatus(1).SaveX(ctx).ID
 	e.memberA2 = client.Member.Create().SetShopID(e.shopA).SetEmail("member-a2@t.dev").SetStatus(1).SaveX(ctx).ID
@@ -179,7 +177,7 @@ func (e *orderEnv) memberRequest(memberID, shopID int, domain, method, path stri
 	req := httptest.NewRequest(method, path, &buf)
 	req.Header.Set("Authorization", "Bearer "+tok)
 	if domain != "" {
-		req.Host = domain // change storefront-client-auth: Host, not X-Site-Domain
+		testutil.SetTenant(req, domain)
 	}
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
@@ -526,7 +524,7 @@ func TestOrderMemberCrossShopIsolation(t *testing.T) {
 	}
 	req := httptest.NewRequest("GET", fmt.Sprintf("/api/v1/shop/orders/%d", orderID), nil)
 	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Host = e.shopBDomain
+	testutil.SetTenant(req, e.shopBDomain)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	if rec.Code != http.StatusUnauthorized {

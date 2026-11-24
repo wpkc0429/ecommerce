@@ -36,7 +36,7 @@ type cmsEnv struct {
 
 	cms    *cms.Service
 	admin  int // platform super admin (from seed)
-	shopID int // demo shop bound to demo.localhost
+	shopID int // demo shop (publishable key seed.DemoPublishableKey)
 	homeID int // auto-created draft home page
 }
 
@@ -122,11 +122,11 @@ func (e *cmsEnv) admin1(t *testing.T, method, path string, body any) (int, map[s
 	return rec.Code, parsed, rec.Body.String()
 }
 
-// renderPage requests the public render bundle for demo.localhost.
+// renderPage requests the public render bundle of the demo shop by its key.
 func (e *cmsEnv) renderPage(t *testing.T, path string) (int, map[string]any, string) {
 	t.Helper()
 	req := httptest.NewRequest("GET", "/api/v1/render/page?path="+path, nil)
-	req.Header.Set("X-Site-Domain", "demo.localhost")
+	req.Header.Set(httpapi.PublishableKeyHeader, seed.DemoPublishableKey)
 	rec := httptest.NewRecorder()
 	e.router.ServeHTTP(rec, req)
 	var parsed map[string]any
