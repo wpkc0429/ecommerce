@@ -43,8 +43,8 @@ const OWNER_EMAIL = process.env.E2E_OWNER_EMAIL ?? "demo-owner@example.com";
 const OWNER_PASSWORD = process.env.E2E_OWNER_PASSWORD ?? "demo-owner-change-me";
 
 // Seeded by api/internal/seed (change commerce-demo-seed). Fixed on purpose —
-// a publishable key is an identifier, not a credential, and the demo shop is
-// already resolvable without one via Host: demo.localhost (design D5).
+// a publishable key is an identifier, not a credential (and the demo data is
+// sample data).
 const PK = "pk_demoseedstorefrontkeynotsecret";
 const CUSTOMER_EMAIL = "demo-customer@example.com";
 const CUSTOMER_PASSWORD = "demo-customer-change-me";

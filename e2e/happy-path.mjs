@@ -1,6 +1,6 @@
 // E2E happy path (task 10.1) through the real browser:
-// seed 建店 → (網域已綁 demo.localhost) → admin UI 登入 → 編輯全域內容與首頁
-// → 發佈 → 前台渲染 → 換版 → 前台反映新主題。
+// seed 建店 → admin UI 登入 → 編輯全域內容與首頁 → 發佈 → 以 publishable key
+// 讀取公開渲染 bundle（內容儲存的公開讀取面）。
 //
 // Since change commerce-demo-seed this script is the "run everything" entry
 // point: after the CMS flow above it also runs the commerce chain
@@ -9,7 +9,7 @@
 // told to run is a suite nobody runs (design D2). The commerce path needs no
 // browser and can also be run on its own: `node commerce-path.mjs`.
 //
-// Prereqs: API on :8080, web on :3000, admin on :3001, seeded demo shop
+// Prereqs: API on :8080, admin on :3001, seeded demo shop
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -27,21 +27,24 @@ const ADMIN_PASSWORD =
   "admin-change-me";
 
 // Base URLs are overridable so the suite can run against a second stack
-// (e.g. web on another port, an API on a fresh database) without touching the
-// developer's running one. Defaults are the documented :3000/:3001/:8080.
-const WEB = (process.env.E2E_WEB_BASE_URL ?? "http://demo.localhost:3000").replace(/\/+$/, "");
+// (e.g. an API on a fresh database) without touching the developer's running
+// one. Defaults are the documented :3001/:8080.
 const ADMIN = (process.env.E2E_ADMIN_BASE_URL ?? "http://localhost:3001").replace(/\/+$/, "");
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
-// The admin SPA reads its API/web base from localStorage at runtime
+// The admin SPA reads its API base from localStorage at runtime
 // (admin/lib/api.js); point it at the same API this run uses.
-await page.addInitScript(([api, web]) => {
+await page.addInitScript((api) => {
   try {
     localStorage.setItem("apiBase", api);
-    localStorage.setItem("webBase", web);
   } catch {}
-}, [API, WEB.replace("://demo.localhost", "://localhost")]);
+}, API);
+// The public read surface of the content store, addressed with the demo shop's
+// publishable key (an identifier, not a credential).
+const DEMO_PK = "pk_demoseedstorefrontkeynotsecret";
+const renderPublic = (path = "/") =>
+  req("GET", `/api/v1/render/page?path=${encodeURIComponent(path)}`, { pk: DEMO_PK });
 page.on("pageerror", (err) => fail(`page JS error: ${err.message}`));
 
 try {
@@ -97,14 +100,13 @@ try {
     document.querySelector("#editor-status").textContent.includes("已發佈"));
   check("published from editor", true);
 
-  // ── 前台渲染 ──
-  console.log("⑤ Storefront renders the published home");
-  await page.goto(`${WEB}/`);
-  await page.waitForSelector("h1");
-  const h1 = await page.textContent("h1");
-  check("storefront shows the edited hero title", h1?.includes("E2E 全新首頁標題"), h1 ?? "");
-  const title = await page.title();
-  check("document title from page", title.length > 0, title);
+  // ── 公開讀取：已發佈首頁經 publishable key 取得 ──
+  console.log("⑤ The published home is served by the public render API");
+  const pubHome = await renderPublic("/");
+  check("render API serves the published home", pubHome.status === 200, brief(pubHome));
+  const heroTitle0 = (pubHome.json?.page?.content?.sections ?? []).find((x) => x.type === "hero")?.title ?? "";
+  check("the bundle carries the edited hero title", heroTitle0.includes("E2E 全新首頁標題"), heroTitle0);
+  check("the bundle carries a page title", (pubHome.json?.page?.title ?? "").length > 0);
 
   // ── 9.3 全域內容編輯 → 立即生效 ──
   console.log("⑥ Shop global content update");
@@ -117,12 +119,12 @@ try {
   page.once("dialog", (d) => d.accept());
   await page.click("#content-save");
   await page.waitForTimeout(400);
-  await page.goto(`${WEB}/`);
-  const headerText = await page.textContent("header");
-  check("storefront header shows updated site title", headerText?.includes("E2E 招牌"), headerText ?? "");
+  const pubAfter = await renderPublic("/");
+  check("the render API reflects the updated site title at once",
+    pubAfter.json?.shop?.content?.header?.site_title === "E2E 招牌", JSON.stringify(pubAfter.json?.shop?.content?.header));
 
   // ── change cms-rich-text-sanitization：rich text 於寫入時消毒，前台不執行注入 ──
-  console.log("⑥b Rich text is sanitized on write and never executes on the storefront");
+  console.log("⑥b Rich text is sanitized on write and the public API serves only the sanitized markup");
   {
     const tok = (await req("POST", "/api/v1/admin/auth/login", {
       body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
@@ -148,103 +150,16 @@ try {
     const pub = await req("POST", `/api/v1/admin/shops/1/pages/${home?.id}/publish`, { token: tok });
     check("publish after rich text edit", pub.status === 200, brief(pub));
 
-    await page.goto(`${WEB}/`);
-    await page.waitForSelector("table");
-    check("storefront renders the sanitized table", (await page.locator("td[colspan='2']").count()) === 1);
-    const injected = await page.evaluate(() => ({
-      xss: window.__xss,
-      onerror: document.querySelectorAll("[onerror]").length,
-      jsLinks: [...document.querySelectorAll("a[href]")].filter((a) => /^javascript:/i.test(a.getAttribute("href"))).length,
-    }));
-    check("no injected handler ran on the storefront", injected.xss === undefined, JSON.stringify(injected));
-    check("storefront DOM has no onerror attributes or javascript: links",
-      injected.onerror === 0 && injected.jsLinks === 0, JSON.stringify(injected));
+    const served = (await renderPublic("/")).json?.page?.content?.sections?.find((x) => x.type === "rich_text")?.html ?? "";
+    check("the public API serves the sanitized table", served.includes('colspan="2"'), served);
+    check("the public API markup has no onerror, script or javascript: link",
+      !/onerror|<script|javascript:/i.test(served), served);
   }
 
-  // ── 換版 → 前台反映新主題 ──
-  console.log("⑦ Theme switch reflected on the storefront");
-  // Create a second theme via the API (admin UI has no theme manager — 平台端).
   const login = await req("POST", "/api/v1/admin/auth/login", {
     body: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
   });
   const adminToken = login.json.access_token;
-  const themeRes = await req("POST", "/api/v1/admin/themes", {
-    token: adminToken,
-    body: {
-      code: "starter-v2", name: "Starter V2", layout_key: "starter/main",
-      config_schema: {
-        type: "object", additionalProperties: false,
-        properties: {
-          tokens: { type: "object", additionalProperties: false, properties: {
-            color_primary: { type: "string", default: "#dc2626" } } },
-          header: { type: "object", additionalProperties: false, properties: {
-            site_title: { type: "string", default: "V2 商店" },
-            logo_url: { type: "string", default: "" },
-            nav: { type: "array", default: [], items: { type: "object",
-              additionalProperties: false, properties: {
-                label: { type: "string", default: "" },
-                href: { type: "string", default: "/" } } } } } },
-          footer: { type: "object", additionalProperties: false, properties: {
-            text: { type: "string", default: "V2 footer" },
-            links: { type: "array", default: [], items: { type: "object",
-              additionalProperties: false, properties: {
-                label: { type: "string", default: "" },
-                href: { type: "string", default: "/" } } } } } },
-        },
-      },
-    },
-  });
-  const theme = themeRes.json;
-  check("v2 theme created", Boolean(theme.id), JSON.stringify(theme));
-  const tp = await req("POST", `/api/v1/admin/themes/${theme.id}/pages`, {
-    token: adminToken,
-    body: {
-      type_key: "home", component_key: "starter/home",
-      page_schema: {
-        type: "object", additionalProperties: false,
-        properties: { sections: { type: "array", default: [], items: { oneOf: [{
-          type: "object", additionalProperties: false, required: ["type"],
-          properties: {
-            type: { const: "hero" },
-            title: { type: "string", default: "" },
-            subtitle: { type: "string", default: "" },
-            image: { type: "string", default: "" },
-            cta_text: { type: "string", default: "" },
-            cta_href: { type: "string", default: "/" },
-          } }] } } },
-      },
-    },
-  });
-  check("v2 home page type registered", Boolean(tp.json.id), tp.text);
-  const sw = await req("POST", "/api/v1/admin/shops/1/theme", {
-    token: adminToken, body: { theme_id: theme.id },
-  });
-  check("theme switched", sw.json.theme_id === theme.id, sw.text);
-
-  // The bundle now carries the v2 theme, and keys the v2 schema does not
-  // define are pruned from the hydrated output (design D6) — while existing
-  // payload values (site_title from step ⑥) are preserved, not reset.
-  const bundleRes = await req("GET", "/api/v1/render/page?path=/", {
-    headers: { "X-Site-Domain": "demo.localhost" },
-  });
-  const bundle = bundleRes.json;
-  check("bundle switches to the v2 theme immediately",
-    bundle.shop?.theme?.code === "starter-v2", JSON.stringify(bundle.shop?.theme));
-  check("keys undefined in the v2 schema are pruned",
-    bundle.shop?.content?.tokens?.color_background === undefined);
-  check("existing payload values survive the switch (hydration, not reset)",
-    bundle.shop?.content?.header?.site_title === "E2E 招牌",
-    JSON.stringify(bundle.shop?.content?.header));
-
-  await page.goto(`${WEB}/`);
-  const heroStill = await page.textContent("h1");
-  check("page payload renders after the switch (hydrated against v2 schema)",
-    heroStill?.includes("E2E 全新首頁標題"), heroStill ?? "");
-
-  // Switch back to starter for repeatability.
-  await req("POST", "/api/v1/admin/shops/1/theme", {
-    token: adminToken, body: { theme_id: 1 },
-  });
 
   // ══ 商品目錄後台（change admin-commerce-catalog, design D10）══
   //
@@ -936,18 +851,16 @@ try {
     resultText.includes("只顯示這一次") && resultText.includes("小時後失效"), resultText.replace(/\s+/g, " ").slice(0, 160));
   check("the checklist shows the owner assigned but the password not yet set",
     (await page.locator('#platform-shop-result [data-check="owner_assigned"]').getAttribute("data-done")) === "true" &&
-    (await page.locator('#platform-shop-result [data-check="owner_password_set"]').getAttribute("data-done")) === "false" &&
-    (await page.locator('#platform-shop-result [data-check="domain_bound"]').getAttribute("data-done")) === "true");
+    (await page.locator('#platform-shop-result [data-check="owner_password_set"]').getAttribute("data-done")) === "false");
   check("the new shop is in the list", (await page.locator(`#platform-shops-tbody tr[data-name="${provShop}"]`).count()) === 1);
 
   // 另一個瀏覽器 context（沒有任何登入狀態）：新 owner 開連結。
   const ownerCtx = await browser.newContext();
-  await ownerCtx.addInitScript(([api, web]) => {
+  await ownerCtx.addInitScript((api) => {
     try {
       localStorage.setItem("apiBase", api);
-      localStorage.setItem("webBase", web);
     } catch {}
-  }, [API, WEB.replace("://demo.localhost", "://localhost")]);
+  }, API);
   const ownerPage = await ownerCtx.newPage();
   ownerPage.on("pageerror", (err) => fail(`owner page JS error: ${err.message}`));
   try {
@@ -1030,12 +943,11 @@ try {
     (await req("POST", "/api/v1/admin/auth/login", { body: { email, password } })).json?.access_token;
   const newAdminCtx = async () => {
     const c = await browser.newContext();
-    await c.addInitScript(([api, web]) => {
+    await c.addInitScript((api) => {
       try {
         localStorage.setItem("apiBase", api);
-        localStorage.setItem("webBase", web);
       } catch {}
-    }, [API, WEB.replace("://demo.localhost", "://localhost")]);
+    }, API);
     return c;
   };
   const uiLogin = async (p, email, password) => {
