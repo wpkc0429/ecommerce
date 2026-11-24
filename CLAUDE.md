@@ -11,11 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 > **不使用本 repo 託管的店面**。
 > - **已棄用（仍保留、仍可運作，不要加新功能、不要讓新商家依賴）**：託管渲染——`/web` 的租戶渲染店面、**主題與主題系統**（`themes`／`theme_pages`、主題端點、`starter` 主題 seed、
 >   `theme.*` 權限）、**site／網域對應與 Host 解析**（`sites`／`site_shop`、`X-Site-Domain`、`tenantmw` 的 Host 後備）、開店精靈的主題／網域欄位、e2e 中依賴 `WEB` 的斷言。
->   移除另案進行（`openspec/changes/retire-hosted-storefront-and-themes`，**草稿、未核准，不得實作**），且需在內容儲存取得「每店 schema」之後。
+>   **使用者已核准直接移除**（2026-11-24，無棄用期；`openspec/changes/retire-hosted-storefront-and-themes`，v1 例外見該 change 的 design D1），第一階段先把頁面 schema 搬到每店的 `content_schemas`，之後才移除主題。**放置規則**：需要後端運算或伺服器狀態的東西歸 ecommerce；很少改的內容放站台自己的 repo；常被表單編輯的內容放內容儲存。
 > - **保留並改造（不是棄用）**：CMS 的**內容功能**——頁面內容與全域內容（`pages`、`shops.content_json`）、schema 驗證、草稿／發佈、preview token、rich text 消毒、圖片網域檢查、
 >   `/api/v1/render/page`／`/render/preview` 公開讀取與其 Redis 快取與事件失效、admin 的「頁面」「全域內容」視圖。商家用後台表單編輯的小東西（文字、banner、活動文案、促銷圖、店家資訊、FAQ）
 >   存在這裡，由商家站台以 publishable key 讀取。改造成通用 headless 內容儲存見 `openspec/changes/headless-content-store`（**提案、未實作**）；在它實作前，現有行為不變。
-> - 兩者都與 `/api/v1` 表面鎖綁在一起：在相關 change 被核准並決定 v1 破例或 `/api/v2` 之前，不得刪除任何路由。
+> - 兩者都與 `/api/v1` 表面鎖綁在一起：除了退役 change 列出的一次性例外（約 60 行，實作時以 ADR 0002 與 `v1-removed.txt` 記錄）之外，不得刪除任何路由或欄位。
 
 - `/api` — Go headless API（唯一資料權威）：chi router、ent + versioned migrations、JWT 雙體系認證、RBAC、多租戶解析、CMS 內容／渲染 bundle／快取（內容儲存；託管渲染與主題已棄用）
 - `/web` — Next.js (App Router) storefront SSR：以渲染 bundle API 取得資料，主題＝前端元件庫（`themes/registry.ts`）。**託管渲染店面已棄用為產品**，將由平台官網取代或退役（`openspec/changes/platform-website`，提案）；目前沒有任何商家使用它

@@ -2,7 +2,7 @@
 
 - 狀態：**已決定**（2026-11-24，由專案擁有者決定；本文件只記錄，不重新討論）。**已修正一次**：見文末「修正（Amendment）」——CMS 內容儲存保留，只棄用託管渲染、主題與 site／網域路由
 - 範圍：產品方向。本文件本身不改任何行為；實際移除走另案、另行核准（見「階段計畫」）。
-- 相關：[`docs/PLATFORM-ROADMAP.md`](../PLATFORM-ROADMAP.md)、OpenSpec change `platform-website`（提案）、`headless-content-store`（**提案，未實作**：把 CMS 內容功能改造成 headless 內容儲存）、`retire-hosted-storefront-and-themes`（**草稿，未核准**）
+- 相關：[`docs/PLATFORM-ROADMAP.md`](../PLATFORM-ROADMAP.md)、OpenSpec change `platform-website`（提案）、`headless-content-store`（**提案，未實作**：把 CMS 內容功能改造成 headless 內容儲存）、`retire-hosted-storefront-and-themes`（**已核准 2026-11-24，可實作**）
 
 ## 背景
 
@@ -33,7 +33,7 @@
    **site／網域對應與 Host 解析**（`sites`／`site_shop`、`/admin/sites*`、`tenantmw` 的 Host 後備、`X-Site-Domain`）。
 4. **CMS 的內容功能保留，並改造成通用的 headless 內容儲存**（見文末「修正」）：每家商家的內容文件（schema 驗證、草稿／發佈、預覽 token、HTML 消毒、
    圖片網域檢查、以 publishable key 讀取的公開 API、帶事件失效的快取）是商家站台的**內容後端**；改造由 `headless-content-store` 負責。
-5. **現在不移除任何東西。** 退役在之後另一個明確核准的 change（`retire-hosted-storefront-and-themes`，目前只是草稿）裡進行；內容儲存改造也是另案、待核准。
+5. **移除已核准（2026-11-24，使用者：「移除舊功能，直接移除」）**：由 `retire-hosted-storefront-and-themes` 執行，**沒有棄用期、沒有 sunset 視窗**；v1 表面鎖採一次性、明確記錄的例外（ADR 0002，於該 change 實作時建立）。內容儲存改造（`headless-content-store`）是另案、待核准；其第一個切片（每店 schema 儲存）由退役 change 的第一階段交付，因為頁面 schema 今天來自主題，必須先搬走才能移除主題。
 
 ## 後果
 
@@ -48,7 +48,7 @@ rich text 消毒（`api/internal/cms/richtext`）、圖片網域檢查、渲染�
 `page.*` 權限、`PREVIEW_TOKEN_TTL`、`cmd/sanitize-content`。這些**會被改造**（schema 改為每店註冊、文件改以穩定的 `key` 定位、新增 `content.*` 權限與
 版本歷史、發佈通知），改造期間既有端點照常運作；細節見 `openspec/changes/headless-content-store`。
 
-**棄用（保留運作、不再演進、新商家不使用）**：
+**移除（已核准，執行前仍保留運作）**：
 `/api/v1/admin/themes*`、`/api/v1/admin/shops/{id}/theme*`、`/shops/{id}/themes`；`/api/v1/admin/sites*`；
 對應的 ent 表（`themes`、`theme_pages`、`sites`、`site_shop`，以及 `shops.theme_id`）、`web/` 現況（Next.js 租戶渲染）、
 admin 開店精靈的主題／網域欄位與檢查清單的 `theme_applied`、`domain_bound`、`starter` 主題 seed、demo 商家的 `demo.localhost` 站點、
@@ -56,8 +56,7 @@ e2e 的租戶渲染區段（依賴 `WEB` 的斷言）。完整清單與依賴見
 **順序上的相依**：今天的頁面 schema 來自主題的 `theme_pages.page_schema`，所以主題只能在內容儲存改成「每店自帶 schema」**之後**才能真正移除。
 
 **對文件與契約的後果**：`/api/v1` 的表面鎖（`api/openapi/v1-surface.txt`）規定移除任何一行＝破壞 v1，且 design D13 的破例窗口已關閉。
-所以日後移除這些端點**不是**單純刪程式碼：需要一個明確核准的「v1 破例」或走 `/api/v2`（縮小範圍後，真正要從契約移除的只有主題與 site 的路由與欄位，見草稿 change 的 design）；在那之前只能標記棄用（例如 `Deprecation`／`Sunset` 標頭）。
-這是這項決定最大的隱藏成本，詳見草稿 change 的 design。
+使用者已核准移除，因此採**一次性、明確記錄的例外**：決策紀錄 ADR 0002、鎖檔的刪除與路由移除在同一個原子 commit、追加專用的 `api/openapi/v1-removed.txt` 與其契約測試、`CLAUDE.md`／`project.md`／`api-contract` spec 的說明。例外**只涵蓋**退役 change 列出的約 60 行（主題與 site 的 16 條路由與相關欄位）；未列入的任何移除仍須另行例外。這**不是**重新開啟 D13 的窗口。
 
 ## 取捨（誠實版）
 
@@ -89,19 +88,18 @@ e2e 的租戶渲染區段（依賴 `WEB` 的斷言）。完整清單與依賴見
 
 - **維持雙軌（託管主題 ＋ 自帶前端）。** 保留了長尾商家的低成本路徑，但要永遠維護一套沒有消費者的主題／託管渲染系統，
   且 `openspec/project.md` 記載的「主題店面電商前台」（選項 C）從未實作。決定不維持。
-- **現在就移除。** 風險集中、且被 v1 表面鎖擋住（見後果）。決定分階段，先標記。
+- **一次全部移除。** 風險集中。決定分階段（每階段可獨立測試與回滾），並由使用者核准 v1 例外，不經棄用期。
 
 ## 階段計畫
 
 | 步驟 | 內容 | 狀態 |
 | --- | --- | --- |
 | 1 | **記錄並標記**：本決定記錄、`docs/PLATFORM-ROADMAP.md`、README／CLAUDE.md／相關 docs 與 specs 的註記、`merchant-onboarding` skill 改為 headless 唯一路徑、OpenSpec change。**不改任何行為。** | 完成（含本次修正） |
-| 2 | **平台官網**（`web/` 改造，或另立 repo，見 `platform-website`）：產品介紹、範本 live demo、開店申請流程。依賴使用者回答其中的開放問題。 | 待核准 |
+| 2 | **平台官網**：產品介紹、範本 live demo、開店申請流程。**已決定（2026-11-24）：零建置靜態站（沿用 merchant template 的鎖定核心＋設計層與守門員），放在獨立 repo，不改造 `web/`**。見 `platform-website`。其餘開放問題待使用者回答。 | 待核准（技術路線已定） |
 | 3 | **`headless-content-store`**：把 CMS 內容功能改造成通用 headless 內容儲存（每店 schema、穩定 `key`、版本歷史、`content.*` 權限、發佈通知、新的公開讀取端點）；既有 `pages`／`render` 端點在棄用期內相容，之後由該 change 內的清理階段移除。含 merchant template 的後續工作（`ctx.data`／`ctx.actions`、schema 驅動表單）。 | 提案，待核准 |
-| 4 | **退役託管店面與主題**：依 `retire-hosted-storefront-and-themes`（草稿，需使用者另行明確核准，且需先決定 v1 破例或 `/api/v2`）。**需在步驟 3 的 schema 所有權轉移之後**。含棄用期與 `Sunset` 標頭、資料遷移與回滾。 | 草稿，**不得實作** |
+| 4 | **退役託管店面與主題**：依 `retire-hosted-storefront-and-themes`（**已核准**：直接移除、無棄用期、v1 例外）。**第一階段先交付每店 schema 儲存（步驟 3 的第一個切片）**，之後才移除主題與 site。 | 已核准，可實作 |
 
-步驟 2 與 4 的耦合：`web/` 現有的 Next.js catch-all 渲染路由與靜態輸出（`output: "export"`）互斥。若官網改放獨立 repo（`platform-website` 的建議），
-`web/` 的退役就與官網建置無關，可獨立在步驟 4 進行。
+步驟 2 與 4 已無耦合：官網在獨立 repo，`web/`（Next.js 租戶渲染）由步驟 4 整個刪除。
 
 ## 修正（Amendment，2026-11-24，同日）
 
@@ -116,6 +114,11 @@ e2e 的租戶渲染區段（依賴 `WEB` 的斷言）。完整清單與依賴見
 
 **為什麼不是先前的做法**：把內容與設計分離是 headless 模式的前提。商家的設計層由 AI 修改、受守門員保護；商家自己的文案若寫在 `content.js` 之類的設計層檔案裡，
 每次文案變更都會進入同一條 AI／審核流程，且與設計編輯衝突。內容儲存把「誰改什麼」切乾淨：AI 改設計層，商家改內容文件，兩者在發佈時才相遇。
+
+**放置規則（Placement rule，使用者於 2026-11-24 決定）**：需要後端運算或伺服器端狀態的東西，歸 ecommerce（API 與平台後台）；很少改動的內容，放在站台自己的 repo（官網 repo，或商家店面 repo 的設計層）；商家或操作員經常用表單編輯的內容，放在 ecommerce 的內容儲存（`headless-content-store`）。
+具體到平台官網：介紹頁、範本展示、價格文字、條款與隱私文字與文案，**放在官網 repo 作為靜態內容**（不依賴 CMS、不在執行期抓取）；申請表單的送出、防濫用驗證、儲存、審核與核准、通知與稽核，**歸 ecommerce**；官網的鎖定核心只呼叫 ecommerce 的公開申請端點，**官網 repo 不需要自己的後端**。
+
+**退役已核准**：使用者隨後核准了退役（範圍限於託管店面、主題、site 路由；內容儲存保留），直接移除、無棄用期。順序限制見 `retire-hosted-storefront-and-themes` 的 design D4。
 
 **對先前文件的影響**：`retire-tenant-rendering`（草稿）縮小範圍並更名為 `retire-hosted-storefront-and-themes`；新增 `headless-content-store`；
 `docs/PLATFORM-ROADMAP.md`、README、CLAUDE.md、`storefront-integration`、`media-r2-setup`、`openspec/project.md` 與相關 specs 的棄用註記已改為只涵蓋被棄用的部分。

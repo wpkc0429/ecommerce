@@ -6,7 +6,7 @@
 > 與 [`docs/PLATFORM-ROADMAP.md`](docs/PLATFORM-ROADMAP.md)）**：平台是 headless 商務 API ＋ 平台後台 ＋ 平台官網。
 > 每家商家的店面與後台都由 merchant template repo 建立、並由 AI agent 只改設計層來重新設計，**不使用本 repo 託管的店面**。
 > 因此本 repo 自己的**託管渲染**——`web/` 的 Next.js 租戶渲染店面、**主題與主題系統**、site／網域對應（Host 解析）——
-> **作為產品已棄用**：目前仍保留且可運作，但不再演進、新商家不使用，之後會在另一個經明確核准的 change（`retire-hosted-storefront-and-themes`）中移除。
+> **作為產品已棄用**：目前仍保留且可運作，但不再演進、新商家不使用，使用者已核准直接移除（2026-11-24，無棄用期），由 change `retire-hosted-storefront-and-themes` 執行（順序上先把頁面 schema 搬到每店儲存）。
 > **CMS 的內容功能不在棄用之列**：頁面與全域內容、schema 驗證、草稿／發佈、預覽、rich text 消毒、`/api/v1/render/*` 公開讀取與快取會被**保留並改造成
 > headless 內容儲存**（商家用後台表單編輯的文字、banner、FAQ 等，由商家站台以 publishable key 讀取；見 OpenSpec change `headless-content-store`，提案、未實作）。
 

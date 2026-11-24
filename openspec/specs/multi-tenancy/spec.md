@@ -1,5 +1,5 @@
 # multi-tenancy Specification
-> **部分已棄用（ADR 0001，2026-11-24）**：「Host-based tenant resolution」「Path-prefix disambiguation」「Site-shop mapping constraints」「Route resolution cache」描述的是 site／網域對應，隨託管渲染一起棄用（草稿 change `retire-hosted-storefront-and-themes`，未核准）；headless 前端以 `X-Publishable-Key` 解析商家。其餘需求不受影響。
+> **部分已棄用（ADR 0001，2026-11-24）**：「Host-based tenant resolution」「Path-prefix disambiguation」「Site-shop mapping constraints」「Route resolution cache」描述的是 site／網域對應，隨託管渲染一起移除（已核准的 change `retire-hosted-storefront-and-themes`，2026-11-24）；headless 前端以 `X-Publishable-Key` 解析商家。其餘需求不受影響。
 
 ## Purpose
 TBD - created by archiving change phase1-multitenant-cms-foundation. Update Purpose after archive.
