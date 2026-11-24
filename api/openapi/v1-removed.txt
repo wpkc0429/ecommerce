@@ -1,0 +1,69 @@
+# v1 一次性例外：已移除的表面 — 每行是被 ADR 0002 核准移除的 v1 鎖檔行原文。
+#
+# 決策紀錄：docs/decisions/0002-v1-exemption-retire-hosted-storefront-and-themes.md
+# （使用者於 2026-11-24 核准；change retire-hosted-storefront-and-themes）。
+#
+# 規則（internal/httpapi/openapi_contract_test.go 的 TestOpenAPIV1RemovedStaysRemoved）：
+#   * 本檔每一行都 MUST NOT 出現在目前產生的表面中（被移除的東西不能悄悄回來）；
+#   * 本檔的行數 MUST 等於 ADR 0002 的 `v1-removed-lines:` 記錄（防止之後被塞入額外的行）。
+# 這不重新開啟 design D13 的破例窗口：未列入本檔的任何移除，仍然使 v1-surface.txt 的檢查轉紅。
+DELETE /api/v1/admin/sites/{siteID}
+DELETE /api/v1/admin/sites/{siteID} path siteID
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID}
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
+DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID}
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
+DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
+GET /api/v1/admin/shops/{shopID}/theme/precheck
+GET /api/v1/admin/shops/{shopID}/theme/precheck path shopID
+GET /api/v1/admin/shops/{shopID}/theme/precheck query theme_id
+GET /api/v1/admin/shops/{shopID}/themes
+GET /api/v1/admin/shops/{shopID}/themes path shopID
+GET /api/v1/admin/sites
+GET /api/v1/admin/themes
+GET /api/v1/admin/themes/{themeID}
+GET /api/v1/admin/themes/{themeID} path themeID
+GET /api/v1/render/page header X-Site-Domain
+GET /api/v1/render/page header X-Site-Domain optional
+POST /api/v1/admin/shops/{shopID}/theme
+POST /api/v1/admin/shops/{shopID}/theme path shopID
+POST /api/v1/admin/sites
+POST /api/v1/admin/sites/{siteID}/shops
+POST /api/v1/admin/sites/{siteID}/shops path siteID
+POST /api/v1/admin/themes
+POST /api/v1/admin/themes/{themeID}/pages
+POST /api/v1/admin/themes/{themeID}/pages path themeID
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID}
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
+PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
+PUT /api/v1/admin/themes/{themeID}
+PUT /api/v1/admin/themes/{themeID} path themeID
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID}
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
+PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
+ProvisionResult.binding
+SetupStatus.domain_bound
+SetupStatus.theme_applied
+Shop.theme_id
+Site.domain
+Site.id
+Site.shops
+Site.ssl_status
+SiteShopBinding.is_primary
+SiteShopBinding.path_prefix
+SiteShopBinding.shop_id
+Theme.code
+Theme.config_schema
+Theme.id
+Theme.is_active
+Theme.layout_key
+Theme.name
+Theme.pages
+ThemePage.component_key
+ThemePage.id
+ThemePage.page_schema
+ThemePage.type_key
+ThemeSummary.code
+ThemeSummary.id
+ThemeSummary.name

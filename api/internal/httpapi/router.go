@@ -25,9 +25,7 @@ type Deps struct {
 	AdminAuth  *AdminAuthHandler
 	MemberAuth *MemberAuthHandler
 	Roles      *RolesHandler
-	Sites      *SitesHandler
 	Shops      *ShopsHandler
-	Themes     *ThemesHandler
 	Pages      *PagesHandler
 	Render     *RenderHandler
 	Categories *CategoriesHandler // change product-catalog
@@ -62,16 +60,16 @@ type Deps struct {
 	// reads: authenticated per shop, and the unauthenticated host-resolved one).
 	Branding *BrandingHandler
 
-	AdminMW       func(http.Handler) http.Handler // admin JWT authentication
+	AdminMW func(http.Handler) http.Handler // admin JWT authentication
 	// change admin-api-public-exposure. All three are always mounted on the
 	// /admin group and are pass-through when their feature is not configured,
 	// so the route table never depends on settings.
 	AdminAccessMW    func(http.Handler) http.Handler // Cloudflare Access JWT (D2), runs first
 	AdminHostMW      func(http.Handler) http.Handler // admin host binding + PLATFORM_ADMIN_HOSTS (D4/D10)
 	AdminBindEmailMW func(http.Handler) http.Handler // CF_ACCESS_BIND_EMAIL (D2), runs after AdminMW
-	TenantMW      func(http.Handler) http.Handler // storefront tenant resolution
-	MemberMW      func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
-	OrderAccessMW func(http.Handler) http.Handler // order access token auth (requires TenantMW)
+	TenantMW         func(http.Handler) http.Handler // storefront tenant resolution
+	MemberMW         func(http.Handler) http.Handler // member JWT auth (requires TenantMW)
+	OrderAccessMW    func(http.Handler) http.Handler // order access token auth (requires TenantMW)
 
 	// CORSOrigins resolves per-shop registered browser origins and their
 	// purpose (change storefront-client-auth, admin-api-public-exposure). nil → only Cfg.CORSAllowedOrigins applies,
@@ -165,9 +163,6 @@ func New(d Deps) http.Handler {
 						if d.Roles != nil {
 							d.Roles.MountShop(sh)
 						}
-						if d.Themes != nil {
-							d.Themes.MountShop(sh)
-						}
 						if d.Pages != nil {
 							d.Pages.MountShop(sh)
 						}
@@ -224,14 +219,8 @@ func New(d Deps) http.Handler {
 					if d.Roles != nil {
 						d.Roles.MountPlatform(pr)
 					}
-					if d.Sites != nil {
-						d.Sites.MountPlatform(pr)
-					}
 					if d.Shops != nil {
 						d.Shops.MountPlatform(pr)
-					}
-					if d.Themes != nil {
-						d.Themes.MountPlatform(pr)
 					}
 					if d.Accounts != nil {
 						d.Accounts.MountPlatform(pr)

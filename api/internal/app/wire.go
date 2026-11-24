@@ -131,11 +131,9 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	resolver := tenant.NewResolver(client, rdb, a.log)
 	dispatcher.Subscribe(func(ctx context.Context, e events.Event) {
 		if ev, ok := e.(events.ShopStatusChanged); ok {
-			resolver.InvalidateHosts(ctx, ev.Hosts...)
-			// change storefront-client-auth (design D10): this event is also
-			// what a shop status change publishes, and the cached publishable
-			// key entries embed that status — so a disabled shop's keys stop
-			// serving at the same moment its domains do.
+			// change storefront-client-auth (design D10): the cached publishable
+			// key entries embed the shop's status — so a disabled shop's keys
+			// stop serving at the same moment its status changes.
 			for _, shopID := range ev.ShopIDs {
 				resolver.InvalidateShopKeys(ctx, shopID)
 			}
@@ -172,12 +170,11 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	}
 	deps.AdminHostMW = httpapi.NewAdminHostBindingMiddleware(resolver, cfg.PlatformAdminHosts)
 	deps.Branding = &httpapi.BrandingHandler{Client: client, Registry: resolver, Authz: authz, Log: a.log}
-	deps.Sites = &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: a.log, Authz: authz}
 	deps.ClientAuth = &httpapi.ClientAuthHandler{Client: client, Dispatcher: dispatcher, Authz: authz, Log: a.log}
 
 	// CMS engine + render pipeline (M5).
 	renderCache := render.NewCache(rdb, a.log)
-	invalidator := &render.Invalidator{Cache: renderCache, Client: client, Log: a.log}
+	invalidator := &render.Invalidator{Cache: renderCache, Log: a.log}
 	dispatcher.Subscribe(invalidator.Handle)
 
 	// member-tiers-and-points (change member-tiers-and-points, design D1):
@@ -195,7 +192,6 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	if cfg.Media.Enabled() {
 		cmsService.RestrictImageDomain(append([]string{cfg.Media.PublicBaseURL}, cfg.Media.ExtraAllowedOrigins...)...)
 	}
-	deps.Themes = &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Shops = &httpapi.ShopsHandler{Client: client, Service: cmsService, Authz: authz, Log: a.log}
 	deps.Provisioning = &httpapi.ProvisioningHandler{
 		Service: &provision.Service{Client: client, CMS: cmsService, Accounts: accountService, Dispatcher: dispatcher},

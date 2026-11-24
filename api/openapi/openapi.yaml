@@ -31,17 +31,13 @@ info:
 
     ## 租戶解析（`/api/v1/shop/**`）
 
-    前台端點不在 URL 裡帶 shop id。伺服器依下列順序解析租戶：
-
-    1. **`X-Publishable-Key`**（優先）— 若標頭存在就用它解析。金鑰未知或已撤銷即回 **404**
-       （`unknown_publishable_key`），**不回退**至 Host。
-    2. **`Host`** — 未帶金鑰時，以請求的 Host 找到該網域綁定的預設商家。
+    前台端點不在 URL 裡帶 shop id。租戶**只**由 **`X-Publishable-Key`** 決定：金鑰未提供、未知、
+    格式不符或已撤銷，一律回 **404**（`unknown_publishable_key`），沒有任何後備。
+    （Host／網域對應與 `X-Site-Domain` 已隨託管店面一併移除，見 ADR 0002。）
 
     publishable key **是識別碼，不是憑證**（`pk_` + base32）：它公開、明文儲存、可完整顯示，
     只回答「你代表哪一家商家」，**不參與任何授權判定**。帶著它去打會員端點仍然是 401。
     它因此**不出現在下方的 Security Schemes**，而是一個一般的請求標頭參數。
-
-    `X-Site-Domain` 只在 `GET /api/v1/render/page` 一個端點上有效（第一方 SSR 中繼訪客 Host 用）。
 
     後台端點（`/api/v1/admin/**`）不做租戶解析：目標 shop 一律來自 URL 的 `{shopID}`，
     並由 RBAC 判定，**不信任任何 payload**。
@@ -98,7 +94,7 @@ info:
 
 servers:
   - url: http://localhost:8080
-    description: 本機開發（`make dev`）。前台端點的租戶由 `X-Publishable-Key` 或 `Host` 決定。
+    description: 本機開發（`make dev`）。前台端點的租戶由 `X-Publishable-Key` 決定。
   - url: "{scheme}://{host}"
     description: 任何部署。
     variables:
@@ -107,7 +103,7 @@ servers:
         enum: [https, http]
       host:
         default: api.example.com
-        description: API 的主機名稱。前台端點若不帶 publishable key，租戶取自這個 Host。
+        description: API 的主機名稱。
 
 tags:
   - name: health
@@ -173,7 +169,7 @@ components:
         **audience 綁定商家**：A 店簽發的權杖拿到 B 店（即租戶解析出不同的 shop）一律 **401**，
         即使 email 與密碼在兩店都存在——顧客身分以商家為界，兩者是互不相干的身分。
 
-        必須在租戶已解析的前提下使用（即帶 `X-Publishable-Key` 或正確的 `Host`）。
+        必須在租戶已解析的前提下使用（即帶有效的 `X-Publishable-Key`）。
     orderAccessToken:
       type: http
       scheme: bearer
@@ -214,9 +210,8 @@ components:
 
         - 公開值：明文儲存、後台可完整顯示、可以寫進前端原始碼與 git。
         - **不參與任何授權判定**：帶著它去打需要會員身分的端點仍然是 401。
-        - 標頭存在時**優先於 `Host`**；金鑰未知或已撤銷 → **404 `unknown_publishable_key`**，
-          **不回退**至 Host（否則撤銷就失去意義）。
-        - 省略時，租戶取自 `Host`。
+        - 金鑰未提供、未知或已撤銷 → **404 `unknown_publishable_key`**，沒有任何後備
+          （Host 與 `X-Site-Domain` 不再決定租戶）。
       schema:
         type: string
         pattern: '^pk_[a-z2-7]+$'
@@ -417,7 +412,7 @@ components:
         | 401 | `unauthorized` | 未認證、權杖無效／過期／audience 不符、登入失敗 |
         | 403 | `forbidden` | 已認證但權限不足，或跨商家存取 |
         | 404 | `not_found` | 資源不存在 |
-        | 404 | `unknown_publishable_key` | publishable key 未知或已撤銷（**不會回退至 Host**） |
+        | 404 | `unknown_publishable_key` | publishable key 未提供、未知或已撤銷 |
         | 405 | `method_not_allowed` | 路徑存在但不支援該方法 |
         | 409 | `conflict` | 與資源當下狀態衝突 |
         | 422 | `validation_failed` | 業務規則驗證失敗，`details` 帶 JSON Pointer |
@@ -1527,12 +1522,10 @@ components:
     Shop:
       type: object
       additionalProperties: false
-      required: [id, name, theme_id, status, content_json, meta, updated_at]
+      required: [id, name, status, content_json, meta, updated_at]
       properties:
         id: { type: integer }
         name: { type: string }
-        theme_id:
-          oneOf: [{ type: integer }, { type: 'null' }]
         status:
           type: integer
           enum: [0, 1, 2]
@@ -1687,21 +1680,9 @@ components:
     ProvisionResult:
       type: object
       additionalProperties: false
-      required: [shop, binding, owner, storefront_origins]
+      required: [shop, owner, storefront_origins]
       properties:
         shop: { $ref: '#/components/schemas/Shop' }
-        binding:
-          oneOf:
-            - type: 'null'
-            - type: object
-              additionalProperties: false
-              required: [site_id, domain, path_prefix, is_primary]
-              properties:
-                site_id: { type: integer }
-                domain: { type: string }
-                path_prefix:
-                  oneOf: [{ type: string }, { type: 'null' }]
-                is_primary: { type: boolean }
         owner:
           type: object
           description: |
@@ -1721,11 +1702,9 @@ components:
     SetupStatus:
       type: object
       additionalProperties: false
-      required: [shop_id, theme_applied, domain_bound, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active]
+      required: [shop_id, owner_assigned, owner_password_set, home_published, shipping_method_active, payment_credentials_set, publishable_key_active]
       properties:
         shop_id: { type: integer }
-        theme_applied: { type: boolean }
-        domain_bound: { type: boolean }
         owner_assigned: { type: boolean }
         owner_password_set: { type: boolean }
         home_published: { type: boolean }
@@ -2038,76 +2017,6 @@ components:
         page_size: { type: integer }
         total: { type: integer, description: 總筆數（不是金額）。 }
 
-    SiteShopBinding:
-      type: object
-      additionalProperties: false
-      required: [shop_id, path_prefix, is_primary]
-      properties:
-        shop_id: { type: integer }
-        path_prefix:
-          oneOf: [{ type: string }, { type: 'null' }]
-          description: "`null` 表示這是該網域的**預設商家**；否則如 `/shop-a`。"
-        is_primary:
-          type: boolean
-          description: 該商家的主網域。
-
-    Site:
-      type: object
-      additionalProperties: false
-      required: [id, domain, ssl_status, shops]
-      properties:
-        id: { type: integer }
-        domain: { type: string, examples: ["demo.localhost"] }
-        ssl_status: { type: string }
-        shops:
-          type: array
-          items: { $ref: '#/components/schemas/SiteShopBinding' }
-
-    ThemePage:
-      type: object
-      additionalProperties: false
-      required: [id, type_key, component_key]
-      properties:
-        id: { type: integer }
-        type_key:
-          type: string
-          description: 頁型代號。頁面以它動態綁定當前主題，換主題免資料遷移。
-          examples: ["home"]
-        component_key:
-          type: string
-          description: 前端元件庫中的元件名稱。
-        page_schema:
-          type: object
-          description: 該頁型的 JSON Schema（驅動後端驗證與 admin 表單）。單一主題查詢才會帶。
-
-    Theme:
-      type: object
-      additionalProperties: false
-      required: [id, code, name, layout_key, is_active, config_schema]
-      properties:
-        id: { type: integer }
-        code: { type: string, examples: ["starter"] }
-        name: { type: string }
-        layout_key: { type: string }
-        is_active: { type: boolean }
-        config_schema:
-          type: object
-          description: 全站內容的 JSON Schema。
-        pages:
-          type: array
-          description: 頁型清單；只有單一主題查詢會帶。
-          items: { $ref: '#/components/schemas/ThemePage' }
-
-    ThemeSummary:
-      type: object
-      additionalProperties: false
-      required: [id, code, name]
-      description: 商家可選主題的精簡形狀。
-      properties:
-        id: { type: integer }
-        code: { type: string }
-        name: { type: string }
-
     Page:
       type: object
       additionalProperties: false
@@ -2237,32 +2146,24 @@ components:
       additionalProperties: false
       required: [shop, page]
       description: |
-        用戶端無關的 SDUI 契約：web SSR 與未來的原生 APP 消費**同一個結構**。
+        用戶端無關的 SDUI 契約：商家站台與原生 APP 消費**同一個結構**。
         消費端遇到未知的區塊型別 MUST 優雅略過，不得整頁崩潰。
       properties:
         shop:
           type: object
           additionalProperties: false
-          required: [id, name, theme, content]
+          required: [id, name, content]
           properties:
             id: { type: integer }
             name: { type: string }
-            theme:
-              type: object
-              additionalProperties: false
-              required: [code, layout_key]
-              properties:
-                code: { type: string }
-                layout_key: { type: string }
             content:
               description: 全站內容（已依 schema 補齊預設值、剔除未定義鍵）。
         page:
           type: object
           additionalProperties: false
-          required: [type_key, component_key, title, content, seo]
+          required: [type_key, title, content, seo]
           properties:
             type_key: { type: string }
-            component_key: { type: string }
             title: { type: string }
             content:
               description: 頁面內容（已 hydrate）。
@@ -2298,7 +2199,7 @@ paths:
       operationId: listPublishedProducts
       summary: 列出已發佈商品
       description: |
-        **無需任何認證**，只需租戶解析（`X-Publishable-Key` 或 `Host`）。
+        **無需任何認證**，只需租戶解析（`X-Publishable-Key`）。
         只回傳 `status = 1` 的商品；每個商品都帶 `skus`（依 `id` 遞增）。
 
         帶 `category`（分類 slug）時只回傳屬於該分類**或其任一子孫分類**的商品，每個商品至多一次，
@@ -2333,7 +2234,7 @@ paths:
       operationId: listPublicCategories
       summary: 取得商家的分類樹
       description: |
-        **無需任何認證**，只需租戶解析（`X-Publishable-Key` 或 `Host`）。回傳整棵分類樹
+        **無需任何認證**，只需租戶解析（`X-Publishable-Key`）。回傳整棵分類樹
         （不分頁，單一商家的分類是數十級），同層依 `position`、`id` 遞增。
         與後台 `GET .../categories` 的預設輸出同形狀。
       security: []
@@ -3270,20 +3171,11 @@ paths:
       description: |
         回傳用戶端無關的 SDUI bundle。**只回已發佈內容**（`published_json`），永不回草稿。
 
-        租戶解析順序：`X-Publishable-Key` → **`X-Site-Domain`** → `Host`。
-
-        **這是全 API 唯一仍接受 `X-Site-Domain` 的端點。** 它的呼叫者是第一方 SSR 伺服器，
-        而 SSR 唯一能傳達「訪客實際請求的網域」的方式就是中繼這個標頭（API 看到的 Host 是 API 自己的）。
-        該標頭可偽造，而在此無害：回應是已發佈的公開內容，偽造它得到的與直接造訪那家商家的網站相同。
+        租戶只由 `X-Publishable-Key` 決定（缺少、未知或已撤銷 → 404 `unknown_publishable_key`）。
         本端點不寫入、不簽發權杖、不接受任何已認證身分。
       security: []
       parameters:
         - $ref: '#/components/parameters/PublishableKey'
-        - name: X-Site-Domain
-          in: header
-          required: false
-          description: 第一方 SSR 中繼的訪客 Host。**僅本端點有效。**
-          schema: { type: string }
         - name: path
           in: query
           required: false
@@ -3998,10 +3890,10 @@ paths:
       operationId: provisionShop
       summary: 一次開好一家店
       description: |
-        需要平台層 `shop.create` ＋ `account.manage`；帶 `domain` 時另需 `shop.manage_domains`，
+        需要平台層 `shop.create` ＋ `account.manage`；
         帶 `storefront_origins` 時另需 `shop.manage_client_origins`（缺任一 → 403）。
 
-        單一交易：商家（含自動首頁）、主題、網域（不存在則建立、存在則綁定）、owner（新 email 建立無密碼帳號並產生設定連結；
+        單一交易：商家（含自動首頁）、owner（新 email 建立無密碼帳號並產生設定連結；
         既有 email 直接加入並授予 `merchant_owner`，不動其密碼）、origin。任一步驟失敗整筆回滾（衝突回 409）。
       security: [{ adminJWT: [] }]
       requestBody:
@@ -4014,10 +3906,7 @@ paths:
               properties:
                 name: { type: string }
                 owner_email: { type: string }
-                theme_id: { type: integer, minimum: 1 }
                 status: { type: integer, enum: [0, 1, 2] }
-                domain: { type: string }
-                path_prefix: { type: string }
                 storefront_origins:
                   type: array
                   items: { type: string }
@@ -4279,183 +4168,6 @@ paths:
         "404": { $ref: '#/components/responses/NotFound' }
 
   # ═══════════════════════ 平台層：網域綁定 ═══════════════════════
-  /api/v1/admin/sites:
-    get:
-      tags: [admin-platform]
-      operationId: listSites
-      summary: 列出網域與其商家綁定
-      description: 需要平台層 `shop.manage_domains`。
-      security: [{ adminJWT: [] }]
-      responses:
-        "200":
-          description: 全部網域。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [sites]
-                properties:
-                  sites:
-                    type: array
-                    items: { $ref: '#/components/schemas/Site' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-    post:
-      tags: [admin-platform]
-      operationId: createSite
-      summary: 登記網域
-      description: |
-        需要平台層 `shop.manage_domains`。網域會被正規化為小寫；格式不符或重複回 422。
-      security: [{ adminJWT: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [domain]
-              properties:
-                domain: { type: string, examples: ["demo.localhost"] }
-      responses:
-        "201":
-          description: 已登記。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [id, domain]
-                properties:
-                  id: { type: integer }
-                  domain: { type: string }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-
-  /api/v1/admin/sites/{siteID}:
-    delete:
-      tags: [admin-platform]
-      operationId: deleteSite
-      summary: 刪除網域（連同其全部商家綁定）
-      description: 需要平台層 `shop.manage_domains`。刪除後路由解析快取立即失效。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - name: siteID
-          in: path
-          required: true
-          schema: { type: integer, minimum: 1 }
-      responses:
-        "204": { $ref: '#/components/responses/NoContent' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-
-  /api/v1/admin/sites/{siteID}/shops:
-    post:
-      tags: [admin-platform]
-      operationId: bindShopToSite
-      summary: 將商家綁定到網域
-      description: |
-        需要平台層 `shop.manage_domains`。
-        `path_prefix` 省略或為 `/` 表示**該網域的預設商家**（每個網域只能有一個）。
-        違反唯一性約束（重複預設商家、重複前綴、重複主網域）一律 422。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - name: siteID
-          in: path
-          required: true
-          schema: { type: integer, minimum: 1 }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [shop_id]
-              properties:
-                shop_id: { type: integer }
-                path_prefix:
-                  oneOf: [{ type: string }, { type: 'null' }]
-                  description: "如 `/shop-a`；`null`／`/`／省略表示預設商家。"
-                is_primary: { type: boolean }
-      responses:
-        "201":
-          description: 已綁定。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [site_id, shop_id, path_prefix, is_primary]
-                properties:
-                  site_id: { type: integer }
-                  shop_id: { type: integer }
-                  path_prefix:
-                    oneOf: [{ type: string }, { type: 'null' }]
-                  is_primary: { type: boolean }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-
-  /api/v1/admin/sites/{siteID}/shops/{shopID}:
-    parameters:
-      - name: siteID
-        in: path
-        required: true
-        schema: { type: integer, minimum: 1 }
-      - $ref: '#/components/parameters/ShopIDPath'
-    put:
-      tags: [admin-platform]
-      operationId: updateSiteShopBinding
-      summary: 修改綁定
-      description: 需要平台層 `shop.manage_domains`。只送要改的鍵；未送的維持不變。
-      security: [{ adminJWT: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                path_prefix:
-                  oneOf: [{ type: string }, { type: 'null' }]
-                is_primary: { type: boolean }
-      responses:
-        "200":
-          description: 已修改。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [site_id, shop_id]
-                properties:
-                  site_id: { type: integer }
-                  shop_id: { type: integer }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-    delete:
-      tags: [admin-platform]
-      operationId: unbindShopFromSite
-      summary: 解除綁定
-      description: 需要平台層 `shop.manage_domains`。
-      security: [{ adminJWT: [] }]
-      responses:
-        "204": { $ref: '#/components/responses/NoContent' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-
   # ═══════════════════════ 平台層：商家 ═══════════════════════
   /api/v1/admin/shops:
     get:
@@ -4492,8 +4204,6 @@ paths:
               required: [name]
               properties:
                 name: { type: string }
-                theme_id:
-                  oneOf: [{ type: integer }, { type: 'null' }]
                 status: { type: integer, enum: [0, 1, 2] }
       responses:
         "201":
@@ -4563,215 +4273,6 @@ paths:
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
   # ═══════════════════════ 平台層：主題 ═══════════════════════
-  /api/v1/admin/themes:
-    get:
-      tags: [admin-platform]
-      operationId: listThemes
-      summary: 列出全部主題
-      description: 需要平台層 `theme.manage`。
-      security: [{ adminJWT: [] }]
-      responses:
-        "200":
-          description: 全部主題（不含頁型）。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [themes]
-                properties:
-                  themes:
-                    type: array
-                    items: { $ref: '#/components/schemas/Theme' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-    post:
-      tags: [admin-platform]
-      operationId: createTheme
-      summary: 建立主題
-      description: |
-        需要平台層 `theme.manage`。`config_schema` 必須是合法的 JSON Schema（draft 2020-12），
-        否則 422。`code` 重複亦 422。
-      security: [{ adminJWT: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [code, name, layout_key]
-              properties:
-                code: { type: string }
-                name: { type: string }
-                layout_key: { type: string }
-                config_schema: { type: object }
-                is_active: { type: boolean }
-      responses:
-        "201":
-          description: 已建立。
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Theme' }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-
-  /api/v1/admin/themes/{themeID}:
-    parameters:
-      - name: themeID
-        in: path
-        required: true
-        schema: { type: integer, minimum: 1 }
-    get:
-      tags: [admin-platform]
-      operationId: getTheme
-      summary: 取得單一主題（含頁型與其 schema）
-      description: 需要平台層 `theme.manage`。
-      security: [{ adminJWT: [] }]
-      responses:
-        "200":
-          description: 主題（`pages` 依 `id` 遞增）。
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Theme' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-    put:
-      tags: [admin-platform]
-      operationId: updateTheme
-      summary: 修改主題
-      description: 需要平台層 `theme.manage`。
-      security: [{ adminJWT: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                code: { type: string }
-                name: { type: string }
-                layout_key: { type: string }
-                config_schema: { type: object }
-                is_active: { type: boolean }
-      responses:
-        "200":
-          description: 已修改。
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Theme' }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-
-  /api/v1/admin/themes/{themeID}/pages:
-    post:
-      tags: [admin-platform]
-      operationId: createThemePage
-      summary: 新增主題頁型
-      description: |
-        需要平台層 `theme.manage`。同一主題內 `type_key` 重複回 422；
-        `page_schema` 必須是合法的 JSON Schema。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - name: themeID
-          in: path
-          required: true
-          schema: { type: integer, minimum: 1 }
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [type_key, component_key]
-              properties:
-                type_key: { type: string }
-                component_key: { type: string }
-                page_schema: { type: object }
-      responses:
-        "201":
-          description: 已建立。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [id, type_key, component_key]
-                properties:
-                  id: { type: integer }
-                  type_key: { type: string }
-                  component_key: { type: string }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-
-  /api/v1/admin/themes/{themeID}/pages/{themePageID}:
-    parameters:
-      - name: themeID
-        in: path
-        required: true
-        schema: { type: integer, minimum: 1 }
-      - name: themePageID
-        in: path
-        required: true
-        schema: { type: integer, minimum: 1 }
-    put:
-      tags: [admin-platform]
-      operationId: updateThemePage
-      summary: 修改主題頁型
-      description: 需要平台層 `theme.manage`。
-      security: [{ adminJWT: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              properties:
-                type_key: { type: string }
-                component_key: { type: string }
-                page_schema: { type: object }
-      responses:
-        "200":
-          description: 已修改。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [id, type_key, component_key]
-                properties:
-                  id: { type: integer }
-                  type_key: { type: string }
-                  component_key: { type: string }
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
-    delete:
-      tags: [admin-platform]
-      operationId: deleteThemePage
-      summary: 刪除主題頁型
-      description: 需要平台層 `theme.manage`。
-      security: [{ adminJWT: [] }]
-      responses:
-        "204": { $ref: '#/components/responses/NoContent' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-
   # ═══════════════════════ 商家層：CMS ═══════════════════════
   /api/v1/admin/shops/{shopID}/pages:
     parameters:
@@ -5061,116 +4562,12 @@ paths:
                     items:
                       type: object
                       additionalProperties: false
-                      required: [type_key, component_key]
+                      required: [type_key]
                       properties:
                         type_key: { type: string }
-                        component_key: { type: string }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
-
-  /api/v1/admin/shops/{shopID}/themes:
-    get:
-      tags: [admin-cms]
-      operationId: listSelectableThemes
-      summary: 列出商家可選的主題
-      description: 需要商家層 `theme.view`。只回啟用中的主題，形狀刻意精簡。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - $ref: '#/components/parameters/ShopIDPath'
-      responses:
-        "200":
-          description: 可選主題。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [themes]
-                properties:
-                  themes:
-                    type: array
-                    items: { $ref: '#/components/schemas/ThemeSummary' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-
-  /api/v1/admin/shops/{shopID}/theme/precheck:
-    get:
-      tags: [admin-cms]
-      operationId: precheckThemeSwitch
-      summary: 換主題前的相容性預檢
-      description: |
-        需要商家層 `shop.update`。回報**換過去之後會變成不相容**的頁面
-        （新主題不支援其 `type_key`）。缺 `theme_id` 查詢參數時回 400。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - $ref: '#/components/parameters/ShopIDPath'
-        - name: theme_id
-          in: query
-          required: true
-          schema: { type: integer, minimum: 1 }
-      responses:
-        "200":
-          description: 不相容頁面清單。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [incompatible_pages]
-                properties:
-                  incompatible_pages:
-                    oneOf:
-                      - type: array
-                        items: { type: object }
-                      - type: 'null'
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-
-  /api/v1/admin/shops/{shopID}/theme:
-    post:
-      tags: [admin-cms]
-      operationId: switchTheme
-      summary: 套用主題
-      description: |
-        需要商家層 `shop.update`。**頁面不需要遷移**——頁面以 `type_key` 動態綁定當前主題，
-        新主題不支援的頁型會被標為不相容並回報，但資料不會被刪除。
-      security: [{ adminJWT: [] }]
-      parameters:
-        - $ref: '#/components/parameters/ShopIDPath'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties: false
-              required: [theme_id]
-              properties:
-                theme_id: { type: integer }
-      responses:
-        "200":
-          description: 已套用，附不相容頁面清單。
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties: false
-                required: [theme_id, incompatible_pages]
-                properties:
-                  theme_id: { type: integer }
-                  incompatible_pages:
-                    oneOf:
-                      - type: array
-                        items: { type: object }
-                      - type: 'null'
-        "400": { $ref: '#/components/responses/BadRequest' }
-        "401": { $ref: '#/components/responses/Unauthorized' }
-        "403": { $ref: '#/components/responses/Forbidden' }
-        "404": { $ref: '#/components/responses/NotFound' }
-        "422": { $ref: '#/components/responses/ValidationFailed' }
 
   # ═══════════════════════ 商家層：RBAC ═══════════════════════
   /api/v1/admin/shops/{shopID}/me:

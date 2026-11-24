@@ -33,24 +33,11 @@ type ShopContentUpdated struct{ ShopID int }
 
 func (ShopContentUpdated) EventName() string { return "shop.content_updated" }
 
-// ThemeSwitched — shop switched theme; tenant-wide version bump.
-type ThemeSwitched struct{ ShopID int }
-
-func (ThemeSwitched) EventName() string { return "shop.theme_switched" }
-
-// ThemeUpdated — platform updated a theme; every shop on it gets a bump.
-type ThemeUpdated struct{ ThemeID int }
-
-func (ThemeUpdated) EventName() string { return "theme.updated" }
-
-// ShopStatusChanged — a shop's status changed (or, until the site code is
-// removed, a site mapping changed). Subscribers drop every cache entry that
-// embeds the shop's status: the render cache version is bumped, and the
-// publishable-key cache entries are invalidated so a disabled shop's keys stop
-// serving at the same moment. Hosts is transitional (route cache of the site
-// code that is being removed).
+// ShopStatusChanged — a shop's status changed (or a shop was provisioned).
+// Subscribers drop every cache entry that embeds the shop's status: the render
+// cache version is bumped, and the publishable-key cache entries are
+// invalidated so a disabled shop's keys stop serving at the same moment.
 type ShopStatusChanged struct {
-	Hosts   []string
 	ShopIDs []int
 }
 

@@ -31,7 +31,7 @@ type BackfillSummary struct {
 }
 
 // BackfillRichText re-sanitizes every stored CMS payload against the schema of
-// the shop's CURRENT theme: pages.content_json, pages.published_json and
+// the shop's CURRENT content schema: pages.content_json, pages.published_json and
 // shops.content_json (design D7). It is idempotent — a second run reports zero
 // changes — and writes nothing unless apply is true.
 //
@@ -86,9 +86,9 @@ func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, em
 	}
 	active, err := s.schemas().Active(ctx, sh.ID)
 	if errors.Is(err, contentschema.ErrNoSchema) {
-		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "no theme applied"})
+		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "no content schema"})
 		for _, p := range pages {
-			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "shop has no theme applied"})
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "shop has no content schema"})
 		}
 		return nil
 	}
@@ -113,7 +113,7 @@ func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, em
 	for _, p := range pages {
 		schema := active.Doc.Types[p.TypeKey]
 		if schema == nil {
-			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "type_key not in current theme"})
+			emit(BackfillItem{Kind: "page", ID: p.ID, ShopID: sh.ID, Field: "content_json", Skipped: "type_key not in the content schema"})
 			continue
 		}
 		if err := s.backfillPage(ctx, p, schema, apply, emit); err != nil {

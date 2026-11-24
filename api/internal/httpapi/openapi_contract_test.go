@@ -86,6 +86,7 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -101,6 +102,8 @@ var updateSurface = flag.Bool("openapi.update-surface", false,
 const (
 	openAPIRelPath  = "../../openapi/openapi.yaml"
 	surfaceRelPath  = "../../openapi/v1-surface.txt"
+	removedRelPath  = "../../openapi/v1-removed.txt"
+	adrRelPath      = "../../../docs/decisions/0002-v1-exemption-retire-hosted-storefront-and-themes.md"
 	minorUnitRef    = "#/components/schemas/MinorUnitAmount"
 	surfaceFileHead = `# v1 表面鎖 — 每一行是 /api/v1 已對外做出的一個承諾。
 #
@@ -109,7 +112,8 @@ const (
 # 檢查規則（internal/httpapi/openapi_contract_test.go）：本檔的每一行都必須仍存在於
 # api/openapi/openapi.yaml 中。**新增自由，刪除必須手動刪掉這裡的那一行。**
 #
-# 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉：
+# 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉；
+# 唯一的例外是 ADR 0002 記錄的一次性移除（清單見 v1-removed.txt，共 60 行）。
 # 後續的破壞性變更 MUST 改走新端點或 /api/v2，MUST NOT 再引用「尚無外部消費者」。
 #
 # 行的五種形式：
@@ -700,6 +704,58 @@ func TestOpenAPIV1SurfaceLock(t *testing.T) {
 		return
 	}
 	t.Logf("表面鎖：%d 項承諾全部仍在（文件目前共 %d 項，新增不受限）", locked, len(current))
+}
+
+// TestOpenAPIV1RemovedStaysRemoved enforces the one-time v1 exemption recorded
+// in ADR 0002 (change retire-hosted-storefront-and-themes): v1-removed.txt holds
+// the verbatim lock lines that were removed on purpose. Every one of them must
+// stay absent from the contract (a removed route cannot quietly come back), and
+// the file's size must equal the number the ADR records, so extra lines cannot
+// be slipped into the exemption. Lines not listed there still fail
+// TestOpenAPIV1SurfaceLock when they disappear.
+func TestOpenAPIV1RemovedStaysRemoved(t *testing.T) {
+	doc := loadOpenAPI(t)
+	present := map[string]bool{}
+	for _, line := range currentSurface(t, doc) {
+		present[line] = true
+	}
+	raw, err := os.ReadFile(removedRelPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", removedRelPath, err)
+	}
+	locked, err := os.ReadFile(surfaceRelPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", surfaceRelPath, err)
+	}
+	inLock := map[string]bool{}
+	for _, line := range strings.Split(string(locked), "\n") {
+		inLock[strings.TrimSpace(line)] = true
+	}
+	var removed []string
+	for _, line := range strings.Split(string(raw), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		removed = append(removed, line)
+		if present[line] {
+			t.Errorf("%q was removed by ADR 0002 but is back in the contract", line)
+		}
+		if inLock[line] {
+			t.Errorf("%q is listed as removed but still in v1-surface.txt", line)
+		}
+	}
+	adr, err := os.ReadFile(adrRelPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", adrRelPath, err)
+	}
+	m := regexp.MustCompile(`v1-removed-lines:\s*(\d+)`).FindStringSubmatch(string(adr))
+	if m == nil {
+		t.Fatalf("ADR 0002 must record `v1-removed-lines: N`")
+	}
+	if got := strconv.Itoa(len(removed)); got != m[1] {
+		t.Fatalf("v1-removed.txt has %s lines but ADR 0002 records %s", got, m[1])
+	}
 }
 
 // TestSimulatorIsNotMountedOnTheAPI encodes change ecpay-payment-provider's

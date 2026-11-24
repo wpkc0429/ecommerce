@@ -5,7 +5,8 @@
 # 檢查規則（internal/httpapi/openapi_contract_test.go）：本檔的每一行都必須仍存在於
 # api/openapi/openapi.yaml 中。**新增自由，刪除必須手動刪掉這裡的那一行。**
 #
-# 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉：
+# 刪除任一行 ＝ 破壞 v1。design D13 的破例窗口已於 change order-extras 用盡並關閉；
+# 唯一的例外是 ADR 0002 記錄的一次性移除（清單見 v1-removed.txt，共 60 行）。
 # 後續的破壞性變更 MUST 改走新端點或 /api/v2，MUST NOT 再引用「尚無外部消費者」。
 #
 # 行的五種形式：
@@ -129,14 +130,6 @@ DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID}
 DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path roleID
 DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/users/{userID}/roles/{roleID} path userID
-DELETE /api/v1/admin/sites/{siteID}
-DELETE /api/v1/admin/sites/{siteID} path siteID
-DELETE /api/v1/admin/sites/{siteID}/shops/{shopID}
-DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
-DELETE /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
-DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID}
-DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
-DELETE /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
 DELETE /api/v1/admin/users/{userID}/roles/{roleID}
 DELETE /api/v1/admin/users/{userID}/roles/{roleID} path roleID
 DELETE /api/v1/admin/users/{userID}/roles/{roleID} path userID
@@ -315,22 +308,11 @@ GET /api/v1/admin/shops/{shopID}/shipping-methods path shopID
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
-GET /api/v1/admin/shops/{shopID}/theme/precheck
-GET /api/v1/admin/shops/{shopID}/theme/precheck path shopID
-GET /api/v1/admin/shops/{shopID}/theme/precheck query theme_id
-GET /api/v1/admin/shops/{shopID}/themes
-GET /api/v1/admin/shops/{shopID}/themes path shopID
 GET /api/v1/admin/shops/{shopID}/users
 GET /api/v1/admin/shops/{shopID}/users path shopID
-GET /api/v1/admin/sites
-GET /api/v1/admin/themes
-GET /api/v1/admin/themes/{themeID}
-GET /api/v1/admin/themes/{themeID} path themeID
 GET /api/v1/render/page
 GET /api/v1/render/page header X-Publishable-Key
 GET /api/v1/render/page header X-Publishable-Key optional
-GET /api/v1/render/page header X-Site-Domain
-GET /api/v1/render/page header X-Site-Domain optional
 GET /api/v1/render/page query path
 GET /api/v1/render/page query path optional
 GET /api/v1/render/page response 200 X-Cache
@@ -585,8 +567,6 @@ POST /api/v1/admin/shops/{shopID}/publishable-keys
 POST /api/v1/admin/shops/{shopID}/publishable-keys path shopID
 POST /api/v1/admin/shops/{shopID}/shipping-methods
 POST /api/v1/admin/shops/{shopID}/shipping-methods path shopID
-POST /api/v1/admin/shops/{shopID}/theme
-POST /api/v1/admin/shops/{shopID}/theme path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/disable
 POST /api/v1/admin/shops/{shopID}/users/{userID}/disable path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/disable path userID
@@ -596,12 +576,6 @@ POST /api/v1/admin/shops/{shopID}/users/{userID}/enable path userID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path userID
-POST /api/v1/admin/sites
-POST /api/v1/admin/sites/{siteID}/shops
-POST /api/v1/admin/sites/{siteID}/shops path siteID
-POST /api/v1/admin/themes
-POST /api/v1/admin/themes/{themeID}/pages
-POST /api/v1/admin/themes/{themeID}/pages path themeID
 POST /api/v1/admin/users/{userID}/roles
 POST /api/v1/admin/users/{userID}/roles path userID
 POST /api/v1/shop/auth/login
@@ -690,14 +664,6 @@ PUT /api/v1/admin/shops/{shopID}/settings path shopID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
-PUT /api/v1/admin/sites/{siteID}/shops/{shopID}
-PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path shopID
-PUT /api/v1/admin/sites/{siteID}/shops/{shopID} path siteID
-PUT /api/v1/admin/themes/{themeID}
-PUT /api/v1/admin/themes/{themeID} path themeID
-PUT /api/v1/admin/themes/{themeID}/pages/{themePageID}
-PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themeID
-PUT /api/v1/admin/themes/{themeID}/pages/{themePageID} path themePageID
 PUT /api/v1/shop/cart/items/{itemID}
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
@@ -811,7 +777,6 @@ ProductSalesRow.gross_amount
 ProductSalesRow.product_title
 ProductSalesRow.quantity
 ProductSalesRow.sku_code
-ProvisionResult.binding
 ProvisionResult.owner
 ProvisionResult.shop
 ProvisionResult.storefront_origins
@@ -861,7 +826,6 @@ SalesReport.to
 SalesReportCurrency.buckets
 SalesReportCurrency.currency
 SalesReportCurrency.summary
-SetupStatus.domain_bound
 SetupStatus.home_published
 SetupStatus.owner_assigned
 SetupStatus.owner_password_set
@@ -869,7 +833,6 @@ SetupStatus.payment_credentials_set
 SetupStatus.publishable_key_active
 SetupStatus.shipping_method_active
 SetupStatus.shop_id
-SetupStatus.theme_applied
 Shipment.carrier
 Shipment.created_at
 Shipment.delivered_at
@@ -910,7 +873,6 @@ Shop.id
 Shop.meta
 Shop.name
 Shop.status
-Shop.theme_id
 Shop.updated_at
 ShopPage.page
 ShopPage.page_size
@@ -928,27 +890,6 @@ ShopUser.membership_status
 ShopUser.roles
 ShopUser.status
 ShopUser.user_id
-Site.domain
-Site.id
-Site.shops
-Site.ssl_status
-SiteShopBinding.is_primary
-SiteShopBinding.path_prefix
-SiteShopBinding.shop_id
-Theme.code
-Theme.config_schema
-Theme.id
-Theme.is_active
-Theme.layout_key
-Theme.name
-Theme.pages
-ThemePage.component_key
-ThemePage.id
-ThemePage.page_schema
-ThemePage.type_key
-ThemeSummary.code
-ThemeSummary.id
-ThemeSummary.name
 TokenResponse.access_token
 TokenResponse.expires_in
 TokenResponse.refresh_token

@@ -4,22 +4,17 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
-	"ksdevworks/ecommerce/api/internal/auth"
-	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/publishablekey"
-	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
-	"ksdevworks/ecommerce/api/internal/rbac"
 	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
@@ -27,9 +22,6 @@ import (
 type tenancyEnv struct {
 	client   *ent.Client
 	resolver *tenant.Resolver
-	router   http.Handler
-	issuer   *auth.TokenIssuer
-	admin    int // platform admin user id
 
 	active, disabled, review, brandA int // shop ids
 }
@@ -46,175 +38,26 @@ func newTenancyEnv(t *testing.T) *tenancyEnv {
 	e.review = client.Shop.Create().SetName("Review").SetStatus(2).SaveX(ctx).ID
 	e.brandA = client.Shop.Create().SetName("Brand A").SetStatus(1).SaveX(ctx).ID
 
-	// shop1.test → default active shop + /brand-a prefix shop.
-	s1 := client.Site.Create().SetDomain("shop1.test").SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(s1.ID).SetShopID(e.active).SetIsPrimary(true).SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(s1.ID).SetShopID(e.brandA).SetPathPrefix("/brand-a").SaveX(ctx)
-	// disabled.test → disabled shop; review.test → shop under review.
-	s2 := client.Site.Create().SetDomain("disabled.test").SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(s2.ID).SetShopID(e.disabled).SaveX(ctx)
-	s3 := client.Site.Create().SetDomain("review.test").SaveX(ctx)
-	client.SiteShop.Create().SetSiteID(s3.ID).SetShopID(e.review).SaveX(ctx)
-	// noshops.test → site without any mapping.
-	client.Site.Create().SetDomain("noshops.test").SaveX(ctx)
-
-	// Platform admin for the sites API.
-	perm := client.Permission.Create().SetName("shop.manage_domains").SaveX(ctx)
-	superRole := client.Role.Create().SetName("super_admin").SetScope("platform").SaveX(ctx)
-	client.RolePermission.Create().SetRoleID(superRole.ID).SetPermissionID(perm.ID).SaveX(ctx)
-	hash, _ := auth.HashPassword("password-123")
-	e.admin = client.User.Create().SetEmail("root@t.dev").SetPasswordHash(hash).SaveX(ctx).ID
-	client.RoleUser.Create().SetUserID(e.admin).SetRoleID(superRole.ID).SaveX(ctx)
-
 	log := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	e.resolver = tenant.NewResolver(client, rdb, log)
-	dispatcher := events.NewDispatcher(log)
-	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.ShopStatusChanged); ok {
-			e.resolver.InvalidateHosts(ctx, m.Hosts...)
-		}
-	})
-
-	issuer, err := auth.NewTokenIssuer("test-admin-secret", "test-member-secret", "test", 15*time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
-	e.issuer = issuer
-	engine := rbac.NewEngine(client, rdb, log)
-	authz := &httpapi.AuthzMW{Engine: engine}
-	e.router = httpapi.New(httpapi.Deps{
-		Cfg:     &config.Config{},
-		Log:     log,
-		AdminMW: httpapi.NewAdminMiddleware(issuer),
-		Sites:   &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: log, Authz: authz},
-	})
 	return e
 }
 
-// Task 5.5: 多網域/多前綴/預設商家/停用商家情境.
-func TestResolveScenarios(t *testing.T) {
+// The tenant middleware end-to-end: the publishable key is the only channel.
+// Host and X-Site-Domain / X-Site-Path name nothing any more (change
+// retire-hosted-storefront-and-themes).
+func TestTenantMiddlewareKeyOnly(t *testing.T) {
 	e := newTenancyEnv(t)
 	ctx := context.Background()
-
-	// Default shop on bound domain (case-insensitive, port stripped).
-	res, err := e.resolver.Resolve(ctx, "SHOP1.test:8443", "/about")
-	if err != nil || res.ShopID != e.active || res.Path != "/about" {
-		t.Fatalf("default resolution: res=%+v err=%v", res, err)
-	}
-	// Prefix hit → brand shop, prefix stripped.
-	res, err = e.resolver.Resolve(ctx, "shop1.test", "/brand-a/about")
-	if err != nil || res.ShopID != e.brandA || res.Path != "/about" {
-		t.Fatalf("prefix resolution: res=%+v err=%v", res, err)
-	}
-	// Unknown domain → 404.
-	if _, err := e.resolver.Resolve(ctx, "unknown.test", "/"); !errors.Is(err, tenant.ErrSiteNotFound) {
-		t.Fatalf("unknown domain: %v", err)
-	}
-	// Site without default shop → 404.
-	if _, err := e.resolver.Resolve(ctx, "noshops.test", "/x"); !errors.Is(err, tenant.ErrNoDefaultShop) {
-		t.Fatalf("no default shop: %v", err)
-	}
-	// Disabled shop → 503; review shop → 404.
-	if _, err := e.resolver.Resolve(ctx, "disabled.test", "/"); !errors.Is(err, tenant.ErrShopDisabled) {
-		t.Fatalf("disabled shop: %v", err)
-	}
-	if _, err := e.resolver.Resolve(ctx, "review.test", "/"); !errors.Is(err, tenant.ErrShopUnderReview) {
-		t.Fatalf("review shop: %v", err)
-	}
-}
-
-func (e *tenancyEnv) adminCall(t *testing.T, method, path string, body any) (int, string) {
-	t.Helper()
-	tok, err := e.issuer.IssueAdmin(e.admin, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	if body != nil {
-		_ = json.NewEncoder(&buf).Encode(body)
-	}
-	req := httptest.NewRequest(method, path, &buf)
-	req.Header.Set("Authorization", "Bearer "+tok)
-	rec := httptest.NewRecorder()
-	e.router.ServeHTTP(rec, req)
-	return rec.Code, rec.Body.String()
-}
-
-// Spec multi-tenancy/Site-shop mapping constraints + Route resolution cache.
-func TestSitesAPIConstraintsAndInvalidation(t *testing.T) {
-	e := newTenancyEnv(t)
-	ctx := context.Background()
-
-	// Duplicate default shop → 422 (constraint-backed).
-	code, body := e.adminCall(t, "POST", "/api/v1/admin/sites/1/shops",
-		map[string]any{"shop_id": e.brandA})
-	if code != 422 {
-		t.Fatalf("duplicate default shop: want 422, got %d (%s)", code, body)
-	}
-	// Duplicate primary domain for the active shop → 422.
-	code, _ = e.adminCall(t, "POST", "/api/v1/admin/sites",
-		map[string]any{"domain": "second.test"})
-	if code != 201 {
-		t.Fatalf("create site: %d", code)
-	}
-	var sites struct {
-		Sites []struct {
-			ID     int    `json:"id"`
-			Domain string `json:"domain"`
-		} `json:"sites"`
-	}
-	_, listBody := e.adminCall(t, "GET", "/api/v1/admin/sites", nil)
-	_ = json.Unmarshal([]byte(listBody), &sites)
-	var secondID int
-	for _, s := range sites.Sites {
-		if s.Domain == "second.test" {
-			secondID = s.ID
+	mint := func(shopID int) string {
+		v, err := tenant.NewPublishableKey()
+		if err != nil {
+			t.Fatal(err)
 		}
+		e.client.PublishableKey.Create().SetShopID(shopID).SetKey(v).SaveX(ctx)
+		return v
 	}
-	code, body = e.adminCall(t, "POST", fmt.Sprintf("/api/v1/admin/sites/%d/shops", secondID),
-		map[string]any{"shop_id": e.active, "is_primary": true})
-	if code != 422 {
-		t.Fatalf("duplicate primary domain: want 422, got %d (%s)", code, body)
-	}
-	// Duplicate prefix on the same site → 422.
-	code, body = e.adminCall(t, "POST", "/api/v1/admin/sites/1/shops",
-		map[string]any{"shop_id": e.disabled, "path_prefix": "/brand-a"})
-	if code != 422 {
-		t.Fatalf("duplicate prefix: want 422, got %d (%s)", code, body)
-	}
-	// Invalid prefix charset → 422.
-	code, _ = e.adminCall(t, "POST", "/api/v1/admin/sites/1/shops",
-		map[string]any{"shop_id": e.disabled, "path_prefix": "/Bad_Prefix!"})
-	if code != 422 {
-		t.Fatalf("invalid prefix: want 422, got %d", code)
-	}
-
-	// ── Route cache invalidation (spec: 對應異動後立即生效) ──
-	// Prime the cache for second.test (no default shop yet → 404).
-	if _, err := e.resolver.Resolve(ctx, "second.test", "/"); !errors.Is(err, tenant.ErrNoDefaultShop) {
-		t.Fatalf("prime: %v", err)
-	}
-	// Bind the brand shop as default via the API (publishes ShopStatusChanged).
-	code, body = e.adminCall(t, "POST", fmt.Sprintf("/api/v1/admin/sites/%d/shops", secondID),
-		map[string]any{"shop_id": e.brandA})
-	if code != 201 {
-		t.Fatalf("bind default: %d (%s)", code, body)
-	}
-	// Without waiting for the 5-minute TTL, the next resolution sees it.
-	res, err := e.resolver.Resolve(ctx, "second.test", "/")
-	if err != nil || res.ShopID != e.brandA {
-		t.Fatalf("post-invalidation resolution: res=%+v err=%v", res, err)
-	}
-}
-
-// The tenant middleware end-to-end: Host channel + status gating.
-//
-// change storefront-client-auth (design D6): the storefront group no longer
-// reads X-Site-Domain / X-Site-Path at all, so the Host is the only
-// keyless channel left — the "header wins over Host" case below is inverted
-// into "the header is ignored".
-func TestTenantMiddlewareHTTP(t *testing.T) {
-	e := newTenancyEnv(t)
+	activeKey, disabledKey, reviewKey := mint(e.active), mint(e.disabled), mint(e.review)
 
 	var gotShop int
 	inner := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -225,20 +68,32 @@ func TestTenantMiddlewareHTTP(t *testing.T) {
 
 	cases := []struct {
 		name     string
+		key      string
 		host     string
+		headers  map[string]string
 		want     int
 		wantShop int
 	}{
-		{"Host resolves to the site's default shop", "shop1.test", 200, e.active},
-		{"unknown domain 404", "nope.test", 404, 0},
-		{"disabled shop 503", "disabled.test", 503, 0},
-		{"review shop 404", "review.test", 404, 0},
+		{"a live key resolves its shop", activeKey, "anything.example", nil, 200, e.active},
+		{"no key is a 404 even with a Host", "", "shop1.test", nil, 404, 0},
+		{"X-Site-Domain / X-Site-Path name nothing", "", "shop1.test",
+			map[string]string{"X-Site-Domain": "shop1.test", "X-Site-Path": "/brand-a"}, 404, 0},
+		{"the key wins and the headers are ignored", activeKey, "x.example",
+			map[string]string{"X-Site-Domain": "other.test"}, 200, e.active},
+		{"disabled shop key 503", disabledKey, "x.example", nil, 503, 0},
+		{"review shop key 404", reviewKey, "x.example", nil, 404, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			gotShop = 0
 			req := httptest.NewRequest("POST", "/api/v1/shop/auth/login", nil)
 			req.Host = tc.host
+			if tc.key != "" {
+				req.Header.Set(httpapi.PublishableKeyHeader, tc.key)
+			}
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
 			rec := httptest.NewRecorder()
 			mw.ServeHTTP(rec, req)
 			if rec.Code != tc.want {
@@ -247,30 +102,16 @@ func TestTenantMiddlewareHTTP(t *testing.T) {
 			if tc.wantShop != 0 && gotShop != tc.wantShop {
 				t.Fatalf("shop ctx %d, want %d", gotShop, tc.wantShop)
 			}
+			if tc.key == "" && !strings.Contains(rec.Body.String(), "unknown_publishable_key") {
+				t.Fatalf("a missing key answers like an unknown key: %s", rec.Body.String())
+			}
 		})
 	}
-
-	// Scenario (multi-tenancy): 前台 API 忽略 X-Site-Domain. The header names a
-	// disabled shop, which would have produced a 503 before this change; the
-	// Host wins because the header is no longer read at all.
-	t.Run("X-Site-Domain is ignored by the storefront group", func(t *testing.T) {
-		gotShop = 0
-		req := httptest.NewRequest("POST", "/api/v1/shop/auth/login", nil)
-		req.Host = "shop1.test"
-		req.Header.Set("X-Site-Domain", "disabled.test")
-		req.Header.Set("X-Site-Path", "/brand-a")
-		rec := httptest.NewRecorder()
-		mw.ServeHTTP(rec, req)
-		if rec.Code != 200 || gotShop != e.active {
-			t.Fatalf("status=%d shop=%d, want 200/%d (%s)", rec.Code, gotShop, e.active, rec.Body.String())
-		}
-	})
 }
 
 // TestPublishableKeyTenantResolution pins spec storefront-client-auth's
-// resolution requirements at the middleware boundary: the key wins over Host,
-// an unusable key never falls back, and unknown/malformed/revoked keys are
-// indistinguishable.
+// resolution requirements at the middleware boundary: an unusable key never
+// falls back, and unknown/malformed/revoked keys are indistinguishable.
 func TestPublishableKeyTenantResolution(t *testing.T) {
 	e := newTenancyEnv(t)
 	ctx := context.Background()
@@ -310,21 +151,15 @@ func TestPublishableKeyTenantResolution(t *testing.T) {
 		return rec.Code, rec.Body.String(), gotShop
 	}
 
-	// Scenario: 有效金鑰解析出商家 — including a shop that has no domain of its
-	// own on this site's default mapping (brandA is prefix-only).
+	// Scenario: 有效金鑰解析出商家.
 	if code, body, shop := call(activeKey, "irrelevant.example"); code != 200 || shop != e.active {
 		t.Fatalf("active key: code=%d shop=%d (%s)", code, shop, body)
 	}
 	if code, body, shop := call(brandKey, "irrelevant.example"); code != 200 || shop != e.brandA {
-		t.Fatalf("prefix-shop key: code=%d shop=%d (%s)", code, shop, body)
+		t.Fatalf("second-shop key: code=%d shop=%d (%s)", code, shop, body)
 	}
 
-	// Scenario: 金鑰優先於 Host — the Host would resolve to a different shop.
-	if code, body, shop := call(activeKey, "review.test"); code != 200 || shop != e.active {
-		t.Fatalf("key must win over Host: code=%d shop=%d (%s)", code, shop, body)
-	}
-
-	// Scenario: 已撤銷金鑰被拒且不回退 — the Host alone would have been a 200.
+	// Scenario: 已撤銷金鑰被拒且不回退.
 	revokedCode, revokedBody, shop := call(revokedKey, "shop1.test")
 	if revokedCode != 404 || shop != 0 {
 		t.Fatalf("revoked key must 404 without falling back: code=%d shop=%d (%s)", revokedCode, shop, revokedBody)
@@ -346,7 +181,7 @@ func TestPublishableKeyTenantResolution(t *testing.T) {
 		t.Fatalf("want the dedicated error code, got %v", parsed)
 	}
 
-	// Scenario: 停用商家的金鑰 / 審核中商家的金鑰 — same gating as the domain path.
+	// Scenario: 停用商家的金鑰 / 審核中商家的金鑰.
 	if code, body, _ := call(disabledKey, "shop1.test"); code != 503 {
 		t.Fatalf("disabled shop key: want 503, got %d (%s)", code, body)
 	}

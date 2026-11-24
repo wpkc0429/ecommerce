@@ -21,18 +21,16 @@ import (
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpapi"
 	"ksdevworks/ecommerce/api/internal/rbac"
-	"ksdevworks/ecommerce/api/internal/tenant"
 	"ksdevworks/ecommerce/api/internal/testutil"
 )
 
 // shopsEnv exercises change platform-shop-crud: platform-only shop
 // CRUD, gated by the existing three-tier RBAC decision (design D1).
 type shopsEnv struct {
-	client   *ent.Client
-	rdb      *redis.Client
-	router   http.Handler
-	issuer   *auth.TokenIssuer
-	resolver *tenant.Resolver
+	client *ent.Client
+	rdb    *redis.Client
+	router http.Handler
+	issuer *auth.TokenIssuer
 
 	platform int // holds shop.create/shop.list/shop.view/shop.update at platform scope
 	shopA    int
@@ -79,13 +77,7 @@ func newShopsEnv(t *testing.T) *shopsEnv {
 	log := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
 	engine := rbac.NewEngine(client, rdb, log)
 	authz := &httpapi.AuthzMW{Engine: engine}
-	e.resolver = tenant.NewResolver(client, rdb, log)
 	dispatcher := events.NewDispatcher(log)
-	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.ShopStatusChanged); ok {
-			e.resolver.InvalidateHosts(ctx, m.Hosts...)
-		}
-	})
 	cmsService := &cms.Service{Client: client, Dispatcher: dispatcher}
 	e.router = httpapi.New(httpapi.Deps{
 		Cfg:     &config.Config{},
@@ -150,10 +142,6 @@ func TestCreateShopValidation(t *testing.T) {
 
 	if code, _ := e.call(t, e.platform, "POST", "/api/v1/admin/shops", map[string]any{"name": ""}); code != http.StatusUnprocessableEntity {
 		t.Fatalf("empty name: want 422, got %d", code)
-	}
-	if code, _ := e.call(t, e.platform, "POST", "/api/v1/admin/shops",
-		map[string]any{"name": "X", "theme_id": 999999}); code != http.StatusUnprocessableEntity {
-		t.Fatalf("unknown theme: want 422, got %d", code)
 	}
 }
 
@@ -255,35 +243,5 @@ func TestListShopsPagination(t *testing.T) {
 		if seen[s.ID] {
 			t.Fatalf("shop %d present on both pages", s.ID)
 		}
-	}
-}
-
-// Scenario (design D5): status 轉換立即使 route resolution cache 失效.
-func TestUpdateShopStatusInvalidatesRouteCache(t *testing.T) {
-	e := newShopsEnv(t)
-	ctx := context.Background()
-
-	site := e.client.Site.Create().SetDomain("shopa.test").SaveX(ctx)
-	e.client.SiteShop.Create().SetSiteID(site.ID).SetShopID(e.shopA).SetIsPrimary(true).SaveX(ctx)
-
-	// Prime the route cache the way the resolver would on first request.
-	if _, err := e.resolver.Resolve(ctx, "shopa.test", "/"); err != nil {
-		t.Fatalf("prime cache: %v", err)
-	}
-	if n, err := e.rdb.Exists(ctx, "route:shopa.test").Result(); err != nil || n != 1 {
-		t.Fatalf("route cache not primed: n=%d err=%v", n, err)
-	}
-
-	code, body := e.call(t, e.platform, "PUT", fmt.Sprintf("/api/v1/admin/shops/%d", e.shopA), map[string]any{"status": 0})
-	if code != http.StatusOK {
-		t.Fatalf("update status: %d %s", code, body)
-	}
-
-	if n, err := e.rdb.Exists(ctx, "route:shopa.test").Result(); err != nil || n != 0 {
-		t.Fatalf("route cache key still present after status change: n=%d err=%v", n, err)
-	}
-	// Confirm it takes effect immediately, not just that the key is gone.
-	if _, err := e.resolver.Resolve(ctx, "shopa.test", "/"); err != tenant.ErrShopDisabled {
-		t.Fatalf("resolve after disable: %v", err)
 	}
 }

@@ -22,8 +22,6 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
-	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 )
 
 // Sources of a schema version.
@@ -41,13 +39,11 @@ type Doc struct {
 	Types         map[string]json.RawMessage `json:"types"`
 	TypeOrder     []string                   `json:"type_order,omitempty"`
 	Global        json.RawMessage            `json:"global"`
-	ComponentKeys map[string]string          `json:"component_keys,omitempty"`
 }
 
 // TypeInfo describes one page type of a shop's schema.
 type TypeInfo struct {
-	TypeKey      string
-	ComponentKey string
+	TypeKey string
 }
 
 // Store reads per-shop schema versions.
@@ -123,7 +119,7 @@ func (d Doc) TypeInfos() []TypeInfo {
 	for _, k := range d.TypeOrder {
 		if _, ok := d.Types[k]; ok && !seen[k] {
 			seen[k] = true
-			out = append(out, TypeInfo{TypeKey: k, ComponentKey: d.ComponentKeys[k]})
+			out = append(out, TypeInfo{TypeKey: k})
 		}
 	}
 	rest := make([]string, 0)
@@ -134,7 +130,7 @@ func (d Doc) TypeInfos() []TypeInfo {
 	}
 	sort.Strings(rest)
 	for _, k := range rest {
-		out = append(out, TypeInfo{TypeKey: k, ComponentKey: d.ComponentKeys[k]})
+		out = append(out, TypeInfo{TypeKey: k})
 	}
 	return out
 }
@@ -172,78 +168,21 @@ func Digest(d Doc) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
-// Writer writes schema versions through a set of ent clients, so the same code
-// runs on a plain client or inside a caller-owned transaction.
+// Writer writes schema versions through one ent client, so the same code runs
+// on a plain client or inside a caller-owned transaction.
 type Writer struct {
 	cs *ent.ContentSchemaClient
-	th *ent.ThemeClient
-	tp *ent.ThemePageClient
-	sh *ent.ShopClient
 }
 
 // WriterFor returns a Writer on a plain client.
-func WriterFor(c *ent.Client) Writer {
-	return Writer{cs: c.ContentSchema, th: c.Theme, tp: c.ThemePage, sh: c.Shop}
-}
+func WriterFor(c *ent.Client) Writer { return Writer{cs: c.ContentSchema} }
 
 // WriterForTx returns a Writer inside tx.
-func WriterForTx(tx *ent.Tx) Writer {
-	return Writer{cs: tx.ContentSchema, th: tx.Theme, tp: tx.ThemePage, sh: tx.Shop}
-}
+func WriterForTx(tx *ent.Tx) Writer { return Writer{cs: tx.ContentSchema} }
 
-// FromTheme builds the format-1 document of a theme.
-func (w Writer) FromTheme(ctx context.Context, themeID int) (Doc, error) {
-	t, err := w.th.Get(ctx, themeID)
-	if err != nil {
-		return Doc{}, fmt.Errorf("contentschema: load theme %d: %w", themeID, err)
-	}
-	tps, err := w.tp.Query().Where(themepage.ThemeIDEQ(themeID)).Order(themepage.ByID()).All(ctx)
-	if err != nil {
-		return Doc{}, fmt.Errorf("contentschema: load theme pages of %d: %w", themeID, err)
-	}
-	d := Doc{
-		Format:        1,
-		Types:         map[string]json.RawMessage{},
-		TypeOrder:     []string{},
-		Global:        t.ConfigSchema,
-		ComponentKeys: map[string]string{},
-	}
-	for _, p := range tps {
-		d.Types[p.TypeKey] = p.PageSchema
-		d.TypeOrder = append(d.TypeOrder, p.TypeKey)
-		d.ComponentKeys[p.TypeKey] = p.ComponentKey
-	}
-	return d, nil
-}
-
-// WriteFromTheme writes the shop's next schema version as a copy of the theme's
-// schemas, unless the active version already has the same content (then it is
-// a no-op and written is false). Used by every path that applies or edits a
-// theme until the theme code is removed.
-func (w Writer) WriteFromTheme(ctx context.Context, shopID, themeID int) (written bool, err error) {
-	d, err := w.FromTheme(ctx, themeID)
-	if err != nil {
-		return false, err
-	}
-	return w.write(ctx, shopID, d, SourceThemeBackfill)
-}
-
-// SyncThemeShops re-copies a theme's schemas to every shop applying it (a
-// platform theme edit used to take effect for all of them at once).
-func (w Writer) SyncThemeShops(ctx context.Context, themeID int) error {
-	ids, err := w.sh.Query().Where(entshop.ThemeIDEQ(themeID)).IDs(ctx)
-	if err != nil {
-		return fmt.Errorf("contentschema: list shops of theme %d: %w", themeID, err)
-	}
-	for _, id := range ids {
-		if _, err := w.WriteFromTheme(ctx, id, themeID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (w Writer) write(ctx context.Context, shopID int, d Doc, source string) (bool, error) {
+// Write stores d as the shop's next schema version, unless the active version
+// already has the same content (then it is a no-op and written is false).
+func (w Writer) Write(ctx context.Context, shopID int, d Doc, source string) (written bool, err error) {
 	digest, err := Digest(d)
 	if err != nil {
 		return false, fmt.Errorf("contentschema: digest: %w", err)

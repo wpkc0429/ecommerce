@@ -118,7 +118,7 @@ func TestOpenAPIAccountResponsesMatchImplementation(t *testing.T) {
 	v.assertResponse(t, "/api/v1/admin/auth/password-setup/inspect", http.MethodPost, http.StatusOK, body)
 
 	code, body = call(http.MethodPost, "/api/v1/admin/shop-provisioning", map[string]any{
-		"name": "Conf Provisioned", "domain": "conf-prov.test", "owner_email": "conf-owner2@t.dev",
+		"name": "Conf Provisioned", "owner_email": "conf-owner2@t.dev",
 		"storefront_origins": []string{"https://conf-prov.test"},
 	})
 	requireStatus(t, code, http.StatusCreated, body)

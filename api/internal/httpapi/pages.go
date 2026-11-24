@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -42,7 +43,7 @@ func (h *PagesHandler) MountShop(r chi.Router) {
 	r.With(h.Authz.RequireShopPermission("page.view")).Get("/page-types", h.pageTypes)
 }
 
-// pageTypes lists the page types of the shop's current theme (admin
+// pageTypes lists the page types of the shop's content schema (admin
 // create-page form data source).
 func (h *PagesHandler) pageTypes(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
@@ -58,10 +59,7 @@ func (h *PagesHandler) pageTypes(w http.ResponseWriter, r *http.Request) {
 	}
 	out := []map[string]any{}
 	for _, t := range types {
-		out = append(out, map[string]any{
-			"type_key":      t.TypeKey,
-			"component_key": t.ComponentKey,
-		})
+		out = append(out, map[string]any{"type_key": t.TypeKey})
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"page_types": out})
 }
@@ -252,4 +250,18 @@ func (h *PagesHandler) updateContent(w http.ResponseWriter, r *http.Request) {
 		"shop_id": shop.ID,
 		"content": shop.ContentJSON,
 	})
+}
+
+// writeCMSError maps cms service errors to HTTP responses.
+func writeCMSError(w http.ResponseWriter, log *slog.Logger, err error) {
+	var ve *cms.ValidationError
+	switch {
+	case errors.As(err, &ve):
+		httpx.Unprocessable(w, ve.Message, ve.Details)
+	case errors.Is(err, cms.ErrNotFound):
+		httpx.NotFound(w)
+	default:
+		log.Error("cms operation failed", "err", err)
+		httpx.Internal(w)
+	}
 }

@@ -826,7 +826,6 @@ try {
   console.log("㉔ 平台開店：精靈 → 設定連結 → 新 owner 設密碼登入 → 停用後被踢回登入（change platform-account-provisioning）");
   // 每輪唯一的店名、網域與 email；不碰 demo 商家，所以可重複執行。
   const provShop = `E2E Provisioned ${runID}`;
-  const provDomain = `e2e-${runID}.localhost`;
   const provOwner = `e2e-owner-${runID}@example.test`;
   // 測試值，只在本機即時產生，不寫入任何檔案。
   const provPassword = `pw-${runID}-${Math.random().toString(36).slice(2, 10)}`;
@@ -840,7 +839,6 @@ try {
   await page.click("#platform-shop-new-btn");
   await page.waitForSelector("#platform-shop-dialog[open]");
   await page.fill("#platform-shop-name", provShop);
-  await page.fill("#platform-shop-domain", provDomain);
   await page.fill("#platform-shop-owner", provOwner);
   await page.click("#platform-shop-form button[type=submit]");
   await page.waitForSelector("#platform-shop-result .link-once", { timeout: 8000 });
@@ -852,6 +850,8 @@ try {
   check("the checklist shows the owner assigned but the password not yet set",
     (await page.locator('#platform-shop-result [data-check="owner_assigned"]').getAttribute("data-done")) === "true" &&
     (await page.locator('#platform-shop-result [data-check="owner_password_set"]').getAttribute("data-done")) === "false");
+  check("the checklist no longer has theme or domain items",
+    (await page.locator('#platform-shop-result [data-check="theme_applied"], #platform-shop-result [data-check="domain_bound"]').count()) === 0);
   check("the new shop is in the list", (await page.locator(`#platform-shops-tbody tr[data-name="${provShop}"]`).count()) === 1);
 
   // 另一個瀏覽器 context（沒有任何登入狀態）：新 owner 開連結。

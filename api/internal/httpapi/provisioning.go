@@ -45,10 +45,7 @@ func (h *ProvisioningHandler) provision(w http.ResponseWriter, r *http.Request) 
 	}
 	var req struct {
 		Name              string   `json:"name"`
-		ThemeID           *int     `json:"theme_id"`
 		Status            *int16   `json:"status"`
-		Domain            string   `json:"domain"`
-		PathPrefix        string   `json:"path_prefix"`
 		StorefrontOrigins []string `json:"storefront_origins"`
 		OwnerEmail        string   `json:"owner_email"`
 	}
@@ -63,9 +60,6 @@ func (h *ProvisioningHandler) provision(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	need := []string{"account.manage"}
-	if req.Domain != "" {
-		need = append(need, "shop.manage_domains")
-	}
 	if len(req.StorefrontOrigins) > 0 {
 		need = append(need, "shop.manage_client_origins")
 	}
@@ -77,8 +71,7 @@ func (h *ProvisioningHandler) provision(w http.ResponseWriter, r *http.Request) 
 	}
 
 	res, err := h.Service.ProvisionShop(r.Context(), provision.Input{
-		Name: req.Name, ThemeID: req.ThemeID, Status: req.Status,
-		Domain: req.Domain, PathPrefix: req.PathPrefix,
+		Name: req.Name, Status: req.Status,
 		StorefrontOrigins: req.StorefrontOrigins, OwnerEmail: req.OwnerEmail,
 		ActorID: actor.UserID,
 	})
@@ -98,15 +91,8 @@ func (h *ProvisioningHandler) provision(w http.ResponseWriter, r *http.Request) 
 			owner[k] = v
 		}
 	}
-	var binding any
-	if res.Binding != nil {
-		binding = map[string]any{
-			"site_id": res.Binding.SiteID, "domain": res.Binding.Domain,
-			"path_prefix": res.Binding.PathPrefix, "is_primary": res.Binding.IsPrimary,
-		}
-	}
 	httpx.WriteJSON(w, http.StatusCreated, map[string]any{
-		"shop": shopJSON(res.Shop), "binding": binding, "owner": owner, "storefront_origins": res.Origins,
+		"shop": shopJSON(res.Shop), "owner": owner, "storefront_origins": res.Origins,
 	})
 }
 
@@ -128,8 +114,6 @@ func (h *ProvisioningHandler) setupStatus(w http.ResponseWriter, r *http.Request
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"shop_id":                 shopID,
-		"theme_applied":           st.ThemeApplied,
-		"domain_bound":            st.DomainBound,
 		"owner_assigned":          st.OwnerAssigned,
 		"owner_password_set":      st.OwnerPasswordSet,
 		"home_published":          st.HomePublished,

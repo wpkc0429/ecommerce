@@ -14,13 +14,13 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/contentschema"
 	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 )
 
 // Gate tests of change retire-hosted-storefront-and-themes group 1 (tasks
-// 1.7). They prove that nothing which validates, publishes or renders content
-// reads themes/theme_pages any more, which is the precondition for removing
-// the theme system.
+// 1.7), kept after the removal: they prove that nothing which validates,
+// publishes or renders content depends on themes, and that the one-time
+// backfill SQL of the add_content_schemas migration copies a theme's schemas
+// faithfully. (The backfill test is deleted together with the theme tables.)
 
 func normalizeJSON(t *testing.T, raw []byte) any {
 	t.Helper()
@@ -38,11 +38,14 @@ func TestContentSchemaBackfillMigrationEquivalence(t *testing.T) {
 	e := newCMSEnv(t)
 	ctx := context.Background()
 
-	themeID := *e.client.Shop.GetX(ctx, e.shopID).ThemeID
-	want, err := contentschema.WriterFor(e.client).FromTheme(ctx, themeID)
-	if err != nil {
-		t.Fatal(err)
-	}
+	// A legacy theme with two page types, applied to the demo shop.
+	pageSchemaA := json.RawMessage(`{"type":"object","additionalProperties":false,"properties":{"sections":{"type":"array","default":[]}}}`)
+	pageSchemaB := json.RawMessage(`{"type":"object","properties":{"body":{"type":"string","default":""}}}`)
+	cfg := json.RawMessage(`{"type":"object","properties":{"tokens":{"type":"object"}}}`)
+	th := e.client.Theme.Create().SetCode("legacy").SetName("Legacy").SetLayoutKey("legacy/main").SetConfigSchema(cfg).SaveX(ctx)
+	e.client.ThemePage.Create().SetThemeID(th.ID).SetTypeKey("home").SetComponentKey("legacy/home").SetPageSchema(pageSchemaA).SaveX(ctx)
+	e.client.ThemePage.Create().SetThemeID(th.ID).SetTypeKey("about").SetComponentKey("legacy/about").SetPageSchema(pageSchemaB).SaveX(ctx)
+	e.client.Shop.UpdateOneID(e.shopID).SetThemeID(th.ID).ExecX(ctx)
 
 	// Simulate a pre-migration database: themed shop, no schema rows.
 	if _, err := e.client.ContentSchema.Delete().Exec(ctx); err != nil {
@@ -74,36 +77,41 @@ func TestContentSchemaBackfillMigrationEquivalence(t *testing.T) {
 	if len(rows) != 1 || rows[0].Version != 1 || rows[0].Source != contentschema.SourceThemeBackfill {
 		t.Fatalf("want exactly one version-1 theme_backfill row, got %d rows: %+v", len(rows), rows)
 	}
+	want := map[string]any{
+		"format":         1,
+		"types":          map[string]any{"home": normalizeJSON(t, pageSchemaA), "about": normalizeJSON(t, pageSchemaB)},
+		"type_order":     []any{"home", "about"},
+		"global":         normalizeJSON(t, cfg),
+		"component_keys": map[string]any{"home": "legacy/home", "about": "legacy/about"},
+	}
 	wantRaw, _ := json.Marshal(want)
 	if !reflect.DeepEqual(normalizeJSON(t, rows[0].SchemaJSON), normalizeJSON(t, wantRaw)) {
-		t.Fatalf("backfilled schema differs from the theme's schemas:\n got %s\nwant %s", rows[0].SchemaJSON, wantRaw)
+		t.Fatalf("backfilled schema differs from the theme's schemas: got %s want %s", rows[0].SchemaJSON, wantRaw)
 	}
 
-	// The store returns the same page types, in the theme's order.
+	// The store reads it back with the theme's page type order.
 	types, err := (&contentschema.Store{Client: e.client}).Types(ctx, e.shopID)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got []string
 	for _, ti := range types {
-		got = append(got, ti.TypeKey+"="+ti.ComponentKey)
+		got = append(got, ti.TypeKey)
 	}
-	if strings.Join(got, ",") != "home=starter/home,about=starter/about,landing_page=starter/landing" {
+	if strings.Join(got, ",") != "home,about" {
 		t.Fatalf("page types after backfill: %v", got)
 	}
 }
 
-// 1.7 (2): with every theme_pages row deleted, page validation, publish,
-// global content, public render, preview and page-types all still work.
-func TestContentSurvivesDeletingThemePages(t *testing.T) {
+// 1.7 (2): with no theme anywhere, page validation, publish, global content,
+// public render, preview and page-types all work from the shop's own schema.
+func TestContentWorksWithoutThemes(t *testing.T) {
 	e := newCMSEnv(t)
 	ctx := context.Background()
 
-	if _, err := e.client.ThemePage.Delete().Where(themepage.IDGT(0)).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if n := e.client.ThemePage.Query().CountX(ctx); n != 0 {
-		t.Fatalf("theme_pages not empty: %d", n)
+	// The seeded demo shop has no theme at all: its schema is its own version.
+	if n := e.client.Theme.Query().CountX(ctx); n != 0 {
+		t.Fatalf("seed must not create themes any more: %d", n)
 	}
 
 	// page-types comes from the shop's own schema.
@@ -156,7 +164,7 @@ func TestContentSurvivesDeletingThemePages(t *testing.T) {
 	// Public render of the published page, with hydration from the schema.
 	rcode, bundle, _ := e.renderPage(t, "/about-us")
 	if rcode != 200 || dig(bundle, "shop", "content", "header", "site_title") != "新招牌" {
-		t.Fatalf("render after theme_pages deletion: %d %v", rcode, bundle)
+		t.Fatalf("render without themes: %d %v", rcode, bundle)
 	}
 	sections, _ := dig(bundle, "page", "content", "sections").([]any)
 	if len(sections) == 0 || sections[0].(map[string]any)["cta_text"] != "了解更多" {
@@ -181,58 +189,52 @@ func TestContentSurvivesDeletingThemePages(t *testing.T) {
 	}
 }
 
-// 1.7 (3): switching theme writes a new schema version, and page validation
-// then uses the new version.
-func TestThemeSwitchWritesNewSchemaVersion(t *testing.T) {
+// A page whose type_key is not in the shop's schema is flagged incompatible
+// in the list and cannot be validated, but it is not deleted.
+func TestPageIncompatibleWhenTypeLeavesSchema(t *testing.T) {
 	e := newCMSEnv(t)
 	ctx := context.Background()
 	store := &contentschema.Store{Client: e.client}
 
-	before, err := store.Active(ctx, e.shopID)
-	if err != nil || before.Version != 1 {
-		t.Fatalf("demo shop must have schema version 1 after seeding: %v %+v", err, before)
+	code, body, raw := e.admin1(t, "POST", e.shopPath("/pages"),
+		map[string]any{"type_key": "landing_page", "title": "促銷", "slug": "promo"})
+	if code != 201 {
+		t.Fatalf("create landing page: %d %s", code, raw)
+	}
+	promoID := int(body["id"].(float64))
+
+	// Register a new schema version without landing_page.
+	active, err := store.Active(ctx, e.shopID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := active.Doc
+	delete(doc.Types, "landing_page")
+	doc.TypeOrder = []string{"home", "about"}
+	if _, err := contentschema.WriterFor(e.client).Write(ctx, e.shopID, doc, contentschema.SourceRegistered); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := store.Active(ctx, e.shopID); v == nil || v.Version != 2 {
+		t.Fatalf("new schema must be version 2: %+v", v)
+	}
+	// Writing identical content again does not create a version.
+	if written, err := contentschema.WriterFor(e.client).Write(ctx, e.shopID, doc, contentschema.SourceRegistered); err != nil || written {
+		t.Fatalf("identical schema must not create a version: written=%v err=%v", written, err)
 	}
 
-	code, body, raw := e.admin1(t, "POST", "/api/v1/admin/themes",
-		map[string]any{"code": "gate-min", "name": "Gate", "layout_key": "gate/main",
-			"config_schema": map[string]any{"type": "object", "additionalProperties": false}})
-	if code != 201 {
-		t.Fatalf("create theme: %d %s", code, raw)
+	code, body, raw = e.admin1(t, "GET", e.shopPath("/pages"), nil)
+	if code != 200 {
+		t.Fatalf("list pages: %d %s", code, raw)
 	}
-	tid := int(body["id"].(float64))
-	if code, _, raw := e.admin1(t, "POST", fmt.Sprintf("/api/v1/admin/themes/%d/pages", tid),
-		map[string]any{"type_key": "home", "component_key": "gate/home",
-			"page_schema": map[string]any{"type": "object", "additionalProperties": false}}); code != 201 {
-		t.Fatalf("create theme page: %d %s", code, raw)
+	flagged := map[string]bool{}
+	for _, p := range body["pages"].([]any) {
+		pm := p.(map[string]any)
+		flagged[pm["slug"].(string)], _ = pm["incompatible"].(bool)
 	}
-	if code, _, raw := e.admin1(t, "POST", e.shopPath("/theme"), map[string]any{"theme_id": tid}); code != 200 {
-		t.Fatalf("switch theme: %d %s", code, raw)
+	if !flagged["promo"] || flagged["home"] {
+		t.Fatalf("incompatible flags: %v", flagged)
 	}
-	after, err := store.Active(ctx, e.shopID)
-	if err != nil || after.Version != 2 {
-		t.Fatalf("switch must write version 2: %v %+v", err, after)
-	}
-	if _, ok := after.Doc.Types["about"]; ok || len(after.Doc.Types) != 1 {
-		t.Fatalf("new version must hold only the new theme's types: %v", after.Doc.TypeOrder)
-	}
-	// The old starter-only type is no longer valid for new pages.
-	if code, _, _ := e.admin1(t, "POST", e.shopPath("/pages"),
-		map[string]any{"type_key": "about", "title": "x", "slug": "x"}); code != 422 {
-		t.Fatalf("type from the old theme: want 422, got %d", code)
-	}
-	// Editing the theme afterwards propagates as another version.
-	if code, _, raw := e.admin1(t, "PUT", fmt.Sprintf("/api/v1/admin/themes/%d", tid),
-		map[string]any{"config_schema": map[string]any{"type": "object"}}); code != 200 {
-		t.Fatalf("update theme: %d %s", code, raw)
-	}
-	if v, _ := store.Active(ctx, e.shopID); v == nil || v.Version != 3 {
-		t.Fatalf("theme edit must propagate a new version: %+v", v)
-	}
-	// Re-applying identical content does not create a version.
-	if code, _, raw := e.admin1(t, "POST", e.shopPath("/theme"), map[string]any{"theme_id": tid}); code != 200 {
-		t.Fatalf("re-switch: %d %s", code, raw)
-	}
-	if v, _ := store.Active(ctx, e.shopID); v == nil || v.Version != 3 {
-		t.Fatalf("identical schema must not create a version: %+v", v)
+	if code, _, _ := e.admin1(t, "POST", e.shopPath(fmt.Sprintf("/pages/%d/publish", promoID)), nil); code != 422 {
+		t.Fatalf("publishing a page whose type left the schema: want 422, got %d", code)
 	}
 }

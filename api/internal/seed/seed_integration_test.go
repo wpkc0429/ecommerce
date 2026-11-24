@@ -216,8 +216,7 @@ func TestDemoSeedIsIdempotent(t *testing.T) {
 			"role_permissions":     client.RolePermission.Query().Count,
 			"role_users":           client.RoleUser.Query().Count,
 			"shop_users":           client.ShopUser.Query().Count,
-			"themes":               client.Theme.Query().Count,
-			"theme_pages":          client.ThemePage.Query().Count,
+			"content_schemas":      client.ContentSchema.Query().Count,
 		} {
 			n, err := count(ctx)
 			if err != nil {
@@ -290,6 +289,7 @@ func TestBaselineSeedProvisionsNoDemoData(t *testing.T) {
 		"publishable_keys":     client.PublishableKey.Query().Count,
 		"shop_allowed_origins": client.ShopAllowedOrigin.Query().Count,
 		"members":              client.Member.Query().Count,
+		"content_schemas":      client.ContentSchema.Query().Count,
 	} {
 		n, err := count(ctx)
 		if err != nil {
@@ -304,8 +304,8 @@ func TestBaselineSeedProvisionsNoDemoData(t *testing.T) {
 	if n, err := client.Permission.Query().Count(ctx); err != nil || n == 0 {
 		t.Errorf("baseline seed did not create the permission catalog (n=%d err=%v)", n, err)
 	}
-	if n, err := client.Theme.Query().Count(ctx); err != nil || n == 0 {
-		t.Errorf("baseline seed did not create the starter theme (n=%d err=%v)", n, err)
+	if n, err := client.Role.Query().Count(ctx); err != nil || n == 0 {
+		t.Errorf("baseline seed did not create the platform roles (n=%d err=%v)", n, err)
 	}
 }
 
@@ -653,5 +653,48 @@ func TestDemoSeedProvisionsStaffAccount(t *testing.T) {
 	}
 	if !client.ShopUser.Query().Where(entshopuser.UserIDEQ(u.ID), entshopuser.StatusEQ(1)).ExistX(ctx) {
 		t.Fatal("demo staff must hold an active membership")
+	}
+}
+
+// Scenario: 已移除的權限節點（theme.*、shop.manage_domains）連同其授予一併被清除，
+// 重跑 seed 不會把它們加回來；page.* 不受影響.
+func TestSeedPurgesRemovedPermissionNodes(t *testing.T) {
+	client := testutil.OpenDB(t)
+	ctx := context.Background()
+	runDemoSeed(t, client)
+
+	// Simulate a database seeded before the removal: nodes exist and are granted.
+	editor := client.Role.Query().Where(entrole.NameEQ("editor")).OnlyX(ctx)
+	for _, name := range []string{"theme.view", "theme.manage", "shop.manage_domains"} {
+		p := client.Permission.Create().SetName(name).SaveX(ctx)
+		client.RolePermission.Create().SetRoleID(editor.ID).SetPermissionID(p.ID).SaveX(ctx)
+	}
+	runDemoSeed(t, client)
+
+	for _, name := range []string{"theme.view", "theme.manage", "shop.manage_domains"} {
+		if client.Permission.Query().Where(entpermission.NameEQ(name)).ExistX(ctx) {
+			t.Errorf("removed permission %s is still in the catalog", name)
+		}
+	}
+	for _, name := range []string{"page.view", "page.create", "page.edit", "page.delete", "page.publish"} {
+		if !client.Permission.Query().Where(entpermission.NameEQ(name)).ExistX(ctx) {
+			t.Errorf("page permission %s must be kept", name)
+		}
+	}
+	if client.RolePermission.Query().Where(
+		entrolepermission.RoleIDEQ(editor.ID),
+		entrolepermission.HasPermissionWith(entpermission.NameHasPrefix("theme.")),
+	).ExistX(ctx) {
+		t.Error("editor still holds a theme.* grant")
+	}
+}
+
+// Scenario: 重跑 demo seed 不會為內容 schema 產生新版本（內容相同則不寫）.
+func TestDemoSeedWritesContentSchemaOnce(t *testing.T) {
+	client := testutil.OpenDB(t)
+	runDemoSeed(t, client)
+	runDemoSeed(t, client)
+	if n := client.ContentSchema.Query().CountX(context.Background()); n != 1 {
+		t.Fatalf("want exactly one content schema version for the demo shop, got %d", n)
 	}
 }

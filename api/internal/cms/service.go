@@ -12,8 +12,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
-	entsite "ksdevworks/ecommerce/api/internal/ent/site"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/events"
 )
 
@@ -30,7 +28,7 @@ var reservedSlugs = map[string]bool{
 	"assets": true, "static": true, "healthz": true,
 }
 
-// Service implements theme/page/shop-content operations. Every write that
+// Service implements page, shop-content and shop CRUD operations. Every write that
 // affects rendering publishes its domain event after the write commits.
 type Service struct {
 	Client     *ent.Client
@@ -70,235 +68,6 @@ func (s *Service) schemas() *contentschema.Store {
 // is not configured).
 func (s *Service) ImagePrefixes() []string { return s.imagePrefixes }
 
-// ── themes (platform) ─────────────────────────────────────────────
-
-type ThemeInput struct {
-	Code         string          `json:"code"`
-	Name         string          `json:"name"`
-	LayoutKey    string          `json:"layout_key"`
-	ConfigSchema json.RawMessage `json:"config_schema"`
-	IsActive     *bool           `json:"is_active"`
-}
-
-func (s *Service) CreateTheme(ctx context.Context, in ThemeInput) (*ent.Theme, error) {
-	if in.Code == "" || in.Name == "" || in.LayoutKey == "" {
-		return nil, &ValidationError{Message: "code, name and layout_key are required"}
-	}
-	if len(in.ConfigSchema) == 0 {
-		in.ConfigSchema = json.RawMessage("{}")
-	}
-	if err := ValidateSchemaDoc(in.ConfigSchema); err != nil {
-		return nil, err
-	}
-	create := s.Client.Theme.Create().
-		SetCode(in.Code).
-		SetName(in.Name).
-		SetLayoutKey(in.LayoutKey).
-		SetConfigSchema(in.ConfigSchema)
-	if in.IsActive != nil {
-		create.SetIsActive(*in.IsActive)
-	}
-	t, err := create.Save(ctx)
-	if ent.IsConstraintError(err) {
-		return nil, &ValidationError{Message: "theme code already exists"}
-	}
-	return t, err
-}
-
-// UpdateTheme applies partial updates; any change propagates to every shop on
-// the theme via ThemeUpdated (spec theme-system/Theme update propagation).
-func (s *Service) UpdateTheme(ctx context.Context, themeID int, in ThemeInput) (*ent.Theme, error) {
-	t, err := s.Client.Theme.Get(ctx, themeID)
-	if err != nil {
-		return nil, ErrNotFound
-	}
-	upd := t.Update()
-	if in.Name != "" {
-		upd.SetName(in.Name)
-	}
-	if in.LayoutKey != "" {
-		upd.SetLayoutKey(in.LayoutKey)
-	}
-	if len(in.ConfigSchema) > 0 {
-		if err := ValidateSchemaDoc(in.ConfigSchema); err != nil {
-			return nil, err
-		}
-		upd.SetConfigSchema(in.ConfigSchema)
-	}
-	if in.IsActive != nil {
-		upd.SetIsActive(*in.IsActive)
-	}
-	t, err = upd.Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, t.ID); err != nil {
-		return nil, err
-	}
-	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: t.ID})
-	return t, nil
-}
-
-type ThemePageInput struct {
-	TypeKey      string          `json:"type_key"`
-	ComponentKey string          `json:"component_key"`
-	PageSchema   json.RawMessage `json:"page_schema"`
-}
-
-func (s *Service) CreateThemePage(ctx context.Context, themeID int, in ThemePageInput) (*ent.ThemePage, error) {
-	if _, err := s.Client.Theme.Get(ctx, themeID); err != nil {
-		return nil, ErrNotFound
-	}
-	if in.TypeKey == "" || in.ComponentKey == "" {
-		return nil, &ValidationError{Message: "type_key and component_key are required"}
-	}
-	if len(in.PageSchema) == 0 {
-		in.PageSchema = json.RawMessage("{}")
-	}
-	if err := ValidateSchemaDoc(in.PageSchema); err != nil {
-		return nil, err
-	}
-	tp, err := s.Client.ThemePage.Create().
-		SetThemeID(themeID).
-		SetTypeKey(in.TypeKey).
-		SetComponentKey(in.ComponentKey).
-		SetPageSchema(in.PageSchema).
-		Save(ctx)
-	if ent.IsConstraintError(err) {
-		// Spec theme-system/Theme page type registry: 重複 type_key 被拒 → 422.
-		return nil, &ValidationError{Message: "type_key already exists in this theme"}
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
-		return nil, err
-	}
-	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
-	return tp, nil
-}
-
-func (s *Service) UpdateThemePage(ctx context.Context, themeID, themePageID int, in ThemePageInput) (*ent.ThemePage, error) {
-	tp, err := s.Client.ThemePage.Query().
-		Where(themepage.IDEQ(themePageID), themepage.ThemeIDEQ(themeID)).
-		Only(ctx)
-	if err != nil {
-		return nil, ErrNotFound
-	}
-	upd := tp.Update()
-	if in.ComponentKey != "" {
-		upd.SetComponentKey(in.ComponentKey)
-	}
-	if len(in.PageSchema) > 0 {
-		if err := ValidateSchemaDoc(in.PageSchema); err != nil {
-			return nil, err
-		}
-		upd.SetPageSchema(in.PageSchema)
-	}
-	tp, err = upd.Save(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
-		return nil, err
-	}
-	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
-	return tp, nil
-}
-
-func (s *Service) DeleteThemePage(ctx context.Context, themeID, themePageID int) error {
-	n, err := s.Client.ThemePage.Delete().
-		Where(themepage.IDEQ(themePageID), themepage.ThemeIDEQ(themeID)).
-		Exec(ctx)
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return ErrNotFound
-	}
-	if err := contentschema.WriterFor(s.Client).SyncThemeShops(ctx, themeID); err != nil {
-		return err
-	}
-	s.Dispatcher.Publish(ctx, events.ThemeUpdated{ThemeID: themeID})
-	return nil
-}
-
-// ── theme switching (merchant, task 6.4) ──────────────────────────
-
-// IncompatiblePage describes a page the target theme does not support.
-type IncompatiblePage struct {
-	ID      int    `json:"id"`
-	Title   string `json:"title"`
-	Slug    string `json:"slug"`
-	TypeKey string `json:"type_key"`
-}
-
-// PrecheckTheme lists pages whose type_key the target theme lacks
-// (spec theme-system/Theme switching with compatibility precheck).
-func (s *Service) PrecheckTheme(ctx context.Context, shopID, themeID int) ([]IncompatiblePage, error) {
-	supported, err := s.Client.ThemePage.Query().
-		Where(themepage.ThemeIDEQ(themeID)).
-		Select(themepage.FieldTypeKey).
-		Strings(ctx)
-	if err != nil {
-		return nil, err
-	}
-	supportedSet := map[string]bool{}
-	for _, k := range supported {
-		supportedSet[k] = true
-	}
-	pages, err := s.Client.Page.Query().Where(entpage.ShopIDEQ(shopID)).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	out := []IncompatiblePage{}
-	for _, p := range pages {
-		if !supportedSet[p.TypeKey] {
-			out = append(out, IncompatiblePage{ID: p.ID, Title: p.Title, Slug: p.Slug, TypeKey: p.TypeKey})
-		}
-	}
-	return out, nil
-}
-
-// SwitchTheme applies an active theme to the shop, returning the
-// incompatibility list. The switch itself always proceeds (換版即時生效);
-// unsupported pages 404 on the storefront and are flagged in the admin list.
-func (s *Service) SwitchTheme(ctx context.Context, shopID, themeID int) ([]IncompatiblePage, error) {
-	t, err := s.Client.Theme.Get(ctx, themeID)
-	if err != nil {
-		return nil, &ValidationError{Message: "theme does not exist"}
-	}
-	if !t.IsActive {
-		// Spec theme-system/Theme activation gating: 套用未開放主題被拒.
-		return nil, &ValidationError{Message: "theme is not active"}
-	}
-	incompatible, err := s.PrecheckTheme(ctx, shopID, themeID)
-	if err != nil {
-		return nil, err
-	}
-	// The theme pointer and the shop's schema version change together.
-	tx, err := s.Client.Tx(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("cms: begin tx: %w", err)
-	}
-	if _, err := tx.Shop.UpdateOneID(shopID).SetThemeID(themeID).Save(ctx); err != nil {
-		_ = tx.Rollback()
-		if ent.IsNotFound(err) {
-			return nil, ErrNotFound
-		}
-		return nil, err
-	}
-	if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shopID, themeID); err != nil {
-		_ = tx.Rollback()
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("cms: commit theme switch: %w", err)
-	}
-	s.Dispatcher.Publish(ctx, events.ThemeSwitched{ShopID: shopID})
-	return incompatible, nil
-}
-
 // ── pages (merchant, tasks 6.5/6.6) ───────────────────────────────
 
 type PageInput struct {
@@ -310,7 +79,7 @@ type PageInput struct {
 }
 
 // currentPageSchema resolves the page schema for (shop, typeKey) from the
-// shop's own content schema.
+// shop's own content schema (change retire-hosted-storefront-and-themes).
 func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey string) (json.RawMessage, error) {
 	if _, err := s.Client.Shop.Get(ctx, shopID); err != nil {
 		return nil, ErrNotFound
@@ -318,14 +87,14 @@ func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey str
 	v, err := s.schemas().Active(ctx, shopID)
 	if err != nil {
 		if errors.Is(err, contentschema.ErrNoSchema) {
-			return nil, &ValidationError{Message: "shop has no theme applied"}
+			return nil, &ValidationError{Message: "shop has no content schema"}
 		}
 		return nil, err
 	}
 	schema, ok := v.Doc.Types[typeKey]
 	if !ok {
 		return nil, &ValidationError{
-			Message: "type_key is not supported by the shop's current theme",
+			Message: "type_key is not in the shop's content schema",
 			Details: []Detail{{Pointer: "/type_key", Message: "unsupported page type"}},
 		}
 	}
@@ -505,8 +274,7 @@ func (s *Service) DeletePage(ctx context.Context, shopID, pageID int) error {
 	return nil
 }
 
-// PageListEntry flags pages unsupported by the current theme (換版後於後台
-// 標示「不受新主題支援」).
+// PageListEntry flags pages whose type_key is not in the shop's content schema.
 type PageListEntry struct {
 	*ent.Page
 	Incompatible bool `json:"incompatible"`
@@ -547,7 +315,7 @@ func (s *Service) GetPage(ctx context.Context, shopID, pageID int) (*ent.Page, j
 	}
 	schema, err := s.currentPageSchema(ctx, shopID, p.TypeKey)
 	if err != nil {
-		// Page exists but its type is unsupported by the current theme:
+		// Page exists but its type is not in the shop's content schema:
 		// return it without a schema so the admin can still see/flag it.
 		return p, nil, nil
 	}
@@ -556,7 +324,7 @@ func (s *Service) GetPage(ctx context.Context, shopID, pageID int) (*ent.Page, j
 
 // ── shop global content (task 6.7) ────────────────────────────────
 
-// UpdateShopContent validates against the current theme's config_schema,
+// UpdateShopContent validates against the shop's content schema (global document),
 // saves immediately (Phase 1 沒有全域草稿), and bumps the tenant cache.
 func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content json.RawMessage) (*ent.Shop, error) {
 	shop, err := s.Client.Shop.Get(ctx, shopID)
@@ -568,7 +336,7 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 		return nil, fmt.Errorf("cms: load content schema: %w", err)
 	}
 	if !ok {
-		return nil, &ValidationError{Message: "shop has no theme applied"}
+		return nil, &ValidationError{Message: "shop has no content schema"}
 	}
 	if len(content) == 0 {
 		content = json.RawMessage("{}")
@@ -608,16 +376,15 @@ func validShopStatus(v int16) bool {
 
 // ShopInput is the payload of platform shop creation (design D4).
 type ShopInput struct {
-	Name    string `json:"name"`
-	ThemeID *int   `json:"theme_id"`
-	Status  *int16 `json:"status"`
+	Name   string `json:"name"`
+	Status *int16 `json:"status"`
 }
 
 // createHomePage idempotently creates the shop's auto-created home page
 // (spec page-management/Auto-created home page). It does not validate
-// content against a page_schema — the shop may not have a theme applied yet
-// (design D4) — so a minimal empty-sections payload is used; normal editing
-// goes through the existing PagesHandler once a theme is applied.
+// content against a page schema — a new shop has no content schema until one
+// is registered — so a minimal empty-sections payload is used; normal editing
+// goes through the PagesHandler once the shop has a schema.
 func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
 	exists, err := tx.Page.Query().
 		Where(entpage.ShopIDEQ(shopID), entpage.SlugEQ("home")).
@@ -644,9 +411,7 @@ func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
 }
 
 // CreateShop creates a shop and its auto-created home page in one
-// transaction (design D4). theme_id is optional: a shop can be created
-// without a theme and have one applied later via the existing theme-switch
-// flow.
+// transaction (design D4).
 func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, error) {
 	name, status, err := s.validateShopInput(ctx, in)
 	if err != nil {
@@ -656,7 +421,7 @@ func (s *Service) CreateShop(ctx context.Context, in ShopInput) (*ent.Shop, erro
 	if err != nil {
 		return nil, fmt.Errorf("cms: begin tx: %w", err)
 	}
-	shop, err := createShopTx(ctx, tx, name, status, in.ThemeID)
+	shop, err := createShopTx(ctx, tx, name, status)
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, err
@@ -677,7 +442,7 @@ func (s *Service) CreateShopTx(ctx context.Context, tx *ent.Tx, in ShopInput) (*
 	if err != nil {
 		return nil, err
 	}
-	return createShopTx(ctx, tx, name, status, in.ThemeID)
+	return createShopTx(ctx, tx, name, status)
 }
 
 // validateShopInput returns the normalized name and status of a ShopInput, or a
@@ -700,34 +465,17 @@ func (s *Service) validateShopInput(ctx context.Context, in ShopInput) (string, 
 		}
 		status = *in.Status
 	}
-	if in.ThemeID != nil {
-		if _, err := s.Client.Theme.Get(ctx, *in.ThemeID); err != nil {
-			return "", 0, &ValidationError{
-				Message: "theme does not exist",
-				Details: []Detail{{Pointer: "/theme_id", Message: "unknown theme"}},
-			}
-		}
-	}
 	return name, status, nil
 }
 
 // createShopTx is the transactional body shared by CreateShop and CreateShopTx.
-func createShopTx(ctx context.Context, tx *ent.Tx, name string, status int16, themeID *int) (*ent.Shop, error) {
-	create := tx.Shop.Create().SetName(name).SetStatus(status)
-	if themeID != nil {
-		create.SetThemeID(*themeID)
-	}
-	shop, err := create.Save(ctx)
+func createShopTx(ctx context.Context, tx *ent.Tx, name string, status int16) (*ent.Shop, error) {
+	shop, err := tx.Shop.Create().SetName(name).SetStatus(status).Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
 			return nil, &ValidationError{Message: "shop could not be created"}
 		}
 		return nil, err
-	}
-	if themeID != nil {
-		if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shop.ID, *themeID); err != nil {
-			return nil, err
-		}
 	}
 	if err := createHomePage(ctx, tx, shop.ID); err != nil {
 		return nil, err
@@ -798,10 +546,10 @@ type ShopUpdate struct {
 	Meta   json.RawMessage `json:"meta"`
 }
 
-// UpdateShop applies a partial update. If status actually changes, the route
-// resolution cache of every domain bound to this shop is invalidated so the
-// new gating takes effect immediately (design D5) instead of waiting out the
-// route cache TTL.
+// UpdateShop applies a partial update. If status actually changes, the
+// caches embedding the status (publishable keys, render cache version) are
+// invalidated through ShopStatusChanged so the new gating takes effect
+// immediately.
 func (s *Service) UpdateShop(ctx context.Context, shopID int, in ShopUpdate) (*ent.Shop, error) {
 	shop, err := s.Client.Shop.Get(ctx, shopID)
 	if err != nil {
@@ -839,11 +587,7 @@ func (s *Service) UpdateShop(ctx context.Context, shopID int, in ShopUpdate) (*e
 		return nil, err
 	}
 	if statusChanged {
-		// Best-effort: even if the domain lookup fails, still publish with
-		// ShopIDs so the render cache version bump (design D8) is not
-		// skipped — only the route-cache host invalidation degrades.
-		domains, _ := shop.QuerySites().Select(entsite.FieldDomain).Strings(ctx)
-		s.Dispatcher.Publish(ctx, events.ShopStatusChanged{Hosts: domains, ShopIDs: []int{shopID}})
+		s.Dispatcher.Publish(ctx, events.ShopStatusChanged{ShopIDs: []int{shopID}})
 	}
 	return shop, nil
 }

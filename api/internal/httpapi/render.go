@@ -26,41 +26,20 @@ type RenderHandler struct {
 }
 
 // Page handles GET /api/v1/render/page?path=/... — the caller passes the
-// original storefront path; the shop comes from X-Publishable-Key, else
-// X-Site-Domain, else Host. Response: the design D8 bundle. X-Cache: HIT|MISS
-// aids smoke tests.
+// storefront path; the shop comes from X-Publishable-Key (a missing or
+// unusable key is a 404 unknown_publishable_key). Response: the design D8
+// bundle. X-Cache: HIT|MISS aids smoke tests.
 //
-// This is the ONE endpoint where X-Site-Domain still works (change
-// storefront-client-auth, design D6). Its caller is the first-party SSR
-// server, whose only way to convey the domain the visitor actually asked for
-// is to relay it — the Host the API sees is the API's own. The header is
-// forgeable, and here that is harmless: the response is published public
-// content, so forging it yields exactly what visiting the other shop's own
-// website yields. The endpoint writes nothing, issues no token and accepts no
-// authenticated identity (preview runs on its own signed token).
+// X-Site-Domain and Host no longer name a shop (change
+// retire-hosted-storefront-and-themes).
 func (h *RenderHandler) Page(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	if path == "" {
 		path = "/"
 	}
-	var (
-		res *tenant.Resolution
-		err error
-	)
-	if key := r.Header.Get(PublishableKeyHeader); key != "" {
-		// A keyed client (self-hosted front end, native app) may read the
-		// bundle too; the key names the shop outright, so no path-prefix
-		// disambiguation is needed.
-		res, err = h.Resolver.ResolveKey(r.Context(), key)
-		if err == nil {
-			res.Path = path
-		}
-	} else {
-		host := r.Header.Get("X-Site-Domain")
-		if host == "" {
-			host = r.Host
-		}
-		res, err = h.Resolver.Resolve(r.Context(), host, path)
+	res, err := h.Resolver.ResolveKey(r.Context(), r.Header.Get(PublishableKeyHeader))
+	if err == nil {
+		res.Path = path
 	}
 	if err != nil {
 		WriteResolveError(w, err)

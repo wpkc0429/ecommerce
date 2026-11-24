@@ -71,13 +71,8 @@ func newCMSEnv(t *testing.T) *cmsEnv {
 
 	dispatcher := events.NewDispatcher(log)
 	resolver := tenant.NewResolver(client, rdb, log)
-	dispatcher.Subscribe(func(ctx context.Context, ev events.Event) {
-		if m, ok := ev.(events.ShopStatusChanged); ok {
-			resolver.InvalidateHosts(ctx, m.Hosts...)
-		}
-	})
 	renderCache := render.NewCache(rdb, log)
-	invalidator := &render.Invalidator{Cache: renderCache, Client: client, Log: log}
+	invalidator := &render.Invalidator{Cache: renderCache, Log: log}
 	dispatcher.Subscribe(invalidator.Handle)
 
 	engine := rbac.NewEngine(client, rdb, log)
@@ -89,7 +84,6 @@ func newCMSEnv(t *testing.T) *cmsEnv {
 		Cfg:     cfg,
 		Log:     log,
 		AdminMW: httpapi.NewAdminMiddleware(issuer),
-		Themes:  &httpapi.ThemesHandler{Client: client, Service: cmsService, Authz: authz, Log: log},
 		Pages:   &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: log},
 		Render: &httpapi.RenderHandler{
 			Resolver:  resolver,
@@ -169,11 +163,11 @@ func TestDraftPublishRenderFlow(t *testing.T) {
 	if code != 200 || cacheState != "MISS" {
 		t.Fatalf("first render: code=%d cache=%s", code, cacheState)
 	}
-	if dig(bundle, "shop", "theme", "code") != "starter" {
-		t.Fatalf("bundle.shop.theme.code wrong: %v", dig(bundle, "shop", "theme", "code"))
+	if dig(bundle, "shop", "theme") != nil || dig(bundle, "page", "component_key") != nil {
+		t.Fatalf("the bundle no longer carries theme or component_key: %v", bundle)
 	}
-	if dig(bundle, "page", "component_key") != "starter/home" {
-		t.Fatalf("bundle.page.component_key wrong: %v", dig(bundle, "page", "component_key"))
+	if dig(bundle, "page", "type_key") != "home" {
+		t.Fatalf("bundle.page.type_key wrong: %v", dig(bundle, "page", "type_key"))
 	}
 	// Shop content hydrated: seeded value + schema default both present.
 	if dig(bundle, "shop", "content", "header", "site_title") != "Demo Shop" {
@@ -323,154 +317,6 @@ func TestShopContentUpdateFlow(t *testing.T) {
 	// Hydration still fills the untouched parts with defaults.
 	if dig(bundle, "shop", "content", "tokens", "color_primary") != "#2563eb" {
 		t.Fatal("defaults lost after content update")
-	}
-}
-
-// Covers 6.3 + 6.4 + theme-system spec scenarios.
-func TestThemeManagementAndSwitch(t *testing.T) {
-	e := newCMSEnv(t)
-	e.admin1(t, "POST", e.shopPath(fmt.Sprintf("/pages/%d/publish", e.homeID)), nil)
-
-	// Invalid schema on theme creation → 422 (metaschema).
-	code, _, _ := e.admin1(t, "POST", "/api/v1/admin/themes",
-		map[string]any{"code": "bad", "name": "Bad", "layout_key": "bad/main",
-			"config_schema": map[string]any{"type": "strng"}})
-	if code != 422 {
-		t.Fatalf("invalid config_schema: want 422, got %d", code)
-	}
-
-	// Create a minimal theme (home only, no landing_page/about).
-	code, body, raw := e.admin1(t, "POST", "/api/v1/admin/themes",
-		map[string]any{"code": "minimal", "name": "Minimal", "layout_key": "minimal/main",
-			"config_schema": map[string]any{
-				"type": "object", "additionalProperties": false,
-				"properties": map[string]any{
-					"tokens": map[string]any{
-						"type": "object", "additionalProperties": false,
-						"properties": map[string]any{
-							"color_primary": map[string]any{"type": "string", "default": "#000000"},
-						},
-					},
-				},
-			}})
-	if code != 201 {
-		t.Fatalf("create theme: %d %s", code, raw)
-	}
-	minimalID := int(body["id"].(float64))
-	code, _, raw = e.admin1(t, "POST", fmt.Sprintf("/api/v1/admin/themes/%d/pages", minimalID),
-		map[string]any{"type_key": "home", "component_key": "minimal/home",
-			"page_schema": map[string]any{
-				"type": "object", "additionalProperties": false,
-				"properties": map[string]any{
-					"sections": map[string]any{"type": "array", "default": []any{},
-						"items": map[string]any{"oneOf": []any{map[string]any{
-							"type": "object", "additionalProperties": false,
-							"required": []any{"type"},
-							"properties": map[string]any{
-								"type":  map[string]any{"const": "hero"},
-								"title": map[string]any{"type": "string", "default": "极简"},
-							},
-						}}}},
-				},
-			}})
-	if code != 201 {
-		t.Fatalf("create theme page: %d %s", code, raw)
-	}
-	// 重複 type_key → 422.
-	code, _, _ = e.admin1(t, "POST", fmt.Sprintf("/api/v1/admin/themes/%d/pages", minimalID),
-		map[string]any{"type_key": "home", "component_key": "minimal/home2"})
-	if code != 422 {
-		t.Fatalf("dup type_key: want 422, got %d", code)
-	}
-
-	// A landing page exists on the shop (published) → precheck must flag it.
-	code, body, _ = e.admin1(t, "POST", e.shopPath("/pages"),
-		map[string]any{"type_key": "landing_page", "title": "促銷", "slug": "promo"})
-	if code != 201 {
-		t.Fatalf("create landing page: %d", code)
-	}
-	promoID := int(body["id"].(float64))
-	e.admin1(t, "POST", e.shopPath(fmt.Sprintf("/pages/%d/publish", promoID)), nil)
-	if code, _, _ := e.renderPage(t, "/promo"); code != 200 {
-		t.Fatal("promo must render under starter")
-	}
-
-	code, body, _ = e.admin1(t, "GET", e.shopPath("/theme/precheck?theme_id="+fmt.Sprint(minimalID)), nil)
-	if code != 200 {
-		t.Fatalf("precheck: %d", code)
-	}
-	incompatible, _ := body["incompatible_pages"].([]any)
-	found := false
-	for _, ip := range incompatible {
-		if ip.(map[string]any)["slug"] == "promo" {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("precheck must list promo (landing_page): %v", incompatible)
-	}
-
-	// 套用未開放主題被拒 → 422.
-	e.admin1(t, "PUT", fmt.Sprintf("/api/v1/admin/themes/%d", minimalID),
-		map[string]any{"is_active": false})
-	code, _, _ = e.admin1(t, "POST", e.shopPath("/theme"), map[string]any{"theme_id": minimalID})
-	if code != 422 {
-		t.Fatalf("inactive theme switch: want 422, got %d", code)
-	}
-	e.admin1(t, "PUT", fmt.Sprintf("/api/v1/admin/themes/%d", minimalID),
-		map[string]any{"is_active": true})
-
-	// Switch → incompatible list, version bump, immediate new component_key.
-	code, body, raw = e.admin1(t, "POST", e.shopPath("/theme"), map[string]any{"theme_id": minimalID})
-	if code != 200 {
-		t.Fatalf("switch: %d %s", code, raw)
-	}
-	if inc, _ := body["incompatible_pages"].([]any); len(inc) == 0 {
-		t.Fatal("switch response must carry the incompatibility list")
-	}
-	rcode, bundle, cacheState := e.renderPage(t, "/")
-	if rcode != 200 || cacheState != "MISS" {
-		t.Fatalf("post-switch render: %d %s", rcode, cacheState)
-	}
-	if dig(bundle, "page", "component_key") != "minimal/home" ||
-		dig(bundle, "shop", "theme", "code") != "minimal" {
-		t.Fatalf("bundle not on new theme: %v", dig(bundle, "page", "component_key"))
-	}
-	// 換版後不受支援頁面前台 404 + 後台標示不相容.
-	if code, _, _ := e.renderPage(t, "/promo"); code != 404 {
-		t.Fatalf("unsupported page must 404 after switch, got %d", code)
-	}
-	_, body, _ = e.admin1(t, "GET", e.shopPath("/pages"), nil)
-	for _, p := range body["pages"].([]any) {
-		pm := p.(map[string]any)
-		if pm["slug"] == "promo" && pm["incompatible"] != true {
-			t.Fatal("promo must be flagged incompatible in the admin list")
-		}
-	}
-
-	// 主題升級後全商家失效: update minimal's home schema adding a defaulted
-	// field → next render carries the new default without any manual action.
-	_, themeBody, _ := e.admin1(t, "GET", fmt.Sprintf("/api/v1/admin/themes/%d", minimalID), nil)
-	pages := themeBody["pages"].([]any)
-	tpID := int(pages[0].(map[string]any)["id"].(float64))
-	code, _, raw = e.admin1(t, "PUT", fmt.Sprintf("/api/v1/admin/themes/%d/pages/%d", minimalID, tpID),
-		map[string]any{"component_key": "minimal/home",
-			"page_schema": map[string]any{
-				"type": "object", "additionalProperties": false,
-				"properties": map[string]any{
-					"promo_banner": map[string]any{"type": "string", "default": "主題升級新欄位"},
-					"sections":     map[string]any{"type": "array", "default": []any{}, "items": map[string]any{}},
-				},
-			}})
-	if code != 200 {
-		t.Fatalf("update theme page: %d %s", code, raw)
-	}
-	rcode, bundle, cacheState = e.renderPage(t, "/")
-	if rcode != 200 || cacheState != "MISS" {
-		t.Fatalf("post-theme-update render: %d %s", rcode, cacheState)
-	}
-	if dig(bundle, "page", "content", "promo_banner") != "主題升級新欄位" {
-		t.Fatalf("theme update default not hydrated: %v", dig(bundle, "page", "content"))
 	}
 }
 

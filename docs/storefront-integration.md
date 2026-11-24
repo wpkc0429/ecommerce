@@ -6,10 +6,10 @@
 
 > **這是唯一支援的店面路徑**（ADR [`docs/decisions/0001-headless-platform-and-merchant-template.md`](decisions/0001-headless-platform-and-merchant-template.md)，2026-11-24）：
 > 商家的店面一律是 headless——由 merchant template repo 建立、以 `X-Publishable-Key` 呼叫 `/api/v1/shop/*`。
-> 平台**不再提供**託管店面：repo 內的 Next.js 租戶渲染店面（`web/`）、**主題**、site 網域對應（Host 解析）都**已棄用**（仍可運作，但新商家不要使用，之後會移除）。
+> 平台**不再提供**託管店面：Next.js 租戶渲染店面（`web/`）、**主題**、site 網域對應（Host 解析）都**已移除**（ADR 0002）。租戶**只**由 `X-Publishable-Key` 決定，沒有 Host 後備；缺少金鑰與未知金鑰一樣回 404 `unknown_publishable_key`。
 > **CMS 的內容功能沒有棄用**：商家用後台表單編輯的文字、banner、FAQ 等會存在平台的 headless 內容儲存，由你的前端以 publishable key 讀取
 > （`GET /api/v1/render/page` 今天已可用 publishable key 讀取；內容儲存的正式讀取契約與改造見 OpenSpec change `headless-content-store`，**尚未實作**）。
-> 因此本文件**暫不描述**內容端點：在 `headless-content-store` 實作並更新 `openapi.yaml` 之前，請不要在新前端依賴現有的 render bundle 格式（它含主題欄位，會改變）。
+> 因此本文件**暫不描述**內容端點：在 `headless-content-store` 實作並更新 `openapi.yaml` 之前，請不要在新前端依賴現有的 render bundle 格式（主題與 `component_key` 欄位已移除；其餘會隨內容儲存改造而改變）。
 
 **分工，請先讀這一段：**
 
@@ -106,7 +106,7 @@ const PUBLISHABLE_KEY = "pk_…";               // 硬編碼即可
 const headers = { "X-Publishable-Key": PUBLISHABLE_KEY };
 ```
 
-- **不要送 `X-Site-Domain` / `X-Site-Path`。** 前台 API 已不再讀取它們（送了不會出錯，也不會有任何作用）。
+- **不要送 `X-Site-Domain` / `X-Site-Path`，也不要靠 Host 指定商家。** 前台 API 與 `GET /api/v1/render/page` 都只讀金鑰（送了不會出錯，也不會有任何作用；沒帶金鑰一律 404）。
 - 會員登入後的請求**同時**帶 `Authorization: Bearer <access_token>` **與**金鑰——
   金鑰決定「哪一家商家」，token 決定「哪一位顧客」，兩者不互相取代。
 
@@ -604,7 +604,7 @@ total_amount    = subtotal_amount − discount_amount + shipping_fee
 | 422 | `idempotency_key_reused` | 同一把 key 配上**不同的**請求主體（第 5.5 節）。 |
 | 429 | `rate_limited` | 短時間內太多次；`Retry-After` 標頭是秒數。 |
 | 500 | `internal` | 平台端問題，**任何端點都可能出現**。 |
-| 503 | `shop_disabled` | 商家被停用（金鑰與網域同時失效）。前台應呈現維護頁而非錯誤頁。 |
+| 503 | `shop_disabled` | 商家被停用（其金鑰立即失效）。前台應呈現維護頁而非錯誤頁。 |
 
 ### 依 `details[].pointer`（`validation_failed`）
 

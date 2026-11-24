@@ -1,10 +1,12 @@
 // Package seed provisions baseline data (task 2.4): the permission catalog,
-// platform roles, the initial platform administrator, and the demo theme
-// "starter" (sections-based page schemas + tokens-based config schema,
-// design D6). Optionally seeds a demo shop for local development and E2E.
+// platform roles and the initial platform administrator. Optionally seeds a
+// demo shop for local development and E2E, with the "starter" content schema
+// (sections-based page schemas + tokens-based global schema, design D6)
+// registered as the shop's content schema.
 //
-// Seeding is idempotent: natural keys are looked up before insertion, and
-// theme schemas are updated in place so re-running pushes schema changes.
+// Seeding is idempotent: natural keys are looked up before insertion, and the
+// starter schema is written as a new content_schemas version only when it
+// changed, so re-running pushes schema changes.
 package seed
 
 import (
@@ -33,9 +35,8 @@ import (
 	entshopallowedorigin "ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	entpaymentcredential "ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
-	"ksdevworks/ecommerce/api/internal/ent/theme"
-	"ksdevworks/ecommerce/api/internal/ent/themepage"
 	"ksdevworks/ecommerce/api/internal/ent/user"
+	"ksdevworks/ecommerce/api/internal/ent/userpermission"
 	"ksdevworks/ecommerce/api/internal/payment/ecpay"
 )
 
@@ -59,17 +60,16 @@ type Options struct {
 }
 
 // PermissionCatalog is the Phase 1 permission node catalog (shop.*, page.*,
-// user.*, theme.*).
+// user.*, ...).
 var PermissionCatalog = []struct{ Name, Description string }{
 	{"shop.view", "檢視商家設定與全域內容"},
 	{"shop.create", "建立商家（平台層）"},
 	{"shop.list", "列出所有商家（平台層）"},
-	{"shop.update", "更新商家全域內容與切換主題"},
+	{"shop.update", "更新商家全域內容"},
 	// change platform-account-provisioning (design D10): platform-level, held
 	// only by super_admin (the "*" grant); never given to a merchant role.
 	{"account.view", "檢視後台帳號與其成員資格（平台層）"},
 	{"account.manage", "建立後台帳號、指派成員資格、停用與重設密碼（平台層）"},
-	{"shop.manage_domains", "管理站點網域與 site-shop 綁定（平台層）"},
 	// change storefront-client-auth (design D11): allowed origins are a
 	// contested global namespace like bound domains, hence platform-scoped;
 	// publishable keys are randomly generated per shop, hence merchant-scoped
@@ -85,8 +85,6 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"page.publish", "發佈與下架頁面"},
 	{"user.view", "檢視商家成員"},
 	{"user.manage_roles", "指派與移除商家角色"},
-	{"theme.view", "檢視主題目錄"},
-	{"theme.manage", "管理主題與頁型（平台層）"},
 	{"category.view", "檢視商品分類"},
 	{"category.create", "建立商品分類"},
 	{"category.edit", "編輯商品分類"},
@@ -158,7 +156,7 @@ var roleDefs = []struct {
 	{"merchant_owner", "merchant", false, []string{
 		"shop.view", "shop.update",
 		"page.view", "page.create", "page.edit", "page.delete", "page.publish",
-		"user.view", "user.manage_roles", "theme.view",
+		"user.view", "user.manage_roles",
 		"category.view", "category.create", "category.edit", "category.delete",
 		"product.view", "product.create", "product.edit", "product.delete",
 		"order.view", "order.cancel",
@@ -192,7 +190,7 @@ var roleDefs = []struct {
 		"shipment.view", "shipment.create", "shipment.update",
 	}},
 	{"editor", "merchant", true, []string{
-		"shop.view", "page.view", "page.create", "page.edit", "theme.view",
+		"shop.view", "page.view", "page.create", "page.edit",
 		"category.view", "category.create", "category.edit",
 		"product.view", "product.create", "product.edit",
 		"order.view",
@@ -228,13 +226,12 @@ var roleDefs = []struct {
 // starterPages defines the three seeded page types and their allowed section
 // block types (design D6 組合式頁面結構).
 var starterPages = []struct {
-	TypeKey      string
-	ComponentKey string
-	Blocks       []string
+	TypeKey string
+	Blocks  []string
 }{
-	{"home", "starter/home", []string{"hero", "rich_text", "feature_grid", "cta"}},
-	{"about", "starter/about", []string{"rich_text", "hero"}},
-	{"landing_page", "starter/landing", []string{"hero", "rich_text", "feature_grid", "cta"}},
+	{"home", []string{"hero", "rich_text", "feature_grid", "cta"}},
+	{"about", []string{"rich_text", "hero"}},
+	{"landing_page", []string{"hero", "rich_text", "feature_grid", "cta"}},
 }
 
 // Run executes the full seed inside one transaction.
@@ -249,6 +246,9 @@ func Run(ctx context.Context, client *ent.Client, opts Options) (err error) {
 		}
 	}()
 
+	if err = purgeRemovedPermissions(ctx, tx); err != nil {
+		return err
+	}
 	perms, err := seedPermissions(ctx, tx)
 	if err != nil {
 		return err
@@ -260,21 +260,12 @@ func Run(ctx context.Context, client *ent.Client, opts Options) (err error) {
 	if err = seedAdmin(ctx, tx, opts, roles["super_admin"]); err != nil {
 		return err
 	}
-	starterID, err := seedStarterTheme(ctx, tx)
-	if err != nil {
-		return err
-	}
-	// Shops already on the starter theme follow its (re-seeded) schemas: the
-	// per-shop content schema is what validation and rendering read.
-	if err = contentschema.WriterForTx(tx).SyncThemeShops(ctx, starterID); err != nil {
-		return err
-	}
 	if opts.Demo {
 		box, berr := cryptbox.ParseKey(opts.PaymentCredentialsEncryptionKey)
 		if berr != nil {
 			return fmt.Errorf("seed: PaymentCredentialsEncryptionKey: %w", berr)
 		}
-		if err = seedDemoShop(ctx, tx, starterID, roles["merchant_owner"], roles["staff"], box); err != nil {
+		if err = seedDemoShop(ctx, tx, roles["merchant_owner"], roles["staff"], box); err != nil {
 			return err
 		}
 	}
@@ -405,7 +396,7 @@ func StarterPageSchema(typeKey string) (json.RawMessage, error) {
 
 	schema := map[string]any{
 		"$schema":              "https://json-schema.org/draft/2020-12/schema",
-		"title":                "Starter theme — " + typeKey + " page",
+		"title":                "Starter — " + typeKey + " page",
 		"type":                 "object",
 		"additionalProperties": false,
 		"$defs":                usedDefs,
@@ -421,68 +412,51 @@ func StarterPageSchema(typeKey string) (json.RawMessage, error) {
 	return json.Marshal(schema)
 }
 
-// StarterConfigSchema returns the starter theme config schema (tokens 區段).
+// StarterConfigSchema returns the starter global content schema (tokens 區段).
 func StarterConfigSchema() json.RawMessage {
 	return json.RawMessage(starterConfigSchema)
 }
 
-func seedStarterTheme(ctx context.Context, tx *ent.Tx) (int, error) {
-	t, err := tx.Theme.Query().Where(theme.CodeEQ("starter")).Only(ctx)
-	switch {
-	case ent.IsNotFound(err):
-		t, err = tx.Theme.Create().
-			SetCode("starter").
-			SetName("Starter").
-			SetLayoutKey("starter/main").
-			SetConfigSchema(json.RawMessage(starterConfigSchema)).
-			SetIsActive(true).
-			Save(ctx)
-		if err != nil {
-			return 0, fmt.Errorf("seed: create starter theme: %w", err)
-		}
-	case err != nil:
-		return 0, fmt.Errorf("seed: query starter theme: %w", err)
-	default:
-		// Keep schema current on re-run.
-		t, err = t.Update().SetConfigSchema(json.RawMessage(starterConfigSchema)).Save(ctx)
-		if err != nil {
-			return 0, fmt.Errorf("seed: update starter theme: %w", err)
-		}
+// StarterContentSchema builds the format-1 content schema document of the demo
+// shop from the embedded starter schemas.
+func StarterContentSchema() (contentschema.Doc, error) {
+	doc := contentschema.Doc{
+		Format:    1,
+		Types:     map[string]json.RawMessage{},
+		TypeOrder: []string{},
+		Global:    StarterConfigSchema(),
 	}
-
 	for _, sp := range starterPages {
 		schema, err := StarterPageSchema(sp.TypeKey)
 		if err != nil {
-			return 0, err
+			return contentschema.Doc{}, err
 		}
-		existing, err := tx.ThemePage.Query().
-			Where(themepage.ThemeIDEQ(t.ID), themepage.TypeKeyEQ(sp.TypeKey)).
-			Only(ctx)
-		switch {
-		case ent.IsNotFound(err):
-			if _, err := tx.ThemePage.Create().
-				SetThemeID(t.ID).
-				SetTypeKey(sp.TypeKey).
-				SetComponentKey(sp.ComponentKey).
-				SetPageSchema(schema).
-				Save(ctx); err != nil {
-				return 0, fmt.Errorf("seed: create theme page %s: %w", sp.TypeKey, err)
-			}
-		case err != nil:
-			return 0, fmt.Errorf("seed: query theme page %s: %w", sp.TypeKey, err)
-		default:
-			if _, err := existing.Update().
-				SetComponentKey(sp.ComponentKey).
-				SetPageSchema(schema).
-				Save(ctx); err != nil {
-				return 0, fmt.Errorf("seed: update theme page %s: %w", sp.TypeKey, err)
-			}
-		}
+		doc.Types[sp.TypeKey] = schema
+		doc.TypeOrder = append(doc.TypeOrder, sp.TypeKey)
 	}
-	return t.ID, nil
+	return doc, nil
 }
 
-func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID, staffRoleID int, box *cryptbox.Box) error {
+// removedPermissions are catalog nodes that no longer exist (change
+// retire-hosted-storefront-and-themes). Their rows, and every grant of them,
+// are deleted on each seed run.
+var removedPermissions = []string{"theme.view", "theme.manage", "shop.manage_domains"}
+
+func purgeRemovedPermissions(ctx context.Context, tx *ent.Tx) error {
+	byName := permission.NameIn(removedPermissions...)
+	if _, err := tx.RolePermission.Delete().Where(rolepermission.HasPermissionWith(byName)).Exec(ctx); err != nil {
+		return fmt.Errorf("seed: purge removed role grants: %w", err)
+	}
+	if _, err := tx.UserPermission.Delete().Where(userpermission.HasPermissionWith(byName)).Exec(ctx); err != nil {
+		return fmt.Errorf("seed: purge removed user grants: %w", err)
+	}
+	if _, err := tx.Permission.Delete().Where(byName).Exec(ctx); err != nil {
+		return fmt.Errorf("seed: purge removed permissions: %w", err)
+	}
+	return nil
+}
+
+func seedDemoShop(ctx context.Context, tx *ent.Tx, merchantOwnerRoleID, staffRoleID int, box *cryptbox.Box) error {
 	// The demo shop is identified by its fixed publishable key (it used to be
 	// the shop mapped to the demo.localhost site; sites are being retired).
 	var shopID int
@@ -505,7 +479,6 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID,
 		})
 		shop, cerr := tx.Shop.Create().
 			SetName("Demo Shop").
-			SetThemeID(themeID).
 			SetStatus(1).
 			SetContentJSON(content).
 			Save(ctx)
@@ -517,8 +490,13 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, themeID, merchantOwnerRoleID,
 		return fmt.Errorf("seed: query demo publishable key: %w", err)
 	}
 
-	// The demo shop's content schema (version 1 on first seed).
-	if _, err := contentschema.WriterForTx(tx).WriteFromTheme(ctx, shopID, themeID); err != nil {
+	// The demo shop's content schema (version 1 on first seed; a new version
+	// only when the starter schemas changed).
+	starterDoc, err := StarterContentSchema()
+	if err != nil {
+		return err
+	}
+	if _, err := contentschema.WriterForTx(tx).Write(ctx, shopID, starterDoc, contentschema.SourceRegistered); err != nil {
 		return fmt.Errorf("seed: demo content schema: %w", err)
 	}
 
@@ -956,7 +934,7 @@ var demoShippingMethods = []struct {
 // Idempotent per row on (shop_id, name) rather than as one block: the rows are
 // independent of each other, so adding a method to this list later must reach
 // databases that were already seeded — the same "existing ones stay, missing
-// ones get created" shape seedStarterTheme uses for theme pages (design D4).
+// ones get created" shape (design D4).
 // Existing rows are never updated: flat_rate and is_active are merchant
 // operational data, and re-running the seed must not undo a value someone
 // changed in the back office.

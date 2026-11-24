@@ -14,7 +14,6 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shippingmethod"
 	"ksdevworks/ecommerce/api/internal/ent/shop"
 	"ksdevworks/ecommerce/api/internal/ent/shoppaymentprovidercredential"
-	"ksdevworks/ecommerce/api/internal/ent/siteshop"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 )
 
@@ -25,8 +24,6 @@ var ErrShopNotFound = errors.New("provision: shop not found")
 // stored: every flag is an existence query on the facts themselves, so it can
 // never drift from them (design D8).
 type SetupStatus struct {
-	ThemeApplied          bool
-	DomainBound           bool
 	OwnerAssigned         bool
 	OwnerPasswordSet      bool
 	HomePublished         bool
@@ -64,8 +61,6 @@ func (s *Service) SetupStatus(ctx context.Context, shopID int) (*SetupStatus, er
 			Exist(context.Context) (bool, error)
 		}
 	}{
-		{&st.ThemeApplied, c.Shop.Query().Where(shop.IDEQ(shopID), shop.ThemeIDNotNil())},
-		{&st.DomainBound, c.SiteShop.Query().Where(siteshop.ShopIDEQ(shopID))},
 		{&st.OwnerAssigned, c.RoleUser.Query().Where(ownerRole)},
 		{&st.OwnerPasswordSet, c.User.Query().Where(user.PasswordHashNotNil(), user.HasRoleUsersWith(ownerRole))},
 		{&st.HomePublished, c.Page.Query().Where(page.ShopIDEQ(shopID), page.SlugEQ("home"), page.StatusEQ(1))},

@@ -37,7 +37,6 @@ func shopJSON(s *ent.Shop) map[string]any {
 	return map[string]any{
 		"id":           s.ID,
 		"name":         s.Name,
-		"theme_id":     s.ThemeID,
 		"status":       s.Status,
 		"content_json": s.ContentJSON,
 		"meta":         s.Meta,

@@ -1,5 +1,5 @@
 // Command sanitize-content re-sanitizes every stored CMS rich text field
-// against the shop's current theme schema (change cms-rich-text-sanitization,
+// against the shop's current content schema (change cms-rich-text-sanitization,
 // design D7). Idempotent: a second -apply run reports zero changes.
 //
 //	go run ./cmd/sanitize-content          # dry run (default): report only, writes nothing
@@ -67,7 +67,7 @@ func main() {
 			logger.Warn("redis unreachable — rows will still be written, but cached renders may stay stale until their TTL", "err", err)
 		}
 		dispatcher = events.NewDispatcher(logger)
-		inv := &render.Invalidator{Cache: render.NewCache(rdb, logger), Client: client, Log: logger}
+		inv := &render.Invalidator{Cache: render.NewCache(rdb, logger), Log: logger}
 		dispatcher.Subscribe(inv.Handle)
 	}
 

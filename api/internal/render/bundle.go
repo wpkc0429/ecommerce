@@ -14,7 +14,7 @@ import (
 )
 
 // ErrNotFound covers every 404 rendering case: page missing, draft-only,
-// shop without theme, type_key unsupported by the current theme (design D3).
+// shop without a content schema, type_key not in the shop's schema (design D3).
 var ErrNotFound = errors.New("render: not found")
 
 // Bundle is the client-agnostic SDUI contract (design D8): web SSR and native
@@ -25,27 +25,20 @@ type Bundle struct {
 }
 
 type BundleShop struct {
-	ID      int         `json:"id"`
-	Name    string      `json:"name"`
-	Theme   BundleTheme `json:"theme"`
-	Content any         `json:"content"`
-}
-
-type BundleTheme struct {
-	Code      string `json:"code"`
-	LayoutKey string `json:"layout_key"`
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Content any    `json:"content"`
 }
 
 type BundlePage struct {
-	TypeKey      string `json:"type_key"`
-	ComponentKey string `json:"component_key"`
-	Title        string `json:"title"`
-	Content      any    `json:"content"`
-	SEO          any    `json:"seo"`
+	TypeKey string `json:"type_key"`
+	Title   string `json:"title"`
+	Content any    `json:"content"`
+	SEO     any    `json:"seo"`
 }
 
 // Assembler builds bundles straight from the database (the cache layer wraps
-// it). component_key is resolved dynamically from (shops.theme_id, type_key).
+// it). Schemas come from the shop's content_schemas version.
 type Assembler struct {
 	Client *ent.Client
 }
@@ -80,22 +73,14 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 		}
 		return nil, fmt.Errorf("render: load shop: %w", err)
 	}
-	// Per-shop schema version (change retire-hosted-storefront-and-themes):
-	// a shop without one cannot render. The theme row is read only for the
-	// transitional shop.theme object until the theme code is removed.
+	// The shop's own schema version validates and hydrates its content; a
+	// shop without one cannot render.
 	schemaVer, err := (&contentschema.Store{Client: a.Client}).Active(ctx, shopID)
 	if err != nil {
 		if errors.Is(err, contentschema.ErrNoSchema) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("render: load content schema: %w", err)
-	}
-	if shop.ThemeID == nil {
-		return nil, ErrNotFound // shop without a theme cannot render
-	}
-	theme, err := a.Client.Theme.Get(ctx, *shop.ThemeID)
-	if err != nil {
-		return nil, ErrNotFound
 	}
 
 	pageQ := a.Client.Page.Query().Where(entpage.ShopIDEQ(shopID), entpage.SlugEQ(slug))
@@ -141,15 +126,13 @@ func (a *Assembler) assemble(ctx context.Context, shopID int, slug string, publi
 		Shop: BundleShop{
 			ID:      shop.ID,
 			Name:    shop.Name,
-			Theme:   BundleTheme{Code: theme.Code, LayoutKey: theme.LayoutKey},
 			Content: shopContent,
 		},
 		Page: BundlePage{
-			TypeKey:      pg.TypeKey,
-			ComponentKey: schemaVer.Doc.ComponentKeys[pg.TypeKey],
-			Title:        pg.Title,
-			Content:      pageContent,
-			SEO:          seo,
+			TypeKey: pg.TypeKey,
+			Title:   pg.Title,
+			Content: pageContent,
+			SEO:     seo,
 		},
 	}, nil
 }

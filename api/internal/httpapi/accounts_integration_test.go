@@ -84,7 +84,6 @@ func newAcctEnv(t *testing.T) *acctEnv {
 		AdminMW:   httpapi.NewAdminMiddleware(issuer),
 		AdminAuth: &httpapi.AdminAuthHandler{Client: client, Issuer: issuer, Refresh: e.refresh, Engine: engine, Log: log},
 		Roles:     &httpapi.RolesHandler{Client: client, Engine: engine, Authz: authz, Log: log},
-		Sites:     &httpapi.SitesHandler{Client: client, Dispatcher: dispatcher, Log: log, Authz: authz},
 		Accounts:  &httpapi.AccountsHandler{Service: e.svc, Authz: authz, Log: log},
 		Team:      &httpapi.TeamHandler{Service: e.svc, Engine: engine, Authz: authz, Log: log},
 		Provisioning: &httpapi.ProvisioningHandler{
@@ -537,14 +536,14 @@ func TestMePlatformPermissions(t *testing.T) {
 }
 
 // Scenario: 一次開好一家店 / owner 設密碼後檢查項改變 / 既有帳號成為 owner /
-// 網域衝突整筆回滾 / 權限組合.
+// origin 衝突整筆回滾 / 權限組合.
 func TestShopProvisioning(t *testing.T) {
 	e := newAcctEnv(t)
 	ctx := context.Background()
 	admin := e.tokenFor(t, e.adminID)
 
 	code, body, raw := e.do(t, "POST", "/api/v1/admin/shop-provisioning", admin, map[string]any{
-		"name": "Bouquet", "domain": "bouquet.test", "owner_email": "Owner@Bouquet.test",
+		"name": "Bouquet", "owner_email": "Owner@Bouquet.test",
 		"storefront_origins": []string{"https://bouquet.test"},
 	})
 	if code != http.StatusCreated {
@@ -555,8 +554,8 @@ func TestShopProvisioning(t *testing.T) {
 	if owner["created"] != true || owner["delivery"] != "manual" || owner["setup_url"] == nil {
 		t.Fatalf("owner: %s", raw)
 	}
-	if b := body["binding"].(map[string]any); b["domain"] != "bouquet.test" || b["is_primary"] != true {
-		t.Fatalf("binding: %s", raw)
+	if _, has := body["binding"]; has {
+		t.Fatalf("binding was removed from the provisioning response: %s", raw)
 	}
 	ownerID := int(owner["user_id"].(float64))
 	if !e.client.ShopUser.Query().Where().ExistX(ctx) {
@@ -568,8 +567,8 @@ func TestShopProvisioning(t *testing.T) {
 
 	statusPath := "/api/v1/admin/shops/" + itoa(shopID) + "/setup-status"
 	_, st, raw := e.do(t, "GET", statusPath, admin, nil)
-	if st["owner_assigned"] != true || st["domain_bound"] != true || st["owner_password_set"] != false ||
-		st["home_published"] != false || st["theme_applied"] != false {
+	if st["owner_assigned"] != true || st["owner_password_set"] != false || st["home_published"] != false ||
+		st["domain_bound"] != nil || st["theme_applied"] != nil {
 		t.Fatalf("status before: %s", raw)
 	}
 	e.setPassword(t, tokenFromURL(t, owner["setup_url"].(string)), acctOwnerPassword)
@@ -600,26 +599,17 @@ func TestShopProvisioning(t *testing.T) {
 		t.Fatal("existing owner's password changed")
 	}
 
-	// Domain conflict: whole request rolls back (no shop, no account).
+	// Conflict: the whole request rolls back (no shop, no account).
 	shopsBefore, usersBefore := e.client.Shop.Query().CountX(ctx), e.client.User.Query().CountX(ctx)
-	code, _, raw = e.do(t, "POST", "/api/v1/admin/shop-provisioning", admin, map[string]any{
-		"name": "Clash", "domain": "bouquet.test", "owner_email": "clash-owner@bouquet.test",
-	})
-	if code != http.StatusConflict {
-		t.Fatalf("domain conflict: %d %s", code, raw)
-	}
-	if e.client.Shop.Query().CountX(ctx) != shopsBefore || e.client.User.Query().CountX(ctx) != usersBefore {
-		t.Fatal("conflicting provisioning left residue")
-	}
-	if e.client.Shop.Query().Where(shop.NameEQ("Clash")).ExistX(ctx) {
-		t.Fatal("Clash shop survived")
-	}
 	// Origin collision rolls back too.
 	code, _, _ = e.do(t, "POST", "/api/v1/admin/shop-provisioning", admin, map[string]any{
 		"name": "Clash2", "owner_email": "clash2@bouquet.test", "storefront_origins": []string{"https://bouquet.test"},
 	})
 	if code != http.StatusConflict || e.client.Shop.Query().Where(shop.NameEQ("Clash2")).ExistX(ctx) {
 		t.Fatalf("origin conflict: %d", code)
+	}
+	if e.client.Shop.Query().CountX(ctx) != shopsBefore || e.client.User.Query().CountX(ctx) != usersBefore {
+		t.Fatal("conflicting provisioning left residue")
 	}
 	// Validation.
 	if c, _, _ := e.do(t, "POST", "/api/v1/admin/shop-provisioning", admin, map[string]any{"name": "NoOwner"}); c != http.StatusUnprocessableEntity {
@@ -630,7 +620,7 @@ func TestShopProvisioning(t *testing.T) {
 	}
 }
 
-// Scenario: 缺 shop.manage_domains 時帶 domain 回 403.
+// Scenario: 缺 shop.manage_client_origins 時帶 storefront_origins 回 403.
 func TestShopProvisioningPermissionCombinations(t *testing.T) {
 	e := newAcctEnv(t)
 	ctx := context.Background()
@@ -649,11 +639,6 @@ func TestShopProvisioningPermissionCombinations(t *testing.T) {
 	tok := e.tokenFor(t, u.ID)
 
 	if c, _, raw := e.do(t, "POST", "/api/v1/admin/shop-provisioning", tok, map[string]any{
-		"name": "P1", "domain": "p1.test", "owner_email": "p1@t.dev",
-	}); c != http.StatusForbidden {
-		t.Fatalf("domain without shop.manage_domains: %d %s", c, raw)
-	}
-	if c, _, raw := e.do(t, "POST", "/api/v1/admin/shop-provisioning", tok, map[string]any{
 		"name": "P2", "owner_email": "p2@t.dev", "storefront_origins": []string{"https://p2.test"},
 	}); c != http.StatusForbidden {
 		t.Fatalf("origin without shop.manage_client_origins: %d %s", c, raw)
@@ -663,7 +648,7 @@ func TestShopProvisioningPermissionCombinations(t *testing.T) {
 	}); c != http.StatusCreated {
 		t.Fatalf("minimal provisioning: %d %s", c, raw)
 	}
-	if e.client.Shop.Query().Where(shop.NameEQ("P1")).ExistX(ctx) {
+	if e.client.Shop.Query().Where(shop.NameEQ("P2")).ExistX(ctx) {
 		t.Fatal("forbidden request created a shop")
 	}
 }

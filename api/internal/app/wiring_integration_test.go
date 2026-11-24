@@ -241,11 +241,10 @@ func TestWiredDispatcherSubscribers(t *testing.T) {
 	// One dispatcher, or the lock guards the wrong object: a publisher holding a
 	// second dispatcher produces exactly the same symptom as no subscription at
 	// all, and the set below would still be perfectly correct.
-	dispatcher := deps.Sites.Dispatcher
+	dispatcher := deps.ClientAuth.Dispatcher
 	for name, held := range map[string]*events.Dispatcher{
 		"ClientAuth": deps.ClientAuth.Dispatcher,
 		"Shops.cms":  deps.Shops.Service.Dispatcher,
-		"Themes.cms": deps.Themes.Service.Dispatcher,
 		"Pages.cms":  deps.Pages.Service.Dispatcher,
 		"Payments":   deps.Payments.Service.Dispatcher,
 		"Shipping":   deps.Shipping.Service.Dispatcher,
