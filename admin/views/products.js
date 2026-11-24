@@ -15,6 +15,7 @@ import { $, el, clear, fillSelect, repeater, rows, renderPager } from "../lib/do
 import { formatMoney, parseAmount, priceRange } from "../lib/money.js";
 import { showValidationErrors } from "../lib/schemaform.js";
 import { can, whenCan, readOnlyUnless } from "../lib/rbac.js";
+import { productImagesSection } from "./product-images.js";
 
 const PAGE_SIZE = 20;
 
@@ -261,6 +262,10 @@ export function createProductsView(ctx) {
       el("span", { class: "hint" },
         "價格是最小貨幣單位的整數：TWD 的 3400 就是 NT$3,400。儲存時會送出上表的完整內容，被移除的列即為刪除。"),
       el("span", { class: "field-error" })));
+
+    // 圖片是子資源（change product-images-r2）：自己的端點、即時生效，**不在
+    // collectBody() 裡**，也不參與上面那顆儲存鍵。
+    form.append(productImagesSection(product, ctx.getShopID()));
 
     state.fields = { title, subtitle, slug, description, status };
     if (!editable) readOnlyUnless("product.edit", form);

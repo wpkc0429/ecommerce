@@ -204,3 +204,13 @@ h4 { margin: 1rem 0 0.4rem; font-size: 0.9rem; color: #374151; }
 .order-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
 .order-list li { display: flex; align-items: center; gap: 0.5rem; }
 .order-list li > span:first-child { flex: 1; }
+
+/* 商品圖片（change product-images-r2）。縮圖＋ alt＋排序／刪除，一張一列。 */
+.image-list { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem; }
+.image-row { display: flex; gap: 0.75rem; align-items: center; padding: 0.4rem; border: 1px solid #e5e7eb; border-radius: 6px; }
+.image-thumb { width: 96px; height: auto; max-height: 96px; object-fit: contain; background: #f3f4f6; border-radius: 4px; }
+.image-meta { flex: 1; display: flex; flex-direction: column; gap: 0.25rem; }
+.image-actions { display: flex; gap: 0.3rem; }
+.image-upload { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.file-button { display: inline-block; padding: 0.35rem 0.7rem; border: 1px solid #9ca3af; border-radius: 6px; cursor: pointer; background: #fff; }
+.file-button input[type="file"] { display: none; }

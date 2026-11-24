@@ -13,6 +13,7 @@
 // 的順序，那個問題在固定形狀表單上根本不存在。
 import { el } from "./dom.js";
 import { ApiError } from "./api.js";
+import { mediaEnabled, uploadContentImage } from "./upload.js";
 
 export function resolveRef(node, root) {
   let cur = node;
@@ -116,6 +117,25 @@ function buildField(key, ps, value, root, pointer) {
   input.dataset.pointer = pointer;
   input.dataset.jsonType = type || "string";
   wrap.append(input, el("span", { class: "field-error" }));
+  if (editor === "image" && mediaEnabled()) {
+    // change product-images-r2：媒體已設定時，圖片欄位旁多一顆上傳鍵；上傳後以
+    // large 變體的網址填入欄位，仍可手動清空。媒體未設定時完全維持原行為。
+    const status = el("span", { class: "hint" });
+    const file = el("input", { type: "file", accept: "image/jpeg,image/png,image/webp,image/heic,image/heif,.heic,.heif" });
+    file.addEventListener("change", async () => {
+      const f = file.files?.[0];
+      file.value = "";
+      if (!f) return;
+      status.textContent = "上傳中…";
+      try {
+        input.value = await uploadContentImage(f);
+        status.textContent = "已上傳（儲存頁面後生效）";
+      } catch (e) {
+        status.textContent = e.message;
+      }
+    });
+    wrap.append(el("label", { class: "file-button" }, "上傳圖片", file), status);
+  }
   if (editor === "richtext") {
     // change cms-rich-text-sanitization：伺服器在儲存時依 allowlist 改寫 HTML，
     // 儲存後重新載入即看到實際存下的值。

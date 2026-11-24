@@ -13,6 +13,7 @@
 import { api, tokens, API_BASE, onUnauthorized } from "./lib/api.js";
 import { $, el } from "./lib/dom.js";
 import { loadPermissions, can, permissionError } from "./lib/rbac.js";
+import { loadMediaConfig, setShopIDSource } from "./lib/upload.js";
 import { parseHash, navigate, onRoute } from "./lib/router.js";
 import { createPagesView } from "./views/pages.js";
 import { createContentView } from "./views/content.js";
@@ -146,6 +147,9 @@ onUnauthorized(logout);
 // 所以只保留視圖名稱。
 async function refreshShopContext(honorHash) {
   await loadPermissions(state.shopID);
+  // change product-images-r2: whether uploads are available at all (R2 may not be
+  // configured yet). Kept in lib/upload.js; controls render only when enabled.
+  await loadMediaConfig();
   const first = renderNav();
   const notice = $("#no-access");
   if (!first) {
@@ -193,6 +197,7 @@ function enterMain() {
 }
 
 onRoute(renderRoute);
+setShopIDSource(() => state.shopID);
 
 async function boot() {
   if (tokens.access) {
