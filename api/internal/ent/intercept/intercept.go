@@ -18,6 +18,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
+	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
+	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
+	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -407,6 +413,168 @@ func (f TraverseContentSchema) Traverse(ctx context.Context, q ent.Query) error 
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.ContentSchemaQuery", q)
+}
+
+// The DesignRequestFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignRequestFunc func(context.Context, *ent.DesignRequestQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignRequestFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignRequestQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignRequestQuery", q)
+}
+
+// The TraverseDesignRequest type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignRequest func(context.Context, *ent.DesignRequestQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignRequest) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignRequest) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignRequestQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignRequestQuery", q)
+}
+
+// The DesignRequestEventFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignRequestEventFunc func(context.Context, *ent.DesignRequestEventQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignRequestEventFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignRequestEventQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignRequestEventQuery", q)
+}
+
+// The TraverseDesignRequestEvent type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignRequestEvent func(context.Context, *ent.DesignRequestEventQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignRequestEvent) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignRequestEvent) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignRequestEventQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignRequestEventQuery", q)
+}
+
+// The DesignScreenshotFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignScreenshotFunc func(context.Context, *ent.DesignScreenshotQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignScreenshotFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignScreenshotQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignScreenshotQuery", q)
+}
+
+// The TraverseDesignScreenshot type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignScreenshot func(context.Context, *ent.DesignScreenshotQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignScreenshot) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignScreenshot) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignScreenshotQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignScreenshotQuery", q)
+}
+
+// The DesignServiceCredentialFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignServiceCredentialFunc func(context.Context, *ent.DesignServiceCredentialQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignServiceCredentialFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignServiceCredentialQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignServiceCredentialQuery", q)
+}
+
+// The TraverseDesignServiceCredential type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignServiceCredential func(context.Context, *ent.DesignServiceCredentialQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignServiceCredential) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignServiceCredential) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignServiceCredentialQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignServiceCredentialQuery", q)
+}
+
+// The DesignSiteStateFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignSiteStateFunc func(context.Context, *ent.DesignSiteStateQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignSiteStateFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignSiteStateQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignSiteStateQuery", q)
+}
+
+// The TraverseDesignSiteState type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignSiteState func(context.Context, *ent.DesignSiteStateQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignSiteState) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignSiteState) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignSiteStateQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignSiteStateQuery", q)
+}
+
+// The DesignUntrackedChangeFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignUntrackedChangeFunc func(context.Context, *ent.DesignUntrackedChangeQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignUntrackedChangeFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignUntrackedChangeQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignUntrackedChangeQuery", q)
+}
+
+// The TraverseDesignUntrackedChange type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignUntrackedChange func(context.Context, *ent.DesignUntrackedChangeQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignUntrackedChange) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignUntrackedChange) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignUntrackedChangeQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignUntrackedChangeQuery", q)
 }
 
 // The MediaUploadFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1325,6 +1493,18 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ContentScheduleQuery, predicate.ContentSchedule, contentschedule.OrderOption]{typ: ent.TypeContentSchedule, tq: q}, nil
 	case *ent.ContentSchemaQuery:
 		return &query[*ent.ContentSchemaQuery, predicate.ContentSchema, contentschema.OrderOption]{typ: ent.TypeContentSchema, tq: q}, nil
+	case *ent.DesignRequestQuery:
+		return &query[*ent.DesignRequestQuery, predicate.DesignRequest, designrequest.OrderOption]{typ: ent.TypeDesignRequest, tq: q}, nil
+	case *ent.DesignRequestEventQuery:
+		return &query[*ent.DesignRequestEventQuery, predicate.DesignRequestEvent, designrequestevent.OrderOption]{typ: ent.TypeDesignRequestEvent, tq: q}, nil
+	case *ent.DesignScreenshotQuery:
+		return &query[*ent.DesignScreenshotQuery, predicate.DesignScreenshot, designscreenshot.OrderOption]{typ: ent.TypeDesignScreenshot, tq: q}, nil
+	case *ent.DesignServiceCredentialQuery:
+		return &query[*ent.DesignServiceCredentialQuery, predicate.DesignServiceCredential, designservicecredential.OrderOption]{typ: ent.TypeDesignServiceCredential, tq: q}, nil
+	case *ent.DesignSiteStateQuery:
+		return &query[*ent.DesignSiteStateQuery, predicate.DesignSiteState, designsitestate.OrderOption]{typ: ent.TypeDesignSiteState, tq: q}, nil
+	case *ent.DesignUntrackedChangeQuery:
+		return &query[*ent.DesignUntrackedChangeQuery, predicate.DesignUntrackedChange, designuntrackedchange.OrderOption]{typ: ent.TypeDesignUntrackedChange, tq: q}, nil
 	case *ent.MediaUploadQuery:
 		return &query[*ent.MediaUploadQuery, predicate.MediaUpload, mediaupload.OrderOption]{typ: ent.TypeMediaUpload, tq: q}, nil
 	case *ent.MemberQuery:

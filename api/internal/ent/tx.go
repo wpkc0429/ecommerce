@@ -36,6 +36,18 @@ type Tx struct {
 	ContentSchedule *ContentScheduleClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
+	// DesignRequest is the client for interacting with the DesignRequest builders.
+	DesignRequest *DesignRequestClient
+	// DesignRequestEvent is the client for interacting with the DesignRequestEvent builders.
+	DesignRequestEvent *DesignRequestEventClient
+	// DesignScreenshot is the client for interacting with the DesignScreenshot builders.
+	DesignScreenshot *DesignScreenshotClient
+	// DesignServiceCredential is the client for interacting with the DesignServiceCredential builders.
+	DesignServiceCredential *DesignServiceCredentialClient
+	// DesignSiteState is the client for interacting with the DesignSiteState builders.
+	DesignSiteState *DesignSiteStateClient
+	// DesignUntrackedChange is the client for interacting with the DesignUntrackedChange builders.
+	DesignUntrackedChange *DesignUntrackedChangeClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
 	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
@@ -244,6 +256,12 @@ func (tx *Tx) init() {
 	tx.ContentRevision = NewContentRevisionClient(tx.config)
 	tx.ContentSchedule = NewContentScheduleClient(tx.config)
 	tx.ContentSchema = NewContentSchemaClient(tx.config)
+	tx.DesignRequest = NewDesignRequestClient(tx.config)
+	tx.DesignRequestEvent = NewDesignRequestEventClient(tx.config)
+	tx.DesignScreenshot = NewDesignScreenshotClient(tx.config)
+	tx.DesignServiceCredential = NewDesignServiceCredentialClient(tx.config)
+	tx.DesignSiteState = NewDesignSiteStateClient(tx.config)
+	tx.DesignUntrackedChange = NewDesignUntrackedChangeClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)

@@ -140,6 +140,78 @@ func (f ContentSchemaFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentSchemaMutation", m)
 }
 
+// The DesignRequestFunc type is an adapter to allow the use of ordinary
+// function as DesignRequest mutator.
+type DesignRequestFunc func(context.Context, *ent.DesignRequestMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignRequestMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignRequestMutation", m)
+}
+
+// The DesignRequestEventFunc type is an adapter to allow the use of ordinary
+// function as DesignRequestEvent mutator.
+type DesignRequestEventFunc func(context.Context, *ent.DesignRequestEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignRequestEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignRequestEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignRequestEventMutation", m)
+}
+
+// The DesignScreenshotFunc type is an adapter to allow the use of ordinary
+// function as DesignScreenshot mutator.
+type DesignScreenshotFunc func(context.Context, *ent.DesignScreenshotMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignScreenshotFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignScreenshotMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignScreenshotMutation", m)
+}
+
+// The DesignServiceCredentialFunc type is an adapter to allow the use of ordinary
+// function as DesignServiceCredential mutator.
+type DesignServiceCredentialFunc func(context.Context, *ent.DesignServiceCredentialMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignServiceCredentialFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignServiceCredentialMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignServiceCredentialMutation", m)
+}
+
+// The DesignSiteStateFunc type is an adapter to allow the use of ordinary
+// function as DesignSiteState mutator.
+type DesignSiteStateFunc func(context.Context, *ent.DesignSiteStateMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignSiteStateFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignSiteStateMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignSiteStateMutation", m)
+}
+
+// The DesignUntrackedChangeFunc type is an adapter to allow the use of ordinary
+// function as DesignUntrackedChange mutator.
+type DesignUntrackedChangeFunc func(context.Context, *ent.DesignUntrackedChangeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignUntrackedChangeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignUntrackedChangeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignUntrackedChangeMutation", m)
+}
+
 // The MediaUploadFunc type is an adapter to allow the use of ordinary
 // function as MediaUpload mutator.
 type MediaUploadFunc func(context.Context, *ent.MediaUploadMutation) (ent.Value, error)

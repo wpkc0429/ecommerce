@@ -450,6 +450,264 @@ var (
 			},
 		},
 	}
+	// DesignRequestsColumns holds the columns for the "design_requests" table.
+	DesignRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "site", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "kind", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "drafting", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "requested_by_user_id", Type: field.TypeInt},
+		{Name: "prompt_text", Type: field.TypeString, Nullable: true, SchemaType: map[string]string{"postgres": "text"}},
+		{Name: "prompt_sha256", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "prompt_flags", Type: field.TypeJSON},
+		{Name: "base_sha", Type: field.TypeString, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "head_sha", Type: field.TypeString, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "candidate_sha", Type: field.TypeString, Nullable: true, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "published_sha", Type: field.TypeString, Nullable: true, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "branch", Type: field.TypeString, Size: 120, SchemaType: map[string]string{"postgres": "varchar(120)"}},
+		{Name: "core_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "design_floor_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "diff_summary", Type: field.TypeJSON},
+		{Name: "guard", Type: field.TypeJSON, Nullable: true},
+		{Name: "preview_origin", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "preview_registered_at", Type: field.TypeTime, Nullable: true},
+		{Name: "preview_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "approved_by_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "approved_at", Type: field.TypeTime, Nullable: true},
+		{Name: "approved_head_sha", Type: field.TypeString, Nullable: true, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "approval_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "publish_tag", Type: field.TypeString, Nullable: true, Size: 60, SchemaType: map[string]string{"postgres": "varchar(60)"}},
+		{Name: "rejected_by_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "rejected_at", Type: field.TypeTime, Nullable: true},
+		{Name: "reject_reason", Type: field.TypeString, Nullable: true, Size: 500, SchemaType: map[string]string{"postgres": "varchar(500)"}},
+		{Name: "change_note", Type: field.TypeString, Nullable: true, Size: 500, SchemaType: map[string]string{"postgres": "varchar(500)"}},
+		{Name: "published_at", Type: field.TypeTime, Nullable: true},
+		{Name: "published_tag", Type: field.TypeString, Nullable: true, Size: 60, SchemaType: map[string]string{"postgres": "varchar(60)"}},
+		{Name: "deployment_id", Type: field.TypeString, Nullable: true, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "restores_request_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "reverted_by_request_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "failure_code", Type: field.TypeString, Nullable: true, Size: 40, SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "failure_detail", Type: field.TypeString, Nullable: true, Size: 300, SchemaType: map[string]string{"postgres": "varchar(300)"}},
+		{Name: "rev", Type: field.TypeInt, Default: 1},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "idempotency_fingerprint", Type: field.TypeString, Nullable: true, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "claimed_by_credential_id", Type: field.TypeInt, Nullable: true},
+		{Name: "claimed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "claim_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// DesignRequestsTable holds the schema information for the "design_requests" table.
+	DesignRequestsTable = &schema.Table{
+		Name:       "design_requests",
+		Columns:    DesignRequestsColumns,
+		PrimaryKey: []*schema.Column{DesignRequestsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_requests_shop_id_id_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignRequestsColumns[1], DesignRequestsColumns[0]},
+			},
+			{
+				Name:    "design_requests_shop_site_created",
+				Unique:  false,
+				Columns: []*schema.Column{DesignRequestsColumns[1], DesignRequestsColumns[2], DesignRequestsColumns[43]},
+			},
+			{
+				Name:    "design_requests_one_active",
+				Unique:  true,
+				Columns: []*schema.Column{DesignRequestsColumns[1], DesignRequestsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('drafting', 'previewing', 'awaiting_approval', 'approved')",
+				},
+			},
+			{
+				Name:    "design_requests_idem_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignRequestsColumns[1], DesignRequestsColumns[38]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "idempotency_key IS NOT NULL",
+				},
+			},
+			{
+				Name:    "design_requests_publish_tag_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignRequestsColumns[1], DesignRequestsColumns[25]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "publish_tag IS NOT NULL",
+				},
+			},
+			{
+				Name:    "design_requests_status_updated",
+				Unique:  false,
+				Columns: []*schema.Column{DesignRequestsColumns[4], DesignRequestsColumns[44]},
+			},
+		},
+	}
+	// DesignRequestEventsColumns holds the columns for the "design_request_events" table.
+	DesignRequestEventsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "request_id", Type: field.TypeUUID},
+		{Name: "seq", Type: field.TypeInt},
+		{Name: "kind", Type: field.TypeString, Size: 30, SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "from_status", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "to_status", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "actor_type", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "actor_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "actor_credential_id", Type: field.TypeInt, Nullable: true},
+		{Name: "head_sha", Type: field.TypeString, Size: 40, Default: "", SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "detail", Type: field.TypeJSON},
+		{Name: "prev_hash", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "hash", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// DesignRequestEventsTable holds the schema information for the "design_request_events" table.
+	DesignRequestEventsTable = &schema.Table{
+		Name:       "design_request_events",
+		Columns:    DesignRequestEventsColumns,
+		PrimaryKey: []*schema.Column{DesignRequestEventsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_request_events_request_seq_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignRequestEventsColumns[2], DesignRequestEventsColumns[3]},
+			},
+			{
+				Name:    "design_request_events_shop_created",
+				Unique:  false,
+				Columns: []*schema.Column{DesignRequestEventsColumns[1], DesignRequestEventsColumns[14]},
+			},
+		},
+	}
+	// DesignScreenshotsColumns holds the columns for the "design_screenshots" table.
+	DesignScreenshotsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "request_id", Type: field.TypeUUID},
+		{Name: "phase", Type: field.TypeString, Size: 6, SchemaType: map[string]string{"postgres": "varchar(6)"}},
+		{Name: "site", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "view_key", Type: field.TypeString, Size: 40, SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "viewport", Type: field.TypeInt16},
+		{Name: "role", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "attempt", Type: field.TypeInt16, Default: 1},
+		{Name: "commit_sha", Type: field.TypeString, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "object_key", Type: field.TypeString, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "content_type", Type: field.TypeString, Size: 20, Default: "image/png", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "byte_size", Type: field.TypeInt},
+		{Name: "width", Type: field.TypeInt},
+		{Name: "height", Type: field.TypeInt},
+		{Name: "sha256", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "diff_ppm", Type: field.TypeInt, Nullable: true},
+		{Name: "capture_manifest", Type: field.TypeJSON},
+		{Name: "purged_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// DesignScreenshotsTable holds the schema information for the "design_screenshots" table.
+	DesignScreenshotsTable = &schema.Table{
+		Name:       "design_screenshots",
+		Columns:    DesignScreenshotsColumns,
+		PrimaryKey: []*schema.Column{DesignScreenshotsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_screenshots_slot_attempt_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignScreenshotsColumns[2], DesignScreenshotsColumns[3], DesignScreenshotsColumns[7], DesignScreenshotsColumns[6], DesignScreenshotsColumns[5], DesignScreenshotsColumns[8]},
+			},
+			{
+				Name:    "design_screenshots_shop_created",
+				Unique:  false,
+				Columns: []*schema.Column{DesignScreenshotsColumns[1], DesignScreenshotsColumns[19]},
+			},
+		},
+	}
+	// DesignServiceCredentialsColumns holds the columns for the "design_service_credentials" table.
+	DesignServiceCredentialsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "name", Type: field.TypeString, Size: 100, SchemaType: map[string]string{"postgres": "varchar(100)"}},
+		{Name: "key_prefix", Type: field.TypeString, Size: 12, SchemaType: map[string]string{"postgres": "varchar(12)"}},
+		{Name: "key_hash", Type: field.TypeString, Size: 64, SchemaType: map[string]string{"postgres": "char(64)"}},
+		{Name: "allowed_cidrs", Type: field.TypeJSON, Nullable: true},
+		{Name: "created_by_user_id", Type: field.TypeInt},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "expires_at", Type: field.TypeTime},
+		{Name: "last_used_at", Type: field.TypeTime, Nullable: true},
+		{Name: "revoked_at", Type: field.TypeTime, Nullable: true},
+	}
+	// DesignServiceCredentialsTable holds the schema information for the "design_service_credentials" table.
+	DesignServiceCredentialsTable = &schema.Table{
+		Name:       "design_service_credentials",
+		Columns:    DesignServiceCredentialsColumns,
+		PrimaryKey: []*schema.Column{DesignServiceCredentialsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_service_credentials_key_hash_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignServiceCredentialsColumns[4]},
+			},
+			{
+				Name:    "design_service_credentials_shop",
+				Unique:  false,
+				Columns: []*schema.Column{DesignServiceCredentialsColumns[1]},
+			},
+		},
+	}
+	// DesignSiteStateColumns holds the columns for the "design_site_state" table.
+	DesignSiteStateColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "site", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "current_request_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "current_tag", Type: field.TypeString, Size: 60, Default: "", SchemaType: map[string]string{"postgres": "varchar(60)"}},
+		{Name: "current_sha", Type: field.TypeString, Size: 40, Default: "", SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "core_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "design_floor_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "last_seen_main_sha", Type: field.TypeString, Size: 40, Default: "", SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "updated_at", Type: field.TypeTime},
+	}
+	// DesignSiteStateTable holds the schema information for the "design_site_state" table.
+	DesignSiteStateTable = &schema.Table{
+		Name:       "design_site_state",
+		Columns:    DesignSiteStateColumns,
+		PrimaryKey: []*schema.Column{DesignSiteStateColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_site_state_shop_site_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignSiteStateColumns[1], DesignSiteStateColumns[2]},
+			},
+		},
+	}
+	// DesignUntrackedChangesColumns holds the columns for the "design_untracked_changes" table.
+	DesignUntrackedChangesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "site", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "commit_sha", Type: field.TypeString, Size: 40, SchemaType: map[string]string{"postgres": "char(40)"}},
+		{Name: "committed_at", Type: field.TypeTime},
+		{Name: "subject", Type: field.TypeString, Size: 200, Default: "", SchemaType: map[string]string{"postgres": "varchar(200)"}},
+		{Name: "files_changed", Type: field.TypeInt, Default: 0},
+		{Name: "additions", Type: field.TypeInt, Default: 0},
+		{Name: "deletions", Type: field.TypeInt, Default: 0},
+		{Name: "detected_at", Type: field.TypeTime},
+		{Name: "acknowledged_by_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "acknowledged_at", Type: field.TypeTime, Nullable: true},
+	}
+	// DesignUntrackedChangesTable holds the schema information for the "design_untracked_changes" table.
+	DesignUntrackedChangesTable = &schema.Table{
+		Name:       "design_untracked_changes",
+		Columns:    DesignUntrackedChangesColumns,
+		PrimaryKey: []*schema.Column{DesignUntrackedChangesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_untracked_changes_commit_key",
+				Unique:  true,
+				Columns: []*schema.Column{DesignUntrackedChangesColumns[1], DesignUntrackedChangesColumns[2], DesignUntrackedChangesColumns[3]},
+			},
+		},
+	}
 	// MediaUploadsColumns holds the columns for the "media_uploads" table.
 	MediaUploadsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1673,6 +1931,12 @@ var (
 		ContentRevisionsTable,
 		ContentPublishSchedulesTable,
 		ContentSchemasTable,
+		DesignRequestsTable,
+		DesignRequestEventsTable,
+		DesignScreenshotsTable,
+		DesignServiceCredentialsTable,
+		DesignSiteStateTable,
+		DesignUntrackedChangesTable,
 		MediaUploadsTable,
 		MembersTable,
 		MemberRefreshTokensTable,
@@ -1778,6 +2042,53 @@ func init() {
 	}
 	ContentSchemasTable.Annotation.Checks = map[string]string{
 		"content_schemas_version_check": "version >= 1",
+	}
+	DesignRequestsTable.Annotation = &entsql.Annotation{
+		Table: "design_requests",
+	}
+	DesignRequestsTable.Annotation.Checks = map[string]string{
+		"design_requests_kind_check":   "kind IN ('change', 'revert')",
+		"design_requests_site_check":   "site IN ('storefront', 'admin')",
+		"design_requests_status_check": "status IN ('drafting', 'previewing', 'awaiting_approval', 'approved', 'published', 'rejected', 'failed', 'cancelled', 'reverted')",
+	}
+	DesignRequestEventsTable.Annotation = &entsql.Annotation{
+		Table: "design_request_events",
+	}
+	DesignRequestEventsTable.Annotation.Checks = map[string]string{
+		"design_request_events_actor_check": "actor_type IN ('service', 'user', 'system')",
+		"design_request_events_kind_check":  "kind IN ('created', 'claimed', 'head_updated', 'guard_run', 'preview_registered', 'screenshots_complete', 'submitted', 'changes_requested', 'approved', 'rejected', 'cancelled', 'guard_rechecked', 'published', 'failed', 'revert_requested', 'reverted_mark', 'expired')",
+	}
+	DesignScreenshotsTable.Annotation = &entsql.Annotation{
+		Table: "design_screenshots",
+	}
+	DesignScreenshotsTable.Annotation.Checks = map[string]string{
+		"design_screenshots_height_check":   "height BETWEEN 1 AND 10000",
+		"design_screenshots_phase_check":    "phase IN ('before', 'after')",
+		"design_screenshots_role_check":     "role IN ('owner', 'staff', 'anon')",
+		"design_screenshots_site_check":     "site IN ('storefront', 'admin')",
+		"design_screenshots_size_check":     "byte_size BETWEEN 1 AND 2097152",
+		"design_screenshots_type_check":     "content_type = 'image/png'",
+		"design_screenshots_view_key_check": "view_key ~ '^[a-z0-9-]+$'",
+		"design_screenshots_viewport_check": "viewport IN (390, 1280)",
+		"design_screenshots_width_check":    "width = viewport",
+	}
+	DesignServiceCredentialsTable.Annotation = &entsql.Annotation{
+		Table: "design_service_credentials",
+	}
+	DesignServiceCredentialsTable.Annotation.Checks = map[string]string{
+		"design_service_credentials_expiry_check": "expires_at > created_at AND expires_at <= created_at + interval '366 days'",
+	}
+	DesignSiteStateTable.Annotation = &entsql.Annotation{
+		Table: "design_site_state",
+	}
+	DesignSiteStateTable.Annotation.Checks = map[string]string{
+		"design_site_state_site_check": "site IN ('storefront', 'admin')",
+	}
+	DesignUntrackedChangesTable.Annotation = &entsql.Annotation{
+		Table: "design_untracked_changes",
+	}
+	DesignUntrackedChangesTable.Annotation.Checks = map[string]string{
+		"design_untracked_changes_site_check": "site IN ('storefront', 'admin')",
 	}
 	MediaUploadsTable.ForeignKeys[0].RefTable = ShopsTable
 	MediaUploadsTable.Annotation = &entsql.Annotation{}

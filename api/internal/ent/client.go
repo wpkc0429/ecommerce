@@ -22,6 +22,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
+	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
+	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
+	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -92,6 +98,18 @@ type Client struct {
 	ContentSchedule *ContentScheduleClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
+	// DesignRequest is the client for interacting with the DesignRequest builders.
+	DesignRequest *DesignRequestClient
+	// DesignRequestEvent is the client for interacting with the DesignRequestEvent builders.
+	DesignRequestEvent *DesignRequestEventClient
+	// DesignScreenshot is the client for interacting with the DesignScreenshot builders.
+	DesignScreenshot *DesignScreenshotClient
+	// DesignServiceCredential is the client for interacting with the DesignServiceCredential builders.
+	DesignServiceCredential *DesignServiceCredentialClient
+	// DesignSiteState is the client for interacting with the DesignSiteState builders.
+	DesignSiteState *DesignSiteStateClient
+	// DesignUntrackedChange is the client for interacting with the DesignUntrackedChange builders.
+	DesignUntrackedChange *DesignUntrackedChangeClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
 	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
@@ -180,6 +198,12 @@ func (c *Client) init() {
 	c.ContentRevision = NewContentRevisionClient(c.config)
 	c.ContentSchedule = NewContentScheduleClient(c.config)
 	c.ContentSchema = NewContentSchemaClient(c.config)
+	c.DesignRequest = NewDesignRequestClient(c.config)
+	c.DesignRequestEvent = NewDesignRequestEventClient(c.config)
+	c.DesignScreenshot = NewDesignScreenshotClient(c.config)
+	c.DesignServiceCredential = NewDesignServiceCredentialClient(c.config)
+	c.DesignSiteState = NewDesignSiteStateClient(c.config)
+	c.DesignUntrackedChange = NewDesignUntrackedChangeClient(c.config)
 	c.MediaUpload = NewMediaUploadClient(c.config)
 	c.Member = NewMemberClient(c.config)
 	c.MemberRefreshToken = NewMemberRefreshTokenClient(c.config)
@@ -316,6 +340,12 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchedule:               NewContentScheduleClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
+		DesignRequest:                 NewDesignRequestClient(cfg),
+		DesignRequestEvent:            NewDesignRequestEventClient(cfg),
+		DesignScreenshot:              NewDesignScreenshotClient(cfg),
+		DesignServiceCredential:       NewDesignServiceCredentialClient(cfg),
+		DesignSiteState:               NewDesignSiteStateClient(cfg),
+		DesignUntrackedChange:         NewDesignUntrackedChangeClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
@@ -379,6 +409,12 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchedule:               NewContentScheduleClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
+		DesignRequest:                 NewDesignRequestClient(cfg),
+		DesignRequestEvent:            NewDesignRequestEventClient(cfg),
+		DesignScreenshot:              NewDesignScreenshotClient(cfg),
+		DesignServiceCredential:       NewDesignServiceCredentialClient(cfg),
+		DesignSiteState:               NewDesignSiteStateClient(cfg),
+		DesignUntrackedChange:         NewDesignUntrackedChangeClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
@@ -444,6 +480,8 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
 		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
+		c.DesignRequest, c.DesignRequestEvent, c.DesignScreenshot,
+		c.DesignServiceCredential, c.DesignSiteState, c.DesignUntrackedChange,
 		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
 		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
 		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
@@ -464,6 +502,8 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
 		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
+		c.DesignRequest, c.DesignRequestEvent, c.DesignScreenshot,
+		c.DesignServiceCredential, c.DesignSiteState, c.DesignUntrackedChange,
 		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
 		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
 		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
@@ -502,6 +542,18 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ContentSchedule.mutate(ctx, m)
 	case *ContentSchemaMutation:
 		return c.ContentSchema.mutate(ctx, m)
+	case *DesignRequestMutation:
+		return c.DesignRequest.mutate(ctx, m)
+	case *DesignRequestEventMutation:
+		return c.DesignRequestEvent.mutate(ctx, m)
+	case *DesignScreenshotMutation:
+		return c.DesignScreenshot.mutate(ctx, m)
+	case *DesignServiceCredentialMutation:
+		return c.DesignServiceCredential.mutate(ctx, m)
+	case *DesignSiteStateMutation:
+		return c.DesignSiteState.mutate(ctx, m)
+	case *DesignUntrackedChangeMutation:
+		return c.DesignUntrackedChange.mutate(ctx, m)
 	case *MediaUploadMutation:
 		return c.MediaUpload.mutate(ctx, m)
 	case *MemberMutation:
@@ -2273,6 +2325,804 @@ func (c *ContentSchemaClient) mutate(ctx context.Context, m *ContentSchemaMutati
 		return (&ContentSchemaDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ContentSchema mutation op: %q", m.Op())
+	}
+}
+
+// DesignRequestClient is a client for the DesignRequest schema.
+type DesignRequestClient struct {
+	config
+}
+
+// NewDesignRequestClient returns a client for the DesignRequest from the given config.
+func NewDesignRequestClient(c config) *DesignRequestClient {
+	return &DesignRequestClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designrequest.Hooks(f(g(h())))`.
+func (c *DesignRequestClient) Use(hooks ...Hook) {
+	c.hooks.DesignRequest = append(c.hooks.DesignRequest, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designrequest.Intercept(f(g(h())))`.
+func (c *DesignRequestClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignRequest = append(c.inters.DesignRequest, interceptors...)
+}
+
+// Create returns a builder for creating a DesignRequest entity.
+func (c *DesignRequestClient) Create() *DesignRequestCreate {
+	mutation := newDesignRequestMutation(c.config, OpCreate)
+	return &DesignRequestCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignRequest entities.
+func (c *DesignRequestClient) CreateBulk(builders ...*DesignRequestCreate) *DesignRequestCreateBulk {
+	return &DesignRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignRequestClient) MapCreateBulk(slice any, setFunc func(*DesignRequestCreate, int)) *DesignRequestCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignRequestCreateBulk{err: fmt.Errorf("calling to DesignRequestClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignRequestCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignRequestCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignRequest.
+func (c *DesignRequestClient) Update() *DesignRequestUpdate {
+	mutation := newDesignRequestMutation(c.config, OpUpdate)
+	return &DesignRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignRequestClient) UpdateOne(_m *DesignRequest) *DesignRequestUpdateOne {
+	mutation := newDesignRequestMutation(c.config, OpUpdateOne, withDesignRequest(_m))
+	return &DesignRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignRequestClient) UpdateOneID(id uuid.UUID) *DesignRequestUpdateOne {
+	mutation := newDesignRequestMutation(c.config, OpUpdateOne, withDesignRequestID(id))
+	return &DesignRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignRequest.
+func (c *DesignRequestClient) Delete() *DesignRequestDelete {
+	mutation := newDesignRequestMutation(c.config, OpDelete)
+	return &DesignRequestDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignRequestClient) DeleteOne(_m *DesignRequest) *DesignRequestDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignRequestClient) DeleteOneID(id uuid.UUID) *DesignRequestDeleteOne {
+	builder := c.Delete().Where(designrequest.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignRequestDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignRequest.
+func (c *DesignRequestClient) Query() *DesignRequestQuery {
+	return &DesignRequestQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignRequest},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignRequest entity by its id.
+func (c *DesignRequestClient) Get(ctx context.Context, id uuid.UUID) (*DesignRequest, error) {
+	return c.Query().Where(designrequest.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignRequestClient) GetX(ctx context.Context, id uuid.UUID) *DesignRequest {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignRequestClient) Hooks() []Hook {
+	return c.hooks.DesignRequest
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignRequestClient) Interceptors() []Interceptor {
+	return c.inters.DesignRequest
+}
+
+func (c *DesignRequestClient) mutate(ctx context.Context, m *DesignRequestMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignRequestCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignRequestUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignRequestUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignRequestDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignRequest mutation op: %q", m.Op())
+	}
+}
+
+// DesignRequestEventClient is a client for the DesignRequestEvent schema.
+type DesignRequestEventClient struct {
+	config
+}
+
+// NewDesignRequestEventClient returns a client for the DesignRequestEvent from the given config.
+func NewDesignRequestEventClient(c config) *DesignRequestEventClient {
+	return &DesignRequestEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designrequestevent.Hooks(f(g(h())))`.
+func (c *DesignRequestEventClient) Use(hooks ...Hook) {
+	c.hooks.DesignRequestEvent = append(c.hooks.DesignRequestEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designrequestevent.Intercept(f(g(h())))`.
+func (c *DesignRequestEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignRequestEvent = append(c.inters.DesignRequestEvent, interceptors...)
+}
+
+// Create returns a builder for creating a DesignRequestEvent entity.
+func (c *DesignRequestEventClient) Create() *DesignRequestEventCreate {
+	mutation := newDesignRequestEventMutation(c.config, OpCreate)
+	return &DesignRequestEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignRequestEvent entities.
+func (c *DesignRequestEventClient) CreateBulk(builders ...*DesignRequestEventCreate) *DesignRequestEventCreateBulk {
+	return &DesignRequestEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignRequestEventClient) MapCreateBulk(slice any, setFunc func(*DesignRequestEventCreate, int)) *DesignRequestEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignRequestEventCreateBulk{err: fmt.Errorf("calling to DesignRequestEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignRequestEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignRequestEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignRequestEvent.
+func (c *DesignRequestEventClient) Update() *DesignRequestEventUpdate {
+	mutation := newDesignRequestEventMutation(c.config, OpUpdate)
+	return &DesignRequestEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignRequestEventClient) UpdateOne(_m *DesignRequestEvent) *DesignRequestEventUpdateOne {
+	mutation := newDesignRequestEventMutation(c.config, OpUpdateOne, withDesignRequestEvent(_m))
+	return &DesignRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignRequestEventClient) UpdateOneID(id int) *DesignRequestEventUpdateOne {
+	mutation := newDesignRequestEventMutation(c.config, OpUpdateOne, withDesignRequestEventID(id))
+	return &DesignRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignRequestEvent.
+func (c *DesignRequestEventClient) Delete() *DesignRequestEventDelete {
+	mutation := newDesignRequestEventMutation(c.config, OpDelete)
+	return &DesignRequestEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignRequestEventClient) DeleteOne(_m *DesignRequestEvent) *DesignRequestEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignRequestEventClient) DeleteOneID(id int) *DesignRequestEventDeleteOne {
+	builder := c.Delete().Where(designrequestevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignRequestEventDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignRequestEvent.
+func (c *DesignRequestEventClient) Query() *DesignRequestEventQuery {
+	return &DesignRequestEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignRequestEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignRequestEvent entity by its id.
+func (c *DesignRequestEventClient) Get(ctx context.Context, id int) (*DesignRequestEvent, error) {
+	return c.Query().Where(designrequestevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignRequestEventClient) GetX(ctx context.Context, id int) *DesignRequestEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignRequestEventClient) Hooks() []Hook {
+	return c.hooks.DesignRequestEvent
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignRequestEventClient) Interceptors() []Interceptor {
+	return c.inters.DesignRequestEvent
+}
+
+func (c *DesignRequestEventClient) mutate(ctx context.Context, m *DesignRequestEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignRequestEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignRequestEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignRequestEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignRequestEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignRequestEvent mutation op: %q", m.Op())
+	}
+}
+
+// DesignScreenshotClient is a client for the DesignScreenshot schema.
+type DesignScreenshotClient struct {
+	config
+}
+
+// NewDesignScreenshotClient returns a client for the DesignScreenshot from the given config.
+func NewDesignScreenshotClient(c config) *DesignScreenshotClient {
+	return &DesignScreenshotClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designscreenshot.Hooks(f(g(h())))`.
+func (c *DesignScreenshotClient) Use(hooks ...Hook) {
+	c.hooks.DesignScreenshot = append(c.hooks.DesignScreenshot, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designscreenshot.Intercept(f(g(h())))`.
+func (c *DesignScreenshotClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignScreenshot = append(c.inters.DesignScreenshot, interceptors...)
+}
+
+// Create returns a builder for creating a DesignScreenshot entity.
+func (c *DesignScreenshotClient) Create() *DesignScreenshotCreate {
+	mutation := newDesignScreenshotMutation(c.config, OpCreate)
+	return &DesignScreenshotCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignScreenshot entities.
+func (c *DesignScreenshotClient) CreateBulk(builders ...*DesignScreenshotCreate) *DesignScreenshotCreateBulk {
+	return &DesignScreenshotCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignScreenshotClient) MapCreateBulk(slice any, setFunc func(*DesignScreenshotCreate, int)) *DesignScreenshotCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignScreenshotCreateBulk{err: fmt.Errorf("calling to DesignScreenshotClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignScreenshotCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignScreenshotCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignScreenshot.
+func (c *DesignScreenshotClient) Update() *DesignScreenshotUpdate {
+	mutation := newDesignScreenshotMutation(c.config, OpUpdate)
+	return &DesignScreenshotUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignScreenshotClient) UpdateOne(_m *DesignScreenshot) *DesignScreenshotUpdateOne {
+	mutation := newDesignScreenshotMutation(c.config, OpUpdateOne, withDesignScreenshot(_m))
+	return &DesignScreenshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignScreenshotClient) UpdateOneID(id uuid.UUID) *DesignScreenshotUpdateOne {
+	mutation := newDesignScreenshotMutation(c.config, OpUpdateOne, withDesignScreenshotID(id))
+	return &DesignScreenshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignScreenshot.
+func (c *DesignScreenshotClient) Delete() *DesignScreenshotDelete {
+	mutation := newDesignScreenshotMutation(c.config, OpDelete)
+	return &DesignScreenshotDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignScreenshotClient) DeleteOne(_m *DesignScreenshot) *DesignScreenshotDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignScreenshotClient) DeleteOneID(id uuid.UUID) *DesignScreenshotDeleteOne {
+	builder := c.Delete().Where(designscreenshot.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignScreenshotDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignScreenshot.
+func (c *DesignScreenshotClient) Query() *DesignScreenshotQuery {
+	return &DesignScreenshotQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignScreenshot},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignScreenshot entity by its id.
+func (c *DesignScreenshotClient) Get(ctx context.Context, id uuid.UUID) (*DesignScreenshot, error) {
+	return c.Query().Where(designscreenshot.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignScreenshotClient) GetX(ctx context.Context, id uuid.UUID) *DesignScreenshot {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignScreenshotClient) Hooks() []Hook {
+	return c.hooks.DesignScreenshot
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignScreenshotClient) Interceptors() []Interceptor {
+	return c.inters.DesignScreenshot
+}
+
+func (c *DesignScreenshotClient) mutate(ctx context.Context, m *DesignScreenshotMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignScreenshotCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignScreenshotUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignScreenshotUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignScreenshotDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignScreenshot mutation op: %q", m.Op())
+	}
+}
+
+// DesignServiceCredentialClient is a client for the DesignServiceCredential schema.
+type DesignServiceCredentialClient struct {
+	config
+}
+
+// NewDesignServiceCredentialClient returns a client for the DesignServiceCredential from the given config.
+func NewDesignServiceCredentialClient(c config) *DesignServiceCredentialClient {
+	return &DesignServiceCredentialClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designservicecredential.Hooks(f(g(h())))`.
+func (c *DesignServiceCredentialClient) Use(hooks ...Hook) {
+	c.hooks.DesignServiceCredential = append(c.hooks.DesignServiceCredential, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designservicecredential.Intercept(f(g(h())))`.
+func (c *DesignServiceCredentialClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignServiceCredential = append(c.inters.DesignServiceCredential, interceptors...)
+}
+
+// Create returns a builder for creating a DesignServiceCredential entity.
+func (c *DesignServiceCredentialClient) Create() *DesignServiceCredentialCreate {
+	mutation := newDesignServiceCredentialMutation(c.config, OpCreate)
+	return &DesignServiceCredentialCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignServiceCredential entities.
+func (c *DesignServiceCredentialClient) CreateBulk(builders ...*DesignServiceCredentialCreate) *DesignServiceCredentialCreateBulk {
+	return &DesignServiceCredentialCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignServiceCredentialClient) MapCreateBulk(slice any, setFunc func(*DesignServiceCredentialCreate, int)) *DesignServiceCredentialCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignServiceCredentialCreateBulk{err: fmt.Errorf("calling to DesignServiceCredentialClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignServiceCredentialCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignServiceCredentialCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignServiceCredential.
+func (c *DesignServiceCredentialClient) Update() *DesignServiceCredentialUpdate {
+	mutation := newDesignServiceCredentialMutation(c.config, OpUpdate)
+	return &DesignServiceCredentialUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignServiceCredentialClient) UpdateOne(_m *DesignServiceCredential) *DesignServiceCredentialUpdateOne {
+	mutation := newDesignServiceCredentialMutation(c.config, OpUpdateOne, withDesignServiceCredential(_m))
+	return &DesignServiceCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignServiceCredentialClient) UpdateOneID(id int) *DesignServiceCredentialUpdateOne {
+	mutation := newDesignServiceCredentialMutation(c.config, OpUpdateOne, withDesignServiceCredentialID(id))
+	return &DesignServiceCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignServiceCredential.
+func (c *DesignServiceCredentialClient) Delete() *DesignServiceCredentialDelete {
+	mutation := newDesignServiceCredentialMutation(c.config, OpDelete)
+	return &DesignServiceCredentialDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignServiceCredentialClient) DeleteOne(_m *DesignServiceCredential) *DesignServiceCredentialDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignServiceCredentialClient) DeleteOneID(id int) *DesignServiceCredentialDeleteOne {
+	builder := c.Delete().Where(designservicecredential.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignServiceCredentialDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignServiceCredential.
+func (c *DesignServiceCredentialClient) Query() *DesignServiceCredentialQuery {
+	return &DesignServiceCredentialQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignServiceCredential},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignServiceCredential entity by its id.
+func (c *DesignServiceCredentialClient) Get(ctx context.Context, id int) (*DesignServiceCredential, error) {
+	return c.Query().Where(designservicecredential.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignServiceCredentialClient) GetX(ctx context.Context, id int) *DesignServiceCredential {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignServiceCredentialClient) Hooks() []Hook {
+	return c.hooks.DesignServiceCredential
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignServiceCredentialClient) Interceptors() []Interceptor {
+	return c.inters.DesignServiceCredential
+}
+
+func (c *DesignServiceCredentialClient) mutate(ctx context.Context, m *DesignServiceCredentialMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignServiceCredentialCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignServiceCredentialUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignServiceCredentialUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignServiceCredentialDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignServiceCredential mutation op: %q", m.Op())
+	}
+}
+
+// DesignSiteStateClient is a client for the DesignSiteState schema.
+type DesignSiteStateClient struct {
+	config
+}
+
+// NewDesignSiteStateClient returns a client for the DesignSiteState from the given config.
+func NewDesignSiteStateClient(c config) *DesignSiteStateClient {
+	return &DesignSiteStateClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designsitestate.Hooks(f(g(h())))`.
+func (c *DesignSiteStateClient) Use(hooks ...Hook) {
+	c.hooks.DesignSiteState = append(c.hooks.DesignSiteState, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designsitestate.Intercept(f(g(h())))`.
+func (c *DesignSiteStateClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignSiteState = append(c.inters.DesignSiteState, interceptors...)
+}
+
+// Create returns a builder for creating a DesignSiteState entity.
+func (c *DesignSiteStateClient) Create() *DesignSiteStateCreate {
+	mutation := newDesignSiteStateMutation(c.config, OpCreate)
+	return &DesignSiteStateCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignSiteState entities.
+func (c *DesignSiteStateClient) CreateBulk(builders ...*DesignSiteStateCreate) *DesignSiteStateCreateBulk {
+	return &DesignSiteStateCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignSiteStateClient) MapCreateBulk(slice any, setFunc func(*DesignSiteStateCreate, int)) *DesignSiteStateCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignSiteStateCreateBulk{err: fmt.Errorf("calling to DesignSiteStateClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignSiteStateCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignSiteStateCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignSiteState.
+func (c *DesignSiteStateClient) Update() *DesignSiteStateUpdate {
+	mutation := newDesignSiteStateMutation(c.config, OpUpdate)
+	return &DesignSiteStateUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignSiteStateClient) UpdateOne(_m *DesignSiteState) *DesignSiteStateUpdateOne {
+	mutation := newDesignSiteStateMutation(c.config, OpUpdateOne, withDesignSiteState(_m))
+	return &DesignSiteStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignSiteStateClient) UpdateOneID(id int) *DesignSiteStateUpdateOne {
+	mutation := newDesignSiteStateMutation(c.config, OpUpdateOne, withDesignSiteStateID(id))
+	return &DesignSiteStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignSiteState.
+func (c *DesignSiteStateClient) Delete() *DesignSiteStateDelete {
+	mutation := newDesignSiteStateMutation(c.config, OpDelete)
+	return &DesignSiteStateDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignSiteStateClient) DeleteOne(_m *DesignSiteState) *DesignSiteStateDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignSiteStateClient) DeleteOneID(id int) *DesignSiteStateDeleteOne {
+	builder := c.Delete().Where(designsitestate.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignSiteStateDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignSiteState.
+func (c *DesignSiteStateClient) Query() *DesignSiteStateQuery {
+	return &DesignSiteStateQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignSiteState},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignSiteState entity by its id.
+func (c *DesignSiteStateClient) Get(ctx context.Context, id int) (*DesignSiteState, error) {
+	return c.Query().Where(designsitestate.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignSiteStateClient) GetX(ctx context.Context, id int) *DesignSiteState {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignSiteStateClient) Hooks() []Hook {
+	return c.hooks.DesignSiteState
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignSiteStateClient) Interceptors() []Interceptor {
+	return c.inters.DesignSiteState
+}
+
+func (c *DesignSiteStateClient) mutate(ctx context.Context, m *DesignSiteStateMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignSiteStateCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignSiteStateUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignSiteStateUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignSiteStateDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignSiteState mutation op: %q", m.Op())
+	}
+}
+
+// DesignUntrackedChangeClient is a client for the DesignUntrackedChange schema.
+type DesignUntrackedChangeClient struct {
+	config
+}
+
+// NewDesignUntrackedChangeClient returns a client for the DesignUntrackedChange from the given config.
+func NewDesignUntrackedChangeClient(c config) *DesignUntrackedChangeClient {
+	return &DesignUntrackedChangeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designuntrackedchange.Hooks(f(g(h())))`.
+func (c *DesignUntrackedChangeClient) Use(hooks ...Hook) {
+	c.hooks.DesignUntrackedChange = append(c.hooks.DesignUntrackedChange, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designuntrackedchange.Intercept(f(g(h())))`.
+func (c *DesignUntrackedChangeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignUntrackedChange = append(c.inters.DesignUntrackedChange, interceptors...)
+}
+
+// Create returns a builder for creating a DesignUntrackedChange entity.
+func (c *DesignUntrackedChangeClient) Create() *DesignUntrackedChangeCreate {
+	mutation := newDesignUntrackedChangeMutation(c.config, OpCreate)
+	return &DesignUntrackedChangeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignUntrackedChange entities.
+func (c *DesignUntrackedChangeClient) CreateBulk(builders ...*DesignUntrackedChangeCreate) *DesignUntrackedChangeCreateBulk {
+	return &DesignUntrackedChangeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignUntrackedChangeClient) MapCreateBulk(slice any, setFunc func(*DesignUntrackedChangeCreate, int)) *DesignUntrackedChangeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignUntrackedChangeCreateBulk{err: fmt.Errorf("calling to DesignUntrackedChangeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignUntrackedChangeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignUntrackedChangeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignUntrackedChange.
+func (c *DesignUntrackedChangeClient) Update() *DesignUntrackedChangeUpdate {
+	mutation := newDesignUntrackedChangeMutation(c.config, OpUpdate)
+	return &DesignUntrackedChangeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignUntrackedChangeClient) UpdateOne(_m *DesignUntrackedChange) *DesignUntrackedChangeUpdateOne {
+	mutation := newDesignUntrackedChangeMutation(c.config, OpUpdateOne, withDesignUntrackedChange(_m))
+	return &DesignUntrackedChangeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignUntrackedChangeClient) UpdateOneID(id int) *DesignUntrackedChangeUpdateOne {
+	mutation := newDesignUntrackedChangeMutation(c.config, OpUpdateOne, withDesignUntrackedChangeID(id))
+	return &DesignUntrackedChangeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignUntrackedChange.
+func (c *DesignUntrackedChangeClient) Delete() *DesignUntrackedChangeDelete {
+	mutation := newDesignUntrackedChangeMutation(c.config, OpDelete)
+	return &DesignUntrackedChangeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignUntrackedChangeClient) DeleteOne(_m *DesignUntrackedChange) *DesignUntrackedChangeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignUntrackedChangeClient) DeleteOneID(id int) *DesignUntrackedChangeDeleteOne {
+	builder := c.Delete().Where(designuntrackedchange.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignUntrackedChangeDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignUntrackedChange.
+func (c *DesignUntrackedChangeClient) Query() *DesignUntrackedChangeQuery {
+	return &DesignUntrackedChangeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignUntrackedChange},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignUntrackedChange entity by its id.
+func (c *DesignUntrackedChangeClient) Get(ctx context.Context, id int) (*DesignUntrackedChange, error) {
+	return c.Query().Where(designuntrackedchange.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignUntrackedChangeClient) GetX(ctx context.Context, id int) *DesignUntrackedChange {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignUntrackedChangeClient) Hooks() []Hook {
+	return c.hooks.DesignUntrackedChange
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignUntrackedChangeClient) Interceptors() []Interceptor {
+	return c.inters.DesignUntrackedChange
+}
+
+func (c *DesignUntrackedChangeClient) mutate(ctx context.Context, m *DesignUntrackedChangeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignUntrackedChangeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignUntrackedChangeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignUntrackedChangeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignUntrackedChangeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignUntrackedChange mutation op: %q", m.Op())
 	}
 }
 
@@ -7635,8 +8485,10 @@ type (
 	hooks struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
-		ContentSchedule, ContentSchema, MediaUpload, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		ContentSchedule, ContentSchema, DesignRequest, DesignRequestEvent,
+		DesignScreenshot, DesignServiceCredential, DesignSiteState,
+		DesignUntrackedChange, MediaUpload, Member, MemberRefreshToken, MemberTier,
+		Order, OrderItem, OrderNotification, Page, Payment, Permission,
 		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
 		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
 		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
@@ -7646,8 +8498,10 @@ type (
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
-		ContentSchedule, ContentSchema, MediaUpload, Member, MemberRefreshToken,
-		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		ContentSchedule, ContentSchema, DesignRequest, DesignRequestEvent,
+		DesignScreenshot, DesignServiceCredential, DesignSiteState,
+		DesignUntrackedChange, MediaUpload, Member, MemberRefreshToken, MemberTier,
+		Order, OrderItem, OrderNotification, Page, Payment, Permission,
 		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
 		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
 		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,

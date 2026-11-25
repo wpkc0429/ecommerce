@@ -15,6 +15,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
+	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
+	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
+	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -595,6 +601,330 @@ func init() {
 	contentschemaDescCreatedAt := contentschemaFields[7].Descriptor()
 	// contentschema.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentschema.DefaultCreatedAt = contentschemaDescCreatedAt.Default.(func() time.Time)
+	designrequestFields := schema.DesignRequest{}.Fields()
+	_ = designrequestFields
+	// designrequestDescSite is the schema descriptor for site field.
+	designrequestDescSite := designrequestFields[2].Descriptor()
+	// designrequest.SiteValidator is a validator for the "site" field. It is called by the builders before save.
+	designrequest.SiteValidator = designrequestDescSite.Validators[0].(func(string) error)
+	// designrequestDescKind is the schema descriptor for kind field.
+	designrequestDescKind := designrequestFields[3].Descriptor()
+	// designrequest.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	designrequest.KindValidator = designrequestDescKind.Validators[0].(func(string) error)
+	// designrequestDescStatus is the schema descriptor for status field.
+	designrequestDescStatus := designrequestFields[4].Descriptor()
+	// designrequest.DefaultStatus holds the default value on creation for the status field.
+	designrequest.DefaultStatus = designrequestDescStatus.Default.(string)
+	// designrequest.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	designrequest.StatusValidator = designrequestDescStatus.Validators[0].(func(string) error)
+	// designrequestDescPromptSha256 is the schema descriptor for prompt_sha256 field.
+	designrequestDescPromptSha256 := designrequestFields[7].Descriptor()
+	// designrequest.PromptSha256Validator is a validator for the "prompt_sha256" field. It is called by the builders before save.
+	designrequest.PromptSha256Validator = designrequestDescPromptSha256.Validators[0].(func(string) error)
+	// designrequestDescPromptFlags is the schema descriptor for prompt_flags field.
+	designrequestDescPromptFlags := designrequestFields[8].Descriptor()
+	// designrequest.DefaultPromptFlags holds the default value on creation for the prompt_flags field.
+	designrequest.DefaultPromptFlags = designrequestDescPromptFlags.Default.([]string)
+	// designrequestDescBaseSha is the schema descriptor for base_sha field.
+	designrequestDescBaseSha := designrequestFields[9].Descriptor()
+	// designrequest.BaseShaValidator is a validator for the "base_sha" field. It is called by the builders before save.
+	designrequest.BaseShaValidator = designrequestDescBaseSha.Validators[0].(func(string) error)
+	// designrequestDescHeadSha is the schema descriptor for head_sha field.
+	designrequestDescHeadSha := designrequestFields[10].Descriptor()
+	// designrequest.HeadShaValidator is a validator for the "head_sha" field. It is called by the builders before save.
+	designrequest.HeadShaValidator = designrequestDescHeadSha.Validators[0].(func(string) error)
+	// designrequestDescCandidateSha is the schema descriptor for candidate_sha field.
+	designrequestDescCandidateSha := designrequestFields[11].Descriptor()
+	// designrequest.CandidateShaValidator is a validator for the "candidate_sha" field. It is called by the builders before save.
+	designrequest.CandidateShaValidator = designrequestDescCandidateSha.Validators[0].(func(string) error)
+	// designrequestDescPublishedSha is the schema descriptor for published_sha field.
+	designrequestDescPublishedSha := designrequestFields[12].Descriptor()
+	// designrequest.PublishedShaValidator is a validator for the "published_sha" field. It is called by the builders before save.
+	designrequest.PublishedShaValidator = designrequestDescPublishedSha.Validators[0].(func(string) error)
+	// designrequestDescBranch is the schema descriptor for branch field.
+	designrequestDescBranch := designrequestFields[13].Descriptor()
+	// designrequest.BranchValidator is a validator for the "branch" field. It is called by the builders before save.
+	designrequest.BranchValidator = designrequestDescBranch.Validators[0].(func(string) error)
+	// designrequestDescCoreVersion is the schema descriptor for core_version field.
+	designrequestDescCoreVersion := designrequestFields[14].Descriptor()
+	// designrequest.DefaultCoreVersion holds the default value on creation for the core_version field.
+	designrequest.DefaultCoreVersion = designrequestDescCoreVersion.Default.(string)
+	// designrequest.CoreVersionValidator is a validator for the "core_version" field. It is called by the builders before save.
+	designrequest.CoreVersionValidator = designrequestDescCoreVersion.Validators[0].(func(string) error)
+	// designrequestDescDesignFloorVersion is the schema descriptor for design_floor_version field.
+	designrequestDescDesignFloorVersion := designrequestFields[15].Descriptor()
+	// designrequest.DefaultDesignFloorVersion holds the default value on creation for the design_floor_version field.
+	designrequest.DefaultDesignFloorVersion = designrequestDescDesignFloorVersion.Default.(string)
+	// designrequest.DesignFloorVersionValidator is a validator for the "design_floor_version" field. It is called by the builders before save.
+	designrequest.DesignFloorVersionValidator = designrequestDescDesignFloorVersion.Validators[0].(func(string) error)
+	// designrequestDescDiffSummary is the schema descriptor for diff_summary field.
+	designrequestDescDiffSummary := designrequestFields[16].Descriptor()
+	// designrequest.DefaultDiffSummary holds the default value on creation for the diff_summary field.
+	designrequest.DefaultDiffSummary = designrequestDescDiffSummary.Default.(json.RawMessage)
+	// designrequestDescPreviewOrigin is the schema descriptor for preview_origin field.
+	designrequestDescPreviewOrigin := designrequestFields[18].Descriptor()
+	// designrequest.PreviewOriginValidator is a validator for the "preview_origin" field. It is called by the builders before save.
+	designrequest.PreviewOriginValidator = designrequestDescPreviewOrigin.Validators[0].(func(string) error)
+	// designrequestDescApprovedHeadSha is the schema descriptor for approved_head_sha field.
+	designrequestDescApprovedHeadSha := designrequestFields[23].Descriptor()
+	// designrequest.ApprovedHeadShaValidator is a validator for the "approved_head_sha" field. It is called by the builders before save.
+	designrequest.ApprovedHeadShaValidator = designrequestDescApprovedHeadSha.Validators[0].(func(string) error)
+	// designrequestDescPublishTag is the schema descriptor for publish_tag field.
+	designrequestDescPublishTag := designrequestFields[25].Descriptor()
+	// designrequest.PublishTagValidator is a validator for the "publish_tag" field. It is called by the builders before save.
+	designrequest.PublishTagValidator = designrequestDescPublishTag.Validators[0].(func(string) error)
+	// designrequestDescRejectReason is the schema descriptor for reject_reason field.
+	designrequestDescRejectReason := designrequestFields[28].Descriptor()
+	// designrequest.RejectReasonValidator is a validator for the "reject_reason" field. It is called by the builders before save.
+	designrequest.RejectReasonValidator = designrequestDescRejectReason.Validators[0].(func(string) error)
+	// designrequestDescChangeNote is the schema descriptor for change_note field.
+	designrequestDescChangeNote := designrequestFields[29].Descriptor()
+	// designrequest.ChangeNoteValidator is a validator for the "change_note" field. It is called by the builders before save.
+	designrequest.ChangeNoteValidator = designrequestDescChangeNote.Validators[0].(func(string) error)
+	// designrequestDescPublishedTag is the schema descriptor for published_tag field.
+	designrequestDescPublishedTag := designrequestFields[31].Descriptor()
+	// designrequest.PublishedTagValidator is a validator for the "published_tag" field. It is called by the builders before save.
+	designrequest.PublishedTagValidator = designrequestDescPublishedTag.Validators[0].(func(string) error)
+	// designrequestDescDeploymentID is the schema descriptor for deployment_id field.
+	designrequestDescDeploymentID := designrequestFields[32].Descriptor()
+	// designrequest.DeploymentIDValidator is a validator for the "deployment_id" field. It is called by the builders before save.
+	designrequest.DeploymentIDValidator = designrequestDescDeploymentID.Validators[0].(func(string) error)
+	// designrequestDescFailureCode is the schema descriptor for failure_code field.
+	designrequestDescFailureCode := designrequestFields[35].Descriptor()
+	// designrequest.FailureCodeValidator is a validator for the "failure_code" field. It is called by the builders before save.
+	designrequest.FailureCodeValidator = designrequestDescFailureCode.Validators[0].(func(string) error)
+	// designrequestDescFailureDetail is the schema descriptor for failure_detail field.
+	designrequestDescFailureDetail := designrequestFields[36].Descriptor()
+	// designrequest.FailureDetailValidator is a validator for the "failure_detail" field. It is called by the builders before save.
+	designrequest.FailureDetailValidator = designrequestDescFailureDetail.Validators[0].(func(string) error)
+	// designrequestDescRev is the schema descriptor for rev field.
+	designrequestDescRev := designrequestFields[37].Descriptor()
+	// designrequest.DefaultRev holds the default value on creation for the rev field.
+	designrequest.DefaultRev = designrequestDescRev.Default.(int)
+	// designrequestDescIdempotencyKey is the schema descriptor for idempotency_key field.
+	designrequestDescIdempotencyKey := designrequestFields[38].Descriptor()
+	// designrequest.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	designrequest.IdempotencyKeyValidator = designrequestDescIdempotencyKey.Validators[0].(func(string) error)
+	// designrequestDescIdempotencyFingerprint is the schema descriptor for idempotency_fingerprint field.
+	designrequestDescIdempotencyFingerprint := designrequestFields[39].Descriptor()
+	// designrequest.IdempotencyFingerprintValidator is a validator for the "idempotency_fingerprint" field. It is called by the builders before save.
+	designrequest.IdempotencyFingerprintValidator = designrequestDescIdempotencyFingerprint.Validators[0].(func(string) error)
+	// designrequestDescCreatedAt is the schema descriptor for created_at field.
+	designrequestDescCreatedAt := designrequestFields[43].Descriptor()
+	// designrequest.DefaultCreatedAt holds the default value on creation for the created_at field.
+	designrequest.DefaultCreatedAt = designrequestDescCreatedAt.Default.(func() time.Time)
+	// designrequestDescUpdatedAt is the schema descriptor for updated_at field.
+	designrequestDescUpdatedAt := designrequestFields[44].Descriptor()
+	// designrequest.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	designrequest.DefaultUpdatedAt = designrequestDescUpdatedAt.Default.(func() time.Time)
+	// designrequest.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	designrequest.UpdateDefaultUpdatedAt = designrequestDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// designrequestDescID is the schema descriptor for id field.
+	designrequestDescID := designrequestFields[0].Descriptor()
+	// designrequest.DefaultID holds the default value on creation for the id field.
+	designrequest.DefaultID = designrequestDescID.Default.(func() uuid.UUID)
+	designrequesteventFields := schema.DesignRequestEvent{}.Fields()
+	_ = designrequesteventFields
+	// designrequesteventDescKind is the schema descriptor for kind field.
+	designrequesteventDescKind := designrequesteventFields[3].Descriptor()
+	// designrequestevent.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	designrequestevent.KindValidator = designrequesteventDescKind.Validators[0].(func(string) error)
+	// designrequesteventDescFromStatus is the schema descriptor for from_status field.
+	designrequesteventDescFromStatus := designrequesteventFields[4].Descriptor()
+	// designrequestevent.DefaultFromStatus holds the default value on creation for the from_status field.
+	designrequestevent.DefaultFromStatus = designrequesteventDescFromStatus.Default.(string)
+	// designrequestevent.FromStatusValidator is a validator for the "from_status" field. It is called by the builders before save.
+	designrequestevent.FromStatusValidator = designrequesteventDescFromStatus.Validators[0].(func(string) error)
+	// designrequesteventDescToStatus is the schema descriptor for to_status field.
+	designrequesteventDescToStatus := designrequesteventFields[5].Descriptor()
+	// designrequestevent.DefaultToStatus holds the default value on creation for the to_status field.
+	designrequestevent.DefaultToStatus = designrequesteventDescToStatus.Default.(string)
+	// designrequestevent.ToStatusValidator is a validator for the "to_status" field. It is called by the builders before save.
+	designrequestevent.ToStatusValidator = designrequesteventDescToStatus.Validators[0].(func(string) error)
+	// designrequesteventDescActorType is the schema descriptor for actor_type field.
+	designrequesteventDescActorType := designrequesteventFields[6].Descriptor()
+	// designrequestevent.ActorTypeValidator is a validator for the "actor_type" field. It is called by the builders before save.
+	designrequestevent.ActorTypeValidator = designrequesteventDescActorType.Validators[0].(func(string) error)
+	// designrequesteventDescHeadSha is the schema descriptor for head_sha field.
+	designrequesteventDescHeadSha := designrequesteventFields[9].Descriptor()
+	// designrequestevent.DefaultHeadSha holds the default value on creation for the head_sha field.
+	designrequestevent.DefaultHeadSha = designrequesteventDescHeadSha.Default.(string)
+	// designrequestevent.HeadShaValidator is a validator for the "head_sha" field. It is called by the builders before save.
+	designrequestevent.HeadShaValidator = designrequesteventDescHeadSha.Validators[0].(func(string) error)
+	// designrequesteventDescDetail is the schema descriptor for detail field.
+	designrequesteventDescDetail := designrequesteventFields[10].Descriptor()
+	// designrequestevent.DefaultDetail holds the default value on creation for the detail field.
+	designrequestevent.DefaultDetail = designrequesteventDescDetail.Default.(json.RawMessage)
+	// designrequesteventDescPrevHash is the schema descriptor for prev_hash field.
+	designrequesteventDescPrevHash := designrequesteventFields[11].Descriptor()
+	// designrequestevent.PrevHashValidator is a validator for the "prev_hash" field. It is called by the builders before save.
+	designrequestevent.PrevHashValidator = designrequesteventDescPrevHash.Validators[0].(func(string) error)
+	// designrequesteventDescHash is the schema descriptor for hash field.
+	designrequesteventDescHash := designrequesteventFields[12].Descriptor()
+	// designrequestevent.HashValidator is a validator for the "hash" field. It is called by the builders before save.
+	designrequestevent.HashValidator = designrequesteventDescHash.Validators[0].(func(string) error)
+	// designrequesteventDescCreatedAt is the schema descriptor for created_at field.
+	designrequesteventDescCreatedAt := designrequesteventFields[13].Descriptor()
+	// designrequestevent.DefaultCreatedAt holds the default value on creation for the created_at field.
+	designrequestevent.DefaultCreatedAt = designrequesteventDescCreatedAt.Default.(func() time.Time)
+	designscreenshotFields := schema.DesignScreenshot{}.Fields()
+	_ = designscreenshotFields
+	// designscreenshotDescPhase is the schema descriptor for phase field.
+	designscreenshotDescPhase := designscreenshotFields[3].Descriptor()
+	// designscreenshot.PhaseValidator is a validator for the "phase" field. It is called by the builders before save.
+	designscreenshot.PhaseValidator = designscreenshotDescPhase.Validators[0].(func(string) error)
+	// designscreenshotDescSite is the schema descriptor for site field.
+	designscreenshotDescSite := designscreenshotFields[4].Descriptor()
+	// designscreenshot.SiteValidator is a validator for the "site" field. It is called by the builders before save.
+	designscreenshot.SiteValidator = designscreenshotDescSite.Validators[0].(func(string) error)
+	// designscreenshotDescViewKey is the schema descriptor for view_key field.
+	designscreenshotDescViewKey := designscreenshotFields[5].Descriptor()
+	// designscreenshot.ViewKeyValidator is a validator for the "view_key" field. It is called by the builders before save.
+	designscreenshot.ViewKeyValidator = designscreenshotDescViewKey.Validators[0].(func(string) error)
+	// designscreenshotDescRole is the schema descriptor for role field.
+	designscreenshotDescRole := designscreenshotFields[7].Descriptor()
+	// designscreenshot.RoleValidator is a validator for the "role" field. It is called by the builders before save.
+	designscreenshot.RoleValidator = designscreenshotDescRole.Validators[0].(func(string) error)
+	// designscreenshotDescAttempt is the schema descriptor for attempt field.
+	designscreenshotDescAttempt := designscreenshotFields[8].Descriptor()
+	// designscreenshot.DefaultAttempt holds the default value on creation for the attempt field.
+	designscreenshot.DefaultAttempt = designscreenshotDescAttempt.Default.(int16)
+	// designscreenshotDescCommitSha is the schema descriptor for commit_sha field.
+	designscreenshotDescCommitSha := designscreenshotFields[9].Descriptor()
+	// designscreenshot.CommitShaValidator is a validator for the "commit_sha" field. It is called by the builders before save.
+	designscreenshot.CommitShaValidator = designscreenshotDescCommitSha.Validators[0].(func(string) error)
+	// designscreenshotDescObjectKey is the schema descriptor for object_key field.
+	designscreenshotDescObjectKey := designscreenshotFields[10].Descriptor()
+	// designscreenshot.ObjectKeyValidator is a validator for the "object_key" field. It is called by the builders before save.
+	designscreenshot.ObjectKeyValidator = designscreenshotDescObjectKey.Validators[0].(func(string) error)
+	// designscreenshotDescContentType is the schema descriptor for content_type field.
+	designscreenshotDescContentType := designscreenshotFields[11].Descriptor()
+	// designscreenshot.DefaultContentType holds the default value on creation for the content_type field.
+	designscreenshot.DefaultContentType = designscreenshotDescContentType.Default.(string)
+	// designscreenshot.ContentTypeValidator is a validator for the "content_type" field. It is called by the builders before save.
+	designscreenshot.ContentTypeValidator = designscreenshotDescContentType.Validators[0].(func(string) error)
+	// designscreenshotDescSha256 is the schema descriptor for sha256 field.
+	designscreenshotDescSha256 := designscreenshotFields[15].Descriptor()
+	// designscreenshot.Sha256Validator is a validator for the "sha256" field. It is called by the builders before save.
+	designscreenshot.Sha256Validator = designscreenshotDescSha256.Validators[0].(func(string) error)
+	// designscreenshotDescCaptureManifest is the schema descriptor for capture_manifest field.
+	designscreenshotDescCaptureManifest := designscreenshotFields[17].Descriptor()
+	// designscreenshot.DefaultCaptureManifest holds the default value on creation for the capture_manifest field.
+	designscreenshot.DefaultCaptureManifest = designscreenshotDescCaptureManifest.Default.(json.RawMessage)
+	// designscreenshotDescCreatedAt is the schema descriptor for created_at field.
+	designscreenshotDescCreatedAt := designscreenshotFields[19].Descriptor()
+	// designscreenshot.DefaultCreatedAt holds the default value on creation for the created_at field.
+	designscreenshot.DefaultCreatedAt = designscreenshotDescCreatedAt.Default.(func() time.Time)
+	// designscreenshotDescID is the schema descriptor for id field.
+	designscreenshotDescID := designscreenshotFields[0].Descriptor()
+	// designscreenshot.DefaultID holds the default value on creation for the id field.
+	designscreenshot.DefaultID = designscreenshotDescID.Default.(func() uuid.UUID)
+	designservicecredentialFields := schema.DesignServiceCredential{}.Fields()
+	_ = designservicecredentialFields
+	// designservicecredentialDescName is the schema descriptor for name field.
+	designservicecredentialDescName := designservicecredentialFields[1].Descriptor()
+	// designservicecredential.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	designservicecredential.NameValidator = func() func(string) error {
+		validators := designservicecredentialDescName.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(name string) error {
+			for _, fn := range fns {
+				if err := fn(name); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// designservicecredentialDescKeyPrefix is the schema descriptor for key_prefix field.
+	designservicecredentialDescKeyPrefix := designservicecredentialFields[2].Descriptor()
+	// designservicecredential.KeyPrefixValidator is a validator for the "key_prefix" field. It is called by the builders before save.
+	designservicecredential.KeyPrefixValidator = designservicecredentialDescKeyPrefix.Validators[0].(func(string) error)
+	// designservicecredentialDescKeyHash is the schema descriptor for key_hash field.
+	designservicecredentialDescKeyHash := designservicecredentialFields[3].Descriptor()
+	// designservicecredential.KeyHashValidator is a validator for the "key_hash" field. It is called by the builders before save.
+	designservicecredential.KeyHashValidator = designservicecredentialDescKeyHash.Validators[0].(func(string) error)
+	// designservicecredentialDescCreatedAt is the schema descriptor for created_at field.
+	designservicecredentialDescCreatedAt := designservicecredentialFields[6].Descriptor()
+	// designservicecredential.DefaultCreatedAt holds the default value on creation for the created_at field.
+	designservicecredential.DefaultCreatedAt = designservicecredentialDescCreatedAt.Default.(func() time.Time)
+	designsitestateFields := schema.DesignSiteState{}.Fields()
+	_ = designsitestateFields
+	// designsitestateDescSite is the schema descriptor for site field.
+	designsitestateDescSite := designsitestateFields[1].Descriptor()
+	// designsitestate.SiteValidator is a validator for the "site" field. It is called by the builders before save.
+	designsitestate.SiteValidator = designsitestateDescSite.Validators[0].(func(string) error)
+	// designsitestateDescCurrentTag is the schema descriptor for current_tag field.
+	designsitestateDescCurrentTag := designsitestateFields[3].Descriptor()
+	// designsitestate.DefaultCurrentTag holds the default value on creation for the current_tag field.
+	designsitestate.DefaultCurrentTag = designsitestateDescCurrentTag.Default.(string)
+	// designsitestate.CurrentTagValidator is a validator for the "current_tag" field. It is called by the builders before save.
+	designsitestate.CurrentTagValidator = designsitestateDescCurrentTag.Validators[0].(func(string) error)
+	// designsitestateDescCurrentSha is the schema descriptor for current_sha field.
+	designsitestateDescCurrentSha := designsitestateFields[4].Descriptor()
+	// designsitestate.DefaultCurrentSha holds the default value on creation for the current_sha field.
+	designsitestate.DefaultCurrentSha = designsitestateDescCurrentSha.Default.(string)
+	// designsitestate.CurrentShaValidator is a validator for the "current_sha" field. It is called by the builders before save.
+	designsitestate.CurrentShaValidator = designsitestateDescCurrentSha.Validators[0].(func(string) error)
+	// designsitestateDescCoreVersion is the schema descriptor for core_version field.
+	designsitestateDescCoreVersion := designsitestateFields[5].Descriptor()
+	// designsitestate.DefaultCoreVersion holds the default value on creation for the core_version field.
+	designsitestate.DefaultCoreVersion = designsitestateDescCoreVersion.Default.(string)
+	// designsitestate.CoreVersionValidator is a validator for the "core_version" field. It is called by the builders before save.
+	designsitestate.CoreVersionValidator = designsitestateDescCoreVersion.Validators[0].(func(string) error)
+	// designsitestateDescDesignFloorVersion is the schema descriptor for design_floor_version field.
+	designsitestateDescDesignFloorVersion := designsitestateFields[6].Descriptor()
+	// designsitestate.DefaultDesignFloorVersion holds the default value on creation for the design_floor_version field.
+	designsitestate.DefaultDesignFloorVersion = designsitestateDescDesignFloorVersion.Default.(string)
+	// designsitestate.DesignFloorVersionValidator is a validator for the "design_floor_version" field. It is called by the builders before save.
+	designsitestate.DesignFloorVersionValidator = designsitestateDescDesignFloorVersion.Validators[0].(func(string) error)
+	// designsitestateDescLastSeenMainSha is the schema descriptor for last_seen_main_sha field.
+	designsitestateDescLastSeenMainSha := designsitestateFields[7].Descriptor()
+	// designsitestate.DefaultLastSeenMainSha holds the default value on creation for the last_seen_main_sha field.
+	designsitestate.DefaultLastSeenMainSha = designsitestateDescLastSeenMainSha.Default.(string)
+	// designsitestate.LastSeenMainShaValidator is a validator for the "last_seen_main_sha" field. It is called by the builders before save.
+	designsitestate.LastSeenMainShaValidator = designsitestateDescLastSeenMainSha.Validators[0].(func(string) error)
+	// designsitestateDescUpdatedAt is the schema descriptor for updated_at field.
+	designsitestateDescUpdatedAt := designsitestateFields[8].Descriptor()
+	// designsitestate.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	designsitestate.DefaultUpdatedAt = designsitestateDescUpdatedAt.Default.(func() time.Time)
+	// designsitestate.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	designsitestate.UpdateDefaultUpdatedAt = designsitestateDescUpdatedAt.UpdateDefault.(func() time.Time)
+	designuntrackedchangeFields := schema.DesignUntrackedChange{}.Fields()
+	_ = designuntrackedchangeFields
+	// designuntrackedchangeDescSite is the schema descriptor for site field.
+	designuntrackedchangeDescSite := designuntrackedchangeFields[1].Descriptor()
+	// designuntrackedchange.SiteValidator is a validator for the "site" field. It is called by the builders before save.
+	designuntrackedchange.SiteValidator = designuntrackedchangeDescSite.Validators[0].(func(string) error)
+	// designuntrackedchangeDescCommitSha is the schema descriptor for commit_sha field.
+	designuntrackedchangeDescCommitSha := designuntrackedchangeFields[2].Descriptor()
+	// designuntrackedchange.CommitShaValidator is a validator for the "commit_sha" field. It is called by the builders before save.
+	designuntrackedchange.CommitShaValidator = designuntrackedchangeDescCommitSha.Validators[0].(func(string) error)
+	// designuntrackedchangeDescSubject is the schema descriptor for subject field.
+	designuntrackedchangeDescSubject := designuntrackedchangeFields[4].Descriptor()
+	// designuntrackedchange.DefaultSubject holds the default value on creation for the subject field.
+	designuntrackedchange.DefaultSubject = designuntrackedchangeDescSubject.Default.(string)
+	// designuntrackedchange.SubjectValidator is a validator for the "subject" field. It is called by the builders before save.
+	designuntrackedchange.SubjectValidator = designuntrackedchangeDescSubject.Validators[0].(func(string) error)
+	// designuntrackedchangeDescFilesChanged is the schema descriptor for files_changed field.
+	designuntrackedchangeDescFilesChanged := designuntrackedchangeFields[5].Descriptor()
+	// designuntrackedchange.DefaultFilesChanged holds the default value on creation for the files_changed field.
+	designuntrackedchange.DefaultFilesChanged = designuntrackedchangeDescFilesChanged.Default.(int)
+	// designuntrackedchangeDescAdditions is the schema descriptor for additions field.
+	designuntrackedchangeDescAdditions := designuntrackedchangeFields[6].Descriptor()
+	// designuntrackedchange.DefaultAdditions holds the default value on creation for the additions field.
+	designuntrackedchange.DefaultAdditions = designuntrackedchangeDescAdditions.Default.(int)
+	// designuntrackedchangeDescDeletions is the schema descriptor for deletions field.
+	designuntrackedchangeDescDeletions := designuntrackedchangeFields[7].Descriptor()
+	// designuntrackedchange.DefaultDeletions holds the default value on creation for the deletions field.
+	designuntrackedchange.DefaultDeletions = designuntrackedchangeDescDeletions.Default.(int)
+	// designuntrackedchangeDescDetectedAt is the schema descriptor for detected_at field.
+	designuntrackedchangeDescDetectedAt := designuntrackedchangeFields[8].Descriptor()
+	// designuntrackedchange.DefaultDetectedAt holds the default value on creation for the detected_at field.
+	designuntrackedchange.DefaultDetectedAt = designuntrackedchangeDescDetectedAt.Default.(func() time.Time)
 	mediauploadFields := schema.MediaUpload{}.Fields()
 	_ = mediauploadFields
 	// mediauploadDescObjectKey is the schema descriptor for object_key field.

@@ -17,6 +17,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
+	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
+	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
+	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -127,6 +133,12 @@ func checkColumn(t, c string) error {
 			contentrevision.Table:               contentrevision.ValidColumn,
 			contentschedule.Table:               contentschedule.ValidColumn,
 			contentschema.Table:                 contentschema.ValidColumn,
+			designrequest.Table:                 designrequest.ValidColumn,
+			designrequestevent.Table:            designrequestevent.ValidColumn,
+			designscreenshot.Table:              designscreenshot.ValidColumn,
+			designservicecredential.Table:       designservicecredential.ValidColumn,
+			designsitestate.Table:               designsitestate.ValidColumn,
+			designuntrackedchange.Table:         designuntrackedchange.ValidColumn,
 			mediaupload.Table:                   mediaupload.ValidColumn,
 			member.Table:                        member.ValidColumn,
 			memberrefreshtoken.Table:            memberrefreshtoken.ValidColumn,

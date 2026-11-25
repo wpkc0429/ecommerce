@@ -39,6 +39,24 @@ type ContentSchedule func(*sql.Selector)
 // ContentSchema is the predicate function for contentschema builders.
 type ContentSchema func(*sql.Selector)
 
+// DesignRequest is the predicate function for designrequest builders.
+type DesignRequest func(*sql.Selector)
+
+// DesignRequestEvent is the predicate function for designrequestevent builders.
+type DesignRequestEvent func(*sql.Selector)
+
+// DesignScreenshot is the predicate function for designscreenshot builders.
+type DesignScreenshot func(*sql.Selector)
+
+// DesignServiceCredential is the predicate function for designservicecredential builders.
+type DesignServiceCredential func(*sql.Selector)
+
+// DesignSiteState is the predicate function for designsitestate builders.
+type DesignSiteState func(*sql.Selector)
+
+// DesignUntrackedChange is the predicate function for designuntrackedchange builders.
+type DesignUntrackedChange func(*sql.Selector)
+
 // MediaUpload is the predicate function for mediaupload builders.
 type MediaUpload func(*sql.Selector)
 

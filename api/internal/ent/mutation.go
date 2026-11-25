@@ -18,6 +18,12 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
+	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
+	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
+	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -80,6 +86,12 @@ const (
 	TypeContentRevision               = "ContentRevision"
 	TypeContentSchedule               = "ContentSchedule"
 	TypeContentSchema                 = "ContentSchema"
+	TypeDesignRequest                 = "DesignRequest"
+	TypeDesignRequestEvent            = "DesignRequestEvent"
+	TypeDesignScreenshot              = "DesignScreenshot"
+	TypeDesignServiceCredential       = "DesignServiceCredential"
+	TypeDesignSiteState               = "DesignSiteState"
+	TypeDesignUntrackedChange         = "DesignUntrackedChange"
 	TypeMediaUpload                   = "MediaUpload"
 	TypeMember                        = "Member"
 	TypeMemberRefreshToken            = "MemberRefreshToken"
@@ -12329,6 +12341,9116 @@ func (m *ContentSchemaMutation) ResetEdge(name string) error {
 		return nil
 	}
 	return fmt.Errorf("unknown ContentSchema edge %s", name)
+}
+
+// DesignRequestMutation represents an operation that mutates the DesignRequest nodes in the graph.
+type DesignRequestMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *uuid.UUID
+	shop_id                     *int
+	addshop_id                  *int
+	site                        *string
+	kind                        *string
+	status                      *string
+	requested_by_user_id        *int
+	addrequested_by_user_id     *int
+	prompt_text                 *string
+	prompt_sha256               *string
+	prompt_flags                *[]string
+	appendprompt_flags          []string
+	base_sha                    *string
+	head_sha                    *string
+	candidate_sha               *string
+	published_sha               *string
+	branch                      *string
+	core_version                *string
+	design_floor_version        *string
+	diff_summary                *json.RawMessage
+	appenddiff_summary          json.RawMessage
+	guard                       *json.RawMessage
+	appendguard                 json.RawMessage
+	preview_origin              *string
+	preview_registered_at       *time.Time
+	preview_expires_at          *time.Time
+	approved_by_user_id         *int
+	addapproved_by_user_id      *int
+	approved_at                 *time.Time
+	approved_head_sha           *string
+	approval_expires_at         *time.Time
+	publish_tag                 *string
+	rejected_by_user_id         *int
+	addrejected_by_user_id      *int
+	rejected_at                 *time.Time
+	reject_reason               *string
+	change_note                 *string
+	published_at                *time.Time
+	published_tag               *string
+	deployment_id               *string
+	restores_request_id         *uuid.UUID
+	reverted_by_request_id      *uuid.UUID
+	failure_code                *string
+	failure_detail              *string
+	rev                         *int
+	addrev                      *int
+	idempotency_key             *string
+	idempotency_fingerprint     *string
+	claimed_by_credential_id    *int
+	addclaimed_by_credential_id *int
+	claimed_at                  *time.Time
+	claim_expires_at            *time.Time
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*DesignRequest, error)
+	predicates                  []predicate.DesignRequest
+}
+
+var _ ent.Mutation = (*DesignRequestMutation)(nil)
+
+// designrequestOption allows management of the mutation configuration using functional options.
+type designrequestOption func(*DesignRequestMutation)
+
+// newDesignRequestMutation creates new mutation for the DesignRequest entity.
+func newDesignRequestMutation(c config, op Op, opts ...designrequestOption) *DesignRequestMutation {
+	m := &DesignRequestMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignRequest,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignRequestID sets the ID field of the mutation.
+func withDesignRequestID(id uuid.UUID) designrequestOption {
+	return func(m *DesignRequestMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignRequest
+		)
+		m.oldValue = func(ctx context.Context) (*DesignRequest, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignRequest.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignRequest sets the old DesignRequest of the mutation.
+func withDesignRequest(node *DesignRequest) designrequestOption {
+	return func(m *DesignRequestMutation) {
+		m.oldValue = func(context.Context) (*DesignRequest, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignRequestMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignRequestMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DesignRequest entities.
+func (m *DesignRequestMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignRequestMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignRequestMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignRequest.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignRequestMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignRequestMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignRequestMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignRequestMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignRequestMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetSite sets the "site" field.
+func (m *DesignRequestMutation) SetSite(s string) {
+	m.site = &s
+}
+
+// Site returns the value of the "site" field in the mutation.
+func (m *DesignRequestMutation) Site() (r string, exists bool) {
+	v := m.site
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSite returns the old "site" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldSite(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSite: %w", err)
+	}
+	return oldValue.Site, nil
+}
+
+// ResetSite resets all changes to the "site" field.
+func (m *DesignRequestMutation) ResetSite() {
+	m.site = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *DesignRequestMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *DesignRequestMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *DesignRequestMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *DesignRequestMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *DesignRequestMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *DesignRequestMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetRequestedByUserID sets the "requested_by_user_id" field.
+func (m *DesignRequestMutation) SetRequestedByUserID(i int) {
+	m.requested_by_user_id = &i
+	m.addrequested_by_user_id = nil
+}
+
+// RequestedByUserID returns the value of the "requested_by_user_id" field in the mutation.
+func (m *DesignRequestMutation) RequestedByUserID() (r int, exists bool) {
+	v := m.requested_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedByUserID returns the old "requested_by_user_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRequestedByUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedByUserID: %w", err)
+	}
+	return oldValue.RequestedByUserID, nil
+}
+
+// AddRequestedByUserID adds i to the "requested_by_user_id" field.
+func (m *DesignRequestMutation) AddRequestedByUserID(i int) {
+	if m.addrequested_by_user_id != nil {
+		*m.addrequested_by_user_id += i
+	} else {
+		m.addrequested_by_user_id = &i
+	}
+}
+
+// AddedRequestedByUserID returns the value that was added to the "requested_by_user_id" field in this mutation.
+func (m *DesignRequestMutation) AddedRequestedByUserID() (r int, exists bool) {
+	v := m.addrequested_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRequestedByUserID resets all changes to the "requested_by_user_id" field.
+func (m *DesignRequestMutation) ResetRequestedByUserID() {
+	m.requested_by_user_id = nil
+	m.addrequested_by_user_id = nil
+}
+
+// SetPromptText sets the "prompt_text" field.
+func (m *DesignRequestMutation) SetPromptText(s string) {
+	m.prompt_text = &s
+}
+
+// PromptText returns the value of the "prompt_text" field in the mutation.
+func (m *DesignRequestMutation) PromptText() (r string, exists bool) {
+	v := m.prompt_text
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPromptText returns the old "prompt_text" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPromptText(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPromptText is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPromptText requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPromptText: %w", err)
+	}
+	return oldValue.PromptText, nil
+}
+
+// ClearPromptText clears the value of the "prompt_text" field.
+func (m *DesignRequestMutation) ClearPromptText() {
+	m.prompt_text = nil
+	m.clearedFields[designrequest.FieldPromptText] = struct{}{}
+}
+
+// PromptTextCleared returns if the "prompt_text" field was cleared in this mutation.
+func (m *DesignRequestMutation) PromptTextCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPromptText]
+	return ok
+}
+
+// ResetPromptText resets all changes to the "prompt_text" field.
+func (m *DesignRequestMutation) ResetPromptText() {
+	m.prompt_text = nil
+	delete(m.clearedFields, designrequest.FieldPromptText)
+}
+
+// SetPromptSha256 sets the "prompt_sha256" field.
+func (m *DesignRequestMutation) SetPromptSha256(s string) {
+	m.prompt_sha256 = &s
+}
+
+// PromptSha256 returns the value of the "prompt_sha256" field in the mutation.
+func (m *DesignRequestMutation) PromptSha256() (r string, exists bool) {
+	v := m.prompt_sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPromptSha256 returns the old "prompt_sha256" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPromptSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPromptSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPromptSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPromptSha256: %w", err)
+	}
+	return oldValue.PromptSha256, nil
+}
+
+// ResetPromptSha256 resets all changes to the "prompt_sha256" field.
+func (m *DesignRequestMutation) ResetPromptSha256() {
+	m.prompt_sha256 = nil
+}
+
+// SetPromptFlags sets the "prompt_flags" field.
+func (m *DesignRequestMutation) SetPromptFlags(s []string) {
+	m.prompt_flags = &s
+	m.appendprompt_flags = nil
+}
+
+// PromptFlags returns the value of the "prompt_flags" field in the mutation.
+func (m *DesignRequestMutation) PromptFlags() (r []string, exists bool) {
+	v := m.prompt_flags
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPromptFlags returns the old "prompt_flags" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPromptFlags(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPromptFlags is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPromptFlags requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPromptFlags: %w", err)
+	}
+	return oldValue.PromptFlags, nil
+}
+
+// AppendPromptFlags adds s to the "prompt_flags" field.
+func (m *DesignRequestMutation) AppendPromptFlags(s []string) {
+	m.appendprompt_flags = append(m.appendprompt_flags, s...)
+}
+
+// AppendedPromptFlags returns the list of values that were appended to the "prompt_flags" field in this mutation.
+func (m *DesignRequestMutation) AppendedPromptFlags() ([]string, bool) {
+	if len(m.appendprompt_flags) == 0 {
+		return nil, false
+	}
+	return m.appendprompt_flags, true
+}
+
+// ResetPromptFlags resets all changes to the "prompt_flags" field.
+func (m *DesignRequestMutation) ResetPromptFlags() {
+	m.prompt_flags = nil
+	m.appendprompt_flags = nil
+}
+
+// SetBaseSha sets the "base_sha" field.
+func (m *DesignRequestMutation) SetBaseSha(s string) {
+	m.base_sha = &s
+}
+
+// BaseSha returns the value of the "base_sha" field in the mutation.
+func (m *DesignRequestMutation) BaseSha() (r string, exists bool) {
+	v := m.base_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBaseSha returns the old "base_sha" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldBaseSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBaseSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBaseSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBaseSha: %w", err)
+	}
+	return oldValue.BaseSha, nil
+}
+
+// ResetBaseSha resets all changes to the "base_sha" field.
+func (m *DesignRequestMutation) ResetBaseSha() {
+	m.base_sha = nil
+}
+
+// SetHeadSha sets the "head_sha" field.
+func (m *DesignRequestMutation) SetHeadSha(s string) {
+	m.head_sha = &s
+}
+
+// HeadSha returns the value of the "head_sha" field in the mutation.
+func (m *DesignRequestMutation) HeadSha() (r string, exists bool) {
+	v := m.head_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHeadSha returns the old "head_sha" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldHeadSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHeadSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHeadSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHeadSha: %w", err)
+	}
+	return oldValue.HeadSha, nil
+}
+
+// ResetHeadSha resets all changes to the "head_sha" field.
+func (m *DesignRequestMutation) ResetHeadSha() {
+	m.head_sha = nil
+}
+
+// SetCandidateSha sets the "candidate_sha" field.
+func (m *DesignRequestMutation) SetCandidateSha(s string) {
+	m.candidate_sha = &s
+}
+
+// CandidateSha returns the value of the "candidate_sha" field in the mutation.
+func (m *DesignRequestMutation) CandidateSha() (r string, exists bool) {
+	v := m.candidate_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCandidateSha returns the old "candidate_sha" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldCandidateSha(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCandidateSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCandidateSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCandidateSha: %w", err)
+	}
+	return oldValue.CandidateSha, nil
+}
+
+// ClearCandidateSha clears the value of the "candidate_sha" field.
+func (m *DesignRequestMutation) ClearCandidateSha() {
+	m.candidate_sha = nil
+	m.clearedFields[designrequest.FieldCandidateSha] = struct{}{}
+}
+
+// CandidateShaCleared returns if the "candidate_sha" field was cleared in this mutation.
+func (m *DesignRequestMutation) CandidateShaCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldCandidateSha]
+	return ok
+}
+
+// ResetCandidateSha resets all changes to the "candidate_sha" field.
+func (m *DesignRequestMutation) ResetCandidateSha() {
+	m.candidate_sha = nil
+	delete(m.clearedFields, designrequest.FieldCandidateSha)
+}
+
+// SetPublishedSha sets the "published_sha" field.
+func (m *DesignRequestMutation) SetPublishedSha(s string) {
+	m.published_sha = &s
+}
+
+// PublishedSha returns the value of the "published_sha" field in the mutation.
+func (m *DesignRequestMutation) PublishedSha() (r string, exists bool) {
+	v := m.published_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishedSha returns the old "published_sha" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPublishedSha(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishedSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishedSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishedSha: %w", err)
+	}
+	return oldValue.PublishedSha, nil
+}
+
+// ClearPublishedSha clears the value of the "published_sha" field.
+func (m *DesignRequestMutation) ClearPublishedSha() {
+	m.published_sha = nil
+	m.clearedFields[designrequest.FieldPublishedSha] = struct{}{}
+}
+
+// PublishedShaCleared returns if the "published_sha" field was cleared in this mutation.
+func (m *DesignRequestMutation) PublishedShaCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPublishedSha]
+	return ok
+}
+
+// ResetPublishedSha resets all changes to the "published_sha" field.
+func (m *DesignRequestMutation) ResetPublishedSha() {
+	m.published_sha = nil
+	delete(m.clearedFields, designrequest.FieldPublishedSha)
+}
+
+// SetBranch sets the "branch" field.
+func (m *DesignRequestMutation) SetBranch(s string) {
+	m.branch = &s
+}
+
+// Branch returns the value of the "branch" field in the mutation.
+func (m *DesignRequestMutation) Branch() (r string, exists bool) {
+	v := m.branch
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBranch returns the old "branch" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldBranch(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBranch is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBranch requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBranch: %w", err)
+	}
+	return oldValue.Branch, nil
+}
+
+// ResetBranch resets all changes to the "branch" field.
+func (m *DesignRequestMutation) ResetBranch() {
+	m.branch = nil
+}
+
+// SetCoreVersion sets the "core_version" field.
+func (m *DesignRequestMutation) SetCoreVersion(s string) {
+	m.core_version = &s
+}
+
+// CoreVersion returns the value of the "core_version" field in the mutation.
+func (m *DesignRequestMutation) CoreVersion() (r string, exists bool) {
+	v := m.core_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoreVersion returns the old "core_version" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldCoreVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoreVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoreVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoreVersion: %w", err)
+	}
+	return oldValue.CoreVersion, nil
+}
+
+// ResetCoreVersion resets all changes to the "core_version" field.
+func (m *DesignRequestMutation) ResetCoreVersion() {
+	m.core_version = nil
+}
+
+// SetDesignFloorVersion sets the "design_floor_version" field.
+func (m *DesignRequestMutation) SetDesignFloorVersion(s string) {
+	m.design_floor_version = &s
+}
+
+// DesignFloorVersion returns the value of the "design_floor_version" field in the mutation.
+func (m *DesignRequestMutation) DesignFloorVersion() (r string, exists bool) {
+	v := m.design_floor_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDesignFloorVersion returns the old "design_floor_version" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldDesignFloorVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDesignFloorVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDesignFloorVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDesignFloorVersion: %w", err)
+	}
+	return oldValue.DesignFloorVersion, nil
+}
+
+// ResetDesignFloorVersion resets all changes to the "design_floor_version" field.
+func (m *DesignRequestMutation) ResetDesignFloorVersion() {
+	m.design_floor_version = nil
+}
+
+// SetDiffSummary sets the "diff_summary" field.
+func (m *DesignRequestMutation) SetDiffSummary(jm json.RawMessage) {
+	m.diff_summary = &jm
+	m.appenddiff_summary = nil
+}
+
+// DiffSummary returns the value of the "diff_summary" field in the mutation.
+func (m *DesignRequestMutation) DiffSummary() (r json.RawMessage, exists bool) {
+	v := m.diff_summary
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiffSummary returns the old "diff_summary" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldDiffSummary(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiffSummary is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiffSummary requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiffSummary: %w", err)
+	}
+	return oldValue.DiffSummary, nil
+}
+
+// AppendDiffSummary adds jm to the "diff_summary" field.
+func (m *DesignRequestMutation) AppendDiffSummary(jm json.RawMessage) {
+	m.appenddiff_summary = append(m.appenddiff_summary, jm...)
+}
+
+// AppendedDiffSummary returns the list of values that were appended to the "diff_summary" field in this mutation.
+func (m *DesignRequestMutation) AppendedDiffSummary() (json.RawMessage, bool) {
+	if len(m.appenddiff_summary) == 0 {
+		return nil, false
+	}
+	return m.appenddiff_summary, true
+}
+
+// ResetDiffSummary resets all changes to the "diff_summary" field.
+func (m *DesignRequestMutation) ResetDiffSummary() {
+	m.diff_summary = nil
+	m.appenddiff_summary = nil
+}
+
+// SetGuard sets the "guard" field.
+func (m *DesignRequestMutation) SetGuard(jm json.RawMessage) {
+	m.guard = &jm
+	m.appendguard = nil
+}
+
+// Guard returns the value of the "guard" field in the mutation.
+func (m *DesignRequestMutation) Guard() (r json.RawMessage, exists bool) {
+	v := m.guard
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldGuard returns the old "guard" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldGuard(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldGuard is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldGuard requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldGuard: %w", err)
+	}
+	return oldValue.Guard, nil
+}
+
+// AppendGuard adds jm to the "guard" field.
+func (m *DesignRequestMutation) AppendGuard(jm json.RawMessage) {
+	m.appendguard = append(m.appendguard, jm...)
+}
+
+// AppendedGuard returns the list of values that were appended to the "guard" field in this mutation.
+func (m *DesignRequestMutation) AppendedGuard() (json.RawMessage, bool) {
+	if len(m.appendguard) == 0 {
+		return nil, false
+	}
+	return m.appendguard, true
+}
+
+// ClearGuard clears the value of the "guard" field.
+func (m *DesignRequestMutation) ClearGuard() {
+	m.guard = nil
+	m.appendguard = nil
+	m.clearedFields[designrequest.FieldGuard] = struct{}{}
+}
+
+// GuardCleared returns if the "guard" field was cleared in this mutation.
+func (m *DesignRequestMutation) GuardCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldGuard]
+	return ok
+}
+
+// ResetGuard resets all changes to the "guard" field.
+func (m *DesignRequestMutation) ResetGuard() {
+	m.guard = nil
+	m.appendguard = nil
+	delete(m.clearedFields, designrequest.FieldGuard)
+}
+
+// SetPreviewOrigin sets the "preview_origin" field.
+func (m *DesignRequestMutation) SetPreviewOrigin(s string) {
+	m.preview_origin = &s
+}
+
+// PreviewOrigin returns the value of the "preview_origin" field in the mutation.
+func (m *DesignRequestMutation) PreviewOrigin() (r string, exists bool) {
+	v := m.preview_origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviewOrigin returns the old "preview_origin" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPreviewOrigin(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviewOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviewOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviewOrigin: %w", err)
+	}
+	return oldValue.PreviewOrigin, nil
+}
+
+// ClearPreviewOrigin clears the value of the "preview_origin" field.
+func (m *DesignRequestMutation) ClearPreviewOrigin() {
+	m.preview_origin = nil
+	m.clearedFields[designrequest.FieldPreviewOrigin] = struct{}{}
+}
+
+// PreviewOriginCleared returns if the "preview_origin" field was cleared in this mutation.
+func (m *DesignRequestMutation) PreviewOriginCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPreviewOrigin]
+	return ok
+}
+
+// ResetPreviewOrigin resets all changes to the "preview_origin" field.
+func (m *DesignRequestMutation) ResetPreviewOrigin() {
+	m.preview_origin = nil
+	delete(m.clearedFields, designrequest.FieldPreviewOrigin)
+}
+
+// SetPreviewRegisteredAt sets the "preview_registered_at" field.
+func (m *DesignRequestMutation) SetPreviewRegisteredAt(t time.Time) {
+	m.preview_registered_at = &t
+}
+
+// PreviewRegisteredAt returns the value of the "preview_registered_at" field in the mutation.
+func (m *DesignRequestMutation) PreviewRegisteredAt() (r time.Time, exists bool) {
+	v := m.preview_registered_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviewRegisteredAt returns the old "preview_registered_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPreviewRegisteredAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviewRegisteredAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviewRegisteredAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviewRegisteredAt: %w", err)
+	}
+	return oldValue.PreviewRegisteredAt, nil
+}
+
+// ClearPreviewRegisteredAt clears the value of the "preview_registered_at" field.
+func (m *DesignRequestMutation) ClearPreviewRegisteredAt() {
+	m.preview_registered_at = nil
+	m.clearedFields[designrequest.FieldPreviewRegisteredAt] = struct{}{}
+}
+
+// PreviewRegisteredAtCleared returns if the "preview_registered_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) PreviewRegisteredAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPreviewRegisteredAt]
+	return ok
+}
+
+// ResetPreviewRegisteredAt resets all changes to the "preview_registered_at" field.
+func (m *DesignRequestMutation) ResetPreviewRegisteredAt() {
+	m.preview_registered_at = nil
+	delete(m.clearedFields, designrequest.FieldPreviewRegisteredAt)
+}
+
+// SetPreviewExpiresAt sets the "preview_expires_at" field.
+func (m *DesignRequestMutation) SetPreviewExpiresAt(t time.Time) {
+	m.preview_expires_at = &t
+}
+
+// PreviewExpiresAt returns the value of the "preview_expires_at" field in the mutation.
+func (m *DesignRequestMutation) PreviewExpiresAt() (r time.Time, exists bool) {
+	v := m.preview_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviewExpiresAt returns the old "preview_expires_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPreviewExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviewExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviewExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviewExpiresAt: %w", err)
+	}
+	return oldValue.PreviewExpiresAt, nil
+}
+
+// ClearPreviewExpiresAt clears the value of the "preview_expires_at" field.
+func (m *DesignRequestMutation) ClearPreviewExpiresAt() {
+	m.preview_expires_at = nil
+	m.clearedFields[designrequest.FieldPreviewExpiresAt] = struct{}{}
+}
+
+// PreviewExpiresAtCleared returns if the "preview_expires_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) PreviewExpiresAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPreviewExpiresAt]
+	return ok
+}
+
+// ResetPreviewExpiresAt resets all changes to the "preview_expires_at" field.
+func (m *DesignRequestMutation) ResetPreviewExpiresAt() {
+	m.preview_expires_at = nil
+	delete(m.clearedFields, designrequest.FieldPreviewExpiresAt)
+}
+
+// SetApprovedByUserID sets the "approved_by_user_id" field.
+func (m *DesignRequestMutation) SetApprovedByUserID(i int) {
+	m.approved_by_user_id = &i
+	m.addapproved_by_user_id = nil
+}
+
+// ApprovedByUserID returns the value of the "approved_by_user_id" field in the mutation.
+func (m *DesignRequestMutation) ApprovedByUserID() (r int, exists bool) {
+	v := m.approved_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedByUserID returns the old "approved_by_user_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldApprovedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedByUserID: %w", err)
+	}
+	return oldValue.ApprovedByUserID, nil
+}
+
+// AddApprovedByUserID adds i to the "approved_by_user_id" field.
+func (m *DesignRequestMutation) AddApprovedByUserID(i int) {
+	if m.addapproved_by_user_id != nil {
+		*m.addapproved_by_user_id += i
+	} else {
+		m.addapproved_by_user_id = &i
+	}
+}
+
+// AddedApprovedByUserID returns the value that was added to the "approved_by_user_id" field in this mutation.
+func (m *DesignRequestMutation) AddedApprovedByUserID() (r int, exists bool) {
+	v := m.addapproved_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearApprovedByUserID clears the value of the "approved_by_user_id" field.
+func (m *DesignRequestMutation) ClearApprovedByUserID() {
+	m.approved_by_user_id = nil
+	m.addapproved_by_user_id = nil
+	m.clearedFields[designrequest.FieldApprovedByUserID] = struct{}{}
+}
+
+// ApprovedByUserIDCleared returns if the "approved_by_user_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) ApprovedByUserIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldApprovedByUserID]
+	return ok
+}
+
+// ResetApprovedByUserID resets all changes to the "approved_by_user_id" field.
+func (m *DesignRequestMutation) ResetApprovedByUserID() {
+	m.approved_by_user_id = nil
+	m.addapproved_by_user_id = nil
+	delete(m.clearedFields, designrequest.FieldApprovedByUserID)
+}
+
+// SetApprovedAt sets the "approved_at" field.
+func (m *DesignRequestMutation) SetApprovedAt(t time.Time) {
+	m.approved_at = &t
+}
+
+// ApprovedAt returns the value of the "approved_at" field in the mutation.
+func (m *DesignRequestMutation) ApprovedAt() (r time.Time, exists bool) {
+	v := m.approved_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedAt returns the old "approved_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldApprovedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedAt: %w", err)
+	}
+	return oldValue.ApprovedAt, nil
+}
+
+// ClearApprovedAt clears the value of the "approved_at" field.
+func (m *DesignRequestMutation) ClearApprovedAt() {
+	m.approved_at = nil
+	m.clearedFields[designrequest.FieldApprovedAt] = struct{}{}
+}
+
+// ApprovedAtCleared returns if the "approved_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) ApprovedAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldApprovedAt]
+	return ok
+}
+
+// ResetApprovedAt resets all changes to the "approved_at" field.
+func (m *DesignRequestMutation) ResetApprovedAt() {
+	m.approved_at = nil
+	delete(m.clearedFields, designrequest.FieldApprovedAt)
+}
+
+// SetApprovedHeadSha sets the "approved_head_sha" field.
+func (m *DesignRequestMutation) SetApprovedHeadSha(s string) {
+	m.approved_head_sha = &s
+}
+
+// ApprovedHeadSha returns the value of the "approved_head_sha" field in the mutation.
+func (m *DesignRequestMutation) ApprovedHeadSha() (r string, exists bool) {
+	v := m.approved_head_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovedHeadSha returns the old "approved_head_sha" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldApprovedHeadSha(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovedHeadSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovedHeadSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovedHeadSha: %w", err)
+	}
+	return oldValue.ApprovedHeadSha, nil
+}
+
+// ClearApprovedHeadSha clears the value of the "approved_head_sha" field.
+func (m *DesignRequestMutation) ClearApprovedHeadSha() {
+	m.approved_head_sha = nil
+	m.clearedFields[designrequest.FieldApprovedHeadSha] = struct{}{}
+}
+
+// ApprovedHeadShaCleared returns if the "approved_head_sha" field was cleared in this mutation.
+func (m *DesignRequestMutation) ApprovedHeadShaCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldApprovedHeadSha]
+	return ok
+}
+
+// ResetApprovedHeadSha resets all changes to the "approved_head_sha" field.
+func (m *DesignRequestMutation) ResetApprovedHeadSha() {
+	m.approved_head_sha = nil
+	delete(m.clearedFields, designrequest.FieldApprovedHeadSha)
+}
+
+// SetApprovalExpiresAt sets the "approval_expires_at" field.
+func (m *DesignRequestMutation) SetApprovalExpiresAt(t time.Time) {
+	m.approval_expires_at = &t
+}
+
+// ApprovalExpiresAt returns the value of the "approval_expires_at" field in the mutation.
+func (m *DesignRequestMutation) ApprovalExpiresAt() (r time.Time, exists bool) {
+	v := m.approval_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldApprovalExpiresAt returns the old "approval_expires_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldApprovalExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldApprovalExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldApprovalExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldApprovalExpiresAt: %w", err)
+	}
+	return oldValue.ApprovalExpiresAt, nil
+}
+
+// ClearApprovalExpiresAt clears the value of the "approval_expires_at" field.
+func (m *DesignRequestMutation) ClearApprovalExpiresAt() {
+	m.approval_expires_at = nil
+	m.clearedFields[designrequest.FieldApprovalExpiresAt] = struct{}{}
+}
+
+// ApprovalExpiresAtCleared returns if the "approval_expires_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) ApprovalExpiresAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldApprovalExpiresAt]
+	return ok
+}
+
+// ResetApprovalExpiresAt resets all changes to the "approval_expires_at" field.
+func (m *DesignRequestMutation) ResetApprovalExpiresAt() {
+	m.approval_expires_at = nil
+	delete(m.clearedFields, designrequest.FieldApprovalExpiresAt)
+}
+
+// SetPublishTag sets the "publish_tag" field.
+func (m *DesignRequestMutation) SetPublishTag(s string) {
+	m.publish_tag = &s
+}
+
+// PublishTag returns the value of the "publish_tag" field in the mutation.
+func (m *DesignRequestMutation) PublishTag() (r string, exists bool) {
+	v := m.publish_tag
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishTag returns the old "publish_tag" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPublishTag(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishTag is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishTag requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishTag: %w", err)
+	}
+	return oldValue.PublishTag, nil
+}
+
+// ClearPublishTag clears the value of the "publish_tag" field.
+func (m *DesignRequestMutation) ClearPublishTag() {
+	m.publish_tag = nil
+	m.clearedFields[designrequest.FieldPublishTag] = struct{}{}
+}
+
+// PublishTagCleared returns if the "publish_tag" field was cleared in this mutation.
+func (m *DesignRequestMutation) PublishTagCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPublishTag]
+	return ok
+}
+
+// ResetPublishTag resets all changes to the "publish_tag" field.
+func (m *DesignRequestMutation) ResetPublishTag() {
+	m.publish_tag = nil
+	delete(m.clearedFields, designrequest.FieldPublishTag)
+}
+
+// SetRejectedByUserID sets the "rejected_by_user_id" field.
+func (m *DesignRequestMutation) SetRejectedByUserID(i int) {
+	m.rejected_by_user_id = &i
+	m.addrejected_by_user_id = nil
+}
+
+// RejectedByUserID returns the value of the "rejected_by_user_id" field in the mutation.
+func (m *DesignRequestMutation) RejectedByUserID() (r int, exists bool) {
+	v := m.rejected_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedByUserID returns the old "rejected_by_user_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRejectedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedByUserID: %w", err)
+	}
+	return oldValue.RejectedByUserID, nil
+}
+
+// AddRejectedByUserID adds i to the "rejected_by_user_id" field.
+func (m *DesignRequestMutation) AddRejectedByUserID(i int) {
+	if m.addrejected_by_user_id != nil {
+		*m.addrejected_by_user_id += i
+	} else {
+		m.addrejected_by_user_id = &i
+	}
+}
+
+// AddedRejectedByUserID returns the value that was added to the "rejected_by_user_id" field in this mutation.
+func (m *DesignRequestMutation) AddedRejectedByUserID() (r int, exists bool) {
+	v := m.addrejected_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearRejectedByUserID clears the value of the "rejected_by_user_id" field.
+func (m *DesignRequestMutation) ClearRejectedByUserID() {
+	m.rejected_by_user_id = nil
+	m.addrejected_by_user_id = nil
+	m.clearedFields[designrequest.FieldRejectedByUserID] = struct{}{}
+}
+
+// RejectedByUserIDCleared returns if the "rejected_by_user_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) RejectedByUserIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldRejectedByUserID]
+	return ok
+}
+
+// ResetRejectedByUserID resets all changes to the "rejected_by_user_id" field.
+func (m *DesignRequestMutation) ResetRejectedByUserID() {
+	m.rejected_by_user_id = nil
+	m.addrejected_by_user_id = nil
+	delete(m.clearedFields, designrequest.FieldRejectedByUserID)
+}
+
+// SetRejectedAt sets the "rejected_at" field.
+func (m *DesignRequestMutation) SetRejectedAt(t time.Time) {
+	m.rejected_at = &t
+}
+
+// RejectedAt returns the value of the "rejected_at" field in the mutation.
+func (m *DesignRequestMutation) RejectedAt() (r time.Time, exists bool) {
+	v := m.rejected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectedAt returns the old "rejected_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRejectedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectedAt: %w", err)
+	}
+	return oldValue.RejectedAt, nil
+}
+
+// ClearRejectedAt clears the value of the "rejected_at" field.
+func (m *DesignRequestMutation) ClearRejectedAt() {
+	m.rejected_at = nil
+	m.clearedFields[designrequest.FieldRejectedAt] = struct{}{}
+}
+
+// RejectedAtCleared returns if the "rejected_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) RejectedAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldRejectedAt]
+	return ok
+}
+
+// ResetRejectedAt resets all changes to the "rejected_at" field.
+func (m *DesignRequestMutation) ResetRejectedAt() {
+	m.rejected_at = nil
+	delete(m.clearedFields, designrequest.FieldRejectedAt)
+}
+
+// SetRejectReason sets the "reject_reason" field.
+func (m *DesignRequestMutation) SetRejectReason(s string) {
+	m.reject_reason = &s
+}
+
+// RejectReason returns the value of the "reject_reason" field in the mutation.
+func (m *DesignRequestMutation) RejectReason() (r string, exists bool) {
+	v := m.reject_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRejectReason returns the old "reject_reason" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRejectReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRejectReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRejectReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRejectReason: %w", err)
+	}
+	return oldValue.RejectReason, nil
+}
+
+// ClearRejectReason clears the value of the "reject_reason" field.
+func (m *DesignRequestMutation) ClearRejectReason() {
+	m.reject_reason = nil
+	m.clearedFields[designrequest.FieldRejectReason] = struct{}{}
+}
+
+// RejectReasonCleared returns if the "reject_reason" field was cleared in this mutation.
+func (m *DesignRequestMutation) RejectReasonCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldRejectReason]
+	return ok
+}
+
+// ResetRejectReason resets all changes to the "reject_reason" field.
+func (m *DesignRequestMutation) ResetRejectReason() {
+	m.reject_reason = nil
+	delete(m.clearedFields, designrequest.FieldRejectReason)
+}
+
+// SetChangeNote sets the "change_note" field.
+func (m *DesignRequestMutation) SetChangeNote(s string) {
+	m.change_note = &s
+}
+
+// ChangeNote returns the value of the "change_note" field in the mutation.
+func (m *DesignRequestMutation) ChangeNote() (r string, exists bool) {
+	v := m.change_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldChangeNote returns the old "change_note" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldChangeNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldChangeNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldChangeNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldChangeNote: %w", err)
+	}
+	return oldValue.ChangeNote, nil
+}
+
+// ClearChangeNote clears the value of the "change_note" field.
+func (m *DesignRequestMutation) ClearChangeNote() {
+	m.change_note = nil
+	m.clearedFields[designrequest.FieldChangeNote] = struct{}{}
+}
+
+// ChangeNoteCleared returns if the "change_note" field was cleared in this mutation.
+func (m *DesignRequestMutation) ChangeNoteCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldChangeNote]
+	return ok
+}
+
+// ResetChangeNote resets all changes to the "change_note" field.
+func (m *DesignRequestMutation) ResetChangeNote() {
+	m.change_note = nil
+	delete(m.clearedFields, designrequest.FieldChangeNote)
+}
+
+// SetPublishedAt sets the "published_at" field.
+func (m *DesignRequestMutation) SetPublishedAt(t time.Time) {
+	m.published_at = &t
+}
+
+// PublishedAt returns the value of the "published_at" field in the mutation.
+func (m *DesignRequestMutation) PublishedAt() (r time.Time, exists bool) {
+	v := m.published_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishedAt returns the old "published_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPublishedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishedAt: %w", err)
+	}
+	return oldValue.PublishedAt, nil
+}
+
+// ClearPublishedAt clears the value of the "published_at" field.
+func (m *DesignRequestMutation) ClearPublishedAt() {
+	m.published_at = nil
+	m.clearedFields[designrequest.FieldPublishedAt] = struct{}{}
+}
+
+// PublishedAtCleared returns if the "published_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) PublishedAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPublishedAt]
+	return ok
+}
+
+// ResetPublishedAt resets all changes to the "published_at" field.
+func (m *DesignRequestMutation) ResetPublishedAt() {
+	m.published_at = nil
+	delete(m.clearedFields, designrequest.FieldPublishedAt)
+}
+
+// SetPublishedTag sets the "published_tag" field.
+func (m *DesignRequestMutation) SetPublishedTag(s string) {
+	m.published_tag = &s
+}
+
+// PublishedTag returns the value of the "published_tag" field in the mutation.
+func (m *DesignRequestMutation) PublishedTag() (r string, exists bool) {
+	v := m.published_tag
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishedTag returns the old "published_tag" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldPublishedTag(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishedTag is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishedTag requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishedTag: %w", err)
+	}
+	return oldValue.PublishedTag, nil
+}
+
+// ClearPublishedTag clears the value of the "published_tag" field.
+func (m *DesignRequestMutation) ClearPublishedTag() {
+	m.published_tag = nil
+	m.clearedFields[designrequest.FieldPublishedTag] = struct{}{}
+}
+
+// PublishedTagCleared returns if the "published_tag" field was cleared in this mutation.
+func (m *DesignRequestMutation) PublishedTagCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldPublishedTag]
+	return ok
+}
+
+// ResetPublishedTag resets all changes to the "published_tag" field.
+func (m *DesignRequestMutation) ResetPublishedTag() {
+	m.published_tag = nil
+	delete(m.clearedFields, designrequest.FieldPublishedTag)
+}
+
+// SetDeploymentID sets the "deployment_id" field.
+func (m *DesignRequestMutation) SetDeploymentID(s string) {
+	m.deployment_id = &s
+}
+
+// DeploymentID returns the value of the "deployment_id" field in the mutation.
+func (m *DesignRequestMutation) DeploymentID() (r string, exists bool) {
+	v := m.deployment_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeploymentID returns the old "deployment_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldDeploymentID(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeploymentID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeploymentID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeploymentID: %w", err)
+	}
+	return oldValue.DeploymentID, nil
+}
+
+// ClearDeploymentID clears the value of the "deployment_id" field.
+func (m *DesignRequestMutation) ClearDeploymentID() {
+	m.deployment_id = nil
+	m.clearedFields[designrequest.FieldDeploymentID] = struct{}{}
+}
+
+// DeploymentIDCleared returns if the "deployment_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) DeploymentIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldDeploymentID]
+	return ok
+}
+
+// ResetDeploymentID resets all changes to the "deployment_id" field.
+func (m *DesignRequestMutation) ResetDeploymentID() {
+	m.deployment_id = nil
+	delete(m.clearedFields, designrequest.FieldDeploymentID)
+}
+
+// SetRestoresRequestID sets the "restores_request_id" field.
+func (m *DesignRequestMutation) SetRestoresRequestID(u uuid.UUID) {
+	m.restores_request_id = &u
+}
+
+// RestoresRequestID returns the value of the "restores_request_id" field in the mutation.
+func (m *DesignRequestMutation) RestoresRequestID() (r uuid.UUID, exists bool) {
+	v := m.restores_request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRestoresRequestID returns the old "restores_request_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRestoresRequestID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRestoresRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRestoresRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRestoresRequestID: %w", err)
+	}
+	return oldValue.RestoresRequestID, nil
+}
+
+// ClearRestoresRequestID clears the value of the "restores_request_id" field.
+func (m *DesignRequestMutation) ClearRestoresRequestID() {
+	m.restores_request_id = nil
+	m.clearedFields[designrequest.FieldRestoresRequestID] = struct{}{}
+}
+
+// RestoresRequestIDCleared returns if the "restores_request_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) RestoresRequestIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldRestoresRequestID]
+	return ok
+}
+
+// ResetRestoresRequestID resets all changes to the "restores_request_id" field.
+func (m *DesignRequestMutation) ResetRestoresRequestID() {
+	m.restores_request_id = nil
+	delete(m.clearedFields, designrequest.FieldRestoresRequestID)
+}
+
+// SetRevertedByRequestID sets the "reverted_by_request_id" field.
+func (m *DesignRequestMutation) SetRevertedByRequestID(u uuid.UUID) {
+	m.reverted_by_request_id = &u
+}
+
+// RevertedByRequestID returns the value of the "reverted_by_request_id" field in the mutation.
+func (m *DesignRequestMutation) RevertedByRequestID() (r uuid.UUID, exists bool) {
+	v := m.reverted_by_request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevertedByRequestID returns the old "reverted_by_request_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRevertedByRequestID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevertedByRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevertedByRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevertedByRequestID: %w", err)
+	}
+	return oldValue.RevertedByRequestID, nil
+}
+
+// ClearRevertedByRequestID clears the value of the "reverted_by_request_id" field.
+func (m *DesignRequestMutation) ClearRevertedByRequestID() {
+	m.reverted_by_request_id = nil
+	m.clearedFields[designrequest.FieldRevertedByRequestID] = struct{}{}
+}
+
+// RevertedByRequestIDCleared returns if the "reverted_by_request_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) RevertedByRequestIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldRevertedByRequestID]
+	return ok
+}
+
+// ResetRevertedByRequestID resets all changes to the "reverted_by_request_id" field.
+func (m *DesignRequestMutation) ResetRevertedByRequestID() {
+	m.reverted_by_request_id = nil
+	delete(m.clearedFields, designrequest.FieldRevertedByRequestID)
+}
+
+// SetFailureCode sets the "failure_code" field.
+func (m *DesignRequestMutation) SetFailureCode(s string) {
+	m.failure_code = &s
+}
+
+// FailureCode returns the value of the "failure_code" field in the mutation.
+func (m *DesignRequestMutation) FailureCode() (r string, exists bool) {
+	v := m.failure_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureCode returns the old "failure_code" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldFailureCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureCode: %w", err)
+	}
+	return oldValue.FailureCode, nil
+}
+
+// ClearFailureCode clears the value of the "failure_code" field.
+func (m *DesignRequestMutation) ClearFailureCode() {
+	m.failure_code = nil
+	m.clearedFields[designrequest.FieldFailureCode] = struct{}{}
+}
+
+// FailureCodeCleared returns if the "failure_code" field was cleared in this mutation.
+func (m *DesignRequestMutation) FailureCodeCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldFailureCode]
+	return ok
+}
+
+// ResetFailureCode resets all changes to the "failure_code" field.
+func (m *DesignRequestMutation) ResetFailureCode() {
+	m.failure_code = nil
+	delete(m.clearedFields, designrequest.FieldFailureCode)
+}
+
+// SetFailureDetail sets the "failure_detail" field.
+func (m *DesignRequestMutation) SetFailureDetail(s string) {
+	m.failure_detail = &s
+}
+
+// FailureDetail returns the value of the "failure_detail" field in the mutation.
+func (m *DesignRequestMutation) FailureDetail() (r string, exists bool) {
+	v := m.failure_detail
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureDetail returns the old "failure_detail" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldFailureDetail(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureDetail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureDetail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureDetail: %w", err)
+	}
+	return oldValue.FailureDetail, nil
+}
+
+// ClearFailureDetail clears the value of the "failure_detail" field.
+func (m *DesignRequestMutation) ClearFailureDetail() {
+	m.failure_detail = nil
+	m.clearedFields[designrequest.FieldFailureDetail] = struct{}{}
+}
+
+// FailureDetailCleared returns if the "failure_detail" field was cleared in this mutation.
+func (m *DesignRequestMutation) FailureDetailCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldFailureDetail]
+	return ok
+}
+
+// ResetFailureDetail resets all changes to the "failure_detail" field.
+func (m *DesignRequestMutation) ResetFailureDetail() {
+	m.failure_detail = nil
+	delete(m.clearedFields, designrequest.FieldFailureDetail)
+}
+
+// SetRev sets the "rev" field.
+func (m *DesignRequestMutation) SetRev(i int) {
+	m.rev = &i
+	m.addrev = nil
+}
+
+// Rev returns the value of the "rev" field in the mutation.
+func (m *DesignRequestMutation) Rev() (r int, exists bool) {
+	v := m.rev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRev returns the old "rev" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldRev(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRev is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRev requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRev: %w", err)
+	}
+	return oldValue.Rev, nil
+}
+
+// AddRev adds i to the "rev" field.
+func (m *DesignRequestMutation) AddRev(i int) {
+	if m.addrev != nil {
+		*m.addrev += i
+	} else {
+		m.addrev = &i
+	}
+}
+
+// AddedRev returns the value that was added to the "rev" field in this mutation.
+func (m *DesignRequestMutation) AddedRev() (r int, exists bool) {
+	v := m.addrev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRev resets all changes to the "rev" field.
+func (m *DesignRequestMutation) ResetRev() {
+	m.rev = nil
+	m.addrev = nil
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *DesignRequestMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *DesignRequestMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (m *DesignRequestMutation) ClearIdempotencyKey() {
+	m.idempotency_key = nil
+	m.clearedFields[designrequest.FieldIdempotencyKey] = struct{}{}
+}
+
+// IdempotencyKeyCleared returns if the "idempotency_key" field was cleared in this mutation.
+func (m *DesignRequestMutation) IdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldIdempotencyKey]
+	return ok
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *DesignRequestMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+	delete(m.clearedFields, designrequest.FieldIdempotencyKey)
+}
+
+// SetIdempotencyFingerprint sets the "idempotency_fingerprint" field.
+func (m *DesignRequestMutation) SetIdempotencyFingerprint(s string) {
+	m.idempotency_fingerprint = &s
+}
+
+// IdempotencyFingerprint returns the value of the "idempotency_fingerprint" field in the mutation.
+func (m *DesignRequestMutation) IdempotencyFingerprint() (r string, exists bool) {
+	v := m.idempotency_fingerprint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyFingerprint returns the old "idempotency_fingerprint" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldIdempotencyFingerprint(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyFingerprint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyFingerprint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyFingerprint: %w", err)
+	}
+	return oldValue.IdempotencyFingerprint, nil
+}
+
+// ClearIdempotencyFingerprint clears the value of the "idempotency_fingerprint" field.
+func (m *DesignRequestMutation) ClearIdempotencyFingerprint() {
+	m.idempotency_fingerprint = nil
+	m.clearedFields[designrequest.FieldIdempotencyFingerprint] = struct{}{}
+}
+
+// IdempotencyFingerprintCleared returns if the "idempotency_fingerprint" field was cleared in this mutation.
+func (m *DesignRequestMutation) IdempotencyFingerprintCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldIdempotencyFingerprint]
+	return ok
+}
+
+// ResetIdempotencyFingerprint resets all changes to the "idempotency_fingerprint" field.
+func (m *DesignRequestMutation) ResetIdempotencyFingerprint() {
+	m.idempotency_fingerprint = nil
+	delete(m.clearedFields, designrequest.FieldIdempotencyFingerprint)
+}
+
+// SetClaimedByCredentialID sets the "claimed_by_credential_id" field.
+func (m *DesignRequestMutation) SetClaimedByCredentialID(i int) {
+	m.claimed_by_credential_id = &i
+	m.addclaimed_by_credential_id = nil
+}
+
+// ClaimedByCredentialID returns the value of the "claimed_by_credential_id" field in the mutation.
+func (m *DesignRequestMutation) ClaimedByCredentialID() (r int, exists bool) {
+	v := m.claimed_by_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimedByCredentialID returns the old "claimed_by_credential_id" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldClaimedByCredentialID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimedByCredentialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimedByCredentialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimedByCredentialID: %w", err)
+	}
+	return oldValue.ClaimedByCredentialID, nil
+}
+
+// AddClaimedByCredentialID adds i to the "claimed_by_credential_id" field.
+func (m *DesignRequestMutation) AddClaimedByCredentialID(i int) {
+	if m.addclaimed_by_credential_id != nil {
+		*m.addclaimed_by_credential_id += i
+	} else {
+		m.addclaimed_by_credential_id = &i
+	}
+}
+
+// AddedClaimedByCredentialID returns the value that was added to the "claimed_by_credential_id" field in this mutation.
+func (m *DesignRequestMutation) AddedClaimedByCredentialID() (r int, exists bool) {
+	v := m.addclaimed_by_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearClaimedByCredentialID clears the value of the "claimed_by_credential_id" field.
+func (m *DesignRequestMutation) ClearClaimedByCredentialID() {
+	m.claimed_by_credential_id = nil
+	m.addclaimed_by_credential_id = nil
+	m.clearedFields[designrequest.FieldClaimedByCredentialID] = struct{}{}
+}
+
+// ClaimedByCredentialIDCleared returns if the "claimed_by_credential_id" field was cleared in this mutation.
+func (m *DesignRequestMutation) ClaimedByCredentialIDCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldClaimedByCredentialID]
+	return ok
+}
+
+// ResetClaimedByCredentialID resets all changes to the "claimed_by_credential_id" field.
+func (m *DesignRequestMutation) ResetClaimedByCredentialID() {
+	m.claimed_by_credential_id = nil
+	m.addclaimed_by_credential_id = nil
+	delete(m.clearedFields, designrequest.FieldClaimedByCredentialID)
+}
+
+// SetClaimedAt sets the "claimed_at" field.
+func (m *DesignRequestMutation) SetClaimedAt(t time.Time) {
+	m.claimed_at = &t
+}
+
+// ClaimedAt returns the value of the "claimed_at" field in the mutation.
+func (m *DesignRequestMutation) ClaimedAt() (r time.Time, exists bool) {
+	v := m.claimed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimedAt returns the old "claimed_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldClaimedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimedAt: %w", err)
+	}
+	return oldValue.ClaimedAt, nil
+}
+
+// ClearClaimedAt clears the value of the "claimed_at" field.
+func (m *DesignRequestMutation) ClearClaimedAt() {
+	m.claimed_at = nil
+	m.clearedFields[designrequest.FieldClaimedAt] = struct{}{}
+}
+
+// ClaimedAtCleared returns if the "claimed_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) ClaimedAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldClaimedAt]
+	return ok
+}
+
+// ResetClaimedAt resets all changes to the "claimed_at" field.
+func (m *DesignRequestMutation) ResetClaimedAt() {
+	m.claimed_at = nil
+	delete(m.clearedFields, designrequest.FieldClaimedAt)
+}
+
+// SetClaimExpiresAt sets the "claim_expires_at" field.
+func (m *DesignRequestMutation) SetClaimExpiresAt(t time.Time) {
+	m.claim_expires_at = &t
+}
+
+// ClaimExpiresAt returns the value of the "claim_expires_at" field in the mutation.
+func (m *DesignRequestMutation) ClaimExpiresAt() (r time.Time, exists bool) {
+	v := m.claim_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimExpiresAt returns the old "claim_expires_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldClaimExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimExpiresAt: %w", err)
+	}
+	return oldValue.ClaimExpiresAt, nil
+}
+
+// ClearClaimExpiresAt clears the value of the "claim_expires_at" field.
+func (m *DesignRequestMutation) ClearClaimExpiresAt() {
+	m.claim_expires_at = nil
+	m.clearedFields[designrequest.FieldClaimExpiresAt] = struct{}{}
+}
+
+// ClaimExpiresAtCleared returns if the "claim_expires_at" field was cleared in this mutation.
+func (m *DesignRequestMutation) ClaimExpiresAtCleared() bool {
+	_, ok := m.clearedFields[designrequest.FieldClaimExpiresAt]
+	return ok
+}
+
+// ResetClaimExpiresAt resets all changes to the "claim_expires_at" field.
+func (m *DesignRequestMutation) ResetClaimExpiresAt() {
+	m.claim_expires_at = nil
+	delete(m.clearedFields, designrequest.FieldClaimExpiresAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesignRequestMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesignRequestMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesignRequestMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DesignRequestMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DesignRequestMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DesignRequest entity.
+// If the DesignRequest object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DesignRequestMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the DesignRequestMutation builder.
+func (m *DesignRequestMutation) Where(ps ...predicate.DesignRequest) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignRequestMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignRequestMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignRequest, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignRequestMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignRequestMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignRequest).
+func (m *DesignRequestMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignRequestMutation) Fields() []string {
+	fields := make([]string, 0, 44)
+	if m.shop_id != nil {
+		fields = append(fields, designrequest.FieldShopID)
+	}
+	if m.site != nil {
+		fields = append(fields, designrequest.FieldSite)
+	}
+	if m.kind != nil {
+		fields = append(fields, designrequest.FieldKind)
+	}
+	if m.status != nil {
+		fields = append(fields, designrequest.FieldStatus)
+	}
+	if m.requested_by_user_id != nil {
+		fields = append(fields, designrequest.FieldRequestedByUserID)
+	}
+	if m.prompt_text != nil {
+		fields = append(fields, designrequest.FieldPromptText)
+	}
+	if m.prompt_sha256 != nil {
+		fields = append(fields, designrequest.FieldPromptSha256)
+	}
+	if m.prompt_flags != nil {
+		fields = append(fields, designrequest.FieldPromptFlags)
+	}
+	if m.base_sha != nil {
+		fields = append(fields, designrequest.FieldBaseSha)
+	}
+	if m.head_sha != nil {
+		fields = append(fields, designrequest.FieldHeadSha)
+	}
+	if m.candidate_sha != nil {
+		fields = append(fields, designrequest.FieldCandidateSha)
+	}
+	if m.published_sha != nil {
+		fields = append(fields, designrequest.FieldPublishedSha)
+	}
+	if m.branch != nil {
+		fields = append(fields, designrequest.FieldBranch)
+	}
+	if m.core_version != nil {
+		fields = append(fields, designrequest.FieldCoreVersion)
+	}
+	if m.design_floor_version != nil {
+		fields = append(fields, designrequest.FieldDesignFloorVersion)
+	}
+	if m.diff_summary != nil {
+		fields = append(fields, designrequest.FieldDiffSummary)
+	}
+	if m.guard != nil {
+		fields = append(fields, designrequest.FieldGuard)
+	}
+	if m.preview_origin != nil {
+		fields = append(fields, designrequest.FieldPreviewOrigin)
+	}
+	if m.preview_registered_at != nil {
+		fields = append(fields, designrequest.FieldPreviewRegisteredAt)
+	}
+	if m.preview_expires_at != nil {
+		fields = append(fields, designrequest.FieldPreviewExpiresAt)
+	}
+	if m.approved_by_user_id != nil {
+		fields = append(fields, designrequest.FieldApprovedByUserID)
+	}
+	if m.approved_at != nil {
+		fields = append(fields, designrequest.FieldApprovedAt)
+	}
+	if m.approved_head_sha != nil {
+		fields = append(fields, designrequest.FieldApprovedHeadSha)
+	}
+	if m.approval_expires_at != nil {
+		fields = append(fields, designrequest.FieldApprovalExpiresAt)
+	}
+	if m.publish_tag != nil {
+		fields = append(fields, designrequest.FieldPublishTag)
+	}
+	if m.rejected_by_user_id != nil {
+		fields = append(fields, designrequest.FieldRejectedByUserID)
+	}
+	if m.rejected_at != nil {
+		fields = append(fields, designrequest.FieldRejectedAt)
+	}
+	if m.reject_reason != nil {
+		fields = append(fields, designrequest.FieldRejectReason)
+	}
+	if m.change_note != nil {
+		fields = append(fields, designrequest.FieldChangeNote)
+	}
+	if m.published_at != nil {
+		fields = append(fields, designrequest.FieldPublishedAt)
+	}
+	if m.published_tag != nil {
+		fields = append(fields, designrequest.FieldPublishedTag)
+	}
+	if m.deployment_id != nil {
+		fields = append(fields, designrequest.FieldDeploymentID)
+	}
+	if m.restores_request_id != nil {
+		fields = append(fields, designrequest.FieldRestoresRequestID)
+	}
+	if m.reverted_by_request_id != nil {
+		fields = append(fields, designrequest.FieldRevertedByRequestID)
+	}
+	if m.failure_code != nil {
+		fields = append(fields, designrequest.FieldFailureCode)
+	}
+	if m.failure_detail != nil {
+		fields = append(fields, designrequest.FieldFailureDetail)
+	}
+	if m.rev != nil {
+		fields = append(fields, designrequest.FieldRev)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, designrequest.FieldIdempotencyKey)
+	}
+	if m.idempotency_fingerprint != nil {
+		fields = append(fields, designrequest.FieldIdempotencyFingerprint)
+	}
+	if m.claimed_by_credential_id != nil {
+		fields = append(fields, designrequest.FieldClaimedByCredentialID)
+	}
+	if m.claimed_at != nil {
+		fields = append(fields, designrequest.FieldClaimedAt)
+	}
+	if m.claim_expires_at != nil {
+		fields = append(fields, designrequest.FieldClaimExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, designrequest.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, designrequest.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignRequestMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designrequest.FieldShopID:
+		return m.ShopID()
+	case designrequest.FieldSite:
+		return m.Site()
+	case designrequest.FieldKind:
+		return m.Kind()
+	case designrequest.FieldStatus:
+		return m.Status()
+	case designrequest.FieldRequestedByUserID:
+		return m.RequestedByUserID()
+	case designrequest.FieldPromptText:
+		return m.PromptText()
+	case designrequest.FieldPromptSha256:
+		return m.PromptSha256()
+	case designrequest.FieldPromptFlags:
+		return m.PromptFlags()
+	case designrequest.FieldBaseSha:
+		return m.BaseSha()
+	case designrequest.FieldHeadSha:
+		return m.HeadSha()
+	case designrequest.FieldCandidateSha:
+		return m.CandidateSha()
+	case designrequest.FieldPublishedSha:
+		return m.PublishedSha()
+	case designrequest.FieldBranch:
+		return m.Branch()
+	case designrequest.FieldCoreVersion:
+		return m.CoreVersion()
+	case designrequest.FieldDesignFloorVersion:
+		return m.DesignFloorVersion()
+	case designrequest.FieldDiffSummary:
+		return m.DiffSummary()
+	case designrequest.FieldGuard:
+		return m.Guard()
+	case designrequest.FieldPreviewOrigin:
+		return m.PreviewOrigin()
+	case designrequest.FieldPreviewRegisteredAt:
+		return m.PreviewRegisteredAt()
+	case designrequest.FieldPreviewExpiresAt:
+		return m.PreviewExpiresAt()
+	case designrequest.FieldApprovedByUserID:
+		return m.ApprovedByUserID()
+	case designrequest.FieldApprovedAt:
+		return m.ApprovedAt()
+	case designrequest.FieldApprovedHeadSha:
+		return m.ApprovedHeadSha()
+	case designrequest.FieldApprovalExpiresAt:
+		return m.ApprovalExpiresAt()
+	case designrequest.FieldPublishTag:
+		return m.PublishTag()
+	case designrequest.FieldRejectedByUserID:
+		return m.RejectedByUserID()
+	case designrequest.FieldRejectedAt:
+		return m.RejectedAt()
+	case designrequest.FieldRejectReason:
+		return m.RejectReason()
+	case designrequest.FieldChangeNote:
+		return m.ChangeNote()
+	case designrequest.FieldPublishedAt:
+		return m.PublishedAt()
+	case designrequest.FieldPublishedTag:
+		return m.PublishedTag()
+	case designrequest.FieldDeploymentID:
+		return m.DeploymentID()
+	case designrequest.FieldRestoresRequestID:
+		return m.RestoresRequestID()
+	case designrequest.FieldRevertedByRequestID:
+		return m.RevertedByRequestID()
+	case designrequest.FieldFailureCode:
+		return m.FailureCode()
+	case designrequest.FieldFailureDetail:
+		return m.FailureDetail()
+	case designrequest.FieldRev:
+		return m.Rev()
+	case designrequest.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	case designrequest.FieldIdempotencyFingerprint:
+		return m.IdempotencyFingerprint()
+	case designrequest.FieldClaimedByCredentialID:
+		return m.ClaimedByCredentialID()
+	case designrequest.FieldClaimedAt:
+		return m.ClaimedAt()
+	case designrequest.FieldClaimExpiresAt:
+		return m.ClaimExpiresAt()
+	case designrequest.FieldCreatedAt:
+		return m.CreatedAt()
+	case designrequest.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignRequestMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designrequest.FieldShopID:
+		return m.OldShopID(ctx)
+	case designrequest.FieldSite:
+		return m.OldSite(ctx)
+	case designrequest.FieldKind:
+		return m.OldKind(ctx)
+	case designrequest.FieldStatus:
+		return m.OldStatus(ctx)
+	case designrequest.FieldRequestedByUserID:
+		return m.OldRequestedByUserID(ctx)
+	case designrequest.FieldPromptText:
+		return m.OldPromptText(ctx)
+	case designrequest.FieldPromptSha256:
+		return m.OldPromptSha256(ctx)
+	case designrequest.FieldPromptFlags:
+		return m.OldPromptFlags(ctx)
+	case designrequest.FieldBaseSha:
+		return m.OldBaseSha(ctx)
+	case designrequest.FieldHeadSha:
+		return m.OldHeadSha(ctx)
+	case designrequest.FieldCandidateSha:
+		return m.OldCandidateSha(ctx)
+	case designrequest.FieldPublishedSha:
+		return m.OldPublishedSha(ctx)
+	case designrequest.FieldBranch:
+		return m.OldBranch(ctx)
+	case designrequest.FieldCoreVersion:
+		return m.OldCoreVersion(ctx)
+	case designrequest.FieldDesignFloorVersion:
+		return m.OldDesignFloorVersion(ctx)
+	case designrequest.FieldDiffSummary:
+		return m.OldDiffSummary(ctx)
+	case designrequest.FieldGuard:
+		return m.OldGuard(ctx)
+	case designrequest.FieldPreviewOrigin:
+		return m.OldPreviewOrigin(ctx)
+	case designrequest.FieldPreviewRegisteredAt:
+		return m.OldPreviewRegisteredAt(ctx)
+	case designrequest.FieldPreviewExpiresAt:
+		return m.OldPreviewExpiresAt(ctx)
+	case designrequest.FieldApprovedByUserID:
+		return m.OldApprovedByUserID(ctx)
+	case designrequest.FieldApprovedAt:
+		return m.OldApprovedAt(ctx)
+	case designrequest.FieldApprovedHeadSha:
+		return m.OldApprovedHeadSha(ctx)
+	case designrequest.FieldApprovalExpiresAt:
+		return m.OldApprovalExpiresAt(ctx)
+	case designrequest.FieldPublishTag:
+		return m.OldPublishTag(ctx)
+	case designrequest.FieldRejectedByUserID:
+		return m.OldRejectedByUserID(ctx)
+	case designrequest.FieldRejectedAt:
+		return m.OldRejectedAt(ctx)
+	case designrequest.FieldRejectReason:
+		return m.OldRejectReason(ctx)
+	case designrequest.FieldChangeNote:
+		return m.OldChangeNote(ctx)
+	case designrequest.FieldPublishedAt:
+		return m.OldPublishedAt(ctx)
+	case designrequest.FieldPublishedTag:
+		return m.OldPublishedTag(ctx)
+	case designrequest.FieldDeploymentID:
+		return m.OldDeploymentID(ctx)
+	case designrequest.FieldRestoresRequestID:
+		return m.OldRestoresRequestID(ctx)
+	case designrequest.FieldRevertedByRequestID:
+		return m.OldRevertedByRequestID(ctx)
+	case designrequest.FieldFailureCode:
+		return m.OldFailureCode(ctx)
+	case designrequest.FieldFailureDetail:
+		return m.OldFailureDetail(ctx)
+	case designrequest.FieldRev:
+		return m.OldRev(ctx)
+	case designrequest.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	case designrequest.FieldIdempotencyFingerprint:
+		return m.OldIdempotencyFingerprint(ctx)
+	case designrequest.FieldClaimedByCredentialID:
+		return m.OldClaimedByCredentialID(ctx)
+	case designrequest.FieldClaimedAt:
+		return m.OldClaimedAt(ctx)
+	case designrequest.FieldClaimExpiresAt:
+		return m.OldClaimExpiresAt(ctx)
+	case designrequest.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case designrequest.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignRequest field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignRequestMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designrequest.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designrequest.FieldSite:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSite(v)
+		return nil
+	case designrequest.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case designrequest.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case designrequest.FieldRequestedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedByUserID(v)
+		return nil
+	case designrequest.FieldPromptText:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPromptText(v)
+		return nil
+	case designrequest.FieldPromptSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPromptSha256(v)
+		return nil
+	case designrequest.FieldPromptFlags:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPromptFlags(v)
+		return nil
+	case designrequest.FieldBaseSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBaseSha(v)
+		return nil
+	case designrequest.FieldHeadSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHeadSha(v)
+		return nil
+	case designrequest.FieldCandidateSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCandidateSha(v)
+		return nil
+	case designrequest.FieldPublishedSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishedSha(v)
+		return nil
+	case designrequest.FieldBranch:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBranch(v)
+		return nil
+	case designrequest.FieldCoreVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoreVersion(v)
+		return nil
+	case designrequest.FieldDesignFloorVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDesignFloorVersion(v)
+		return nil
+	case designrequest.FieldDiffSummary:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiffSummary(v)
+		return nil
+	case designrequest.FieldGuard:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetGuard(v)
+		return nil
+	case designrequest.FieldPreviewOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviewOrigin(v)
+		return nil
+	case designrequest.FieldPreviewRegisteredAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviewRegisteredAt(v)
+		return nil
+	case designrequest.FieldPreviewExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviewExpiresAt(v)
+		return nil
+	case designrequest.FieldApprovedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedByUserID(v)
+		return nil
+	case designrequest.FieldApprovedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedAt(v)
+		return nil
+	case designrequest.FieldApprovedHeadSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovedHeadSha(v)
+		return nil
+	case designrequest.FieldApprovalExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetApprovalExpiresAt(v)
+		return nil
+	case designrequest.FieldPublishTag:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishTag(v)
+		return nil
+	case designrequest.FieldRejectedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedByUserID(v)
+		return nil
+	case designrequest.FieldRejectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectedAt(v)
+		return nil
+	case designrequest.FieldRejectReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRejectReason(v)
+		return nil
+	case designrequest.FieldChangeNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetChangeNote(v)
+		return nil
+	case designrequest.FieldPublishedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishedAt(v)
+		return nil
+	case designrequest.FieldPublishedTag:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishedTag(v)
+		return nil
+	case designrequest.FieldDeploymentID:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeploymentID(v)
+		return nil
+	case designrequest.FieldRestoresRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRestoresRequestID(v)
+		return nil
+	case designrequest.FieldRevertedByRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevertedByRequestID(v)
+		return nil
+	case designrequest.FieldFailureCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureCode(v)
+		return nil
+	case designrequest.FieldFailureDetail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureDetail(v)
+		return nil
+	case designrequest.FieldRev:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRev(v)
+		return nil
+	case designrequest.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	case designrequest.FieldIdempotencyFingerprint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyFingerprint(v)
+		return nil
+	case designrequest.FieldClaimedByCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimedByCredentialID(v)
+		return nil
+	case designrequest.FieldClaimedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimedAt(v)
+		return nil
+	case designrequest.FieldClaimExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimExpiresAt(v)
+		return nil
+	case designrequest.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case designrequest.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequest field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignRequestMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designrequest.FieldShopID)
+	}
+	if m.addrequested_by_user_id != nil {
+		fields = append(fields, designrequest.FieldRequestedByUserID)
+	}
+	if m.addapproved_by_user_id != nil {
+		fields = append(fields, designrequest.FieldApprovedByUserID)
+	}
+	if m.addrejected_by_user_id != nil {
+		fields = append(fields, designrequest.FieldRejectedByUserID)
+	}
+	if m.addrev != nil {
+		fields = append(fields, designrequest.FieldRev)
+	}
+	if m.addclaimed_by_credential_id != nil {
+		fields = append(fields, designrequest.FieldClaimedByCredentialID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignRequestMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designrequest.FieldShopID:
+		return m.AddedShopID()
+	case designrequest.FieldRequestedByUserID:
+		return m.AddedRequestedByUserID()
+	case designrequest.FieldApprovedByUserID:
+		return m.AddedApprovedByUserID()
+	case designrequest.FieldRejectedByUserID:
+		return m.AddedRejectedByUserID()
+	case designrequest.FieldRev:
+		return m.AddedRev()
+	case designrequest.FieldClaimedByCredentialID:
+		return m.AddedClaimedByCredentialID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignRequestMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designrequest.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designrequest.FieldRequestedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRequestedByUserID(v)
+		return nil
+	case designrequest.FieldApprovedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddApprovedByUserID(v)
+		return nil
+	case designrequest.FieldRejectedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRejectedByUserID(v)
+		return nil
+	case designrequest.FieldRev:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRev(v)
+		return nil
+	case designrequest.FieldClaimedByCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddClaimedByCredentialID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequest numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignRequestMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designrequest.FieldPromptText) {
+		fields = append(fields, designrequest.FieldPromptText)
+	}
+	if m.FieldCleared(designrequest.FieldCandidateSha) {
+		fields = append(fields, designrequest.FieldCandidateSha)
+	}
+	if m.FieldCleared(designrequest.FieldPublishedSha) {
+		fields = append(fields, designrequest.FieldPublishedSha)
+	}
+	if m.FieldCleared(designrequest.FieldGuard) {
+		fields = append(fields, designrequest.FieldGuard)
+	}
+	if m.FieldCleared(designrequest.FieldPreviewOrigin) {
+		fields = append(fields, designrequest.FieldPreviewOrigin)
+	}
+	if m.FieldCleared(designrequest.FieldPreviewRegisteredAt) {
+		fields = append(fields, designrequest.FieldPreviewRegisteredAt)
+	}
+	if m.FieldCleared(designrequest.FieldPreviewExpiresAt) {
+		fields = append(fields, designrequest.FieldPreviewExpiresAt)
+	}
+	if m.FieldCleared(designrequest.FieldApprovedByUserID) {
+		fields = append(fields, designrequest.FieldApprovedByUserID)
+	}
+	if m.FieldCleared(designrequest.FieldApprovedAt) {
+		fields = append(fields, designrequest.FieldApprovedAt)
+	}
+	if m.FieldCleared(designrequest.FieldApprovedHeadSha) {
+		fields = append(fields, designrequest.FieldApprovedHeadSha)
+	}
+	if m.FieldCleared(designrequest.FieldApprovalExpiresAt) {
+		fields = append(fields, designrequest.FieldApprovalExpiresAt)
+	}
+	if m.FieldCleared(designrequest.FieldPublishTag) {
+		fields = append(fields, designrequest.FieldPublishTag)
+	}
+	if m.FieldCleared(designrequest.FieldRejectedByUserID) {
+		fields = append(fields, designrequest.FieldRejectedByUserID)
+	}
+	if m.FieldCleared(designrequest.FieldRejectedAt) {
+		fields = append(fields, designrequest.FieldRejectedAt)
+	}
+	if m.FieldCleared(designrequest.FieldRejectReason) {
+		fields = append(fields, designrequest.FieldRejectReason)
+	}
+	if m.FieldCleared(designrequest.FieldChangeNote) {
+		fields = append(fields, designrequest.FieldChangeNote)
+	}
+	if m.FieldCleared(designrequest.FieldPublishedAt) {
+		fields = append(fields, designrequest.FieldPublishedAt)
+	}
+	if m.FieldCleared(designrequest.FieldPublishedTag) {
+		fields = append(fields, designrequest.FieldPublishedTag)
+	}
+	if m.FieldCleared(designrequest.FieldDeploymentID) {
+		fields = append(fields, designrequest.FieldDeploymentID)
+	}
+	if m.FieldCleared(designrequest.FieldRestoresRequestID) {
+		fields = append(fields, designrequest.FieldRestoresRequestID)
+	}
+	if m.FieldCleared(designrequest.FieldRevertedByRequestID) {
+		fields = append(fields, designrequest.FieldRevertedByRequestID)
+	}
+	if m.FieldCleared(designrequest.FieldFailureCode) {
+		fields = append(fields, designrequest.FieldFailureCode)
+	}
+	if m.FieldCleared(designrequest.FieldFailureDetail) {
+		fields = append(fields, designrequest.FieldFailureDetail)
+	}
+	if m.FieldCleared(designrequest.FieldIdempotencyKey) {
+		fields = append(fields, designrequest.FieldIdempotencyKey)
+	}
+	if m.FieldCleared(designrequest.FieldIdempotencyFingerprint) {
+		fields = append(fields, designrequest.FieldIdempotencyFingerprint)
+	}
+	if m.FieldCleared(designrequest.FieldClaimedByCredentialID) {
+		fields = append(fields, designrequest.FieldClaimedByCredentialID)
+	}
+	if m.FieldCleared(designrequest.FieldClaimedAt) {
+		fields = append(fields, designrequest.FieldClaimedAt)
+	}
+	if m.FieldCleared(designrequest.FieldClaimExpiresAt) {
+		fields = append(fields, designrequest.FieldClaimExpiresAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignRequestMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignRequestMutation) ClearField(name string) error {
+	switch name {
+	case designrequest.FieldPromptText:
+		m.ClearPromptText()
+		return nil
+	case designrequest.FieldCandidateSha:
+		m.ClearCandidateSha()
+		return nil
+	case designrequest.FieldPublishedSha:
+		m.ClearPublishedSha()
+		return nil
+	case designrequest.FieldGuard:
+		m.ClearGuard()
+		return nil
+	case designrequest.FieldPreviewOrigin:
+		m.ClearPreviewOrigin()
+		return nil
+	case designrequest.FieldPreviewRegisteredAt:
+		m.ClearPreviewRegisteredAt()
+		return nil
+	case designrequest.FieldPreviewExpiresAt:
+		m.ClearPreviewExpiresAt()
+		return nil
+	case designrequest.FieldApprovedByUserID:
+		m.ClearApprovedByUserID()
+		return nil
+	case designrequest.FieldApprovedAt:
+		m.ClearApprovedAt()
+		return nil
+	case designrequest.FieldApprovedHeadSha:
+		m.ClearApprovedHeadSha()
+		return nil
+	case designrequest.FieldApprovalExpiresAt:
+		m.ClearApprovalExpiresAt()
+		return nil
+	case designrequest.FieldPublishTag:
+		m.ClearPublishTag()
+		return nil
+	case designrequest.FieldRejectedByUserID:
+		m.ClearRejectedByUserID()
+		return nil
+	case designrequest.FieldRejectedAt:
+		m.ClearRejectedAt()
+		return nil
+	case designrequest.FieldRejectReason:
+		m.ClearRejectReason()
+		return nil
+	case designrequest.FieldChangeNote:
+		m.ClearChangeNote()
+		return nil
+	case designrequest.FieldPublishedAt:
+		m.ClearPublishedAt()
+		return nil
+	case designrequest.FieldPublishedTag:
+		m.ClearPublishedTag()
+		return nil
+	case designrequest.FieldDeploymentID:
+		m.ClearDeploymentID()
+		return nil
+	case designrequest.FieldRestoresRequestID:
+		m.ClearRestoresRequestID()
+		return nil
+	case designrequest.FieldRevertedByRequestID:
+		m.ClearRevertedByRequestID()
+		return nil
+	case designrequest.FieldFailureCode:
+		m.ClearFailureCode()
+		return nil
+	case designrequest.FieldFailureDetail:
+		m.ClearFailureDetail()
+		return nil
+	case designrequest.FieldIdempotencyKey:
+		m.ClearIdempotencyKey()
+		return nil
+	case designrequest.FieldIdempotencyFingerprint:
+		m.ClearIdempotencyFingerprint()
+		return nil
+	case designrequest.FieldClaimedByCredentialID:
+		m.ClearClaimedByCredentialID()
+		return nil
+	case designrequest.FieldClaimedAt:
+		m.ClearClaimedAt()
+		return nil
+	case designrequest.FieldClaimExpiresAt:
+		m.ClearClaimExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequest nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignRequestMutation) ResetField(name string) error {
+	switch name {
+	case designrequest.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designrequest.FieldSite:
+		m.ResetSite()
+		return nil
+	case designrequest.FieldKind:
+		m.ResetKind()
+		return nil
+	case designrequest.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case designrequest.FieldRequestedByUserID:
+		m.ResetRequestedByUserID()
+		return nil
+	case designrequest.FieldPromptText:
+		m.ResetPromptText()
+		return nil
+	case designrequest.FieldPromptSha256:
+		m.ResetPromptSha256()
+		return nil
+	case designrequest.FieldPromptFlags:
+		m.ResetPromptFlags()
+		return nil
+	case designrequest.FieldBaseSha:
+		m.ResetBaseSha()
+		return nil
+	case designrequest.FieldHeadSha:
+		m.ResetHeadSha()
+		return nil
+	case designrequest.FieldCandidateSha:
+		m.ResetCandidateSha()
+		return nil
+	case designrequest.FieldPublishedSha:
+		m.ResetPublishedSha()
+		return nil
+	case designrequest.FieldBranch:
+		m.ResetBranch()
+		return nil
+	case designrequest.FieldCoreVersion:
+		m.ResetCoreVersion()
+		return nil
+	case designrequest.FieldDesignFloorVersion:
+		m.ResetDesignFloorVersion()
+		return nil
+	case designrequest.FieldDiffSummary:
+		m.ResetDiffSummary()
+		return nil
+	case designrequest.FieldGuard:
+		m.ResetGuard()
+		return nil
+	case designrequest.FieldPreviewOrigin:
+		m.ResetPreviewOrigin()
+		return nil
+	case designrequest.FieldPreviewRegisteredAt:
+		m.ResetPreviewRegisteredAt()
+		return nil
+	case designrequest.FieldPreviewExpiresAt:
+		m.ResetPreviewExpiresAt()
+		return nil
+	case designrequest.FieldApprovedByUserID:
+		m.ResetApprovedByUserID()
+		return nil
+	case designrequest.FieldApprovedAt:
+		m.ResetApprovedAt()
+		return nil
+	case designrequest.FieldApprovedHeadSha:
+		m.ResetApprovedHeadSha()
+		return nil
+	case designrequest.FieldApprovalExpiresAt:
+		m.ResetApprovalExpiresAt()
+		return nil
+	case designrequest.FieldPublishTag:
+		m.ResetPublishTag()
+		return nil
+	case designrequest.FieldRejectedByUserID:
+		m.ResetRejectedByUserID()
+		return nil
+	case designrequest.FieldRejectedAt:
+		m.ResetRejectedAt()
+		return nil
+	case designrequest.FieldRejectReason:
+		m.ResetRejectReason()
+		return nil
+	case designrequest.FieldChangeNote:
+		m.ResetChangeNote()
+		return nil
+	case designrequest.FieldPublishedAt:
+		m.ResetPublishedAt()
+		return nil
+	case designrequest.FieldPublishedTag:
+		m.ResetPublishedTag()
+		return nil
+	case designrequest.FieldDeploymentID:
+		m.ResetDeploymentID()
+		return nil
+	case designrequest.FieldRestoresRequestID:
+		m.ResetRestoresRequestID()
+		return nil
+	case designrequest.FieldRevertedByRequestID:
+		m.ResetRevertedByRequestID()
+		return nil
+	case designrequest.FieldFailureCode:
+		m.ResetFailureCode()
+		return nil
+	case designrequest.FieldFailureDetail:
+		m.ResetFailureDetail()
+		return nil
+	case designrequest.FieldRev:
+		m.ResetRev()
+		return nil
+	case designrequest.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	case designrequest.FieldIdempotencyFingerprint:
+		m.ResetIdempotencyFingerprint()
+		return nil
+	case designrequest.FieldClaimedByCredentialID:
+		m.ResetClaimedByCredentialID()
+		return nil
+	case designrequest.FieldClaimedAt:
+		m.ResetClaimedAt()
+		return nil
+	case designrequest.FieldClaimExpiresAt:
+		m.ResetClaimExpiresAt()
+		return nil
+	case designrequest.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case designrequest.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequest field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignRequestMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignRequestMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignRequestMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignRequestMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignRequestMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignRequestMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignRequestMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignRequest unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignRequestMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignRequest edge %s", name)
+}
+
+// DesignRequestEventMutation represents an operation that mutates the DesignRequestEvent nodes in the graph.
+type DesignRequestEventMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *int
+	shop_id                *int
+	addshop_id             *int
+	request_id             *uuid.UUID
+	seq                    *int
+	addseq                 *int
+	kind                   *string
+	from_status            *string
+	to_status              *string
+	actor_type             *string
+	actor_user_id          *int
+	addactor_user_id       *int
+	actor_credential_id    *int
+	addactor_credential_id *int
+	head_sha               *string
+	detail                 *json.RawMessage
+	appenddetail           json.RawMessage
+	prev_hash              *string
+	hash                   *string
+	created_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*DesignRequestEvent, error)
+	predicates             []predicate.DesignRequestEvent
+}
+
+var _ ent.Mutation = (*DesignRequestEventMutation)(nil)
+
+// designrequesteventOption allows management of the mutation configuration using functional options.
+type designrequesteventOption func(*DesignRequestEventMutation)
+
+// newDesignRequestEventMutation creates new mutation for the DesignRequestEvent entity.
+func newDesignRequestEventMutation(c config, op Op, opts ...designrequesteventOption) *DesignRequestEventMutation {
+	m := &DesignRequestEventMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignRequestEvent,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignRequestEventID sets the ID field of the mutation.
+func withDesignRequestEventID(id int) designrequesteventOption {
+	return func(m *DesignRequestEventMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignRequestEvent
+		)
+		m.oldValue = func(ctx context.Context) (*DesignRequestEvent, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignRequestEvent.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignRequestEvent sets the old DesignRequestEvent of the mutation.
+func withDesignRequestEvent(node *DesignRequestEvent) designrequesteventOption {
+	return func(m *DesignRequestEventMutation) {
+		m.oldValue = func(context.Context) (*DesignRequestEvent, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignRequestEventMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignRequestEventMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignRequestEventMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignRequestEventMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignRequestEvent.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignRequestEventMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignRequestEventMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignRequestEventMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignRequestEventMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignRequestEventMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *DesignRequestEventMutation) SetRequestID(u uuid.UUID) {
+	m.request_id = &u
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *DesignRequestEventMutation) RequestID() (r uuid.UUID, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldRequestID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *DesignRequestEventMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetSeq sets the "seq" field.
+func (m *DesignRequestEventMutation) SetSeq(i int) {
+	m.seq = &i
+	m.addseq = nil
+}
+
+// Seq returns the value of the "seq" field in the mutation.
+func (m *DesignRequestEventMutation) Seq() (r int, exists bool) {
+	v := m.seq
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSeq returns the old "seq" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldSeq(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSeq is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSeq requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSeq: %w", err)
+	}
+	return oldValue.Seq, nil
+}
+
+// AddSeq adds i to the "seq" field.
+func (m *DesignRequestEventMutation) AddSeq(i int) {
+	if m.addseq != nil {
+		*m.addseq += i
+	} else {
+		m.addseq = &i
+	}
+}
+
+// AddedSeq returns the value that was added to the "seq" field in this mutation.
+func (m *DesignRequestEventMutation) AddedSeq() (r int, exists bool) {
+	v := m.addseq
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetSeq resets all changes to the "seq" field.
+func (m *DesignRequestEventMutation) ResetSeq() {
+	m.seq = nil
+	m.addseq = nil
+}
+
+// SetKind sets the "kind" field.
+func (m *DesignRequestEventMutation) SetKind(s string) {
+	m.kind = &s
+}
+
+// Kind returns the value of the "kind" field in the mutation.
+func (m *DesignRequestEventMutation) Kind() (r string, exists bool) {
+	v := m.kind
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKind returns the old "kind" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldKind(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKind is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKind requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKind: %w", err)
+	}
+	return oldValue.Kind, nil
+}
+
+// ResetKind resets all changes to the "kind" field.
+func (m *DesignRequestEventMutation) ResetKind() {
+	m.kind = nil
+}
+
+// SetFromStatus sets the "from_status" field.
+func (m *DesignRequestEventMutation) SetFromStatus(s string) {
+	m.from_status = &s
+}
+
+// FromStatus returns the value of the "from_status" field in the mutation.
+func (m *DesignRequestEventMutation) FromStatus() (r string, exists bool) {
+	v := m.from_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFromStatus returns the old "from_status" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldFromStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFromStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFromStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFromStatus: %w", err)
+	}
+	return oldValue.FromStatus, nil
+}
+
+// ResetFromStatus resets all changes to the "from_status" field.
+func (m *DesignRequestEventMutation) ResetFromStatus() {
+	m.from_status = nil
+}
+
+// SetToStatus sets the "to_status" field.
+func (m *DesignRequestEventMutation) SetToStatus(s string) {
+	m.to_status = &s
+}
+
+// ToStatus returns the value of the "to_status" field in the mutation.
+func (m *DesignRequestEventMutation) ToStatus() (r string, exists bool) {
+	v := m.to_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldToStatus returns the old "to_status" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldToStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldToStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldToStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldToStatus: %w", err)
+	}
+	return oldValue.ToStatus, nil
+}
+
+// ResetToStatus resets all changes to the "to_status" field.
+func (m *DesignRequestEventMutation) ResetToStatus() {
+	m.to_status = nil
+}
+
+// SetActorType sets the "actor_type" field.
+func (m *DesignRequestEventMutation) SetActorType(s string) {
+	m.actor_type = &s
+}
+
+// ActorType returns the value of the "actor_type" field in the mutation.
+func (m *DesignRequestEventMutation) ActorType() (r string, exists bool) {
+	v := m.actor_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorType returns the old "actor_type" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldActorType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorType: %w", err)
+	}
+	return oldValue.ActorType, nil
+}
+
+// ResetActorType resets all changes to the "actor_type" field.
+func (m *DesignRequestEventMutation) ResetActorType() {
+	m.actor_type = nil
+}
+
+// SetActorUserID sets the "actor_user_id" field.
+func (m *DesignRequestEventMutation) SetActorUserID(i int) {
+	m.actor_user_id = &i
+	m.addactor_user_id = nil
+}
+
+// ActorUserID returns the value of the "actor_user_id" field in the mutation.
+func (m *DesignRequestEventMutation) ActorUserID() (r int, exists bool) {
+	v := m.actor_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorUserID returns the old "actor_user_id" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldActorUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorUserID: %w", err)
+	}
+	return oldValue.ActorUserID, nil
+}
+
+// AddActorUserID adds i to the "actor_user_id" field.
+func (m *DesignRequestEventMutation) AddActorUserID(i int) {
+	if m.addactor_user_id != nil {
+		*m.addactor_user_id += i
+	} else {
+		m.addactor_user_id = &i
+	}
+}
+
+// AddedActorUserID returns the value that was added to the "actor_user_id" field in this mutation.
+func (m *DesignRequestEventMutation) AddedActorUserID() (r int, exists bool) {
+	v := m.addactor_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearActorUserID clears the value of the "actor_user_id" field.
+func (m *DesignRequestEventMutation) ClearActorUserID() {
+	m.actor_user_id = nil
+	m.addactor_user_id = nil
+	m.clearedFields[designrequestevent.FieldActorUserID] = struct{}{}
+}
+
+// ActorUserIDCleared returns if the "actor_user_id" field was cleared in this mutation.
+func (m *DesignRequestEventMutation) ActorUserIDCleared() bool {
+	_, ok := m.clearedFields[designrequestevent.FieldActorUserID]
+	return ok
+}
+
+// ResetActorUserID resets all changes to the "actor_user_id" field.
+func (m *DesignRequestEventMutation) ResetActorUserID() {
+	m.actor_user_id = nil
+	m.addactor_user_id = nil
+	delete(m.clearedFields, designrequestevent.FieldActorUserID)
+}
+
+// SetActorCredentialID sets the "actor_credential_id" field.
+func (m *DesignRequestEventMutation) SetActorCredentialID(i int) {
+	m.actor_credential_id = &i
+	m.addactor_credential_id = nil
+}
+
+// ActorCredentialID returns the value of the "actor_credential_id" field in the mutation.
+func (m *DesignRequestEventMutation) ActorCredentialID() (r int, exists bool) {
+	v := m.actor_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldActorCredentialID returns the old "actor_credential_id" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldActorCredentialID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldActorCredentialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldActorCredentialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldActorCredentialID: %w", err)
+	}
+	return oldValue.ActorCredentialID, nil
+}
+
+// AddActorCredentialID adds i to the "actor_credential_id" field.
+func (m *DesignRequestEventMutation) AddActorCredentialID(i int) {
+	if m.addactor_credential_id != nil {
+		*m.addactor_credential_id += i
+	} else {
+		m.addactor_credential_id = &i
+	}
+}
+
+// AddedActorCredentialID returns the value that was added to the "actor_credential_id" field in this mutation.
+func (m *DesignRequestEventMutation) AddedActorCredentialID() (r int, exists bool) {
+	v := m.addactor_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearActorCredentialID clears the value of the "actor_credential_id" field.
+func (m *DesignRequestEventMutation) ClearActorCredentialID() {
+	m.actor_credential_id = nil
+	m.addactor_credential_id = nil
+	m.clearedFields[designrequestevent.FieldActorCredentialID] = struct{}{}
+}
+
+// ActorCredentialIDCleared returns if the "actor_credential_id" field was cleared in this mutation.
+func (m *DesignRequestEventMutation) ActorCredentialIDCleared() bool {
+	_, ok := m.clearedFields[designrequestevent.FieldActorCredentialID]
+	return ok
+}
+
+// ResetActorCredentialID resets all changes to the "actor_credential_id" field.
+func (m *DesignRequestEventMutation) ResetActorCredentialID() {
+	m.actor_credential_id = nil
+	m.addactor_credential_id = nil
+	delete(m.clearedFields, designrequestevent.FieldActorCredentialID)
+}
+
+// SetHeadSha sets the "head_sha" field.
+func (m *DesignRequestEventMutation) SetHeadSha(s string) {
+	m.head_sha = &s
+}
+
+// HeadSha returns the value of the "head_sha" field in the mutation.
+func (m *DesignRequestEventMutation) HeadSha() (r string, exists bool) {
+	v := m.head_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHeadSha returns the old "head_sha" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldHeadSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHeadSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHeadSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHeadSha: %w", err)
+	}
+	return oldValue.HeadSha, nil
+}
+
+// ResetHeadSha resets all changes to the "head_sha" field.
+func (m *DesignRequestEventMutation) ResetHeadSha() {
+	m.head_sha = nil
+}
+
+// SetDetail sets the "detail" field.
+func (m *DesignRequestEventMutation) SetDetail(jm json.RawMessage) {
+	m.detail = &jm
+	m.appenddetail = nil
+}
+
+// Detail returns the value of the "detail" field in the mutation.
+func (m *DesignRequestEventMutation) Detail() (r json.RawMessage, exists bool) {
+	v := m.detail
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetail returns the old "detail" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldDetail(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetail: %w", err)
+	}
+	return oldValue.Detail, nil
+}
+
+// AppendDetail adds jm to the "detail" field.
+func (m *DesignRequestEventMutation) AppendDetail(jm json.RawMessage) {
+	m.appenddetail = append(m.appenddetail, jm...)
+}
+
+// AppendedDetail returns the list of values that were appended to the "detail" field in this mutation.
+func (m *DesignRequestEventMutation) AppendedDetail() (json.RawMessage, bool) {
+	if len(m.appenddetail) == 0 {
+		return nil, false
+	}
+	return m.appenddetail, true
+}
+
+// ResetDetail resets all changes to the "detail" field.
+func (m *DesignRequestEventMutation) ResetDetail() {
+	m.detail = nil
+	m.appenddetail = nil
+}
+
+// SetPrevHash sets the "prev_hash" field.
+func (m *DesignRequestEventMutation) SetPrevHash(s string) {
+	m.prev_hash = &s
+}
+
+// PrevHash returns the value of the "prev_hash" field in the mutation.
+func (m *DesignRequestEventMutation) PrevHash() (r string, exists bool) {
+	v := m.prev_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrevHash returns the old "prev_hash" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldPrevHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrevHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrevHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrevHash: %w", err)
+	}
+	return oldValue.PrevHash, nil
+}
+
+// ResetPrevHash resets all changes to the "prev_hash" field.
+func (m *DesignRequestEventMutation) ResetPrevHash() {
+	m.prev_hash = nil
+}
+
+// SetHash sets the "hash" field.
+func (m *DesignRequestEventMutation) SetHash(s string) {
+	m.hash = &s
+}
+
+// Hash returns the value of the "hash" field in the mutation.
+func (m *DesignRequestEventMutation) Hash() (r string, exists bool) {
+	v := m.hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHash returns the old "hash" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHash: %w", err)
+	}
+	return oldValue.Hash, nil
+}
+
+// ResetHash resets all changes to the "hash" field.
+func (m *DesignRequestEventMutation) ResetHash() {
+	m.hash = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesignRequestEventMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesignRequestEventMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesignRequestEvent entity.
+// If the DesignRequestEvent object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignRequestEventMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesignRequestEventMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the DesignRequestEventMutation builder.
+func (m *DesignRequestEventMutation) Where(ps ...predicate.DesignRequestEvent) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignRequestEventMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignRequestEventMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignRequestEvent, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignRequestEventMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignRequestEventMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignRequestEvent).
+func (m *DesignRequestEventMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignRequestEventMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.shop_id != nil {
+		fields = append(fields, designrequestevent.FieldShopID)
+	}
+	if m.request_id != nil {
+		fields = append(fields, designrequestevent.FieldRequestID)
+	}
+	if m.seq != nil {
+		fields = append(fields, designrequestevent.FieldSeq)
+	}
+	if m.kind != nil {
+		fields = append(fields, designrequestevent.FieldKind)
+	}
+	if m.from_status != nil {
+		fields = append(fields, designrequestevent.FieldFromStatus)
+	}
+	if m.to_status != nil {
+		fields = append(fields, designrequestevent.FieldToStatus)
+	}
+	if m.actor_type != nil {
+		fields = append(fields, designrequestevent.FieldActorType)
+	}
+	if m.actor_user_id != nil {
+		fields = append(fields, designrequestevent.FieldActorUserID)
+	}
+	if m.actor_credential_id != nil {
+		fields = append(fields, designrequestevent.FieldActorCredentialID)
+	}
+	if m.head_sha != nil {
+		fields = append(fields, designrequestevent.FieldHeadSha)
+	}
+	if m.detail != nil {
+		fields = append(fields, designrequestevent.FieldDetail)
+	}
+	if m.prev_hash != nil {
+		fields = append(fields, designrequestevent.FieldPrevHash)
+	}
+	if m.hash != nil {
+		fields = append(fields, designrequestevent.FieldHash)
+	}
+	if m.created_at != nil {
+		fields = append(fields, designrequestevent.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignRequestEventMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designrequestevent.FieldShopID:
+		return m.ShopID()
+	case designrequestevent.FieldRequestID:
+		return m.RequestID()
+	case designrequestevent.FieldSeq:
+		return m.Seq()
+	case designrequestevent.FieldKind:
+		return m.Kind()
+	case designrequestevent.FieldFromStatus:
+		return m.FromStatus()
+	case designrequestevent.FieldToStatus:
+		return m.ToStatus()
+	case designrequestevent.FieldActorType:
+		return m.ActorType()
+	case designrequestevent.FieldActorUserID:
+		return m.ActorUserID()
+	case designrequestevent.FieldActorCredentialID:
+		return m.ActorCredentialID()
+	case designrequestevent.FieldHeadSha:
+		return m.HeadSha()
+	case designrequestevent.FieldDetail:
+		return m.Detail()
+	case designrequestevent.FieldPrevHash:
+		return m.PrevHash()
+	case designrequestevent.FieldHash:
+		return m.Hash()
+	case designrequestevent.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignRequestEventMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designrequestevent.FieldShopID:
+		return m.OldShopID(ctx)
+	case designrequestevent.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case designrequestevent.FieldSeq:
+		return m.OldSeq(ctx)
+	case designrequestevent.FieldKind:
+		return m.OldKind(ctx)
+	case designrequestevent.FieldFromStatus:
+		return m.OldFromStatus(ctx)
+	case designrequestevent.FieldToStatus:
+		return m.OldToStatus(ctx)
+	case designrequestevent.FieldActorType:
+		return m.OldActorType(ctx)
+	case designrequestevent.FieldActorUserID:
+		return m.OldActorUserID(ctx)
+	case designrequestevent.FieldActorCredentialID:
+		return m.OldActorCredentialID(ctx)
+	case designrequestevent.FieldHeadSha:
+		return m.OldHeadSha(ctx)
+	case designrequestevent.FieldDetail:
+		return m.OldDetail(ctx)
+	case designrequestevent.FieldPrevHash:
+		return m.OldPrevHash(ctx)
+	case designrequestevent.FieldHash:
+		return m.OldHash(ctx)
+	case designrequestevent.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignRequestEvent field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignRequestEventMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designrequestevent.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designrequestevent.FieldRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case designrequestevent.FieldSeq:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSeq(v)
+		return nil
+	case designrequestevent.FieldKind:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKind(v)
+		return nil
+	case designrequestevent.FieldFromStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFromStatus(v)
+		return nil
+	case designrequestevent.FieldToStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetToStatus(v)
+		return nil
+	case designrequestevent.FieldActorType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorType(v)
+		return nil
+	case designrequestevent.FieldActorUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorUserID(v)
+		return nil
+	case designrequestevent.FieldActorCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetActorCredentialID(v)
+		return nil
+	case designrequestevent.FieldHeadSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHeadSha(v)
+		return nil
+	case designrequestevent.FieldDetail:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetail(v)
+		return nil
+	case designrequestevent.FieldPrevHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrevHash(v)
+		return nil
+	case designrequestevent.FieldHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHash(v)
+		return nil
+	case designrequestevent.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequestEvent field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignRequestEventMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designrequestevent.FieldShopID)
+	}
+	if m.addseq != nil {
+		fields = append(fields, designrequestevent.FieldSeq)
+	}
+	if m.addactor_user_id != nil {
+		fields = append(fields, designrequestevent.FieldActorUserID)
+	}
+	if m.addactor_credential_id != nil {
+		fields = append(fields, designrequestevent.FieldActorCredentialID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignRequestEventMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designrequestevent.FieldShopID:
+		return m.AddedShopID()
+	case designrequestevent.FieldSeq:
+		return m.AddedSeq()
+	case designrequestevent.FieldActorUserID:
+		return m.AddedActorUserID()
+	case designrequestevent.FieldActorCredentialID:
+		return m.AddedActorCredentialID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignRequestEventMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designrequestevent.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designrequestevent.FieldSeq:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddSeq(v)
+		return nil
+	case designrequestevent.FieldActorUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActorUserID(v)
+		return nil
+	case designrequestevent.FieldActorCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddActorCredentialID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequestEvent numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignRequestEventMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designrequestevent.FieldActorUserID) {
+		fields = append(fields, designrequestevent.FieldActorUserID)
+	}
+	if m.FieldCleared(designrequestevent.FieldActorCredentialID) {
+		fields = append(fields, designrequestevent.FieldActorCredentialID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignRequestEventMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignRequestEventMutation) ClearField(name string) error {
+	switch name {
+	case designrequestevent.FieldActorUserID:
+		m.ClearActorUserID()
+		return nil
+	case designrequestevent.FieldActorCredentialID:
+		m.ClearActorCredentialID()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequestEvent nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignRequestEventMutation) ResetField(name string) error {
+	switch name {
+	case designrequestevent.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designrequestevent.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case designrequestevent.FieldSeq:
+		m.ResetSeq()
+		return nil
+	case designrequestevent.FieldKind:
+		m.ResetKind()
+		return nil
+	case designrequestevent.FieldFromStatus:
+		m.ResetFromStatus()
+		return nil
+	case designrequestevent.FieldToStatus:
+		m.ResetToStatus()
+		return nil
+	case designrequestevent.FieldActorType:
+		m.ResetActorType()
+		return nil
+	case designrequestevent.FieldActorUserID:
+		m.ResetActorUserID()
+		return nil
+	case designrequestevent.FieldActorCredentialID:
+		m.ResetActorCredentialID()
+		return nil
+	case designrequestevent.FieldHeadSha:
+		m.ResetHeadSha()
+		return nil
+	case designrequestevent.FieldDetail:
+		m.ResetDetail()
+		return nil
+	case designrequestevent.FieldPrevHash:
+		m.ResetPrevHash()
+		return nil
+	case designrequestevent.FieldHash:
+		m.ResetHash()
+		return nil
+	case designrequestevent.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignRequestEvent field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignRequestEventMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignRequestEventMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignRequestEventMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignRequestEventMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignRequestEventMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignRequestEventMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignRequestEventMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignRequestEvent unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignRequestEventMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignRequestEvent edge %s", name)
+}
+
+// DesignScreenshotMutation represents an operation that mutates the DesignScreenshot nodes in the graph.
+type DesignScreenshotMutation struct {
+	config
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	shop_id                *int
+	addshop_id             *int
+	request_id             *uuid.UUID
+	phase                  *string
+	site                   *string
+	view_key               *string
+	viewport               *int16
+	addviewport            *int16
+	role                   *string
+	attempt                *int16
+	addattempt             *int16
+	commit_sha             *string
+	object_key             *string
+	content_type           *string
+	byte_size              *int
+	addbyte_size           *int
+	width                  *int
+	addwidth               *int
+	height                 *int
+	addheight              *int
+	sha256                 *string
+	diff_ppm               *int
+	adddiff_ppm            *int
+	capture_manifest       *json.RawMessage
+	appendcapture_manifest json.RawMessage
+	purged_at              *time.Time
+	created_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*DesignScreenshot, error)
+	predicates             []predicate.DesignScreenshot
+}
+
+var _ ent.Mutation = (*DesignScreenshotMutation)(nil)
+
+// designscreenshotOption allows management of the mutation configuration using functional options.
+type designscreenshotOption func(*DesignScreenshotMutation)
+
+// newDesignScreenshotMutation creates new mutation for the DesignScreenshot entity.
+func newDesignScreenshotMutation(c config, op Op, opts ...designscreenshotOption) *DesignScreenshotMutation {
+	m := &DesignScreenshotMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignScreenshot,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignScreenshotID sets the ID field of the mutation.
+func withDesignScreenshotID(id uuid.UUID) designscreenshotOption {
+	return func(m *DesignScreenshotMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignScreenshot
+		)
+		m.oldValue = func(ctx context.Context) (*DesignScreenshot, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignScreenshot.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignScreenshot sets the old DesignScreenshot of the mutation.
+func withDesignScreenshot(node *DesignScreenshot) designscreenshotOption {
+	return func(m *DesignScreenshotMutation) {
+		m.oldValue = func(context.Context) (*DesignScreenshot, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignScreenshotMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignScreenshotMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DesignScreenshot entities.
+func (m *DesignScreenshotMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignScreenshotMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignScreenshotMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignScreenshot.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignScreenshotMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignScreenshotMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignScreenshotMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignScreenshotMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignScreenshotMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetRequestID sets the "request_id" field.
+func (m *DesignScreenshotMutation) SetRequestID(u uuid.UUID) {
+	m.request_id = &u
+}
+
+// RequestID returns the value of the "request_id" field in the mutation.
+func (m *DesignScreenshotMutation) RequestID() (r uuid.UUID, exists bool) {
+	v := m.request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestID returns the old "request_id" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldRequestID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestID: %w", err)
+	}
+	return oldValue.RequestID, nil
+}
+
+// ResetRequestID resets all changes to the "request_id" field.
+func (m *DesignScreenshotMutation) ResetRequestID() {
+	m.request_id = nil
+}
+
+// SetPhase sets the "phase" field.
+func (m *DesignScreenshotMutation) SetPhase(s string) {
+	m.phase = &s
+}
+
+// Phase returns the value of the "phase" field in the mutation.
+func (m *DesignScreenshotMutation) Phase() (r string, exists bool) {
+	v := m.phase
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPhase returns the old "phase" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldPhase(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPhase is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPhase requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPhase: %w", err)
+	}
+	return oldValue.Phase, nil
+}
+
+// ResetPhase resets all changes to the "phase" field.
+func (m *DesignScreenshotMutation) ResetPhase() {
+	m.phase = nil
+}
+
+// SetSite sets the "site" field.
+func (m *DesignScreenshotMutation) SetSite(s string) {
+	m.site = &s
+}
+
+// Site returns the value of the "site" field in the mutation.
+func (m *DesignScreenshotMutation) Site() (r string, exists bool) {
+	v := m.site
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSite returns the old "site" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldSite(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSite: %w", err)
+	}
+	return oldValue.Site, nil
+}
+
+// ResetSite resets all changes to the "site" field.
+func (m *DesignScreenshotMutation) ResetSite() {
+	m.site = nil
+}
+
+// SetViewKey sets the "view_key" field.
+func (m *DesignScreenshotMutation) SetViewKey(s string) {
+	m.view_key = &s
+}
+
+// ViewKey returns the value of the "view_key" field in the mutation.
+func (m *DesignScreenshotMutation) ViewKey() (r string, exists bool) {
+	v := m.view_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldViewKey returns the old "view_key" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldViewKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldViewKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldViewKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldViewKey: %w", err)
+	}
+	return oldValue.ViewKey, nil
+}
+
+// ResetViewKey resets all changes to the "view_key" field.
+func (m *DesignScreenshotMutation) ResetViewKey() {
+	m.view_key = nil
+}
+
+// SetViewport sets the "viewport" field.
+func (m *DesignScreenshotMutation) SetViewport(i int16) {
+	m.viewport = &i
+	m.addviewport = nil
+}
+
+// Viewport returns the value of the "viewport" field in the mutation.
+func (m *DesignScreenshotMutation) Viewport() (r int16, exists bool) {
+	v := m.viewport
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldViewport returns the old "viewport" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldViewport(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldViewport is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldViewport requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldViewport: %w", err)
+	}
+	return oldValue.Viewport, nil
+}
+
+// AddViewport adds i to the "viewport" field.
+func (m *DesignScreenshotMutation) AddViewport(i int16) {
+	if m.addviewport != nil {
+		*m.addviewport += i
+	} else {
+		m.addviewport = &i
+	}
+}
+
+// AddedViewport returns the value that was added to the "viewport" field in this mutation.
+func (m *DesignScreenshotMutation) AddedViewport() (r int16, exists bool) {
+	v := m.addviewport
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetViewport resets all changes to the "viewport" field.
+func (m *DesignScreenshotMutation) ResetViewport() {
+	m.viewport = nil
+	m.addviewport = nil
+}
+
+// SetRole sets the "role" field.
+func (m *DesignScreenshotMutation) SetRole(s string) {
+	m.role = &s
+}
+
+// Role returns the value of the "role" field in the mutation.
+func (m *DesignScreenshotMutation) Role() (r string, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRole returns the old "role" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldRole(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRole is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRole requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRole: %w", err)
+	}
+	return oldValue.Role, nil
+}
+
+// ResetRole resets all changes to the "role" field.
+func (m *DesignScreenshotMutation) ResetRole() {
+	m.role = nil
+}
+
+// SetAttempt sets the "attempt" field.
+func (m *DesignScreenshotMutation) SetAttempt(i int16) {
+	m.attempt = &i
+	m.addattempt = nil
+}
+
+// Attempt returns the value of the "attempt" field in the mutation.
+func (m *DesignScreenshotMutation) Attempt() (r int16, exists bool) {
+	v := m.attempt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttempt returns the old "attempt" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldAttempt(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttempt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttempt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttempt: %w", err)
+	}
+	return oldValue.Attempt, nil
+}
+
+// AddAttempt adds i to the "attempt" field.
+func (m *DesignScreenshotMutation) AddAttempt(i int16) {
+	if m.addattempt != nil {
+		*m.addattempt += i
+	} else {
+		m.addattempt = &i
+	}
+}
+
+// AddedAttempt returns the value that was added to the "attempt" field in this mutation.
+func (m *DesignScreenshotMutation) AddedAttempt() (r int16, exists bool) {
+	v := m.addattempt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttempt resets all changes to the "attempt" field.
+func (m *DesignScreenshotMutation) ResetAttempt() {
+	m.attempt = nil
+	m.addattempt = nil
+}
+
+// SetCommitSha sets the "commit_sha" field.
+func (m *DesignScreenshotMutation) SetCommitSha(s string) {
+	m.commit_sha = &s
+}
+
+// CommitSha returns the value of the "commit_sha" field in the mutation.
+func (m *DesignScreenshotMutation) CommitSha() (r string, exists bool) {
+	v := m.commit_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCommitSha returns the old "commit_sha" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldCommitSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCommitSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCommitSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCommitSha: %w", err)
+	}
+	return oldValue.CommitSha, nil
+}
+
+// ResetCommitSha resets all changes to the "commit_sha" field.
+func (m *DesignScreenshotMutation) ResetCommitSha() {
+	m.commit_sha = nil
+}
+
+// SetObjectKey sets the "object_key" field.
+func (m *DesignScreenshotMutation) SetObjectKey(s string) {
+	m.object_key = &s
+}
+
+// ObjectKey returns the value of the "object_key" field in the mutation.
+func (m *DesignScreenshotMutation) ObjectKey() (r string, exists bool) {
+	v := m.object_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldObjectKey returns the old "object_key" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldObjectKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldObjectKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldObjectKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldObjectKey: %w", err)
+	}
+	return oldValue.ObjectKey, nil
+}
+
+// ResetObjectKey resets all changes to the "object_key" field.
+func (m *DesignScreenshotMutation) ResetObjectKey() {
+	m.object_key = nil
+}
+
+// SetContentType sets the "content_type" field.
+func (m *DesignScreenshotMutation) SetContentType(s string) {
+	m.content_type = &s
+}
+
+// ContentType returns the value of the "content_type" field in the mutation.
+func (m *DesignScreenshotMutation) ContentType() (r string, exists bool) {
+	v := m.content_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldContentType returns the old "content_type" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldContentType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldContentType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldContentType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldContentType: %w", err)
+	}
+	return oldValue.ContentType, nil
+}
+
+// ResetContentType resets all changes to the "content_type" field.
+func (m *DesignScreenshotMutation) ResetContentType() {
+	m.content_type = nil
+}
+
+// SetByteSize sets the "byte_size" field.
+func (m *DesignScreenshotMutation) SetByteSize(i int) {
+	m.byte_size = &i
+	m.addbyte_size = nil
+}
+
+// ByteSize returns the value of the "byte_size" field in the mutation.
+func (m *DesignScreenshotMutation) ByteSize() (r int, exists bool) {
+	v := m.byte_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldByteSize returns the old "byte_size" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldByteSize(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldByteSize is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldByteSize requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldByteSize: %w", err)
+	}
+	return oldValue.ByteSize, nil
+}
+
+// AddByteSize adds i to the "byte_size" field.
+func (m *DesignScreenshotMutation) AddByteSize(i int) {
+	if m.addbyte_size != nil {
+		*m.addbyte_size += i
+	} else {
+		m.addbyte_size = &i
+	}
+}
+
+// AddedByteSize returns the value that was added to the "byte_size" field in this mutation.
+func (m *DesignScreenshotMutation) AddedByteSize() (r int, exists bool) {
+	v := m.addbyte_size
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetByteSize resets all changes to the "byte_size" field.
+func (m *DesignScreenshotMutation) ResetByteSize() {
+	m.byte_size = nil
+	m.addbyte_size = nil
+}
+
+// SetWidth sets the "width" field.
+func (m *DesignScreenshotMutation) SetWidth(i int) {
+	m.width = &i
+	m.addwidth = nil
+}
+
+// Width returns the value of the "width" field in the mutation.
+func (m *DesignScreenshotMutation) Width() (r int, exists bool) {
+	v := m.width
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldWidth returns the old "width" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldWidth(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldWidth is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldWidth requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldWidth: %w", err)
+	}
+	return oldValue.Width, nil
+}
+
+// AddWidth adds i to the "width" field.
+func (m *DesignScreenshotMutation) AddWidth(i int) {
+	if m.addwidth != nil {
+		*m.addwidth += i
+	} else {
+		m.addwidth = &i
+	}
+}
+
+// AddedWidth returns the value that was added to the "width" field in this mutation.
+func (m *DesignScreenshotMutation) AddedWidth() (r int, exists bool) {
+	v := m.addwidth
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetWidth resets all changes to the "width" field.
+func (m *DesignScreenshotMutation) ResetWidth() {
+	m.width = nil
+	m.addwidth = nil
+}
+
+// SetHeight sets the "height" field.
+func (m *DesignScreenshotMutation) SetHeight(i int) {
+	m.height = &i
+	m.addheight = nil
+}
+
+// Height returns the value of the "height" field in the mutation.
+func (m *DesignScreenshotMutation) Height() (r int, exists bool) {
+	v := m.height
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHeight returns the old "height" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldHeight(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHeight is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHeight requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHeight: %w", err)
+	}
+	return oldValue.Height, nil
+}
+
+// AddHeight adds i to the "height" field.
+func (m *DesignScreenshotMutation) AddHeight(i int) {
+	if m.addheight != nil {
+		*m.addheight += i
+	} else {
+		m.addheight = &i
+	}
+}
+
+// AddedHeight returns the value that was added to the "height" field in this mutation.
+func (m *DesignScreenshotMutation) AddedHeight() (r int, exists bool) {
+	v := m.addheight
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetHeight resets all changes to the "height" field.
+func (m *DesignScreenshotMutation) ResetHeight() {
+	m.height = nil
+	m.addheight = nil
+}
+
+// SetSha256 sets the "sha256" field.
+func (m *DesignScreenshotMutation) SetSha256(s string) {
+	m.sha256 = &s
+}
+
+// Sha256 returns the value of the "sha256" field in the mutation.
+func (m *DesignScreenshotMutation) Sha256() (r string, exists bool) {
+	v := m.sha256
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSha256 returns the old "sha256" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldSha256(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSha256 is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSha256 requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSha256: %w", err)
+	}
+	return oldValue.Sha256, nil
+}
+
+// ResetSha256 resets all changes to the "sha256" field.
+func (m *DesignScreenshotMutation) ResetSha256() {
+	m.sha256 = nil
+}
+
+// SetDiffPpm sets the "diff_ppm" field.
+func (m *DesignScreenshotMutation) SetDiffPpm(i int) {
+	m.diff_ppm = &i
+	m.adddiff_ppm = nil
+}
+
+// DiffPpm returns the value of the "diff_ppm" field in the mutation.
+func (m *DesignScreenshotMutation) DiffPpm() (r int, exists bool) {
+	v := m.diff_ppm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDiffPpm returns the old "diff_ppm" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldDiffPpm(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDiffPpm is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDiffPpm requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDiffPpm: %w", err)
+	}
+	return oldValue.DiffPpm, nil
+}
+
+// AddDiffPpm adds i to the "diff_ppm" field.
+func (m *DesignScreenshotMutation) AddDiffPpm(i int) {
+	if m.adddiff_ppm != nil {
+		*m.adddiff_ppm += i
+	} else {
+		m.adddiff_ppm = &i
+	}
+}
+
+// AddedDiffPpm returns the value that was added to the "diff_ppm" field in this mutation.
+func (m *DesignScreenshotMutation) AddedDiffPpm() (r int, exists bool) {
+	v := m.adddiff_ppm
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearDiffPpm clears the value of the "diff_ppm" field.
+func (m *DesignScreenshotMutation) ClearDiffPpm() {
+	m.diff_ppm = nil
+	m.adddiff_ppm = nil
+	m.clearedFields[designscreenshot.FieldDiffPpm] = struct{}{}
+}
+
+// DiffPpmCleared returns if the "diff_ppm" field was cleared in this mutation.
+func (m *DesignScreenshotMutation) DiffPpmCleared() bool {
+	_, ok := m.clearedFields[designscreenshot.FieldDiffPpm]
+	return ok
+}
+
+// ResetDiffPpm resets all changes to the "diff_ppm" field.
+func (m *DesignScreenshotMutation) ResetDiffPpm() {
+	m.diff_ppm = nil
+	m.adddiff_ppm = nil
+	delete(m.clearedFields, designscreenshot.FieldDiffPpm)
+}
+
+// SetCaptureManifest sets the "capture_manifest" field.
+func (m *DesignScreenshotMutation) SetCaptureManifest(jm json.RawMessage) {
+	m.capture_manifest = &jm
+	m.appendcapture_manifest = nil
+}
+
+// CaptureManifest returns the value of the "capture_manifest" field in the mutation.
+func (m *DesignScreenshotMutation) CaptureManifest() (r json.RawMessage, exists bool) {
+	v := m.capture_manifest
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCaptureManifest returns the old "capture_manifest" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldCaptureManifest(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCaptureManifest is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCaptureManifest requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCaptureManifest: %w", err)
+	}
+	return oldValue.CaptureManifest, nil
+}
+
+// AppendCaptureManifest adds jm to the "capture_manifest" field.
+func (m *DesignScreenshotMutation) AppendCaptureManifest(jm json.RawMessage) {
+	m.appendcapture_manifest = append(m.appendcapture_manifest, jm...)
+}
+
+// AppendedCaptureManifest returns the list of values that were appended to the "capture_manifest" field in this mutation.
+func (m *DesignScreenshotMutation) AppendedCaptureManifest() (json.RawMessage, bool) {
+	if len(m.appendcapture_manifest) == 0 {
+		return nil, false
+	}
+	return m.appendcapture_manifest, true
+}
+
+// ResetCaptureManifest resets all changes to the "capture_manifest" field.
+func (m *DesignScreenshotMutation) ResetCaptureManifest() {
+	m.capture_manifest = nil
+	m.appendcapture_manifest = nil
+}
+
+// SetPurgedAt sets the "purged_at" field.
+func (m *DesignScreenshotMutation) SetPurgedAt(t time.Time) {
+	m.purged_at = &t
+}
+
+// PurgedAt returns the value of the "purged_at" field in the mutation.
+func (m *DesignScreenshotMutation) PurgedAt() (r time.Time, exists bool) {
+	v := m.purged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPurgedAt returns the old "purged_at" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldPurgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPurgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPurgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPurgedAt: %w", err)
+	}
+	return oldValue.PurgedAt, nil
+}
+
+// ClearPurgedAt clears the value of the "purged_at" field.
+func (m *DesignScreenshotMutation) ClearPurgedAt() {
+	m.purged_at = nil
+	m.clearedFields[designscreenshot.FieldPurgedAt] = struct{}{}
+}
+
+// PurgedAtCleared returns if the "purged_at" field was cleared in this mutation.
+func (m *DesignScreenshotMutation) PurgedAtCleared() bool {
+	_, ok := m.clearedFields[designscreenshot.FieldPurgedAt]
+	return ok
+}
+
+// ResetPurgedAt resets all changes to the "purged_at" field.
+func (m *DesignScreenshotMutation) ResetPurgedAt() {
+	m.purged_at = nil
+	delete(m.clearedFields, designscreenshot.FieldPurgedAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesignScreenshotMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesignScreenshotMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesignScreenshot entity.
+// If the DesignScreenshot object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignScreenshotMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesignScreenshotMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// Where appends a list predicates to the DesignScreenshotMutation builder.
+func (m *DesignScreenshotMutation) Where(ps ...predicate.DesignScreenshot) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignScreenshotMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignScreenshotMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignScreenshot, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignScreenshotMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignScreenshotMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignScreenshot).
+func (m *DesignScreenshotMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignScreenshotMutation) Fields() []string {
+	fields := make([]string, 0, 19)
+	if m.shop_id != nil {
+		fields = append(fields, designscreenshot.FieldShopID)
+	}
+	if m.request_id != nil {
+		fields = append(fields, designscreenshot.FieldRequestID)
+	}
+	if m.phase != nil {
+		fields = append(fields, designscreenshot.FieldPhase)
+	}
+	if m.site != nil {
+		fields = append(fields, designscreenshot.FieldSite)
+	}
+	if m.view_key != nil {
+		fields = append(fields, designscreenshot.FieldViewKey)
+	}
+	if m.viewport != nil {
+		fields = append(fields, designscreenshot.FieldViewport)
+	}
+	if m.role != nil {
+		fields = append(fields, designscreenshot.FieldRole)
+	}
+	if m.attempt != nil {
+		fields = append(fields, designscreenshot.FieldAttempt)
+	}
+	if m.commit_sha != nil {
+		fields = append(fields, designscreenshot.FieldCommitSha)
+	}
+	if m.object_key != nil {
+		fields = append(fields, designscreenshot.FieldObjectKey)
+	}
+	if m.content_type != nil {
+		fields = append(fields, designscreenshot.FieldContentType)
+	}
+	if m.byte_size != nil {
+		fields = append(fields, designscreenshot.FieldByteSize)
+	}
+	if m.width != nil {
+		fields = append(fields, designscreenshot.FieldWidth)
+	}
+	if m.height != nil {
+		fields = append(fields, designscreenshot.FieldHeight)
+	}
+	if m.sha256 != nil {
+		fields = append(fields, designscreenshot.FieldSha256)
+	}
+	if m.diff_ppm != nil {
+		fields = append(fields, designscreenshot.FieldDiffPpm)
+	}
+	if m.capture_manifest != nil {
+		fields = append(fields, designscreenshot.FieldCaptureManifest)
+	}
+	if m.purged_at != nil {
+		fields = append(fields, designscreenshot.FieldPurgedAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, designscreenshot.FieldCreatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignScreenshotMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designscreenshot.FieldShopID:
+		return m.ShopID()
+	case designscreenshot.FieldRequestID:
+		return m.RequestID()
+	case designscreenshot.FieldPhase:
+		return m.Phase()
+	case designscreenshot.FieldSite:
+		return m.Site()
+	case designscreenshot.FieldViewKey:
+		return m.ViewKey()
+	case designscreenshot.FieldViewport:
+		return m.Viewport()
+	case designscreenshot.FieldRole:
+		return m.Role()
+	case designscreenshot.FieldAttempt:
+		return m.Attempt()
+	case designscreenshot.FieldCommitSha:
+		return m.CommitSha()
+	case designscreenshot.FieldObjectKey:
+		return m.ObjectKey()
+	case designscreenshot.FieldContentType:
+		return m.ContentType()
+	case designscreenshot.FieldByteSize:
+		return m.ByteSize()
+	case designscreenshot.FieldWidth:
+		return m.Width()
+	case designscreenshot.FieldHeight:
+		return m.Height()
+	case designscreenshot.FieldSha256:
+		return m.Sha256()
+	case designscreenshot.FieldDiffPpm:
+		return m.DiffPpm()
+	case designscreenshot.FieldCaptureManifest:
+		return m.CaptureManifest()
+	case designscreenshot.FieldPurgedAt:
+		return m.PurgedAt()
+	case designscreenshot.FieldCreatedAt:
+		return m.CreatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignScreenshotMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designscreenshot.FieldShopID:
+		return m.OldShopID(ctx)
+	case designscreenshot.FieldRequestID:
+		return m.OldRequestID(ctx)
+	case designscreenshot.FieldPhase:
+		return m.OldPhase(ctx)
+	case designscreenshot.FieldSite:
+		return m.OldSite(ctx)
+	case designscreenshot.FieldViewKey:
+		return m.OldViewKey(ctx)
+	case designscreenshot.FieldViewport:
+		return m.OldViewport(ctx)
+	case designscreenshot.FieldRole:
+		return m.OldRole(ctx)
+	case designscreenshot.FieldAttempt:
+		return m.OldAttempt(ctx)
+	case designscreenshot.FieldCommitSha:
+		return m.OldCommitSha(ctx)
+	case designscreenshot.FieldObjectKey:
+		return m.OldObjectKey(ctx)
+	case designscreenshot.FieldContentType:
+		return m.OldContentType(ctx)
+	case designscreenshot.FieldByteSize:
+		return m.OldByteSize(ctx)
+	case designscreenshot.FieldWidth:
+		return m.OldWidth(ctx)
+	case designscreenshot.FieldHeight:
+		return m.OldHeight(ctx)
+	case designscreenshot.FieldSha256:
+		return m.OldSha256(ctx)
+	case designscreenshot.FieldDiffPpm:
+		return m.OldDiffPpm(ctx)
+	case designscreenshot.FieldCaptureManifest:
+		return m.OldCaptureManifest(ctx)
+	case designscreenshot.FieldPurgedAt:
+		return m.OldPurgedAt(ctx)
+	case designscreenshot.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignScreenshot field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignScreenshotMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designscreenshot.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designscreenshot.FieldRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestID(v)
+		return nil
+	case designscreenshot.FieldPhase:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPhase(v)
+		return nil
+	case designscreenshot.FieldSite:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSite(v)
+		return nil
+	case designscreenshot.FieldViewKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetViewKey(v)
+		return nil
+	case designscreenshot.FieldViewport:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetViewport(v)
+		return nil
+	case designscreenshot.FieldRole:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRole(v)
+		return nil
+	case designscreenshot.FieldAttempt:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttempt(v)
+		return nil
+	case designscreenshot.FieldCommitSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCommitSha(v)
+		return nil
+	case designscreenshot.FieldObjectKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetObjectKey(v)
+		return nil
+	case designscreenshot.FieldContentType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetContentType(v)
+		return nil
+	case designscreenshot.FieldByteSize:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetByteSize(v)
+		return nil
+	case designscreenshot.FieldWidth:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetWidth(v)
+		return nil
+	case designscreenshot.FieldHeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHeight(v)
+		return nil
+	case designscreenshot.FieldSha256:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSha256(v)
+		return nil
+	case designscreenshot.FieldDiffPpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDiffPpm(v)
+		return nil
+	case designscreenshot.FieldCaptureManifest:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCaptureManifest(v)
+		return nil
+	case designscreenshot.FieldPurgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPurgedAt(v)
+		return nil
+	case designscreenshot.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignScreenshot field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignScreenshotMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designscreenshot.FieldShopID)
+	}
+	if m.addviewport != nil {
+		fields = append(fields, designscreenshot.FieldViewport)
+	}
+	if m.addattempt != nil {
+		fields = append(fields, designscreenshot.FieldAttempt)
+	}
+	if m.addbyte_size != nil {
+		fields = append(fields, designscreenshot.FieldByteSize)
+	}
+	if m.addwidth != nil {
+		fields = append(fields, designscreenshot.FieldWidth)
+	}
+	if m.addheight != nil {
+		fields = append(fields, designscreenshot.FieldHeight)
+	}
+	if m.adddiff_ppm != nil {
+		fields = append(fields, designscreenshot.FieldDiffPpm)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignScreenshotMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designscreenshot.FieldShopID:
+		return m.AddedShopID()
+	case designscreenshot.FieldViewport:
+		return m.AddedViewport()
+	case designscreenshot.FieldAttempt:
+		return m.AddedAttempt()
+	case designscreenshot.FieldByteSize:
+		return m.AddedByteSize()
+	case designscreenshot.FieldWidth:
+		return m.AddedWidth()
+	case designscreenshot.FieldHeight:
+		return m.AddedHeight()
+	case designscreenshot.FieldDiffPpm:
+		return m.AddedDiffPpm()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignScreenshotMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designscreenshot.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designscreenshot.FieldViewport:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddViewport(v)
+		return nil
+	case designscreenshot.FieldAttempt:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttempt(v)
+		return nil
+	case designscreenshot.FieldByteSize:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddByteSize(v)
+		return nil
+	case designscreenshot.FieldWidth:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddWidth(v)
+		return nil
+	case designscreenshot.FieldHeight:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddHeight(v)
+		return nil
+	case designscreenshot.FieldDiffPpm:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDiffPpm(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignScreenshot numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignScreenshotMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designscreenshot.FieldDiffPpm) {
+		fields = append(fields, designscreenshot.FieldDiffPpm)
+	}
+	if m.FieldCleared(designscreenshot.FieldPurgedAt) {
+		fields = append(fields, designscreenshot.FieldPurgedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignScreenshotMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignScreenshotMutation) ClearField(name string) error {
+	switch name {
+	case designscreenshot.FieldDiffPpm:
+		m.ClearDiffPpm()
+		return nil
+	case designscreenshot.FieldPurgedAt:
+		m.ClearPurgedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignScreenshot nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignScreenshotMutation) ResetField(name string) error {
+	switch name {
+	case designscreenshot.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designscreenshot.FieldRequestID:
+		m.ResetRequestID()
+		return nil
+	case designscreenshot.FieldPhase:
+		m.ResetPhase()
+		return nil
+	case designscreenshot.FieldSite:
+		m.ResetSite()
+		return nil
+	case designscreenshot.FieldViewKey:
+		m.ResetViewKey()
+		return nil
+	case designscreenshot.FieldViewport:
+		m.ResetViewport()
+		return nil
+	case designscreenshot.FieldRole:
+		m.ResetRole()
+		return nil
+	case designscreenshot.FieldAttempt:
+		m.ResetAttempt()
+		return nil
+	case designscreenshot.FieldCommitSha:
+		m.ResetCommitSha()
+		return nil
+	case designscreenshot.FieldObjectKey:
+		m.ResetObjectKey()
+		return nil
+	case designscreenshot.FieldContentType:
+		m.ResetContentType()
+		return nil
+	case designscreenshot.FieldByteSize:
+		m.ResetByteSize()
+		return nil
+	case designscreenshot.FieldWidth:
+		m.ResetWidth()
+		return nil
+	case designscreenshot.FieldHeight:
+		m.ResetHeight()
+		return nil
+	case designscreenshot.FieldSha256:
+		m.ResetSha256()
+		return nil
+	case designscreenshot.FieldDiffPpm:
+		m.ResetDiffPpm()
+		return nil
+	case designscreenshot.FieldCaptureManifest:
+		m.ResetCaptureManifest()
+		return nil
+	case designscreenshot.FieldPurgedAt:
+		m.ResetPurgedAt()
+		return nil
+	case designscreenshot.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignScreenshot field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignScreenshotMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignScreenshotMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignScreenshotMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignScreenshotMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignScreenshotMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignScreenshotMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignScreenshotMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignScreenshot unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignScreenshotMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignScreenshot edge %s", name)
+}
+
+// DesignServiceCredentialMutation represents an operation that mutates the DesignServiceCredential nodes in the graph.
+type DesignServiceCredentialMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *int
+	shop_id               *int
+	addshop_id            *int
+	name                  *string
+	key_prefix            *string
+	key_hash              *string
+	allowed_cidrs         *[]string
+	appendallowed_cidrs   []string
+	created_by_user_id    *int
+	addcreated_by_user_id *int
+	created_at            *time.Time
+	expires_at            *time.Time
+	last_used_at          *time.Time
+	revoked_at            *time.Time
+	clearedFields         map[string]struct{}
+	done                  bool
+	oldValue              func(context.Context) (*DesignServiceCredential, error)
+	predicates            []predicate.DesignServiceCredential
+}
+
+var _ ent.Mutation = (*DesignServiceCredentialMutation)(nil)
+
+// designservicecredentialOption allows management of the mutation configuration using functional options.
+type designservicecredentialOption func(*DesignServiceCredentialMutation)
+
+// newDesignServiceCredentialMutation creates new mutation for the DesignServiceCredential entity.
+func newDesignServiceCredentialMutation(c config, op Op, opts ...designservicecredentialOption) *DesignServiceCredentialMutation {
+	m := &DesignServiceCredentialMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignServiceCredential,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignServiceCredentialID sets the ID field of the mutation.
+func withDesignServiceCredentialID(id int) designservicecredentialOption {
+	return func(m *DesignServiceCredentialMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignServiceCredential
+		)
+		m.oldValue = func(ctx context.Context) (*DesignServiceCredential, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignServiceCredential.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignServiceCredential sets the old DesignServiceCredential of the mutation.
+func withDesignServiceCredential(node *DesignServiceCredential) designservicecredentialOption {
+	return func(m *DesignServiceCredentialMutation) {
+		m.oldValue = func(context.Context) (*DesignServiceCredential, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignServiceCredentialMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignServiceCredentialMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignServiceCredentialMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignServiceCredentialMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignServiceCredential.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignServiceCredentialMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignServiceCredentialMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignServiceCredentialMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignServiceCredentialMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignServiceCredentialMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetName sets the "name" field.
+func (m *DesignServiceCredentialMutation) SetName(s string) {
+	m.name = &s
+}
+
+// Name returns the value of the "name" field in the mutation.
+func (m *DesignServiceCredentialMutation) Name() (r string, exists bool) {
+	v := m.name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldName returns the old "name" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldName(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldName: %w", err)
+	}
+	return oldValue.Name, nil
+}
+
+// ResetName resets all changes to the "name" field.
+func (m *DesignServiceCredentialMutation) ResetName() {
+	m.name = nil
+}
+
+// SetKeyPrefix sets the "key_prefix" field.
+func (m *DesignServiceCredentialMutation) SetKeyPrefix(s string) {
+	m.key_prefix = &s
+}
+
+// KeyPrefix returns the value of the "key_prefix" field in the mutation.
+func (m *DesignServiceCredentialMutation) KeyPrefix() (r string, exists bool) {
+	v := m.key_prefix
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyPrefix returns the old "key_prefix" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldKeyPrefix(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyPrefix is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyPrefix requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyPrefix: %w", err)
+	}
+	return oldValue.KeyPrefix, nil
+}
+
+// ResetKeyPrefix resets all changes to the "key_prefix" field.
+func (m *DesignServiceCredentialMutation) ResetKeyPrefix() {
+	m.key_prefix = nil
+}
+
+// SetKeyHash sets the "key_hash" field.
+func (m *DesignServiceCredentialMutation) SetKeyHash(s string) {
+	m.key_hash = &s
+}
+
+// KeyHash returns the value of the "key_hash" field in the mutation.
+func (m *DesignServiceCredentialMutation) KeyHash() (r string, exists bool) {
+	v := m.key_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldKeyHash returns the old "key_hash" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldKeyHash(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldKeyHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldKeyHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldKeyHash: %w", err)
+	}
+	return oldValue.KeyHash, nil
+}
+
+// ResetKeyHash resets all changes to the "key_hash" field.
+func (m *DesignServiceCredentialMutation) ResetKeyHash() {
+	m.key_hash = nil
+}
+
+// SetAllowedCidrs sets the "allowed_cidrs" field.
+func (m *DesignServiceCredentialMutation) SetAllowedCidrs(s []string) {
+	m.allowed_cidrs = &s
+	m.appendallowed_cidrs = nil
+}
+
+// AllowedCidrs returns the value of the "allowed_cidrs" field in the mutation.
+func (m *DesignServiceCredentialMutation) AllowedCidrs() (r []string, exists bool) {
+	v := m.allowed_cidrs
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAllowedCidrs returns the old "allowed_cidrs" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldAllowedCidrs(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAllowedCidrs is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAllowedCidrs requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAllowedCidrs: %w", err)
+	}
+	return oldValue.AllowedCidrs, nil
+}
+
+// AppendAllowedCidrs adds s to the "allowed_cidrs" field.
+func (m *DesignServiceCredentialMutation) AppendAllowedCidrs(s []string) {
+	m.appendallowed_cidrs = append(m.appendallowed_cidrs, s...)
+}
+
+// AppendedAllowedCidrs returns the list of values that were appended to the "allowed_cidrs" field in this mutation.
+func (m *DesignServiceCredentialMutation) AppendedAllowedCidrs() ([]string, bool) {
+	if len(m.appendallowed_cidrs) == 0 {
+		return nil, false
+	}
+	return m.appendallowed_cidrs, true
+}
+
+// ClearAllowedCidrs clears the value of the "allowed_cidrs" field.
+func (m *DesignServiceCredentialMutation) ClearAllowedCidrs() {
+	m.allowed_cidrs = nil
+	m.appendallowed_cidrs = nil
+	m.clearedFields[designservicecredential.FieldAllowedCidrs] = struct{}{}
+}
+
+// AllowedCidrsCleared returns if the "allowed_cidrs" field was cleared in this mutation.
+func (m *DesignServiceCredentialMutation) AllowedCidrsCleared() bool {
+	_, ok := m.clearedFields[designservicecredential.FieldAllowedCidrs]
+	return ok
+}
+
+// ResetAllowedCidrs resets all changes to the "allowed_cidrs" field.
+func (m *DesignServiceCredentialMutation) ResetAllowedCidrs() {
+	m.allowed_cidrs = nil
+	m.appendallowed_cidrs = nil
+	delete(m.clearedFields, designservicecredential.FieldAllowedCidrs)
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *DesignServiceCredentialMutation) SetCreatedByUserID(i int) {
+	m.created_by_user_id = &i
+	m.addcreated_by_user_id = nil
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *DesignServiceCredentialMutation) CreatedByUserID() (r int, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldCreatedByUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// AddCreatedByUserID adds i to the "created_by_user_id" field.
+func (m *DesignServiceCredentialMutation) AddCreatedByUserID(i int) {
+	if m.addcreated_by_user_id != nil {
+		*m.addcreated_by_user_id += i
+	} else {
+		m.addcreated_by_user_id = &i
+	}
+}
+
+// AddedCreatedByUserID returns the value that was added to the "created_by_user_id" field in this mutation.
+func (m *DesignServiceCredentialMutation) AddedCreatedByUserID() (r int, exists bool) {
+	v := m.addcreated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *DesignServiceCredentialMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.addcreated_by_user_id = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesignServiceCredentialMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesignServiceCredentialMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesignServiceCredentialMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *DesignServiceCredentialMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *DesignServiceCredentialMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *DesignServiceCredentialMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// SetLastUsedAt sets the "last_used_at" field.
+func (m *DesignServiceCredentialMutation) SetLastUsedAt(t time.Time) {
+	m.last_used_at = &t
+}
+
+// LastUsedAt returns the value of the "last_used_at" field in the mutation.
+func (m *DesignServiceCredentialMutation) LastUsedAt() (r time.Time, exists bool) {
+	v := m.last_used_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUsedAt returns the old "last_used_at" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldLastUsedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUsedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUsedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUsedAt: %w", err)
+	}
+	return oldValue.LastUsedAt, nil
+}
+
+// ClearLastUsedAt clears the value of the "last_used_at" field.
+func (m *DesignServiceCredentialMutation) ClearLastUsedAt() {
+	m.last_used_at = nil
+	m.clearedFields[designservicecredential.FieldLastUsedAt] = struct{}{}
+}
+
+// LastUsedAtCleared returns if the "last_used_at" field was cleared in this mutation.
+func (m *DesignServiceCredentialMutation) LastUsedAtCleared() bool {
+	_, ok := m.clearedFields[designservicecredential.FieldLastUsedAt]
+	return ok
+}
+
+// ResetLastUsedAt resets all changes to the "last_used_at" field.
+func (m *DesignServiceCredentialMutation) ResetLastUsedAt() {
+	m.last_used_at = nil
+	delete(m.clearedFields, designservicecredential.FieldLastUsedAt)
+}
+
+// SetRevokedAt sets the "revoked_at" field.
+func (m *DesignServiceCredentialMutation) SetRevokedAt(t time.Time) {
+	m.revoked_at = &t
+}
+
+// RevokedAt returns the value of the "revoked_at" field in the mutation.
+func (m *DesignServiceCredentialMutation) RevokedAt() (r time.Time, exists bool) {
+	v := m.revoked_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRevokedAt returns the old "revoked_at" field's value of the DesignServiceCredential entity.
+// If the DesignServiceCredential object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignServiceCredentialMutation) OldRevokedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRevokedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRevokedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRevokedAt: %w", err)
+	}
+	return oldValue.RevokedAt, nil
+}
+
+// ClearRevokedAt clears the value of the "revoked_at" field.
+func (m *DesignServiceCredentialMutation) ClearRevokedAt() {
+	m.revoked_at = nil
+	m.clearedFields[designservicecredential.FieldRevokedAt] = struct{}{}
+}
+
+// RevokedAtCleared returns if the "revoked_at" field was cleared in this mutation.
+func (m *DesignServiceCredentialMutation) RevokedAtCleared() bool {
+	_, ok := m.clearedFields[designservicecredential.FieldRevokedAt]
+	return ok
+}
+
+// ResetRevokedAt resets all changes to the "revoked_at" field.
+func (m *DesignServiceCredentialMutation) ResetRevokedAt() {
+	m.revoked_at = nil
+	delete(m.clearedFields, designservicecredential.FieldRevokedAt)
+}
+
+// Where appends a list predicates to the DesignServiceCredentialMutation builder.
+func (m *DesignServiceCredentialMutation) Where(ps ...predicate.DesignServiceCredential) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignServiceCredentialMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignServiceCredentialMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignServiceCredential, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignServiceCredentialMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignServiceCredentialMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignServiceCredential).
+func (m *DesignServiceCredentialMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignServiceCredentialMutation) Fields() []string {
+	fields := make([]string, 0, 10)
+	if m.shop_id != nil {
+		fields = append(fields, designservicecredential.FieldShopID)
+	}
+	if m.name != nil {
+		fields = append(fields, designservicecredential.FieldName)
+	}
+	if m.key_prefix != nil {
+		fields = append(fields, designservicecredential.FieldKeyPrefix)
+	}
+	if m.key_hash != nil {
+		fields = append(fields, designservicecredential.FieldKeyHash)
+	}
+	if m.allowed_cidrs != nil {
+		fields = append(fields, designservicecredential.FieldAllowedCidrs)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, designservicecredential.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, designservicecredential.FieldCreatedAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, designservicecredential.FieldExpiresAt)
+	}
+	if m.last_used_at != nil {
+		fields = append(fields, designservicecredential.FieldLastUsedAt)
+	}
+	if m.revoked_at != nil {
+		fields = append(fields, designservicecredential.FieldRevokedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignServiceCredentialMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designservicecredential.FieldShopID:
+		return m.ShopID()
+	case designservicecredential.FieldName:
+		return m.Name()
+	case designservicecredential.FieldKeyPrefix:
+		return m.KeyPrefix()
+	case designservicecredential.FieldKeyHash:
+		return m.KeyHash()
+	case designservicecredential.FieldAllowedCidrs:
+		return m.AllowedCidrs()
+	case designservicecredential.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case designservicecredential.FieldCreatedAt:
+		return m.CreatedAt()
+	case designservicecredential.FieldExpiresAt:
+		return m.ExpiresAt()
+	case designservicecredential.FieldLastUsedAt:
+		return m.LastUsedAt()
+	case designservicecredential.FieldRevokedAt:
+		return m.RevokedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignServiceCredentialMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designservicecredential.FieldShopID:
+		return m.OldShopID(ctx)
+	case designservicecredential.FieldName:
+		return m.OldName(ctx)
+	case designservicecredential.FieldKeyPrefix:
+		return m.OldKeyPrefix(ctx)
+	case designservicecredential.FieldKeyHash:
+		return m.OldKeyHash(ctx)
+	case designservicecredential.FieldAllowedCidrs:
+		return m.OldAllowedCidrs(ctx)
+	case designservicecredential.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case designservicecredential.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case designservicecredential.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	case designservicecredential.FieldLastUsedAt:
+		return m.OldLastUsedAt(ctx)
+	case designservicecredential.FieldRevokedAt:
+		return m.OldRevokedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignServiceCredential field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignServiceCredentialMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designservicecredential.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designservicecredential.FieldName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetName(v)
+		return nil
+	case designservicecredential.FieldKeyPrefix:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyPrefix(v)
+		return nil
+	case designservicecredential.FieldKeyHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetKeyHash(v)
+		return nil
+	case designservicecredential.FieldAllowedCidrs:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAllowedCidrs(v)
+		return nil
+	case designservicecredential.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case designservicecredential.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case designservicecredential.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	case designservicecredential.FieldLastUsedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastUsedAt(v)
+		return nil
+	case designservicecredential.FieldRevokedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRevokedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignServiceCredential field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignServiceCredentialMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designservicecredential.FieldShopID)
+	}
+	if m.addcreated_by_user_id != nil {
+		fields = append(fields, designservicecredential.FieldCreatedByUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignServiceCredentialMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designservicecredential.FieldShopID:
+		return m.AddedShopID()
+	case designservicecredential.FieldCreatedByUserID:
+		return m.AddedCreatedByUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignServiceCredentialMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designservicecredential.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designservicecredential.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignServiceCredential numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignServiceCredentialMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designservicecredential.FieldAllowedCidrs) {
+		fields = append(fields, designservicecredential.FieldAllowedCidrs)
+	}
+	if m.FieldCleared(designservicecredential.FieldLastUsedAt) {
+		fields = append(fields, designservicecredential.FieldLastUsedAt)
+	}
+	if m.FieldCleared(designservicecredential.FieldRevokedAt) {
+		fields = append(fields, designservicecredential.FieldRevokedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignServiceCredentialMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignServiceCredentialMutation) ClearField(name string) error {
+	switch name {
+	case designservicecredential.FieldAllowedCidrs:
+		m.ClearAllowedCidrs()
+		return nil
+	case designservicecredential.FieldLastUsedAt:
+		m.ClearLastUsedAt()
+		return nil
+	case designservicecredential.FieldRevokedAt:
+		m.ClearRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignServiceCredential nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignServiceCredentialMutation) ResetField(name string) error {
+	switch name {
+	case designservicecredential.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designservicecredential.FieldName:
+		m.ResetName()
+		return nil
+	case designservicecredential.FieldKeyPrefix:
+		m.ResetKeyPrefix()
+		return nil
+	case designservicecredential.FieldKeyHash:
+		m.ResetKeyHash()
+		return nil
+	case designservicecredential.FieldAllowedCidrs:
+		m.ResetAllowedCidrs()
+		return nil
+	case designservicecredential.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case designservicecredential.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case designservicecredential.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	case designservicecredential.FieldLastUsedAt:
+		m.ResetLastUsedAt()
+		return nil
+	case designservicecredential.FieldRevokedAt:
+		m.ResetRevokedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignServiceCredential field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignServiceCredentialMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignServiceCredentialMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignServiceCredentialMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignServiceCredentialMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignServiceCredentialMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignServiceCredentialMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignServiceCredentialMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignServiceCredential unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignServiceCredentialMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignServiceCredential edge %s", name)
+}
+
+// DesignSiteStateMutation represents an operation that mutates the DesignSiteState nodes in the graph.
+type DesignSiteStateMutation struct {
+	config
+	op                   Op
+	typ                  string
+	id                   *int
+	shop_id              *int
+	addshop_id           *int
+	site                 *string
+	current_request_id   *uuid.UUID
+	current_tag          *string
+	current_sha          *string
+	core_version         *string
+	design_floor_version *string
+	last_seen_main_sha   *string
+	updated_at           *time.Time
+	clearedFields        map[string]struct{}
+	done                 bool
+	oldValue             func(context.Context) (*DesignSiteState, error)
+	predicates           []predicate.DesignSiteState
+}
+
+var _ ent.Mutation = (*DesignSiteStateMutation)(nil)
+
+// designsitestateOption allows management of the mutation configuration using functional options.
+type designsitestateOption func(*DesignSiteStateMutation)
+
+// newDesignSiteStateMutation creates new mutation for the DesignSiteState entity.
+func newDesignSiteStateMutation(c config, op Op, opts ...designsitestateOption) *DesignSiteStateMutation {
+	m := &DesignSiteStateMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignSiteState,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignSiteStateID sets the ID field of the mutation.
+func withDesignSiteStateID(id int) designsitestateOption {
+	return func(m *DesignSiteStateMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignSiteState
+		)
+		m.oldValue = func(ctx context.Context) (*DesignSiteState, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignSiteState.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignSiteState sets the old DesignSiteState of the mutation.
+func withDesignSiteState(node *DesignSiteState) designsitestateOption {
+	return func(m *DesignSiteStateMutation) {
+		m.oldValue = func(context.Context) (*DesignSiteState, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignSiteStateMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignSiteStateMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignSiteStateMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignSiteStateMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignSiteState.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignSiteStateMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignSiteStateMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignSiteStateMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignSiteStateMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignSiteStateMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetSite sets the "site" field.
+func (m *DesignSiteStateMutation) SetSite(s string) {
+	m.site = &s
+}
+
+// Site returns the value of the "site" field in the mutation.
+func (m *DesignSiteStateMutation) Site() (r string, exists bool) {
+	v := m.site
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSite returns the old "site" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldSite(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSite: %w", err)
+	}
+	return oldValue.Site, nil
+}
+
+// ResetSite resets all changes to the "site" field.
+func (m *DesignSiteStateMutation) ResetSite() {
+	m.site = nil
+}
+
+// SetCurrentRequestID sets the "current_request_id" field.
+func (m *DesignSiteStateMutation) SetCurrentRequestID(u uuid.UUID) {
+	m.current_request_id = &u
+}
+
+// CurrentRequestID returns the value of the "current_request_id" field in the mutation.
+func (m *DesignSiteStateMutation) CurrentRequestID() (r uuid.UUID, exists bool) {
+	v := m.current_request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrentRequestID returns the old "current_request_id" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldCurrentRequestID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrentRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrentRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrentRequestID: %w", err)
+	}
+	return oldValue.CurrentRequestID, nil
+}
+
+// ClearCurrentRequestID clears the value of the "current_request_id" field.
+func (m *DesignSiteStateMutation) ClearCurrentRequestID() {
+	m.current_request_id = nil
+	m.clearedFields[designsitestate.FieldCurrentRequestID] = struct{}{}
+}
+
+// CurrentRequestIDCleared returns if the "current_request_id" field was cleared in this mutation.
+func (m *DesignSiteStateMutation) CurrentRequestIDCleared() bool {
+	_, ok := m.clearedFields[designsitestate.FieldCurrentRequestID]
+	return ok
+}
+
+// ResetCurrentRequestID resets all changes to the "current_request_id" field.
+func (m *DesignSiteStateMutation) ResetCurrentRequestID() {
+	m.current_request_id = nil
+	delete(m.clearedFields, designsitestate.FieldCurrentRequestID)
+}
+
+// SetCurrentTag sets the "current_tag" field.
+func (m *DesignSiteStateMutation) SetCurrentTag(s string) {
+	m.current_tag = &s
+}
+
+// CurrentTag returns the value of the "current_tag" field in the mutation.
+func (m *DesignSiteStateMutation) CurrentTag() (r string, exists bool) {
+	v := m.current_tag
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrentTag returns the old "current_tag" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldCurrentTag(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrentTag is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrentTag requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrentTag: %w", err)
+	}
+	return oldValue.CurrentTag, nil
+}
+
+// ResetCurrentTag resets all changes to the "current_tag" field.
+func (m *DesignSiteStateMutation) ResetCurrentTag() {
+	m.current_tag = nil
+}
+
+// SetCurrentSha sets the "current_sha" field.
+func (m *DesignSiteStateMutation) SetCurrentSha(s string) {
+	m.current_sha = &s
+}
+
+// CurrentSha returns the value of the "current_sha" field in the mutation.
+func (m *DesignSiteStateMutation) CurrentSha() (r string, exists bool) {
+	v := m.current_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrentSha returns the old "current_sha" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldCurrentSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrentSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrentSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrentSha: %w", err)
+	}
+	return oldValue.CurrentSha, nil
+}
+
+// ResetCurrentSha resets all changes to the "current_sha" field.
+func (m *DesignSiteStateMutation) ResetCurrentSha() {
+	m.current_sha = nil
+}
+
+// SetCoreVersion sets the "core_version" field.
+func (m *DesignSiteStateMutation) SetCoreVersion(s string) {
+	m.core_version = &s
+}
+
+// CoreVersion returns the value of the "core_version" field in the mutation.
+func (m *DesignSiteStateMutation) CoreVersion() (r string, exists bool) {
+	v := m.core_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoreVersion returns the old "core_version" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldCoreVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoreVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoreVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoreVersion: %w", err)
+	}
+	return oldValue.CoreVersion, nil
+}
+
+// ResetCoreVersion resets all changes to the "core_version" field.
+func (m *DesignSiteStateMutation) ResetCoreVersion() {
+	m.core_version = nil
+}
+
+// SetDesignFloorVersion sets the "design_floor_version" field.
+func (m *DesignSiteStateMutation) SetDesignFloorVersion(s string) {
+	m.design_floor_version = &s
+}
+
+// DesignFloorVersion returns the value of the "design_floor_version" field in the mutation.
+func (m *DesignSiteStateMutation) DesignFloorVersion() (r string, exists bool) {
+	v := m.design_floor_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDesignFloorVersion returns the old "design_floor_version" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldDesignFloorVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDesignFloorVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDesignFloorVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDesignFloorVersion: %w", err)
+	}
+	return oldValue.DesignFloorVersion, nil
+}
+
+// ResetDesignFloorVersion resets all changes to the "design_floor_version" field.
+func (m *DesignSiteStateMutation) ResetDesignFloorVersion() {
+	m.design_floor_version = nil
+}
+
+// SetLastSeenMainSha sets the "last_seen_main_sha" field.
+func (m *DesignSiteStateMutation) SetLastSeenMainSha(s string) {
+	m.last_seen_main_sha = &s
+}
+
+// LastSeenMainSha returns the value of the "last_seen_main_sha" field in the mutation.
+func (m *DesignSiteStateMutation) LastSeenMainSha() (r string, exists bool) {
+	v := m.last_seen_main_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastSeenMainSha returns the old "last_seen_main_sha" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldLastSeenMainSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastSeenMainSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastSeenMainSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastSeenMainSha: %w", err)
+	}
+	return oldValue.LastSeenMainSha, nil
+}
+
+// ResetLastSeenMainSha resets all changes to the "last_seen_main_sha" field.
+func (m *DesignSiteStateMutation) ResetLastSeenMainSha() {
+	m.last_seen_main_sha = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DesignSiteStateMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DesignSiteStateMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DesignSiteState entity.
+// If the DesignSiteState object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignSiteStateMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DesignSiteStateMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// Where appends a list predicates to the DesignSiteStateMutation builder.
+func (m *DesignSiteStateMutation) Where(ps ...predicate.DesignSiteState) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignSiteStateMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignSiteStateMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignSiteState, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignSiteStateMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignSiteStateMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignSiteState).
+func (m *DesignSiteStateMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignSiteStateMutation) Fields() []string {
+	fields := make([]string, 0, 9)
+	if m.shop_id != nil {
+		fields = append(fields, designsitestate.FieldShopID)
+	}
+	if m.site != nil {
+		fields = append(fields, designsitestate.FieldSite)
+	}
+	if m.current_request_id != nil {
+		fields = append(fields, designsitestate.FieldCurrentRequestID)
+	}
+	if m.current_tag != nil {
+		fields = append(fields, designsitestate.FieldCurrentTag)
+	}
+	if m.current_sha != nil {
+		fields = append(fields, designsitestate.FieldCurrentSha)
+	}
+	if m.core_version != nil {
+		fields = append(fields, designsitestate.FieldCoreVersion)
+	}
+	if m.design_floor_version != nil {
+		fields = append(fields, designsitestate.FieldDesignFloorVersion)
+	}
+	if m.last_seen_main_sha != nil {
+		fields = append(fields, designsitestate.FieldLastSeenMainSha)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, designsitestate.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignSiteStateMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designsitestate.FieldShopID:
+		return m.ShopID()
+	case designsitestate.FieldSite:
+		return m.Site()
+	case designsitestate.FieldCurrentRequestID:
+		return m.CurrentRequestID()
+	case designsitestate.FieldCurrentTag:
+		return m.CurrentTag()
+	case designsitestate.FieldCurrentSha:
+		return m.CurrentSha()
+	case designsitestate.FieldCoreVersion:
+		return m.CoreVersion()
+	case designsitestate.FieldDesignFloorVersion:
+		return m.DesignFloorVersion()
+	case designsitestate.FieldLastSeenMainSha:
+		return m.LastSeenMainSha()
+	case designsitestate.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignSiteStateMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designsitestate.FieldShopID:
+		return m.OldShopID(ctx)
+	case designsitestate.FieldSite:
+		return m.OldSite(ctx)
+	case designsitestate.FieldCurrentRequestID:
+		return m.OldCurrentRequestID(ctx)
+	case designsitestate.FieldCurrentTag:
+		return m.OldCurrentTag(ctx)
+	case designsitestate.FieldCurrentSha:
+		return m.OldCurrentSha(ctx)
+	case designsitestate.FieldCoreVersion:
+		return m.OldCoreVersion(ctx)
+	case designsitestate.FieldDesignFloorVersion:
+		return m.OldDesignFloorVersion(ctx)
+	case designsitestate.FieldLastSeenMainSha:
+		return m.OldLastSeenMainSha(ctx)
+	case designsitestate.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignSiteState field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignSiteStateMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designsitestate.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designsitestate.FieldSite:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSite(v)
+		return nil
+	case designsitestate.FieldCurrentRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrentRequestID(v)
+		return nil
+	case designsitestate.FieldCurrentTag:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrentTag(v)
+		return nil
+	case designsitestate.FieldCurrentSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrentSha(v)
+		return nil
+	case designsitestate.FieldCoreVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoreVersion(v)
+		return nil
+	case designsitestate.FieldDesignFloorVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDesignFloorVersion(v)
+		return nil
+	case designsitestate.FieldLastSeenMainSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastSeenMainSha(v)
+		return nil
+	case designsitestate.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignSiteState field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignSiteStateMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designsitestate.FieldShopID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignSiteStateMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designsitestate.FieldShopID:
+		return m.AddedShopID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignSiteStateMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designsitestate.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignSiteState numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignSiteStateMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designsitestate.FieldCurrentRequestID) {
+		fields = append(fields, designsitestate.FieldCurrentRequestID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignSiteStateMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignSiteStateMutation) ClearField(name string) error {
+	switch name {
+	case designsitestate.FieldCurrentRequestID:
+		m.ClearCurrentRequestID()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignSiteState nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignSiteStateMutation) ResetField(name string) error {
+	switch name {
+	case designsitestate.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designsitestate.FieldSite:
+		m.ResetSite()
+		return nil
+	case designsitestate.FieldCurrentRequestID:
+		m.ResetCurrentRequestID()
+		return nil
+	case designsitestate.FieldCurrentTag:
+		m.ResetCurrentTag()
+		return nil
+	case designsitestate.FieldCurrentSha:
+		m.ResetCurrentSha()
+		return nil
+	case designsitestate.FieldCoreVersion:
+		m.ResetCoreVersion()
+		return nil
+	case designsitestate.FieldDesignFloorVersion:
+		m.ResetDesignFloorVersion()
+		return nil
+	case designsitestate.FieldLastSeenMainSha:
+		m.ResetLastSeenMainSha()
+		return nil
+	case designsitestate.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignSiteState field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignSiteStateMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignSiteStateMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignSiteStateMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignSiteStateMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignSiteStateMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignSiteStateMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignSiteStateMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignSiteState unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignSiteStateMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignSiteState edge %s", name)
+}
+
+// DesignUntrackedChangeMutation represents an operation that mutates the DesignUntrackedChange nodes in the graph.
+type DesignUntrackedChangeMutation struct {
+	config
+	op                         Op
+	typ                        string
+	id                         *int
+	shop_id                    *int
+	addshop_id                 *int
+	site                       *string
+	commit_sha                 *string
+	committed_at               *time.Time
+	subject                    *string
+	files_changed              *int
+	addfiles_changed           *int
+	additions                  *int
+	addadditions               *int
+	deletions                  *int
+	adddeletions               *int
+	detected_at                *time.Time
+	acknowledged_by_user_id    *int
+	addacknowledged_by_user_id *int
+	acknowledged_at            *time.Time
+	clearedFields              map[string]struct{}
+	done                       bool
+	oldValue                   func(context.Context) (*DesignUntrackedChange, error)
+	predicates                 []predicate.DesignUntrackedChange
+}
+
+var _ ent.Mutation = (*DesignUntrackedChangeMutation)(nil)
+
+// designuntrackedchangeOption allows management of the mutation configuration using functional options.
+type designuntrackedchangeOption func(*DesignUntrackedChangeMutation)
+
+// newDesignUntrackedChangeMutation creates new mutation for the DesignUntrackedChange entity.
+func newDesignUntrackedChangeMutation(c config, op Op, opts ...designuntrackedchangeOption) *DesignUntrackedChangeMutation {
+	m := &DesignUntrackedChangeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignUntrackedChange,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignUntrackedChangeID sets the ID field of the mutation.
+func withDesignUntrackedChangeID(id int) designuntrackedchangeOption {
+	return func(m *DesignUntrackedChangeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignUntrackedChange
+		)
+		m.oldValue = func(ctx context.Context) (*DesignUntrackedChange, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignUntrackedChange.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignUntrackedChange sets the old DesignUntrackedChange of the mutation.
+func withDesignUntrackedChange(node *DesignUntrackedChange) designuntrackedchangeOption {
+	return func(m *DesignUntrackedChangeMutation) {
+		m.oldValue = func(context.Context) (*DesignUntrackedChange, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignUntrackedChangeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignUntrackedChangeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignUntrackedChangeMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignUntrackedChangeMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignUntrackedChange.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignUntrackedChangeMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignUntrackedChangeMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignUntrackedChangeMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignUntrackedChangeMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetSite sets the "site" field.
+func (m *DesignUntrackedChangeMutation) SetSite(s string) {
+	m.site = &s
+}
+
+// Site returns the value of the "site" field in the mutation.
+func (m *DesignUntrackedChangeMutation) Site() (r string, exists bool) {
+	v := m.site
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSite returns the old "site" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldSite(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSite: %w", err)
+	}
+	return oldValue.Site, nil
+}
+
+// ResetSite resets all changes to the "site" field.
+func (m *DesignUntrackedChangeMutation) ResetSite() {
+	m.site = nil
+}
+
+// SetCommitSha sets the "commit_sha" field.
+func (m *DesignUntrackedChangeMutation) SetCommitSha(s string) {
+	m.commit_sha = &s
+}
+
+// CommitSha returns the value of the "commit_sha" field in the mutation.
+func (m *DesignUntrackedChangeMutation) CommitSha() (r string, exists bool) {
+	v := m.commit_sha
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCommitSha returns the old "commit_sha" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldCommitSha(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCommitSha is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCommitSha requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCommitSha: %w", err)
+	}
+	return oldValue.CommitSha, nil
+}
+
+// ResetCommitSha resets all changes to the "commit_sha" field.
+func (m *DesignUntrackedChangeMutation) ResetCommitSha() {
+	m.commit_sha = nil
+}
+
+// SetCommittedAt sets the "committed_at" field.
+func (m *DesignUntrackedChangeMutation) SetCommittedAt(t time.Time) {
+	m.committed_at = &t
+}
+
+// CommittedAt returns the value of the "committed_at" field in the mutation.
+func (m *DesignUntrackedChangeMutation) CommittedAt() (r time.Time, exists bool) {
+	v := m.committed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCommittedAt returns the old "committed_at" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldCommittedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCommittedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCommittedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCommittedAt: %w", err)
+	}
+	return oldValue.CommittedAt, nil
+}
+
+// ResetCommittedAt resets all changes to the "committed_at" field.
+func (m *DesignUntrackedChangeMutation) ResetCommittedAt() {
+	m.committed_at = nil
+}
+
+// SetSubject sets the "subject" field.
+func (m *DesignUntrackedChangeMutation) SetSubject(s string) {
+	m.subject = &s
+}
+
+// Subject returns the value of the "subject" field in the mutation.
+func (m *DesignUntrackedChangeMutation) Subject() (r string, exists bool) {
+	v := m.subject
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubject returns the old "subject" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldSubject(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubject is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubject requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubject: %w", err)
+	}
+	return oldValue.Subject, nil
+}
+
+// ResetSubject resets all changes to the "subject" field.
+func (m *DesignUntrackedChangeMutation) ResetSubject() {
+	m.subject = nil
+}
+
+// SetFilesChanged sets the "files_changed" field.
+func (m *DesignUntrackedChangeMutation) SetFilesChanged(i int) {
+	m.files_changed = &i
+	m.addfiles_changed = nil
+}
+
+// FilesChanged returns the value of the "files_changed" field in the mutation.
+func (m *DesignUntrackedChangeMutation) FilesChanged() (r int, exists bool) {
+	v := m.files_changed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFilesChanged returns the old "files_changed" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldFilesChanged(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFilesChanged is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFilesChanged requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFilesChanged: %w", err)
+	}
+	return oldValue.FilesChanged, nil
+}
+
+// AddFilesChanged adds i to the "files_changed" field.
+func (m *DesignUntrackedChangeMutation) AddFilesChanged(i int) {
+	if m.addfiles_changed != nil {
+		*m.addfiles_changed += i
+	} else {
+		m.addfiles_changed = &i
+	}
+}
+
+// AddedFilesChanged returns the value that was added to the "files_changed" field in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedFilesChanged() (r int, exists bool) {
+	v := m.addfiles_changed
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFilesChanged resets all changes to the "files_changed" field.
+func (m *DesignUntrackedChangeMutation) ResetFilesChanged() {
+	m.files_changed = nil
+	m.addfiles_changed = nil
+}
+
+// SetAdditions sets the "additions" field.
+func (m *DesignUntrackedChangeMutation) SetAdditions(i int) {
+	m.additions = &i
+	m.addadditions = nil
+}
+
+// Additions returns the value of the "additions" field in the mutation.
+func (m *DesignUntrackedChangeMutation) Additions() (r int, exists bool) {
+	v := m.additions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAdditions returns the old "additions" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldAdditions(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAdditions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAdditions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAdditions: %w", err)
+	}
+	return oldValue.Additions, nil
+}
+
+// AddAdditions adds i to the "additions" field.
+func (m *DesignUntrackedChangeMutation) AddAdditions(i int) {
+	if m.addadditions != nil {
+		*m.addadditions += i
+	} else {
+		m.addadditions = &i
+	}
+}
+
+// AddedAdditions returns the value that was added to the "additions" field in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedAdditions() (r int, exists bool) {
+	v := m.addadditions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAdditions resets all changes to the "additions" field.
+func (m *DesignUntrackedChangeMutation) ResetAdditions() {
+	m.additions = nil
+	m.addadditions = nil
+}
+
+// SetDeletions sets the "deletions" field.
+func (m *DesignUntrackedChangeMutation) SetDeletions(i int) {
+	m.deletions = &i
+	m.adddeletions = nil
+}
+
+// Deletions returns the value of the "deletions" field in the mutation.
+func (m *DesignUntrackedChangeMutation) Deletions() (r int, exists bool) {
+	v := m.deletions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDeletions returns the old "deletions" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldDeletions(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDeletions is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDeletions requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDeletions: %w", err)
+	}
+	return oldValue.Deletions, nil
+}
+
+// AddDeletions adds i to the "deletions" field.
+func (m *DesignUntrackedChangeMutation) AddDeletions(i int) {
+	if m.adddeletions != nil {
+		*m.adddeletions += i
+	} else {
+		m.adddeletions = &i
+	}
+}
+
+// AddedDeletions returns the value that was added to the "deletions" field in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedDeletions() (r int, exists bool) {
+	v := m.adddeletions
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDeletions resets all changes to the "deletions" field.
+func (m *DesignUntrackedChangeMutation) ResetDeletions() {
+	m.deletions = nil
+	m.adddeletions = nil
+}
+
+// SetDetectedAt sets the "detected_at" field.
+func (m *DesignUntrackedChangeMutation) SetDetectedAt(t time.Time) {
+	m.detected_at = &t
+}
+
+// DetectedAt returns the value of the "detected_at" field in the mutation.
+func (m *DesignUntrackedChangeMutation) DetectedAt() (r time.Time, exists bool) {
+	v := m.detected_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDetectedAt returns the old "detected_at" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldDetectedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDetectedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDetectedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDetectedAt: %w", err)
+	}
+	return oldValue.DetectedAt, nil
+}
+
+// ResetDetectedAt resets all changes to the "detected_at" field.
+func (m *DesignUntrackedChangeMutation) ResetDetectedAt() {
+	m.detected_at = nil
+}
+
+// SetAcknowledgedByUserID sets the "acknowledged_by_user_id" field.
+func (m *DesignUntrackedChangeMutation) SetAcknowledgedByUserID(i int) {
+	m.acknowledged_by_user_id = &i
+	m.addacknowledged_by_user_id = nil
+}
+
+// AcknowledgedByUserID returns the value of the "acknowledged_by_user_id" field in the mutation.
+func (m *DesignUntrackedChangeMutation) AcknowledgedByUserID() (r int, exists bool) {
+	v := m.acknowledged_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAcknowledgedByUserID returns the old "acknowledged_by_user_id" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldAcknowledgedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAcknowledgedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAcknowledgedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAcknowledgedByUserID: %w", err)
+	}
+	return oldValue.AcknowledgedByUserID, nil
+}
+
+// AddAcknowledgedByUserID adds i to the "acknowledged_by_user_id" field.
+func (m *DesignUntrackedChangeMutation) AddAcknowledgedByUserID(i int) {
+	if m.addacknowledged_by_user_id != nil {
+		*m.addacknowledged_by_user_id += i
+	} else {
+		m.addacknowledged_by_user_id = &i
+	}
+}
+
+// AddedAcknowledgedByUserID returns the value that was added to the "acknowledged_by_user_id" field in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedAcknowledgedByUserID() (r int, exists bool) {
+	v := m.addacknowledged_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearAcknowledgedByUserID clears the value of the "acknowledged_by_user_id" field.
+func (m *DesignUntrackedChangeMutation) ClearAcknowledgedByUserID() {
+	m.acknowledged_by_user_id = nil
+	m.addacknowledged_by_user_id = nil
+	m.clearedFields[designuntrackedchange.FieldAcknowledgedByUserID] = struct{}{}
+}
+
+// AcknowledgedByUserIDCleared returns if the "acknowledged_by_user_id" field was cleared in this mutation.
+func (m *DesignUntrackedChangeMutation) AcknowledgedByUserIDCleared() bool {
+	_, ok := m.clearedFields[designuntrackedchange.FieldAcknowledgedByUserID]
+	return ok
+}
+
+// ResetAcknowledgedByUserID resets all changes to the "acknowledged_by_user_id" field.
+func (m *DesignUntrackedChangeMutation) ResetAcknowledgedByUserID() {
+	m.acknowledged_by_user_id = nil
+	m.addacknowledged_by_user_id = nil
+	delete(m.clearedFields, designuntrackedchange.FieldAcknowledgedByUserID)
+}
+
+// SetAcknowledgedAt sets the "acknowledged_at" field.
+func (m *DesignUntrackedChangeMutation) SetAcknowledgedAt(t time.Time) {
+	m.acknowledged_at = &t
+}
+
+// AcknowledgedAt returns the value of the "acknowledged_at" field in the mutation.
+func (m *DesignUntrackedChangeMutation) AcknowledgedAt() (r time.Time, exists bool) {
+	v := m.acknowledged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAcknowledgedAt returns the old "acknowledged_at" field's value of the DesignUntrackedChange entity.
+// If the DesignUntrackedChange object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignUntrackedChangeMutation) OldAcknowledgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAcknowledgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAcknowledgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAcknowledgedAt: %w", err)
+	}
+	return oldValue.AcknowledgedAt, nil
+}
+
+// ClearAcknowledgedAt clears the value of the "acknowledged_at" field.
+func (m *DesignUntrackedChangeMutation) ClearAcknowledgedAt() {
+	m.acknowledged_at = nil
+	m.clearedFields[designuntrackedchange.FieldAcknowledgedAt] = struct{}{}
+}
+
+// AcknowledgedAtCleared returns if the "acknowledged_at" field was cleared in this mutation.
+func (m *DesignUntrackedChangeMutation) AcknowledgedAtCleared() bool {
+	_, ok := m.clearedFields[designuntrackedchange.FieldAcknowledgedAt]
+	return ok
+}
+
+// ResetAcknowledgedAt resets all changes to the "acknowledged_at" field.
+func (m *DesignUntrackedChangeMutation) ResetAcknowledgedAt() {
+	m.acknowledged_at = nil
+	delete(m.clearedFields, designuntrackedchange.FieldAcknowledgedAt)
+}
+
+// Where appends a list predicates to the DesignUntrackedChangeMutation builder.
+func (m *DesignUntrackedChangeMutation) Where(ps ...predicate.DesignUntrackedChange) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignUntrackedChangeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignUntrackedChangeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignUntrackedChange, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignUntrackedChangeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignUntrackedChangeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignUntrackedChange).
+func (m *DesignUntrackedChangeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignUntrackedChangeMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.shop_id != nil {
+		fields = append(fields, designuntrackedchange.FieldShopID)
+	}
+	if m.site != nil {
+		fields = append(fields, designuntrackedchange.FieldSite)
+	}
+	if m.commit_sha != nil {
+		fields = append(fields, designuntrackedchange.FieldCommitSha)
+	}
+	if m.committed_at != nil {
+		fields = append(fields, designuntrackedchange.FieldCommittedAt)
+	}
+	if m.subject != nil {
+		fields = append(fields, designuntrackedchange.FieldSubject)
+	}
+	if m.files_changed != nil {
+		fields = append(fields, designuntrackedchange.FieldFilesChanged)
+	}
+	if m.additions != nil {
+		fields = append(fields, designuntrackedchange.FieldAdditions)
+	}
+	if m.deletions != nil {
+		fields = append(fields, designuntrackedchange.FieldDeletions)
+	}
+	if m.detected_at != nil {
+		fields = append(fields, designuntrackedchange.FieldDetectedAt)
+	}
+	if m.acknowledged_by_user_id != nil {
+		fields = append(fields, designuntrackedchange.FieldAcknowledgedByUserID)
+	}
+	if m.acknowledged_at != nil {
+		fields = append(fields, designuntrackedchange.FieldAcknowledgedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignUntrackedChangeMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		return m.ShopID()
+	case designuntrackedchange.FieldSite:
+		return m.Site()
+	case designuntrackedchange.FieldCommitSha:
+		return m.CommitSha()
+	case designuntrackedchange.FieldCommittedAt:
+		return m.CommittedAt()
+	case designuntrackedchange.FieldSubject:
+		return m.Subject()
+	case designuntrackedchange.FieldFilesChanged:
+		return m.FilesChanged()
+	case designuntrackedchange.FieldAdditions:
+		return m.Additions()
+	case designuntrackedchange.FieldDeletions:
+		return m.Deletions()
+	case designuntrackedchange.FieldDetectedAt:
+		return m.DetectedAt()
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		return m.AcknowledgedByUserID()
+	case designuntrackedchange.FieldAcknowledgedAt:
+		return m.AcknowledgedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignUntrackedChangeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		return m.OldShopID(ctx)
+	case designuntrackedchange.FieldSite:
+		return m.OldSite(ctx)
+	case designuntrackedchange.FieldCommitSha:
+		return m.OldCommitSha(ctx)
+	case designuntrackedchange.FieldCommittedAt:
+		return m.OldCommittedAt(ctx)
+	case designuntrackedchange.FieldSubject:
+		return m.OldSubject(ctx)
+	case designuntrackedchange.FieldFilesChanged:
+		return m.OldFilesChanged(ctx)
+	case designuntrackedchange.FieldAdditions:
+		return m.OldAdditions(ctx)
+	case designuntrackedchange.FieldDeletions:
+		return m.OldDeletions(ctx)
+	case designuntrackedchange.FieldDetectedAt:
+		return m.OldDetectedAt(ctx)
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		return m.OldAcknowledgedByUserID(ctx)
+	case designuntrackedchange.FieldAcknowledgedAt:
+		return m.OldAcknowledgedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignUntrackedChange field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignUntrackedChangeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designuntrackedchange.FieldSite:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSite(v)
+		return nil
+	case designuntrackedchange.FieldCommitSha:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCommitSha(v)
+		return nil
+	case designuntrackedchange.FieldCommittedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCommittedAt(v)
+		return nil
+	case designuntrackedchange.FieldSubject:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubject(v)
+		return nil
+	case designuntrackedchange.FieldFilesChanged:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFilesChanged(v)
+		return nil
+	case designuntrackedchange.FieldAdditions:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAdditions(v)
+		return nil
+	case designuntrackedchange.FieldDeletions:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDeletions(v)
+		return nil
+	case designuntrackedchange.FieldDetectedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDetectedAt(v)
+		return nil
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAcknowledgedByUserID(v)
+		return nil
+	case designuntrackedchange.FieldAcknowledgedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAcknowledgedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignUntrackedChange field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignUntrackedChangeMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designuntrackedchange.FieldShopID)
+	}
+	if m.addfiles_changed != nil {
+		fields = append(fields, designuntrackedchange.FieldFilesChanged)
+	}
+	if m.addadditions != nil {
+		fields = append(fields, designuntrackedchange.FieldAdditions)
+	}
+	if m.adddeletions != nil {
+		fields = append(fields, designuntrackedchange.FieldDeletions)
+	}
+	if m.addacknowledged_by_user_id != nil {
+		fields = append(fields, designuntrackedchange.FieldAcknowledgedByUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignUntrackedChangeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		return m.AddedShopID()
+	case designuntrackedchange.FieldFilesChanged:
+		return m.AddedFilesChanged()
+	case designuntrackedchange.FieldAdditions:
+		return m.AddedAdditions()
+	case designuntrackedchange.FieldDeletions:
+		return m.AddedDeletions()
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		return m.AddedAcknowledgedByUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignUntrackedChangeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designuntrackedchange.FieldFilesChanged:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFilesChanged(v)
+		return nil
+	case designuntrackedchange.FieldAdditions:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAdditions(v)
+		return nil
+	case designuntrackedchange.FieldDeletions:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDeletions(v)
+		return nil
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAcknowledgedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignUntrackedChange numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignUntrackedChangeMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designuntrackedchange.FieldAcknowledgedByUserID) {
+		fields = append(fields, designuntrackedchange.FieldAcknowledgedByUserID)
+	}
+	if m.FieldCleared(designuntrackedchange.FieldAcknowledgedAt) {
+		fields = append(fields, designuntrackedchange.FieldAcknowledgedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignUntrackedChangeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignUntrackedChangeMutation) ClearField(name string) error {
+	switch name {
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		m.ClearAcknowledgedByUserID()
+		return nil
+	case designuntrackedchange.FieldAcknowledgedAt:
+		m.ClearAcknowledgedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignUntrackedChange nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignUntrackedChangeMutation) ResetField(name string) error {
+	switch name {
+	case designuntrackedchange.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designuntrackedchange.FieldSite:
+		m.ResetSite()
+		return nil
+	case designuntrackedchange.FieldCommitSha:
+		m.ResetCommitSha()
+		return nil
+	case designuntrackedchange.FieldCommittedAt:
+		m.ResetCommittedAt()
+		return nil
+	case designuntrackedchange.FieldSubject:
+		m.ResetSubject()
+		return nil
+	case designuntrackedchange.FieldFilesChanged:
+		m.ResetFilesChanged()
+		return nil
+	case designuntrackedchange.FieldAdditions:
+		m.ResetAdditions()
+		return nil
+	case designuntrackedchange.FieldDeletions:
+		m.ResetDeletions()
+		return nil
+	case designuntrackedchange.FieldDetectedAt:
+		m.ResetDetectedAt()
+		return nil
+	case designuntrackedchange.FieldAcknowledgedByUserID:
+		m.ResetAcknowledgedByUserID()
+		return nil
+	case designuntrackedchange.FieldAcknowledgedAt:
+		m.ResetAcknowledgedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignUntrackedChange field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignUntrackedChangeMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignUntrackedChangeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignUntrackedChangeMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignUntrackedChangeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignUntrackedChangeMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignUntrackedChangeMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignUntrackedChange unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignUntrackedChangeMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignUntrackedChange edge %s", name)
 }
 
 // MediaUploadMutation represents an operation that mutates the MediaUpload nodes in the graph.
