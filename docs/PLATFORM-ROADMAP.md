@@ -24,6 +24,10 @@
 | 3 | 把 CMS 內容功能改造成 headless 內容儲存：每店 schema、穩定 `key`、草稿／發佈、版本歷史、`content.*` 權限、發佈通知、公開讀取 API；加上 merchant template 的後台內容功能（後續工作） | OpenSpec change [`headless-content-store`](../openspec/changes/headless-content-store/proposal.md)（**提案，未實作**；含需要使用者回答的開放問題） | 提案 |
 | 4 | 退役託管店面與主題：主題端點／表／seed／權限、site／網域路由與 Host 後備、`web/` 的租戶渲染程式碼、相關 e2e 與 CI。**第一階段先交付每店 schema 儲存**（頁面 schema 今天來自主題） | OpenSpec change [`retire-hosted-storefront-and-themes`](../openspec/changes/retire-hosted-storefront-and-themes/proposal.md)（**已實作 2026-11-25**；直接移除、無棄用期；v1 例外見 ADR 0002） | 完成（資料遷移待在正式資料庫套用） |
 
+### 設計歷史（提案）
+
+AI 重新設計的紀錄、截圖、核准與還原：OpenSpec change [`design-history`](../openspec/changes/design-history/proposal.md)（**提案，未實作**；AI edit service 本身也尚未建置；含需要使用者回答的開放問題 Q1–Q10，尤其是 admin 截圖只用 sandbox 資料集的隱私規則）。
+
 ## 現在可以依賴什麼
 
 - 新商家一律走 headless：`merchant-onboarding` skill（`.claude/skills/merchant-onboarding/`）。
