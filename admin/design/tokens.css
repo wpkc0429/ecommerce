@@ -1,0 +1,5 @@
+/* Design tokens (design layer). The defaults are mirrored in design-defaults/tokens.css. Per-shop branding overrides these at runtime. */
+:root {
+  --brand-primary: #2563eb;
+  --brand-accent: #111827;
+}

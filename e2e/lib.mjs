@@ -293,3 +293,13 @@ export function isoDate(days = 1) {
 
 /** Unique-per-run suffix so repeated runs never collide on an identity. */
 export const runID = `${Date.now().toString(36)}`;
+
+/**
+ * The admin asks irreversible actions through the core's own confirm dialog (a <dialog data-testid="confirm-dialog">; before the
+ * locked-core / design-layer split these were native confirm() dialogs). Arm BEFORE the click that opens it: clicks "confirm-yes"
+ * as soon as the dialog is open. Fire-and-forget on purpose (the click that follows does not wait for the dialog to close).
+ */
+export function armConfirm(page, timeout = 10000) {
+  page.waitForSelector('dialog[data-testid="confirm-dialog"][open] [data-testid="confirm-yes"]', { timeout })
+    .then((el) => el.click()).catch(() => {});
+}

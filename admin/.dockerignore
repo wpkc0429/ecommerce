@@ -6,3 +6,7 @@
 Dockerfile
 .dockerignore
 package.json
+docs
+scripts
+e2e
+node_modules

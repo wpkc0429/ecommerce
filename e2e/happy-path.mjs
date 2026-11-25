@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 import { applicationBody, runApplicationPath, submitApplication, tokenFromMessage } from "./application-path.mjs";
-import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
+import { API, armConfirm, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 import { runContentOpsPath } from "./content-ops-path.mjs";
 
@@ -118,7 +118,6 @@ try {
   await page.waitForSelector("#content-form fieldset");
   const siteTitleInput = page.locator('#content-form input[data-pointer="/header/site_title"]');
   await siteTitleInput.fill("E2E 招牌");
-  page.once("dialog", (d) => d.accept());
   await page.click("#content-save");
   await page.waitForTimeout(400);
   const pubAfter = await renderPublic("/");
@@ -481,7 +480,7 @@ try {
   const shipText = (await page.textContent("#order-shipment")) ?? "";
   check("shipment created through the admin UI", shipText.includes(`E2E-OPS-${runID}`), shipText.slice(0, 200));
   check("order is now marked shipped", shipText.includes("已出貨"), shipText.slice(0, 200));
-  page.once("dialog", (d) => d.accept());
+  armConfirm(page);
   await page.click("#shipment-delivered-btn");
   await page.waitForSelector("#shipment-terminal-note", { timeout: 8000 });
   check("shipment advanced to delivered",
@@ -671,7 +670,8 @@ try {
   await memberRow.locator("button", { hasText: "詳情" }).click();
   await page.waitForSelector("#tab-member-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#member-orders-tbody tr", { timeout: 8000 });
-  const memberID = Number((await page.getAttribute(`#members-tbody tr:has-text("${guestEmail}")`, "data-member-id")));
+  // the detail route is #/members/<id>; the roster row is not kept in the DOM while the detail is open (each route mounts its own view)
+  const memberID = Number(new URL(page.url()).hash.split("/").pop());
   const detailText = (await page.textContent("#member-summary")) ?? "";
   check("detail shows the customer's email", detailText.includes(guestEmail), detailText.slice(0, 200));
   const memberPoints = (await page.textContent("#member-points")).trim();
@@ -707,8 +707,9 @@ try {
   await page.click('.tab[data-tab="storefront-clients"]');
   await page.waitForSelector("#tab-storefront-clients:not([hidden])");
   const keyLabel = `e2e-${runID}`;
-  page.once("dialog", (d) => d.accept(keyLabel));
   await page.click("#new-publishable-key-btn");
+  await page.fill("#publishable-key-label", keyLabel);
+  await page.click("#publishable-key-form button[type=submit]");
   const newKeyRow = page.locator(`#publishable-keys-tbody tr:has-text("${keyLabel}")`);
   await newKeyRow.waitFor({ timeout: 8000 });
   const keyValue = (await newKeyRow.locator("td.key-value").textContent()).trim();
@@ -725,7 +726,7 @@ try {
   const originRow = page.locator(`#allowed-origins-tbody tr[data-origin="${e2eOrigin}"]`);
   await originRow.waitFor({ timeout: 8000 });
   check("allowed origin registered through the admin UI", true, e2eOrigin);
-  page.once("dialog", (d) => d.accept());
+  armConfirm(page);
   await originRow.locator("button").click();
   await originRow.waitFor({ state: "detached", timeout: 8000 });
   check("allowed origin removed again (globally unique — leaving it would 422 next run)", true);
@@ -763,7 +764,7 @@ try {
     return row && row.textContent.includes("2%");
   }, tierName, { timeout: 8000 });
   check("member tier edited through the admin UI", true, "discount 1% → 2%");
-  page.once("dialog", (d) => d.accept());
+  armConfirm(page);
   await tierRow.locator("button", { hasText: "刪除" }).click();
   await tierRow.waitFor({ state: "detached", timeout: 8000 });
   check("member tier deleted (the seeded ladder is left exactly as it was)", true);
@@ -918,7 +919,7 @@ try {
       ((await acctRow.textContent()) ?? "").includes("已設定"));
     await acctRow.locator("button", { hasText: "詳情" }).click();
     await page.waitForSelector('#platform-account-detail [data-act="disable"]', { timeout: 8000 });
-    page.once("dialog", (d) => d.accept());
+    armConfirm(page);
     await page.click('#platform-account-detail [data-act="disable"]');
     await page.waitForSelector('#platform-account-detail [data-act="enable"]', { timeout: 8000 });
     check("the account is disabled from the platform view", true);
@@ -976,7 +977,7 @@ try {
       const v = await req("POST", "/api/v1/public/shop-applications/verify", { body: { token: vtok } });
       check("the applicant verifies through the link's token", v.status === 200, brief(v));
     } else {
-      page.once("dialog", (d) => d.accept());
+      armConfirm(page);
       await page.click('#platform-application-detail [data-act="verify-manually"]');
     }
     await page.selectOption("#platform-applications-filter", "pending_review");
@@ -1088,7 +1089,7 @@ try {
     check("the clerk created a shipment", ((await sp.textContent("#order-shipment")) ?? "").includes(`E2E-STAFF-${runID}`));
     check("the clerk can mark it delivered but has no return button",
       (await sp.locator("#shipment-delivered-btn").count()) === 1 && (await sp.locator("#shipment-returned-btn").count()) === 0);
-    sp.once("dialog", (d) => d.accept());
+    armConfirm(sp);
     await sp.click("#shipment-delivered-btn");
     await sp.waitForSelector("#shipment-terminal-note", { timeout: 8000 });
     check("the clerk marked the shipment delivered",
@@ -1230,7 +1231,7 @@ try {
     check("before the disable the clerk can list orders", before.status === 200, brief(before));
     await op.reload();
     await op.waitForSelector(`#team-members-tbody tr[data-email="${inviteEmail}"]`, { timeout: 8000 });
-    op.once("dialog", (d) => d.accept());
+    armConfirm(op);
     await op.click(`#team-members-tbody tr[data-email="${inviteEmail}"] [data-act="disable"]`);
     await op.waitForSelector(`#team-members-tbody tr[data-email="${inviteEmail}"] [data-act="enable"]`, { timeout: 8000 });
     check("the owner disabled the membership from the members view", true);

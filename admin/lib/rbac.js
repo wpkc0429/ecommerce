@@ -46,3 +46,6 @@ export function readOnlyUnless(node, container) {
   container.querySelectorAll("input, select, textarea, button").forEach((n) => (n.disabled = true));
   return true;
 }
+
+/** At least one of the nodes is granted (a tab that carries two permission levels). */
+export function canAny(...nodes) { return nodes.some((n) => can(n)); }

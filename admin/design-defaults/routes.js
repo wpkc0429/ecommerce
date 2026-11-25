@@ -1,0 +1,25 @@
+// Route id -> view module under this folder (generated from lib/meta by scripts/sync-design.mjs).
+export default {
+  "shell": "views/shell.js",
+  "notFound": "views/not-found.js",
+  "noPermission": "views/no-permission.js",
+  "bootError": "views/boot-error.js",
+  "login": "views/login.js",
+  "setPassword": "views/set-password.js",
+  "acceptInvite": "views/accept-invite.js",
+  "pages": "views/pages.js",
+  "content": "views/content.js",
+  "categories": "views/categories.js",
+  "products": "views/products.js",
+  "orders": "views/orders.js",
+  "shippingMethods": "views/shipping-methods.js",
+  "memberTiers": "views/member-tiers.js",
+  "members": "views/members.js",
+  "points": "views/points.js",
+  "reports": "views/reports.js",
+  "storefrontClients": "views/storefront-clients.js",
+  "team": "views/team.js",
+  "platformShops": "views/platform-shops.js",
+  "platformAccounts": "views/platform-accounts.js",
+  "platformApplications": "views/platform-applications.js"
+};

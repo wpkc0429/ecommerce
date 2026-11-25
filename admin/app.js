@@ -1,313 +1,153 @@
-// Ecommerce Admin — 薄殼 SPA 的 shell（change admin-commerce-catalog, design D1）。
-//
-// 這個檔案只做四件事：登入/登出、商家選擇、視圖註冊表、路由。所有畫面邏輯
-// 住在 views/*.js，共用詞彙住在 lib/*.js——全部是**瀏覽器原生 ES module**，
-// 沒有打包器、沒有轉譯器、沒有任何建置步驟。「無建置步驟」不等於「一個檔案」。
-//
-// 新增一個視圖 = 在 index.html 加一個 .tab-panel 容器 + 在下方 views 註冊表加
-// 一列。第 12 個分頁的成本與第 4 個相同。
-//
-// change admin-commerce-operations（design D5）把分頁切換換成 hash 路由：
-// showTab() 只負責寫 hash，真正的畫面切換發生在單一的路由處理器裡。兩份真相
-// （「現在在哪個分頁」與「網址說在哪個分頁」）會立刻漂移，所以只留一份。
-import { api, tokens, login, logoutRequest, canRefresh, refreshTokens, onUnauthorized } from "./lib/api.js";
-import { $, el } from "./lib/dom.js";
-import { loadPermissions, can, canPlatform, setPlatformPermissions, permissionError } from "./lib/rbac.js";
-import { loadMediaConfig, setShopIDSource } from "./lib/upload.js";
+// App bootstrap (CORE, locked): boot, the hash router, the session lifecycle and the permission gate.
+// Every screen, including the shell (topbar + navigation) and the login / set-password / accept-invite screens, is a
+// design-layer view mounted through core/host.js with a ctx from core/context.js. This file decides WHICH screen shows and
+// WHETHER the person may see it; the design layer decides only how it looks. Structure adapted from merchant-template
+// v0.3.0 app.js (docs/DESIGN-LAYER-PROVENANCE.md); routing keeps this admin's `#/<view>[/<param>]` hash router.
+import { api, onUnauthorized } from "./lib/api.js";
 import { parseHash, navigate, onRoute } from "./lib/router.js";
-import { createPagesView } from "./views/pages.js";
-import { createContentView } from "./views/content.js";
-import { createCategoriesView } from "./views/categories.js";
-import { createProductsView } from "./views/products.js";
-import { createOrdersView } from "./views/orders.js";
-import { createShippingMethodsView } from "./views/shipping-methods.js";
-import { createMemberTiersView } from "./views/member-tiers.js";
-import { createMembersView } from "./views/members.js";
-import { createPointsView } from "./views/points.js";
-import { createReportsView } from "./views/reports.js";
-import { createStorefrontClientsView } from "./views/storefront-clients.js";
-import { createPlatformShopsView } from "./views/platform-shops.js";
-import { createPlatformAccountsView } from "./views/platform-accounts.js";
-import { createPlatformApplicationsView, refreshApplicationsBadge } from "./views/platform-applications.js";
-import { createSetPasswordView } from "./views/set-password.js";
-import { createAcceptInviteView } from "./views/accept-invite.js";
-import { createTeamView } from "./views/team.js";
-import { applyBranding, loadHostBranding, loadShopBranding } from "./lib/branding.js";
+import { session, restoreSession, enterShop, loadMe, clearSession, onShopChanged, onBadge } from "./lib/session.js";
+import { can, permissionError } from "./lib/rbac.js";
+import { loadHostBranding } from "./lib/branding.js";
+import { mediaConfig } from "./lib/upload.js";
+import { loadDesign, t } from "./lib/design.js";
+import { h, clear, applyBranding, allowImageOrigin, errorMessage } from "./ui/kit.js";
+import { byName, allowed, visibleNav } from "./core/routes.js";
+import { makeContext } from "./core/context.js";
+import { makeAuth } from "./core/auth.js";
+import { mountView } from "./core/host.js";
 
-const state = { me: null, shopID: null };
+const root = document.getElementById("app");
+let shell = null;           // {main, setActive, setNoAccess}
+let viewToken = 0;          // invalidates in-flight view renders on navigation
+let bootState = "pending";  // pending | in | out | error
 
-const ctx = {
-  getShopID: () => state.shopID,
-  showTab,
-  showPanel,
-};
+const fragment = () => document.createDocumentFragment();
+const nav = () => visibleNav().map((n) => ({ key: n.key, copy: n.copy }));
+const firstAllowed = () => visibleNav()[0]?.key || "";
 
-// 視圖註冊表。
-//   nav:false       → 不出現在導覽（編輯器由其列表視圖開啟）
-//   transient:true  → 沒有自己的載入器，內容由開啟它的視圖預先填好；因此**開機時
-//                     不得路由過去**（重新整理會停在一個空畫面）。導覽期間照常。
-//   perm            → 進入該視圖所需的權限節點（design D5：UI 依實際權限決定
-//                     可見性，但伺服器端永遠是唯一權威）
-//   perms           → 任一成立即可見（用於一個分頁承載兩種權限層級的情形）
-const views = {
-  pages: { label: "頁面", panel: "tab-pages", nav: true, perm: "page.view", view: createPagesView(ctx) },
-  editor: { panel: "tab-editor", nav: false, transient: true },
-  content: { label: "全域內容", panel: "tab-content", nav: true, perm: "shop.view", view: createContentView(ctx) },
-  orders: { label: "訂單", panel: "tab-orders", nav: true, perm: "order.view", view: createOrdersView(ctx) },
-  products: { label: "商品", panel: "tab-products", nav: true, perm: "product.view", view: createProductsView(ctx) },
-  "product-editor": { panel: "tab-product-editor", nav: false, transient: true },
-  categories: { label: "分類", panel: "tab-categories", nav: true, perm: "category.view", view: createCategoriesView(ctx) },
-  "shipping-methods": {
-    label: "運送方式", panel: "tab-shipping-methods", nav: true,
-    perm: "shipping_method.view", view: createShippingMethodsView(ctx),
-  },
-  "member-tiers": {
-    label: "會員等級", panel: "tab-member-tiers", nav: true,
-    perm: "member_tier.view", view: createMemberTiersView(ctx),
-  },
-  // 顧客名冊（change member-directory）。與 orders 同型：一個註冊表項目、兩個面貌
-  // （#/members 名冊、#/members/57 詳情），詳情的 panel 由視圖自己 showPanel 切過去。
-  members: { label: "顧客", panel: "tab-members", nav: true, perm: "member.view", view: createMembersView(ctx) },
-  points: { label: "會員點數", panel: "tab-points", nav: true, perm: "point.view", view: createPointsView(ctx) },
-  // 營運報表（change merchant-reports）。時區的設定入口也住在這裡——一個只有一個
-  // 欄位的「設定」分頁，其存在的理由會比它的內容多（design D7）。
-  reports: { label: "報表", panel: "tab-reports", nav: true, perm: "report.view", view: createReportsView(ctx) },
-  // 前端接入：金鑰是商家層、origin 是平台層（design D6）。分頁只要其中一邊看得到
-  // 就該出現，區塊各自再判一次。change ecpay-per-shop-credentials 加了第三個
-  // 區塊（ECPay 憑證，payment_credential.manage）——同一個「我怎麼跟外界接上」
-  // 分頁底下再一塊，不是新分頁。
-  "storefront-clients": {
-    label: "前端接入", panel: "tab-storefront-clients", nav: true,
-    perms: ["publishable_key.view", "shop.manage_client_origins", "payment_credential.manage"],
-    view: createStorefrontClientsView(ctx),
-  },
-  // 成員（change merchant-staff-role）：owner 邀請、停用店員。
-  team: { label: "成員", panel: "tab-team", nav: true, perm: "user.manage_members", view: createTeamView(ctx) },
-  // 平台視圖（change platform-account-provisioning）：不屬於任何商家，可見性來源是
-  // /admin/me 的 platform_permissions（platformPerm），不是 /shops/{id}/me。
-  "platform-shops": {
-    label: "商家（平台）", panel: "tab-platform-shops", nav: true,
-    platformPerm: "shop.list", view: createPlatformShopsView(),
-  },
-  "platform-accounts": {
-    label: "帳號（平台）", panel: "tab-platform-accounts", nav: true,
-    platformPerm: "account.view", view: createPlatformAccountsView(),
-  },
-  // 開店申請審核（change platform-website）：同為平台視圖，可見性是平台權限節點。
-  "platform-applications": {
-    label: "開店申請", panel: "tab-platform-applications", nav: true,
-    platformPerm: "shop_application.view", view: createPlatformApplicationsView(),
+// ── Auth hooks handed to the screens through ctx.auth ──────────────────
+const hooks = {
+  onLoggedIn: async () => { await enterApp(); },
+  onLogout: () => doLogout(),
+  goLogin: (email, notice) => { history.replaceState(null, "", window.location.pathname + window.location.search); showLogin({ email, notice }); },
+  afterJoin: async (prevSids) => {
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    await loadMe();
+    const added = (session.me.sids || []).find((id) => !(prevSids || []).includes(id));
+    await enterApp(added);
   },
 };
+const authFor = (linkToken) => makeAuth({ linkToken, hooks });
 
-// 密碼設定頁（#/set-password/{token}）不在註冊表：它無需登入，也不屬於任何分頁。
-// 連結形狀是給所有 admin 前端的契約（docs/admin-frontend-integration.md）。
-const setPasswordView = createSetPasswordView({
-  toLogin(email) {
-    // 設定完成：清掉網址上的 token，回登入頁並預填 email。
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    show("view-login");
-    $("#login-email").value = email || "";
-    $("#login-password").value = "";
-    $(email ? "#login-password" : "#login-email").focus();
-  },
-});
-
-function openSetPassword(token) {
-  show("view-set-password");
-  setPasswordView.load(token);
+// ── Boot ───────────────────────────────────────────────────────────────
+async function boot() {
+  await loadDesign();
+  onUnauthorized(() => doLogout());
+  onShopChanged(() => { const r = parseHash(); renderRoute({ name: r.name, params: [] }); });
+  onRoute(renderRoute);
+  onBadge(() => { if (shell && shell.refreshBadge) shell.refreshBadge(); });
+  loadHostBranding(); // the login page also carries the shop's branding (resolved from the admin host)
+  const r = parseHash();
+  if (r.name === "set-password" || r.name === "accept-invite") return renderRoute(r);
+  try {
+    if (await restoreSession()) { await enterApp(undefined, true); return; }
+  } catch (e) { return showBootError(e); }
+  bootState = "out";
+  showLogin({});
 }
 
-// 邀請接受頁（#/accept-invite/{token}，change merchant-staff-role）：同樣不在註冊表。
-// 接受成功後：新帳號導回登入頁；既有帳號已換發 token，直接進主畫面並切到新商家。
-const acceptInviteView = createAcceptInviteView({
-  toLogin(email) {
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    show("view-login");
-    $("#login-email").value = email || "";
-    $("#login-password").value = "";
-    $(email ? "#login-password" : "#login-email").focus();
-  },
-  async toMain(prevSids) {
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    state.me = await api("GET", "/admin/me");
-    const added = (state.me.sids || []).find((id) => !prevSids.includes(id));
-    await enterMain(added);
-  },
-});
-
-function openAcceptInvite(token) {
-  show("view-accept-invite");
-  acceptInviteView.load(token);
+async function showBootError(e) {
+  bootState = "error";
+  const { root: r } = await mountView("bootError", fragment, () => makeContext({ routeId: "bootError", state: { error: errorMessage(e) } }));
+  root.replaceChildren(r);
 }
 
-function allowed(def) {
-  if (!def) return false;
-  if (def.platformPerm) return canPlatform(def.platformPerm);
-  if (def.perms) return def.perms.some((p) => can(p));
-  return !def.perm || can(def.perm);
-}
-
-function show(viewID) {
-  document.querySelectorAll(".view").forEach((v) => (v.hidden = v.id !== viewID));
-}
-
-function showPanel(panelID) {
-  document.querySelectorAll(".tab-panel").forEach((p) => (p.hidden = p.id !== panelID));
-}
-
-/** 導航。hash 沒變時瀏覽器不發 hashchange，所以自己渲染一次。 */
-function showTab(name, ...params) {
-  if (!navigate(name, ...params)) renderRoute({ name, params });
-}
-
-/** 唯一的畫面切換入口——hashchange 與「hash 未變」的直接呼叫都走這裡。 */
-function renderRoute({ name, params }) {
-  if (name === "set-password") return openSetPassword(params[0]);
-  if (name === "accept-invite") return openAcceptInvite(params[0]);
-  const def = views[name];
-  if (!def || !allowed(def)) {
-    // 過期的書籤、無權限的連結、拼錯的 hash——一律安靜地回落到一個進得去的
-    // 畫面。一個過期的書籤不該長得像故障（spec admin-operations-ui）。
-    const first = firstAllowedView();
-    if (first && first !== name) showTab(first);
+async function enterApp(preferShop, honorHash = false) {
+  if (!session.me) await loadMe();
+  await enterShop(preferShop);
+  const base = mediaConfig().public_base_url;
+  if (base) allowImageOrigin(base);
+  bootState = "in";
+  await buildShell();
+  const first = firstAllowed();
+  if (!first) {
+    shell.setNoAccess(permissionError()
+      ? t("shell.noAccessError", { message: permissionError().message })
+      : t("shell.noAccess"));
+    shell.main.replaceChildren();
     return;
   }
-  showPanel(def.panel);
-  document.querySelectorAll(".tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  def.view?.load?.(...params);
-}
-
-function firstAllowedView() {
-  for (const [name, def] of Object.entries(views)) {
-    if (def.nav && allowed(def)) return name;
+  shell.setNoAccess("");
+  const r = parseHash();
+  const def = byName(r.name);
+  if (def && !def.public && allowed(def) && !def.transient) {
+    // Only a boot honours deep-link parameters; after login the person lands on the named view.
+    return renderRoute(honorHash ? r : { name: r.name, params: [] });
   }
-  return null;
+  navigate(first) || renderRoute({ name: first, params: [] });
 }
 
-function renderNav() {
-  const nav = $("#tabs");
-  nav.textContent = "";
-  for (const [name, def] of Object.entries(views)) {
-    if (!def.nav || !allowed(def)) continue;
-    nav.append(el("button", { class: "tab", "data-tab": name, onclick: () => showTab(name) }, def.label));
+// ── Routing ────────────────────────────────────────────────────────────
+async function renderRoute({ name, params = [] }) {
+  const token = ++viewToken;
+  if (name === "set-password" || name === "accept-invite") {
+    teardownShell();
+    const def = byName(name);
+    const { root: r } = await mountView(def.id, fragment, () => makeContext({ routeId: def.id, auth: authFor(params[0] || "") }));
+    if (token !== viewToken) return;
+    root.replaceChildren(r);
+    return;
   }
-  return firstAllowedView();
+  if (!session.me) { if (bootState !== "pending") showLogin({}); return; }
+  const def = byName(name);
+  if (!def || def.public || !allowed(def)) {
+    // Stale bookmarks, links without permission and typos all fall back quietly to a view the person can open.
+    const first = firstAllowed();
+    if (first && first !== name) { if (!navigate(first)) renderRoute({ name: first, params: [] }); }
+    return;
+  }
+  if (!shell) await buildShell();
+  if (token !== viewToken) return;
+  shell.setActive(def.nav || def.name);
+  window.scrollTo(0, 0);
+  const ctxFor = () => makeContext({ routeId: def.id, params, alive: () => token === viewToken, nav: nav(), auth: authFor(null) });
+  try {
+    const { root: view } = await mountView(def.id, fragment, ctxFor);
+    if (token !== viewToken) return;
+    shell.main.replaceChildren(view);
+  } catch (e) {
+    if (token !== viewToken) return;
+    shell.main.replaceChildren(h("p", { class: "error" }, errorMessage(e)));
+  }
 }
 
-function logout() {
-  logoutRequest();
-  tokens.clear();
+// ── Login / shell ──────────────────────────────────────────────────────
+async function showLogin({ email = "", notice = "" }) {
+  const token = ++viewToken;
+  teardownShell();
+  bootState = "out";
   applyBranding(null);
-  show("view-login");
+  const { root: r } = await mountView("login", fragment, () => makeContext({ routeId: "login", state: { email, notice }, auth: authFor(null) }));
+  if (token !== viewToken) return;
+  root.replaceChildren(r);
   loadHostBranding();
 }
-onUnauthorized(logout);
 
-// 切換商家後權限必須重新判定——權限依商家而異（spec admin-catalog-ui）。
-//
-// honorHash 只在開機時為真：那是深層連結唯一該被採信的時刻。切換商家時參數
-// （訂單編號、會員編號）屬於**上一家店**，帶著它們過去只會得到一個 404 畫面，
-// 所以只保留視圖名稱。
-async function refreshShopContext(honorHash) {
-  await loadPermissions(state.shopID);
-  loadShopBranding(state.shopID); // 不阻塞：品牌只是外觀
-  // change product-images-r2: whether uploads are available at all (R2 may not be
-  // configured yet). Kept in lib/upload.js; controls render only when enabled.
-  await loadMediaConfig();
-  const first = renderNav();
-  refreshApplicationsBadge();
-  const notice = $("#no-access");
-  if (!first) {
-    showPanel(null);
-    notice.textContent = permissionError()
-      ? `無法取得你在此商家的權限（${permissionError().message}）。請確認商家編號，或重新登入。`
-      : "你在這個商家沒有任何可用的功能。";
-    notice.hidden = false;
-    return;
-  }
-  notice.hidden = true;
-  const route = parseHash();
-  const def = views[route.name];
-  if (honorHash && def && allowed(def) && !def.transient) {
-    showTab(route.name, ...route.params);
-    return;
-  }
-  if (!honorHash && def && allowed(def) && !def.transient) {
-    showTab(route.name); // 同一個視圖，換一家店，不帶參數
-    return;
-  }
-  showTab(first);
+function teardownShell() { shell = null; }
+
+async function buildShell() {
+  const { root: r, result } = await mountView("shell", fragment,
+    () => makeContext({ routeId: "shell", nav: nav(), auth: authFor(null) }),
+    { validate: (res, frag) => Boolean(res && res.main instanceof HTMLElement && typeof res.setActive === "function" && typeof res.setNoAccess === "function" && frag.contains(res.main)) });
+  root.replaceChildren(r);
+  shell = { main: result.main, setActive: result.setActive, setNoAccess: result.setNoAccess, refreshBadge: typeof result.refreshBadge === "function" ? result.refreshBadge : null };
 }
 
-function enterMain(preferShop) {
-  setPlatformPermissions(state.me.platform_permissions);
-  show("view-main");
-  $("#whoami").textContent = state.me.email;
-  const sel = $("#shop-select");
-  sel.textContent = "";
-  const sids = state.me.sids || [];
-  if (sids.length > 0) {
-    for (const id of sids) sel.append(el("option", { value: id }, `Shop #${id}`));
-    state.shopID = sids.includes(preferShop) ? preferShop : sids[0];
-    sel.value = String(state.shopID);
-    sel.hidden = false;
-    $("#shop-input").hidden = true;
-  } else {
-    // 平台管理員無 sids 提示 → 手動輸入目標 shop。
-    sel.hidden = true;
-    const input = $("#shop-input");
-    input.hidden = false;
-    state.shopID = Number(localStorage.getItem("shopID") || 1);
-    input.value = state.shopID;
-  }
-  return refreshShopContext(true);
+async function doLogout() {
+  document.querySelectorAll("dialog").forEach((d) => d.close());
+  clearSession();
+  viewToken++;
+  showLogin({ notice: "" });
 }
-
-onRoute(renderRoute);
-setShopIDSource(() => state.shopID);
-
-async function boot() {
-  loadHostBranding(); // 登入頁也要有商家品牌（以請求的 admin 主機解析；未登記＝預設）
-  const route = parseHash();
-  if (route.name === "set-password") return openSetPassword(route.params[0]);
-  if (route.name === "accept-invite") return openAcceptInvite(route.params[0]);
-  // access token 只在記憶體：重新整理後以 refresh（cookie 或儲存的 token）換一枚新的。
-  if (!tokens.access && canRefresh()) {
-    try { await refreshTokens(); } catch { tokens.clear(); }
-  }
-  if (tokens.access) {
-    try {
-      state.me = await api("GET", "/admin/me");
-      await enterMain();
-      return;
-    } catch { tokens.clear(); }
-  }
-  show("view-login");
-}
-
-$("#login-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  $("#login-error").hidden = true;
-  try {
-    await login($("#login-email").value, $("#login-password").value);
-    state.me = await api("GET", "/admin/me");
-    await enterMain();
-  } catch {
-    $("#login-error").hidden = false;
-  }
-});
-
-$("#logout-btn").addEventListener("click", logout);
-
-$("#shop-select").addEventListener("change", (e) => {
-  state.shopID = Number(e.target.value);
-  refreshShopContext(false);
-});
-$("#shop-input").addEventListener("change", (e) => {
-  state.shopID = Number(e.target.value);
-  localStorage.setItem("shopID", String(state.shopID));
-  refreshShopContext(false);
-});
 
 boot();
