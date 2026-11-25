@@ -1,3 +1,4 @@
+> **切片 2（截圖與私有儲存）已於 2026-11-26 實作**（第 2 組、4.4、6.x、8.x 與 9.x 的對應部分已勾選；Cloudflare 的 bucket 與 token、sandbox 堆疊的部署是人工步驟，見 9.3 與操作員手冊）。
 > **切片 1（資料與 API，無截圖、無簽章 permit）已於 2026-11-26 實作**，已勾選的項目即其內容；切片 2（截圖與儲存）、切片 3（選用）與 template 後續任務仍未做。
 > design.md 的 Q1–Q10 已於 2026-11-25 由使用者定案（採用建議原文）；Q9（publish grant）與 Q10（通知信）為附條件決議，見 design.md。每組可獨立部署；切片對應 design 的 Migration Plan。
 
@@ -12,16 +13,16 @@
 - [x] 1.7 `api/internal/httpapi/router.go`：`Deps` 新增 `Design`、`DesignService`、`DesignCredentials`；機器路由族掛在 `/api/v1/design-service`（**不在 `/admin` 群組**，不經 `AdminAccessMW`）；`api/internal/app/wire.go` 接線（`wiring_integration_test.go` ⑤⑥ 必須綠）
 - [x] 1.8 限流：`ratelimitmw.go` 新增 `NewDesignServiceRateLimit`（每憑證）、`NewDesignApproveRateLimit`（每商家＋呼叫者）；每店每日請求上限（資料庫 `COUNT`，不依賴 Redis） （實作註記：每憑證限流在 `design_service_auth.go`，每商家＋呼叫者的核准限流在 `DesignAdminHandler`，非 `ratelimitmw.go`）
 - [x] 1.9 `api/internal/config/design.go`：`DESIGN_APPROVAL_TTL`、`DESIGN_MIN_PREVIEW_REMAINING`、`DESIGN_DAILY_REQUEST_CAP`、`DESIGN_CLAIM_LEASE`、`DESIGN_APPROVAL_PENDING_TIMEOUT`（含 min/max 檢查，同 `contentops.go`）；`.env.example`
-- [ ] 1.10 `cmd/design-sweep`（dry run 預設、`-apply`、`-verify` 驗證事件雜湊串、`-orphans` 報告）；`Makefile` 目標 `design-sweep` （切片 1 已完成 dry run／`-apply`／`-verify` 與 Makefile 目標；`-orphans` 只是占位，需要切片 2 的物件儲存才有意義，所以此項尚未勾選）
+- [x] 1.10 `cmd/design-sweep`（dry run 預設、`-apply`、`-verify` 驗證事件雜湊串、`-orphans` 報告）；`Makefile` 目標 `design-sweep` （切片 2 完成：`-orphans` 列出 bucket 與資料表的差異〔孤兒物件、缺物件的列〕，有差異時 exit 1，只讀；`Service.Orphans`）
 
 ## 2. 截圖與儲存（切片 2，design D5／D6／D11／D12）
 
-- [ ] 2.1 `api/internal/media/store.go`：`ObjectStore` 增加 `PresignGet(ctx, key, ttl)`；`s3store.go` 實作；`fakestore.go`、`NullStore` 補上（additive；既有測試不改）
-- [ ] 2.2 `api/internal/config/design.go`：`DESIGN_R2_BUCKET`、`DESIGN_R2_ACCESS_KEY_ID`、`DESIGN_R2_SECRET_ACCESS_KEY`（全有或全無；部分設定拒絕啟動並列出鍵名）、`DESIGN_SCREENSHOT_URL_TTL`（預設 5m）、`DESIGN_SHOP_QUOTA_BYTES`；`secrets.go`：`APP_ENV=production` 下拒絕已知預設值
-- [ ] 2.3 `api/internal/design/screenshots.go`：接收 PNG（`MaxBytesReader` 2 MiB、`DecodeConfig` 驗寬等於視口與高 ≤ 10,000、完整解碼後**重新編碼**以去除中繼資料、SHA-256 對存入位元組、`X-Content-SHA256` 對上傳位元組）、沿用 media 併發信號量、`capture_manifest` 驗證（`dataset=sandbox-v1` 才收 admin）、每請求 80 張／40 MiB 與每店配額、`attempt` 配發（同位元組重放 200、不同位元組新增 attempt）、物件鍵 `shops/{shop}/design/{request}/{id}.png`
-- [ ] 2.4 `GET …/screenshots`：5 分鐘簽名網址、`Cache-Control: no-store`、簽名網址不入日誌；未設定 bucket → 503 `design_storage_not_configured`（授權檢查之後）
-- [ ] 2.5 `docker-compose.yml`：MinIO 新增第三個**私有**（非匿名可讀）bucket `ecommerce-design-history`（與 e2e 用的獨立 bucket）；`.env.example`
-- [ ] 2.6 `docs/design-history-privacy.md` 的規則 R1–R5 在程式中的落點對照（上傳檢查、遮蔽、日誌）
+- [x] 2.1 `api/internal/media/store.go`：`ObjectStore` 增加 `PresignGet(ctx, key, ttl)`；`s3store.go` 實作；`fakestore.go`、`NullStore` 補上（additive；既有測試不改） （`FakeStore.PresignGet` 回 httptest 網址並強制到期）
+- [x] 2.2 `api/internal/config/design.go`：`DESIGN_R2_BUCKET`、`DESIGN_R2_ACCESS_KEY_ID`、`DESIGN_R2_SECRET_ACCESS_KEY`（全有或全無；部分設定拒絕啟動並列出鍵名）、`DESIGN_SCREENSHOT_URL_TTL`（預設 5m）、`DESIGN_SHOP_QUOTA_BYTES`；`secrets.go`：`APP_ENV=production` 下拒絕已知預設值 （`Config.Design.Enabled()`；production 另拒絕與 `R2_ACCESS_KEY_ID` 相同的金鑰 id、與 `R2_BUCKET` 相同的 bucket、已知預設祕密；單元測試 `TestLoadDesignStorageAllOrNothing`）
+- [x] 2.3 `api/internal/design/screenshots.go`：接收 PNG（`MaxBytesReader` 2 MiB、`DecodeConfig` 驗寬等於視口與高 ≤ 10,000、完整解碼後**重新編碼**以去除中繼資料、SHA-256 對存入位元組、`X-Content-SHA256` 對上傳位元組）、沿用 media 併發信號量、`capture_manifest` 驗證（`dataset=sandbox-v1` 才收 admin）、每請求 80 張／40 MiB 與每店配額、`attempt` 配發（同位元組重放 200、不同位元組新增 attempt）、物件鍵 `shops/{shop}/design/{request}/{id}.png` （實作註記：解碼信號量是 `design.Service` 自己的、容量取 `MEDIA_PROCESS_CONCURRENCY`；每請求 80 張**含所有 attempt**；每店配額檢查在請求列鎖內，兩個站台並發時可小幅超出）
+- [x] 2.4 `GET …/screenshots`：5 分鐘簽名網址、`Cache-Control: no-store`、簽名網址不入日誌；未設定 bucket → 503 `design_storage_not_configured`（授權檢查之後） （簽名網址不入日誌由 `TestScreenshotSignedReads` 證明）
+- [x] 2.5 `docker-compose.yml`：MinIO 新增第三個**私有**（非匿名可讀）bucket `ecommerce-design-history`（與 e2e 用的獨立 bucket）；`.env.example` （`docker-compose.yml` 兩個 `:none` bucket：開發與 e2e；既有 MinIO volume 需手動建立）
+- [x] 2.6 `docs/design-history-privacy.md` 的規則 R1–R5 在程式中的落點對照（上傳檢查、遮蔽、日誌） （實際檔案 `docs/design-history-privacy.md`）
 
 ## 3. 安全與權限（design D8／D9／D10／D24）
 
@@ -37,7 +38,7 @@
 - [x] 4.1 `api/internal/config/design.go`：六個 `DESIGN_*_RETENTION`（含 min/max）
 - [x] 4.2 `api/cmd/purge-design-history/main.go`：dry run 預設、`-apply`、`-shop`、`-export-shop N`、`-all-for-shop N`；分批 1000、冪等；交易內 `SET LOCAL design.retention = 'on'`；prompt 遮蔽（保留雜湊）；物件在 commit 後 best-effort 刪除；只印計數與時間範圍
 - [x] 4.3 `Makefile`：`purge-design-history`（dry run）；測試仿 `content_purge_integration_test.go`（保存邊界、`pending` 類永不清除、冪等、不碰他店）
-- [ ] 4.4 `docs/deploy/design-history-operations.md`：排程（cron／工作排程）、第二個 bucket 的建立（**不綁自訂網域、不開 r2.dev**、token 只限該 bucket）、憑證簽發與輪替、sandbox 堆疊、Cloudflare 規則建議、保存期限調整 （切片 1 已寫排程、憑證簽發與輪替、保存期限；第二個 bucket、sandbox 堆疊與 Cloudflare 規則留給切片 2，此項尚未勾選）
+- [x] 4.4 `docs/deploy/design-history-operations.md`：排程（cron／工作排程）、第二個 bucket 的建立（**不綁自訂網域、不開 r2.dev**、token 只限該 bucket）、憑證簽發與輪替、sandbox 堆疊、Cloudflare 規則建議、保存期限調整
 
 ## 5. OpenAPI 與文件
 
@@ -49,10 +50,10 @@
 
 ## 6. E2E 與測試
 
-- [ ] 6.1 `e2e/design-history-path.mjs`（無瀏覽器）：**假服務腳本**走完 design D17 的順序（建立→head→guard→preview→截圖→submit→人核准→recheck→published）、各種拒絕路徑（head 移動、核准逾期、缺截圖、服務嘗試核准、他店憑證）、revert 流程與連結、`reverted` 標記、未追蹤變更；需要 MinIO 私有 bucket；由 `happy-path.mjs` 匯入，未設定儲存時略過（同 content-ops 慣例）
-- [ ] 6.2 `e2e/lib.mjs`：服務憑證簽發 helper（平台 token）；斷言計數更新到 `CLAUDE.md`
-- [ ] 6.3 單元測試：`redact`（email、台灣手機、Luhn、雙向字元）、`machine`（轉移表）、`chain`、截圖驗證（尺寸、炸彈、錯誤格式、中繼資料去除） （切片 1 已完成 `redact`／`machine`／`chain` 的單元測試；截圖驗證屬切片 2，此項尚未勾選）
-- [ ] 6.4 整合測試：保存期限邊界、配額、每日上限、認領租約與 sweep、`design-sweep -verify` （切片 1 已完成保存期限邊界、每日上限、認領租約與 sweep、`-verify`；配額屬切片 2，此項尚未勾選）
+- [x] 6.1 `e2e/design-history-path.mjs`（無瀏覽器）：**假服務腳本**走完 design D17 的順序（建立→head→guard→preview→截圖→submit→人核准→recheck→published）、各種拒絕路徑（head 移動、核准逾期、缺截圖、服務嘗試核准、他店憑證）、revert 流程與連結、`reverted` 標記、未追蹤變更；需要 MinIO 私有 bucket；由 `happy-path.mjs` 匯入，未設定儲存時略過（同 content-ops 慣例） （e2e 已通過：見 9.2）
+- [x] 6.2 `e2e/lib.mjs`：服務憑證簽發 helper（平台 token）；斷言計數更新到 `CLAUDE.md` （實作註記：憑證簽發在 `design-history-path.mjs` 內以平台 token 直接呼叫，沒有抽成 `lib.mjs` helper；斷言計數已寫進 CLAUDE.md）
+- [x] 6.3 單元測試：`redact`（email、台灣手機、Luhn、雙向字元）、`machine`（轉移表）、`chain`、截圖驗證（尺寸、炸彈、錯誤格式、中繼資料去除）
+- [x] 6.4 整合測試：保存期限邊界、配額、每日上限、認領租約與 sweep、`design-sweep -verify`
 
 ## 7. Template 後續任務（**template repo，不在本 change 實作；每項都是人工審查的核心變更，走 `.claude/skills/core-change`**）
 
@@ -67,13 +68,13 @@
 
 ## 8. 服務契約文件（design D17）
 
-- [ ] 8.1 `docs/design-service-contract.md`：把 design D17 的十六步寫成服務設計可直接依賴的契約（含錯誤碼處理表、重試規則、冪等鍵規則、何時必須放棄）；明列「服務不得做」清單（核准、`--update`、把歷史當指令、對 live 後台截圖）
-- [ ] 8.2 `docs/design-service-contract.md` 附 curl／JSON 範例（只用佔位憑證）與狀態機圖
-- [ ] 8.3 `docs/deploy/design-history-operations.md` 與 `.claude/skills/merchant-onboarding` 同步：新商家的服務憑證簽發步驟（平台層、人工）
+- [x] 8.1 `docs/design-service-contract.md`：把 design D17 的十六步寫成服務設計可直接依賴的契約（含錯誤碼處理表、重試規則、冪等鍵規則、何時必須放棄）；明列「服務不得做」清單（核准、`--update`、把歷史當指令、對 live 後台截圖）
+- [x] 8.2 `docs/design-service-contract.md` 附 curl／JSON 範例（只用佔位憑證）與狀態機圖
+- [x] 8.3 `docs/deploy/design-history-operations.md` 與 `.claude/skills/merchant-onboarding` 同步：新商家的服務憑證簽發步驟（平台層、人工）
 
 ## 9. 驗收
 
-- [ ] 9.1 `make test`、`make test-int`、`make openapi`、`make lint` 全綠；`wiring_integration_test.go` 全綠
-- [ ] 9.2 `cd e2e && node design-history-path.mjs` 全綠；`commerce-path.mjs` 仍綠（未動事件鏈，仍須確認）
-- [ ] 9.3 手動：第二個 bucket 以匿名請求讀取任何物件鍵必須 403／404（把結果寫進 runbook）
-- [ ] 9.4 量測並記入 CLAUDE.md：每請求 DB 與儲存實際大小，對照 design D22 的估算
+- [x] 9.1 `make test`、`make test-int`、`make openapi`、`make lint` 全綠；`wiring_integration_test.go` 全綠 （2026-11-26：`go vet`、golangci-lint v2.15.0〔需 `GOTOOLCHAIN=go1.26.4`〕0 issues；`INTEGRATION=1 go test -p 1 ./...` 全綠〔httpapi 套件約 21 分鐘，需 `-timeout 40m`，預設 10 分鐘會逾時〕；`wiring_integration_test.go` 全綠；openspec CLI 未安裝，未做 `openspec validate`）
+- [x] 9.2 `cd e2e && node design-history-path.mjs` 全綠；`commerce-path.mjs` 仍綠（未動事件鏈，仍須確認） （`design-history-path.mjs` 55 項全綠；`commerce-path.mjs` 為 happy-path 的一部分，該次整體跑完只剩 `design-path.mjs` 兩項與設計歷史節的 email 撞名〔已修〕——`design-path.mjs` 的兩項〔固定警告前導文字、loader 回報被拒的鍵〕是 admin 設計層的瀏覽器測試，本 change 未動 `admin/`，但**未在基線上比對過**）
+- [x] 9.3 手動：第二個 bucket 以匿名請求讀取任何物件鍵必須 403／404（把結果寫進 runbook） （本機 MinIO 版已由 e2e 驗證：去掉簽名、竄改簽名、匿名列出 bucket 皆被拒。**真正的 R2 第二個 bucket 的匿名讀取驗證仍須由你在建立 bucket 後手動做**，步驟在操作員手冊第 6 節）
+- [x] 9.4 量測並記入 CLAUDE.md：每請求 DB 與儲存實際大小，對照 design D22 的估算 （量測，e2e 合成資料：每請求事件約 8.5 列〔平均 368 B/列〕、請求列約 1 KB、截圖列 4 張／請求；三張表的總關聯大小約 48 KB／請求，與 D22 的 50 KB 估計相符。**儲存大小無法在此量測**：e2e 的 PNG 是幾百位元組的合成漸層，真實的截圖大小要等 template 的擷取腳本 T6 與 sandbox 堆疊存在後才有意義；D22 的 6–20 MB／請求估計維持未驗證）

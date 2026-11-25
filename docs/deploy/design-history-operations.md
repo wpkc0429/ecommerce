@@ -1,4 +1,4 @@
-# 設計歷史：操作員手冊（切片 1）
+# 設計歷史：操作員手冊（切片 1＋2）
 
 給負責部署平台的人。設計與契約見 `docs/design-history.md`。
 
@@ -43,15 +43,80 @@ cd api && go run ./cmd/purge-design-history
 cd api && go run ./cmd/purge-design-history -apply
 ```
 
-Windows 工作排程器同理。`design-sweep -orphans` 在切片 2 才有意義。
+Windows 工作排程器同理。截圖物件的孤兒報告（只讀；有孤兒或缺物件時 exit 1）：
+
+```bash
+cd api && go run ./cmd/design-sweep -orphans            # 全部商家
+cd api && go run ./cmd/design-sweep -orphans -shop 3
+```
+
+清除指令在 commit 之後才刪物件（best-effort）：失敗會留下孤兒物件而不是不正確的資料列，下一次 `-orphans` 會列出，
+孤兒的處置（確認後以 `mc rm`／R2 後台刪除）是人工的。
 
 ## 4. 保存期限與調整
 
 預設值與環境變數見 `.env.example` 的 “design history” 區塊（`DESIGN_PROMPT_RETENTION`、`DESIGN_AUDIT_RETENTION` 等，皆有上下限，超出範圍拒絕啟動）。
 個資請求或商家下架：`-export-shop N` 匯出 JSON（不含簽名網址），確認後 `-all-for-shop N -apply` 刪除（只影響該店；服務憑證不在其中，請另行撤銷）。
 
-## 5. 切片 1 的限制（刻意）
+## 5. 沒有設定截圖儲存時（刻意）
 
-沒有截圖儲存，所以 `submit` 回 503 `design_storage_not_configured`，請求停在 `previewing`；`GET …/screenshots` 恆為 503。
-切片 2（私有 R2 bucket、`PresignGet`、上傳端點）上線後本節與 `docs/design-history.md` 一併更新；
-那時需要：第二個 R2 bucket（**不綁自訂網域、不開 r2.dev**、token 只限該 bucket）、sandbox 堆疊、手冊的匿名讀取驗證（task 9.3）。
+`DESIGN_R2_*` 全空時：所有路由照掛，上傳與 `GET …/screenshots` 回 503 `design_storage_not_configured`（授權與請求存在性之後），
+`submit` 同樣 503，所以沒有請求能走到 `awaiting_approval`（沒有 after 截圖就不能被核准，D18）。`DESIGN_R2_*` 只設一部分則**拒絕啟動**並列出缺少的鍵名。
+
+## 6. 第二個 bucket：私有的截圖儲存（切片 2，只能由人做）
+
+截圖含後台畫面，**絕不能公開**。R2 的公開存取是 bucket 層級的（`docs/media-r2-setup.md` 把圖片 bucket 整個綁成公開網域），
+所以截圖要放在**另一個 bucket**，不是現有 bucket 的前綴。**這一節的 Cloudflare 步驟程式與 CI 都不會做，只由你在 Cloudflare 後台執行。**
+
+1. R2 → Create bucket，例如 `ecommerce-design-history`。**不要**：Connect domain（自訂網域）、Public access → r2.dev subdomain。保持兩者皆未啟用。
+2. R2 → Manage API tokens → Create API token：權限 **Object Read & Write**，Specify bucket 只選這個 bucket；**不要**與圖片 bucket 的 token 共用
+   （共用等於圖片 token 外洩就能讀所有截圖；production 設定會拒絕 `DESIGN_R2_ACCESS_KEY_ID` 等於 `R2_ACCESS_KEY_ID`）。
+3. 把 `DESIGN_R2_BUCKET`、`DESIGN_R2_ACCESS_KEY_ID`、`DESIGN_R2_SECRET_ACCESS_KEY` 放進 API 的祕密管理（帳號與端點沿用 `R2_ACCOUNT_ID`／`R2_ENDPOINT`）。
+   不得貼進聊天、工單、日誌。可選：`DESIGN_SCREENSHOT_URL_TTL`（預設 5m）、`DESIGN_SHOP_QUOTA_BYTES`（預設 2 GiB）。
+4. 重啟 API。日誌的 “design screenshot storage not configured” 那行消失即已啟用。
+
+**驗證（task 9.3，每次建立或變更 bucket 設定後都要做）**：匿名請求必須被拒絕。
+
+```bash
+# 取一個真實物件鍵（簽名網址去掉問號之後的部分），不帶簽名直接讀：必須是 403 或 404，絕不能是 200
+curl -s -o /dev/null -w '%{http_code}
+' "https://<account>.r2.cloudflarestorage.com/<bucket>/shops/<shop>/design/<request>/<id>.png"
+# 匿名列出 bucket：必須是 403
+curl -s -o /dev/null -w '%{http_code}
+' "https://<account>.r2.cloudflarestorage.com/<bucket>/"
+# 若曾開過 r2.dev 或綁過網域，也要對它們試一次（必須 403／404／無法解析）
+```
+
+本機 MinIO 的驗證已寫進 `e2e/design-history-path.mjs`（私有 bucket 的簽名網址可讀，去掉簽名／亂改簽名／匿名列出皆被拒絕；2026-11-26 通過）。
+本機 bucket 是 `ecommerce-design-history`（開發）與 `ecommerce-design-history-e2e`（e2e，可整桶清空），`docker-compose.yml` 以 `:none`（無匿名存取）建立；
+**已存在的 MinIO volume 不會重跑建立**，請手動：`docker exec <minio> mc mb --ignore-existing local/ecommerce-design-history` 後 `mc anonymous set none`。
+
+**風險（殘留）**：bucket 若被誤綁公開網域，鍵含 uuid 但全部截圖都會公開。沒有程式能從內部證明 bucket 是私有的，所以靠上面的驗證與部署檢查清單。
+
+## 7. sandbox 堆疊（admin 截圖的唯一來源，Q5）
+
+admin 截圖**只能**來自拋棄式的 sandbox 部署：另一個 API ＋ 另一個資料庫，資料集是固定的合成資料（`make seed-demo` 等價：虛構顧客、地址、訂單；固定帳號 owner／staff），
+**絕不對真實商家的 live 後台截圖**。平台在上傳時檢查 `capture_manifest.dataset = sandbox-v1` 且 `api_origin_class = sandbox`（否則 422 `live_data_capture_refused`），
+storefront 截圖只收匿名、`sandbox-v1`（sandbox 來源）或 `public-live`（公開來源，商品與內容本來就公開）。**平台無法證明截圖真的來自 sandbox**：這是契約加縱深防禦，
+所以：
+
+- sandbox 堆疊要**另外部署**（你或服務的營運者）：一個小型 API ＋ Postgres，`seed -demo`，API origin 列入擷取腳本的允許清單，按需啟動、拍完即毀。**這個 repo 不包含它的部署。**
+- 商家看的預覽（連真實 API）與擷取預覽（連 sandbox）是同一份靜態檔、兩個部署。
+- 擷取腳本（template 後續任務 T6）必須拒絕在 API origin 不在 sandbox 允許清單時啟動，並對 `data-pii` 元素遮罩（T7）。
+
+## 8. Cloudflare 規則建議（人工，repo 外）
+
+- `/api/v1/design-service/**` 不經 Access（服務沒有 user 身分）：用 WAF 自訂規則只允許服務的出口 IP，或要求 Access service token；程式層另有 `allowed_cidrs`。
+- 上傳是 PUT 且本文可到 2 MiB：不要對這個路徑前綴開啟會緩衝或改寫本文的轉換；`Content-Type: image/png` 與 `X-Capture-Manifest` 標頭必須原樣通過。
+- 簽名網址指向 R2 的 S3 端點（不是你的網域）：商家後台若要顯示截圖，其 CSP `img-src` 需放行該主機（template 任務 T3，是人工審查的核心變更）。
+- 截圖 bucket 不要加任何 Cache Rule／Transform Rule／Worker 路由。
+
+## 9. 保存期限（Q1）
+
+已發佈請求的截圖 365 天、其餘（rejected／failed／cancelled）30 天、prompt 全文 365 天、請求與事件 730 天；`cmd/purge-design-history` 會刪 bucket 內的物件（資料列保留並設 `purged_at`，簽名讀取對已清除者回 `url: null`）。
+調整：`DESIGN_SCREENSHOT_RETENTION`、`DESIGN_SCREENSHOT_RETENTION_UNPUBLISHED`（有上下限，超出拒絕啟動）。
+
+## 10. 新商家的服務憑證（與 `merchant-onboarding` 同步，平台層、人工）
+
+見第 2 節；入職檢查清單多一步：商家要用 AI 重新設計時，由平台管理員簽發該店的 `dsk_` 憑證（每店一把）、交給服務的祕密管理、記下到期日。
+未簽發憑證的商家不受影響（沒有請求就沒有任何寫入）。

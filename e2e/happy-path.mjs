@@ -25,6 +25,7 @@ import { applicationBody, runApplicationPath, submitApplication, tokenFromMessag
 import { API, armConfirm, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 import { runContentOpsPath } from "./content-ops-path.mjs";
+import { runDesignHistoryPath } from "./design-history-path.mjs";
 import { runContentUiPath } from "./content-ui-path.mjs";
 import { runDesignPath } from "./design-path.mjs";
 
@@ -1388,6 +1389,13 @@ try {
   await runContentOpsPath();
 } catch (err) {
   fail(`content ops path aborted: ${err?.stack ?? err}`);
+}
+
+// ── 設計歷史（change design-history）：假服務走完 D17、截圖進私有 bucket；API 未設定 DESIGN_R2_* 時該節略過。──
+try {
+  await runDesignHistoryPath();
+} catch (err) {
+  fail(`design history path aborted: ${err?.stack ?? err}`);
 }
 
 if (failureCount() > 0) {

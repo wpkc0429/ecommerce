@@ -2,7 +2,7 @@
 
 > change `design-history` 的**第一個切片**（資料與 API，無截圖、無簽章 permit）。權威來源是
 > `openspec/changes/design-history/`（proposal、design 的 D1–D24 與決議 Q1–Q10）；本文件是實作後的操作與契約摘要。
-> 服務端的步驟契約（給 AI edit service）見後續的 `docs/design-service-contract.md`（尚未撰寫，task 8）。
+> 服務端的步驟契約（給 AI edit service）見 `docs/design-service-contract.md`；隱私規則 R1–R5 的程式落點見 `docs/design-history-privacy.md`。
 
 ## 它是什麼
 
@@ -61,7 +61,7 @@ awaiting_approval ─(人：reject)→ rejected      awaiting_approval ─(人�
 
 ## API
 
-後台（人）`/api/v1/admin/shops/{shopID}/design/…`：`requests`（列表、詳情＋ETag、`events`、`screenshots`〔切片 1 恆為 503〕、`approve`、`reject`、
+後台（人）`/api/v1/admin/shops/{shopID}/design/…`：`requests`（列表、詳情＋ETag、`events`、`screenshots`、`approve`、`reject`、
 `request-changes`、`cancel`、`revert`）、`state`、`untracked-changes`（＋`{sha}/acknowledge`）。
 權限：`design.view`（owner、editor）、`design.request`（owner；取消）、`design.approve`（owner；核准／拒絕／要求修改／確認未追蹤）、`design.revert`（owner）。`staff` 全無。
 平台層 `design_service.manage`（只有 `super_admin`）：`/api/v1/admin/design-service/credentials`（列表、簽發、撤銷、輪替）。
@@ -98,8 +98,18 @@ awaiting_approval ─(人：reject)→ rejected      awaiting_approval ─(人�
 `cmd/design-sweep`（dry run 預設）：認領租約過期 → `failed(service_lost)`、`awaiting_approval` 逾 7 天 → `failed(approval_timeout)`、核准逾期 → `failed(approval_expired)`；皆為 `actor_type=system` 的事件。
 **repo 沒有排程器**，需營運者排程（`docs/deploy/design-history-operations.md`）。
 
-## 切片 1 之外（未做）
+## 截圖（切片 2，D5／D6／D11）
 
-截圖上傳與簽名讀取、私有 bucket、`PresignGet`、sandbox 堆疊（D5／D6／D12）、publish grant（Q9）、通知信（Q10）、
-`design-sweep -orphans`、`e2e/design-history-path.mjs`、服務契約文件、template 後續任務（T1–T8）。**切片 1 單獨上線時 `submit` 回 503 `design_storage_not_configured`**，
-所以沒有請求能走到 `awaiting_approval`：這是刻意的（沒有 after 截圖就不能被核准，D18）。
+私有的第二個 bucket（`DESIGN_R2_BUCKET`，自己的 token，不綁網域）；程式重用 `media.S3Store`（`ObjectStore` 新增 `PresignGet`），bucket、鍵、設定分開。
+鍵 `shops/{shop}/design/{request}/{id}.png`；讀取**只經** `GET …/screenshots` 的簽名網址（預設 5 分鐘、`Cache-Control: no-store`，不寫日誌、不入任何資料表、回應不含物件鍵）。
+上傳 `PUT …/requests/{id}/screenshots/{phase}/{role}/{viewport}/{viewKey}`（機器路由）：`image/png` ≤ 2 MiB、寬必須等於視口（390／1280）、高 ≤ 10,000、完整解碼後**重新編碼**
+（去除全部中繼資料）、`sha256` 對存入位元組、`X-Content-SHA256` 對上傳位元組、`X-Capture-Manifest`（base64 JSON，只存已知欄位）；同位元組同 commit 重放回 200，不同位元組新增 `attempt`；
+before 的 `commit_sha`＝`base_sha`、after＝目前 head；只在 `drafting`／`previewing` 可上傳。每請求 80 張（含所有 attempt）／40 MiB、每店 `DESIGN_SHOP_QUOTA_BYTES`（2 GiB）→ 409 `quota_exceeded`；
+每憑證每分鐘 60 次上傳；解碼沿用同一種信號量（`MEDIA_PROCESS_CONCURRENCY`）。**admin 截圖必須來自 sandbox**（`live_data_capture_refused`，見操作員手冊第 7 節與 `docs/design-history-privacy.md`）。
+`submit` 現在檢查 before／after 完整性，未設定儲存才回 503。清除指令刪物件，`cmd/design-sweep -orphans` 報告 bucket 與資料表的差異。
+服務側的完整契約：`docs/design-service-contract.md`。
+
+## 尚未做
+
+publish grant（Q9）與通知信（Q10）（附條件決議）、sandbox 堆疊的部署（操作員手冊第 7 節）、template 後續任務 T1–T8
+（`openspec/changes/design-history/tasks.md` 列出每一項需要什麼）。

@@ -60,6 +60,8 @@ In production the platform-level admin API is reachable only from `PLATFORM_ADMI
 
 Steps 7, 9 (credentials) and 13 are the usual critical path: start them first because they wait on the human.
 
+**Optional, only when the merchant will use AI redesigns (change `design-history`):** a platform admin (`design_service.manage`, `super_admin` only; never the merchant, never an agent) issues ONE design-service credential for the shop with `POST /api/v1/admin/design-service/credentials` (`{"shop_id", "name", "allowed_cidrs", "expires_in_days"}`). The `dsk_` key is shown once: put it straight into the AI edit service's secret store, note its expiry (rotate 14 days before), keep it apart from the merchant repo's git token. Screenshots need the platform's private bucket (`DESIGN_R2_*`) and a sandbox stack for admin captures; both are one-time platform setup, see `docs/deploy/design-history-operations.md` sections 2 and 6-7 and the service rules in `docs/design-service-contract.md`. A shop without a credential is unaffected.
+
 ## Stop and ask when
 
 - `setup-status` flags stay false after the step that should flip them.
