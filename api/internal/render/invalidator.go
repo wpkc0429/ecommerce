@@ -22,6 +22,10 @@ func (i *Invalidator) Handle(ctx context.Context, e events.Event) {
 		i.Cache.DeletePage(ctx, ev.ShopID, ev.Slug)
 	case events.PageUnpublished:
 		i.Cache.DeletePage(ctx, ev.ShopID, ev.Slug)
+	case events.ContentPublished:
+		i.Cache.DeleteContent(ctx, ev.ShopID, ev.Key)
+	case events.ContentUnpublished:
+		i.Cache.DeleteContent(ctx, ev.ShopID, ev.Key)
 	case events.ShopContentUpdated:
 		i.Cache.BumpShops(ctx, ev.ShopID)
 	case events.ContentSchemaRegistered:

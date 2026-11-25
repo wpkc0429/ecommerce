@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"ksdevworks/ecommerce/api/internal/contentschema"
+	"ksdevworks/ecommerce/api/internal/contentstore"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
@@ -102,7 +103,13 @@ func (s *Service) backfillShop(ctx context.Context, sh *ent.Shop, apply bool, em
 		emit(BackfillItem{Kind: "shop", ID: sh.ID, ShopID: sh.ID, Field: "content_json", Skipped: "unparseable content"})
 	} else {
 		if changed && apply {
-			if _, err := s.Client.Shop.UpdateOneID(sh.ID).SetContentJSON(clean).Save(ctx); err != nil {
+			version := s.activeSchemaVersion(ctx, sh.ID)
+			if err := s.inTx(ctx, func(c *ent.Client) error {
+				if _, err := c.Shop.UpdateOneID(sh.ID).SetContentJSON(clean).Save(ctx); err != nil {
+					return err
+				}
+				return contentstore.SyncGlobal(ctx, c, sh.ID, clean, version)
+			}); err != nil {
 				return fmt.Errorf("cms: backfill: write shop %d: %w", sh.ID, err)
 			}
 			s.publish(ctx, events.ShopContentUpdated{ShopID: sh.ID})
@@ -147,20 +154,31 @@ func (s *Service) backfillPage(ctx context.Context, p *ent.Page, schema json.Raw
 	if !apply || (!draftChanged && !publishedChanged) {
 		return nil
 	}
-	upd := s.Client.Page.UpdateOneID(p.ID).Where(entpage.ShopIDEQ(p.ShopID))
-	if draftChanged {
-		upd.SetContentJSON(draft)
-	}
-	if publishedChanged {
-		upd.SetPublishedJSON(published)
-	}
-	if _, err := upd.Save(ctx); err != nil {
+	version := s.activeSchemaVersion(ctx, p.ShopID)
+	if err := s.inTx(ctx, func(c *ent.Client) error {
+		upd := c.Page.UpdateOneID(p.ID).Where(entpage.ShopIDEQ(p.ShopID))
+		if draftChanged {
+			upd.SetContentJSON(draft)
+		}
+		if publishedChanged {
+			upd.SetPublishedJSON(published)
+		}
+		np, err := upd.Save(ctx)
+		if err != nil {
+			return err
+		}
+		// The document store is kept equal in the same transaction.
+		return contentstore.SyncPage(ctx, c, contentstore.PageSync{
+			Page: np, DraftChanged: draftChanged, PublishedRewritten: publishedChanged, SchemaVersion: version,
+		})
+	}); err != nil {
 		return fmt.Errorf("cms: backfill: write page %d: %w", p.ID, err)
 	}
 	if publishedChanged {
 		// Same event a publish emits: the render invalidator deletes the
 		// page's cache key, so the next render serves the sanitized snapshot.
 		s.publish(ctx, events.PagePublished{ShopID: p.ShopID, Slug: p.Slug})
+		s.publish(ctx, events.ContentPublished{ShopID: p.ShopID, Key: p.Slug})
 	}
 	return nil
 }

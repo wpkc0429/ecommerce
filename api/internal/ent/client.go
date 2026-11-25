@@ -16,6 +16,9 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
+	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -75,6 +78,12 @@ type Client struct {
 	Category *CategoryClient
 	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
 	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
+	// ContentAuditLog is the client for interacting with the ContentAuditLog builders.
+	ContentAuditLog *ContentAuditLogClient
+	// ContentDocument is the client for interacting with the ContentDocument builders.
+	ContentDocument *ContentDocumentClient
+	// ContentRevision is the client for interacting with the ContentRevision builders.
+	ContentRevision *ContentRevisionClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
@@ -159,6 +168,9 @@ func (c *Client) init() {
 	c.CartItem = NewCartItemClient(c.config)
 	c.Category = NewCategoryClient(c.config)
 	c.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(c.config)
+	c.ContentAuditLog = NewContentAuditLogClient(c.config)
+	c.ContentDocument = NewContentDocumentClient(c.config)
+	c.ContentRevision = NewContentRevisionClient(c.config)
 	c.ContentSchema = NewContentSchemaClient(c.config)
 	c.MediaUpload = NewMediaUploadClient(c.config)
 	c.Member = NewMemberClient(c.config)
@@ -290,6 +302,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		ContentAuditLog:               NewContentAuditLogClient(cfg),
+		ContentDocument:               NewContentDocumentClient(cfg),
+		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
@@ -348,6 +363,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CartItem:                      NewCartItemClient(cfg),
 		Category:                      NewCategoryClient(cfg),
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
+		ContentAuditLog:               NewContentAuditLogClient(cfg),
+		ContentDocument:               NewContentDocumentClient(cfg),
+		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
@@ -412,7 +430,8 @@ func (c *Client) Close() error {
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
-		c.CheckoutIdempotencyKey, c.ContentSchema, c.MediaUpload, c.Member,
+		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
+		c.ContentRevision, c.ContentSchema, c.MediaUpload, c.Member,
 		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
@@ -431,7 +450,8 @@ func (c *Client) Use(hooks ...Hook) {
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
-		c.CheckoutIdempotencyKey, c.ContentSchema, c.MediaUpload, c.Member,
+		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
+		c.ContentRevision, c.ContentSchema, c.MediaUpload, c.Member,
 		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
 		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
 		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
@@ -458,6 +478,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Category.mutate(ctx, m)
 	case *CheckoutIdempotencyKeyMutation:
 		return c.CheckoutIdempotencyKey.mutate(ctx, m)
+	case *ContentAuditLogMutation:
+		return c.ContentAuditLog.mutate(ctx, m)
+	case *ContentDocumentMutation:
+		return c.ContentDocument.mutate(ctx, m)
+	case *ContentRevisionMutation:
+		return c.ContentRevision.mutate(ctx, m)
 	case *ContentSchemaMutation:
 		return c.ContentSchema.mutate(ctx, m)
 	case *MediaUploadMutation:
@@ -1417,6 +1443,405 @@ func (c *CheckoutIdempotencyKeyClient) mutate(ctx context.Context, m *CheckoutId
 		return (&CheckoutIdempotencyKeyDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown CheckoutIdempotencyKey mutation op: %q", m.Op())
+	}
+}
+
+// ContentAuditLogClient is a client for the ContentAuditLog schema.
+type ContentAuditLogClient struct {
+	config
+}
+
+// NewContentAuditLogClient returns a client for the ContentAuditLog from the given config.
+func NewContentAuditLogClient(c config) *ContentAuditLogClient {
+	return &ContentAuditLogClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentauditlog.Hooks(f(g(h())))`.
+func (c *ContentAuditLogClient) Use(hooks ...Hook) {
+	c.hooks.ContentAuditLog = append(c.hooks.ContentAuditLog, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentauditlog.Intercept(f(g(h())))`.
+func (c *ContentAuditLogClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentAuditLog = append(c.inters.ContentAuditLog, interceptors...)
+}
+
+// Create returns a builder for creating a ContentAuditLog entity.
+func (c *ContentAuditLogClient) Create() *ContentAuditLogCreate {
+	mutation := newContentAuditLogMutation(c.config, OpCreate)
+	return &ContentAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentAuditLog entities.
+func (c *ContentAuditLogClient) CreateBulk(builders ...*ContentAuditLogCreate) *ContentAuditLogCreateBulk {
+	return &ContentAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentAuditLogClient) MapCreateBulk(slice any, setFunc func(*ContentAuditLogCreate, int)) *ContentAuditLogCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentAuditLogCreateBulk{err: fmt.Errorf("calling to ContentAuditLogClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentAuditLogCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentAuditLogCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentAuditLog.
+func (c *ContentAuditLogClient) Update() *ContentAuditLogUpdate {
+	mutation := newContentAuditLogMutation(c.config, OpUpdate)
+	return &ContentAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentAuditLogClient) UpdateOne(_m *ContentAuditLog) *ContentAuditLogUpdateOne {
+	mutation := newContentAuditLogMutation(c.config, OpUpdateOne, withContentAuditLog(_m))
+	return &ContentAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentAuditLogClient) UpdateOneID(id int) *ContentAuditLogUpdateOne {
+	mutation := newContentAuditLogMutation(c.config, OpUpdateOne, withContentAuditLogID(id))
+	return &ContentAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentAuditLog.
+func (c *ContentAuditLogClient) Delete() *ContentAuditLogDelete {
+	mutation := newContentAuditLogMutation(c.config, OpDelete)
+	return &ContentAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentAuditLogClient) DeleteOne(_m *ContentAuditLog) *ContentAuditLogDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentAuditLogClient) DeleteOneID(id int) *ContentAuditLogDeleteOne {
+	builder := c.Delete().Where(contentauditlog.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentAuditLogDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentAuditLog.
+func (c *ContentAuditLogClient) Query() *ContentAuditLogQuery {
+	return &ContentAuditLogQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentAuditLog},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentAuditLog entity by its id.
+func (c *ContentAuditLogClient) Get(ctx context.Context, id int) (*ContentAuditLog, error) {
+	return c.Query().Where(contentauditlog.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentAuditLogClient) GetX(ctx context.Context, id int) *ContentAuditLog {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentAuditLogClient) Hooks() []Hook {
+	return c.hooks.ContentAuditLog
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentAuditLogClient) Interceptors() []Interceptor {
+	return c.inters.ContentAuditLog
+}
+
+func (c *ContentAuditLogClient) mutate(ctx context.Context, m *ContentAuditLogMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentAuditLogCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentAuditLogUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentAuditLogUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentAuditLogDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentAuditLog mutation op: %q", m.Op())
+	}
+}
+
+// ContentDocumentClient is a client for the ContentDocument schema.
+type ContentDocumentClient struct {
+	config
+}
+
+// NewContentDocumentClient returns a client for the ContentDocument from the given config.
+func NewContentDocumentClient(c config) *ContentDocumentClient {
+	return &ContentDocumentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentdocument.Hooks(f(g(h())))`.
+func (c *ContentDocumentClient) Use(hooks ...Hook) {
+	c.hooks.ContentDocument = append(c.hooks.ContentDocument, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentdocument.Intercept(f(g(h())))`.
+func (c *ContentDocumentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentDocument = append(c.inters.ContentDocument, interceptors...)
+}
+
+// Create returns a builder for creating a ContentDocument entity.
+func (c *ContentDocumentClient) Create() *ContentDocumentCreate {
+	mutation := newContentDocumentMutation(c.config, OpCreate)
+	return &ContentDocumentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentDocument entities.
+func (c *ContentDocumentClient) CreateBulk(builders ...*ContentDocumentCreate) *ContentDocumentCreateBulk {
+	return &ContentDocumentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentDocumentClient) MapCreateBulk(slice any, setFunc func(*ContentDocumentCreate, int)) *ContentDocumentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentDocumentCreateBulk{err: fmt.Errorf("calling to ContentDocumentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentDocumentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentDocumentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentDocument.
+func (c *ContentDocumentClient) Update() *ContentDocumentUpdate {
+	mutation := newContentDocumentMutation(c.config, OpUpdate)
+	return &ContentDocumentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentDocumentClient) UpdateOne(_m *ContentDocument) *ContentDocumentUpdateOne {
+	mutation := newContentDocumentMutation(c.config, OpUpdateOne, withContentDocument(_m))
+	return &ContentDocumentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentDocumentClient) UpdateOneID(id int) *ContentDocumentUpdateOne {
+	mutation := newContentDocumentMutation(c.config, OpUpdateOne, withContentDocumentID(id))
+	return &ContentDocumentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentDocument.
+func (c *ContentDocumentClient) Delete() *ContentDocumentDelete {
+	mutation := newContentDocumentMutation(c.config, OpDelete)
+	return &ContentDocumentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentDocumentClient) DeleteOne(_m *ContentDocument) *ContentDocumentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentDocumentClient) DeleteOneID(id int) *ContentDocumentDeleteOne {
+	builder := c.Delete().Where(contentdocument.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentDocumentDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentDocument.
+func (c *ContentDocumentClient) Query() *ContentDocumentQuery {
+	return &ContentDocumentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentDocument},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentDocument entity by its id.
+func (c *ContentDocumentClient) Get(ctx context.Context, id int) (*ContentDocument, error) {
+	return c.Query().Where(contentdocument.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentDocumentClient) GetX(ctx context.Context, id int) *ContentDocument {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentDocumentClient) Hooks() []Hook {
+	return c.hooks.ContentDocument
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentDocumentClient) Interceptors() []Interceptor {
+	return c.inters.ContentDocument
+}
+
+func (c *ContentDocumentClient) mutate(ctx context.Context, m *ContentDocumentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentDocumentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentDocumentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentDocumentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentDocumentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentDocument mutation op: %q", m.Op())
+	}
+}
+
+// ContentRevisionClient is a client for the ContentRevision schema.
+type ContentRevisionClient struct {
+	config
+}
+
+// NewContentRevisionClient returns a client for the ContentRevision from the given config.
+func NewContentRevisionClient(c config) *ContentRevisionClient {
+	return &ContentRevisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentrevision.Hooks(f(g(h())))`.
+func (c *ContentRevisionClient) Use(hooks ...Hook) {
+	c.hooks.ContentRevision = append(c.hooks.ContentRevision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentrevision.Intercept(f(g(h())))`.
+func (c *ContentRevisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentRevision = append(c.inters.ContentRevision, interceptors...)
+}
+
+// Create returns a builder for creating a ContentRevision entity.
+func (c *ContentRevisionClient) Create() *ContentRevisionCreate {
+	mutation := newContentRevisionMutation(c.config, OpCreate)
+	return &ContentRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentRevision entities.
+func (c *ContentRevisionClient) CreateBulk(builders ...*ContentRevisionCreate) *ContentRevisionCreateBulk {
+	return &ContentRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentRevisionClient) MapCreateBulk(slice any, setFunc func(*ContentRevisionCreate, int)) *ContentRevisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentRevisionCreateBulk{err: fmt.Errorf("calling to ContentRevisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentRevisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentRevisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentRevision.
+func (c *ContentRevisionClient) Update() *ContentRevisionUpdate {
+	mutation := newContentRevisionMutation(c.config, OpUpdate)
+	return &ContentRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentRevisionClient) UpdateOne(_m *ContentRevision) *ContentRevisionUpdateOne {
+	mutation := newContentRevisionMutation(c.config, OpUpdateOne, withContentRevision(_m))
+	return &ContentRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentRevisionClient) UpdateOneID(id int) *ContentRevisionUpdateOne {
+	mutation := newContentRevisionMutation(c.config, OpUpdateOne, withContentRevisionID(id))
+	return &ContentRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentRevision.
+func (c *ContentRevisionClient) Delete() *ContentRevisionDelete {
+	mutation := newContentRevisionMutation(c.config, OpDelete)
+	return &ContentRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentRevisionClient) DeleteOne(_m *ContentRevision) *ContentRevisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentRevisionClient) DeleteOneID(id int) *ContentRevisionDeleteOne {
+	builder := c.Delete().Where(contentrevision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentRevisionDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentRevision.
+func (c *ContentRevisionClient) Query() *ContentRevisionQuery {
+	return &ContentRevisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentRevision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentRevision entity by its id.
+func (c *ContentRevisionClient) Get(ctx context.Context, id int) (*ContentRevision, error) {
+	return c.Query().Where(contentrevision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentRevisionClient) GetX(ctx context.Context, id int) *ContentRevision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentRevisionClient) Hooks() []Hook {
+	return c.hooks.ContentRevision
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentRevisionClient) Interceptors() []Interceptor {
+	return c.inters.ContentRevision
+}
+
+func (c *ContentRevisionClient) mutate(ctx context.Context, m *ContentRevisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentRevisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentRevisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentRevisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentRevision mutation op: %q", m.Op())
 	}
 }
 
@@ -6927,23 +7352,25 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 type (
 	hooks struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
-		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
-		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
-		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
-		ShopUser, User, UserPermission, UserRefreshToken []ent.Hook
+		ContentAuditLog, ContentDocument, ContentRevision, ContentSchema, MediaUpload,
+		Member, MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification,
+		Page, Payment, Permission, PointTransaction, Product, ProductCategory,
+		ProductImage, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
+		Shipment, ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopApplication, ShopApplicationEvent, ShopApplicationMessage,
+		ShopApplicationToken, ShopPaymentProviderCredential, ShopUser, User,
+		UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
-		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
-		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
-		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
-		ShopUser, User, UserPermission, UserRefreshToken []ent.Interceptor
+		ContentAuditLog, ContentDocument, ContentRevision, ContentSchema, MediaUpload,
+		Member, MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification,
+		Page, Payment, Permission, PointTransaction, Product, ProductCategory,
+		ProductImage, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
+		Shipment, ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
+		ShopApplication, ShopApplicationEvent, ShopApplicationMessage,
+		ShopApplicationToken, ShopPaymentProviderCredential, ShopUser, User,
+		UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

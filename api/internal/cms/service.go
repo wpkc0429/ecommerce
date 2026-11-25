@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"ksdevworks/ecommerce/api/internal/contentschema"
+	"ksdevworks/ecommerce/api/internal/contentstore"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
@@ -26,6 +27,35 @@ var slugRe = regexp.MustCompile(`^[a-z0-9-]+$`)
 var reservedSlugs = map[string]bool{
 	"api": true, "admin": true, "preview": true, "_next": true,
 	"assets": true, "static": true, "healthz": true,
+	// "global" is the key of the shop-global content document (change
+	// headless-content-store slice 2).
+	"global": true,
+}
+
+// inTx runs fn in one transaction and rolls back on any error. The legacy
+// tables and the content documents are written together (design D1).
+func (s *Service) inTx(ctx context.Context, fn func(c *ent.Client) error) error {
+	tx, err := s.Client.Tx(ctx)
+	if err != nil {
+		return fmt.Errorf("cms: begin tx: %w", err)
+	}
+	if err := fn(tx.Client()); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("cms: commit: %w", err)
+	}
+	return nil
+}
+
+// activeSchemaVersion is the shop's active schema version number (0 = none).
+func (s *Service) activeSchemaVersion(ctx context.Context, shopID int) int {
+	v, err := s.schemas().Active(ctx, shopID)
+	if err != nil {
+		return 0
+	}
+	return v.Version
 }
 
 // Service implements page, shop-content and shop CRUD operations. Every write that
@@ -104,7 +134,10 @@ func (s *Service) currentPageSchema(ctx context.Context, shopID int, typeKey str
 // noSchemaError is the actionable 422 for a shop that has no content schema
 // yet: it names the call that fixes it (change headless-content-store). The
 // message keeps its historical prefix so clients matching on it still work.
-func noSchemaError(shopID int) *ValidationError {
+func noSchemaError(shopID int) *ValidationError { return NoSchemaError(shopID) }
+
+// NoSchemaError is noSchemaError for other packages.
+func NoSchemaError(shopID int) *ValidationError {
 	return &ValidationError{
 		Message: fmt.Sprintf("shop has no content schema: register one first with PUT /api/v1/admin/shops/%d/content/schema (dry run with ?dry_run=true; a starter schema is in docs/content-schema.md)", shopID),
 		Details: []Detail{{Pointer: "", Message: "no content schema registered for this shop"}},
@@ -113,7 +146,9 @@ func noSchemaError(shopID int) *ValidationError {
 
 func normalizeSlug(raw string) (string, error) {
 	slug := strings.ToLower(strings.TrimSpace(raw))
-	if !slugRe.MatchString(slug) {
+	if !slugRe.MatchString(slug) || !contentstore.ValidKey(slug) {
+		// The slug is also the document key of the content store: at most 63
+		// characters, not starting with a hyphen.
 		return "", &ValidationError{
 			Message: "invalid slug",
 			Details: []Detail{{Pointer: "/slug", Message: "must match ^[a-z0-9-]+$"}},
@@ -149,15 +184,26 @@ func (s *Service) CreatePage(ctx context.Context, shopID int, in PageInput) (*en
 		in.Meta = json.RawMessage("{}")
 	}
 
-	create := s.Client.Page.Create().
-		SetShopID(shopID).
-		SetTypeKey(in.TypeKey).
-		SetTitle(in.Title).
-		SetSlug(slug).
-		SetStatus(0).
-		SetContentJSON(in.Content).
-		SetMeta(in.Meta)
-	p, err := create.Save(ctx)
+	schemaVersion := s.activeSchemaVersion(ctx, shopID)
+	var p *ent.Page
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		var cerr error
+		p, cerr = c.Page.Create().
+			SetShopID(shopID).
+			SetTypeKey(in.TypeKey).
+			SetTitle(in.Title).
+			SetSlug(slug).
+			SetStatus(0).
+			SetContentJSON(in.Content).
+			SetMeta(in.Meta).
+			Save(ctx)
+		if cerr != nil {
+			return cerr
+		}
+		return contentstore.SyncPage(ctx, c, contentstore.PageSync{
+			Page: p, DraftChanged: true, SchemaVersion: schemaVersion,
+		})
+	})
 	if ent.IsConstraintError(err) {
 		// Spec page-management: 同店 slug 重複 → 422.
 		return nil, &ValidationError{
@@ -183,41 +229,59 @@ func (s *Service) UpdatePage(ctx context.Context, shopID, pageID int, in PageUpd
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	upd := p.Update()
-	if in.Title != nil {
-		upd.SetTitle(*in.Title)
-	}
+	oldSlug := p.Slug
+	var newSlug string
 	if in.Slug != nil && *in.Slug != p.Slug {
 		if p.Slug == "home" {
 			return nil, &ValidationError{Message: "the home page slug cannot change"}
 		}
-		slug, err := normalizeSlug(*in.Slug)
+		newSlug, err = normalizeSlug(*in.Slug)
 		if err != nil {
 			return nil, err
 		}
-		upd.SetSlug(slug)
 	}
+	var content json.RawMessage
+	var schema json.RawMessage
 	if len(in.Content) > 0 {
-		schema, err := s.currentPageSchema(ctx, shopID, p.TypeKey)
+		schema, err = s.currentPageSchema(ctx, shopID, p.TypeKey)
 		if err != nil {
 			return nil, err
 		}
-		content, err := s.validateAndSanitize(schema, in.Content)
+		content, err = s.validateAndSanitize(schema, in.Content)
 		if err != nil {
 			return nil, err
 		}
-		upd.SetContentJSON(content)
-		// The new draft passes the active schema. The page leaves the
-		// needs-attention state unless its published snapshot is still invalid
-		// (publishing the fixed draft clears that).
-		if p.NeedsAttention {
-			upd.SetNeedsAttention(len(p.PublishedJSON) > 0 && ValidatePayload(schema, p.PublishedJSON) != nil)
+	}
+	schemaVersion := s.activeSchemaVersion(ctx, shopID)
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		upd := c.Page.UpdateOne(p)
+		if in.Title != nil {
+			upd.SetTitle(*in.Title)
 		}
-	}
-	if len(in.Meta) > 0 {
-		upd.SetMeta(in.Meta)
-	}
-	p, err = upd.Save(ctx)
+		if newSlug != "" {
+			upd.SetSlug(newSlug)
+		}
+		if len(content) > 0 {
+			upd.SetContentJSON(content)
+			// The new draft passes the active schema. The page leaves the
+			// needs-attention state unless its published snapshot is still
+			// invalid (publishing the fixed draft clears that).
+			if p.NeedsAttention {
+				upd.SetNeedsAttention(len(p.PublishedJSON) > 0 && ValidatePayload(schema, p.PublishedJSON) != nil)
+			}
+		}
+		if len(in.Meta) > 0 {
+			upd.SetMeta(in.Meta)
+		}
+		np, uerr := upd.Save(ctx)
+		if uerr != nil {
+			return uerr
+		}
+		p = np
+		return contentstore.SyncPage(ctx, c, contentstore.PageSync{
+			OldSlug: oldSlug, Page: p, DraftChanged: len(content) > 0, SchemaVersion: schemaVersion,
+		})
+	})
 	if ent.IsConstraintError(err) {
 		return nil, &ValidationError{Message: "slug already exists in this shop"}
 	}
@@ -244,15 +308,26 @@ func (s *Service) PublishPage(ctx context.Context, shopID, pageID int) (*ent.Pag
 	if err := ValidatePayload(schema, p.ContentJSON); err != nil {
 		return nil, err
 	}
-	p, err = p.Update().
-		SetPublishedJSON(p.ContentJSON).
-		SetStatus(1).
-		SetNeedsAttention(false).
-		Save(ctx)
+	schemaVersion := s.activeSchemaVersion(ctx, shopID)
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		np, uerr := c.Page.UpdateOne(p).
+			SetPublishedJSON(p.ContentJSON).
+			SetStatus(1).
+			SetNeedsAttention(false).
+			Save(ctx)
+		if uerr != nil {
+			return uerr
+		}
+		p = np
+		return contentstore.SyncPage(ctx, c, contentstore.PageSync{
+			Page: p, Published: true, SchemaVersion: schemaVersion,
+		})
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.Dispatcher.Publish(ctx, events.PagePublished{ShopID: shopID, Slug: p.Slug})
+	s.Dispatcher.Publish(ctx, events.ContentPublished{ShopID: shopID, Key: p.Slug})
 	return p, nil
 }
 
@@ -264,11 +339,20 @@ func (s *Service) UnpublishPage(ctx context.Context, shopID, pageID int) (*ent.P
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	p, err = p.Update().SetStatus(0).Save(ctx)
+	schemaVersion := s.activeSchemaVersion(ctx, shopID)
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		np, uerr := c.Page.UpdateOne(p).SetStatus(0).Save(ctx)
+		if uerr != nil {
+			return uerr
+		}
+		p = np
+		return contentstore.SyncPage(ctx, c, contentstore.PageSync{Page: p, SchemaVersion: schemaVersion})
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.Dispatcher.Publish(ctx, events.PageUnpublished{ShopID: shopID, Slug: p.Slug})
+	s.Dispatcher.Publish(ctx, events.ContentUnpublished{ShopID: shopID, Key: p.Slug})
 	return p, nil
 }
 
@@ -282,11 +366,18 @@ func (s *Service) DeletePage(ctx context.Context, shopID, pageID int) error {
 	if p.Slug == "home" {
 		return &ValidationError{Message: "the home page cannot be deleted"}
 	}
-	if err := s.Client.Page.DeleteOne(p).Exec(ctx); err != nil {
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		if derr := c.Page.DeleteOne(p).Exec(ctx); derr != nil {
+			return derr
+		}
+		return contentstore.SyncPageDelete(ctx, c, shopID, p.Slug)
+	})
+	if err != nil {
 		return err
 	}
 	if p.Status == 1 {
 		s.Dispatcher.Publish(ctx, events.PageUnpublished{ShopID: shopID, Slug: p.Slug})
+		s.Dispatcher.Publish(ctx, events.ContentUnpublished{ShopID: shopID, Key: p.Slug})
 	}
 	return nil
 }
@@ -362,11 +453,20 @@ func (s *Service) UpdateShopContent(ctx context.Context, shopID int, content jso
 	if err != nil {
 		return nil, err
 	}
-	shop, err = shop.Update().SetContentJSON(content).Save(ctx)
+	schemaVersion := s.activeSchemaVersion(ctx, shopID)
+	err = s.inTx(ctx, func(c *ent.Client) error {
+		ns, uerr := c.Shop.UpdateOne(shop).SetContentJSON(content).Save(ctx)
+		if uerr != nil {
+			return uerr
+		}
+		shop = ns
+		return contentstore.SyncGlobal(ctx, c, shopID, content, schemaVersion)
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.Dispatcher.Publish(ctx, events.ShopContentUpdated{ShopID: shopID})
+	s.Dispatcher.Publish(ctx, events.ContentPublished{ShopID: shopID, Key: contentstore.GlobalKey})
 	return shop, nil
 }
 
@@ -412,7 +512,7 @@ func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
 	if exists {
 		return nil
 	}
-	_, err = tx.Page.Create().
+	home, err := tx.Page.Create().
 		SetShopID(shopID).
 		SetTypeKey("home").
 		SetTitle("首頁").
@@ -423,6 +523,9 @@ func createHomePage(ctx context.Context, tx *ent.Tx, shopID int) error {
 		Save(ctx)
 	if err != nil {
 		return fmt.Errorf("cms: create home page: %w", err)
+	}
+	if err := contentstore.SyncPage(ctx, tx.Client(), contentstore.PageSync{Page: home, DraftChanged: true}); err != nil {
+		return fmt.Errorf("cms: create home document: %w", err)
 	}
 	return nil
 }
@@ -496,6 +599,9 @@ func createShopTx(ctx context.Context, tx *ent.Tx, name string, status int16) (*
 	}
 	if err := createHomePage(ctx, tx, shop.ID); err != nil {
 		return nil, err
+	}
+	if err := contentstore.EnsureGlobal(ctx, tx.Client(), shop.ID); err != nil {
+		return nil, fmt.Errorf("cms: create global document: %w", err)
 	}
 	return shop, nil
 }

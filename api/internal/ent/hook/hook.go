@@ -68,6 +68,42 @@ func (f CheckoutIdempotencyKeyFunc) Mutate(ctx context.Context, m ent.Mutation) 
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CheckoutIdempotencyKeyMutation", m)
 }
 
+// The ContentAuditLogFunc type is an adapter to allow the use of ordinary
+// function as ContentAuditLog mutator.
+type ContentAuditLogFunc func(context.Context, *ent.ContentAuditLogMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentAuditLogFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentAuditLogMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentAuditLogMutation", m)
+}
+
+// The ContentDocumentFunc type is an adapter to allow the use of ordinary
+// function as ContentDocument mutator.
+type ContentDocumentFunc func(context.Context, *ent.ContentDocumentMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentDocumentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentDocumentMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentDocumentMutation", m)
+}
+
+// The ContentRevisionFunc type is an adapter to allow the use of ordinary
+// function as ContentRevision mutator.
+type ContentRevisionFunc func(context.Context, *ent.ContentRevisionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentRevisionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentRevisionMutation", m)
+}
+
 // The ContentSchemaFunc type is an adapter to allow the use of ordinary
 // function as ContentSchema mutator.
 type ContentSchemaFunc func(context.Context, *ent.ContentSchemaMutation) (ent.Value, error)

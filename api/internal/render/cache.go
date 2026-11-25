@@ -125,3 +125,74 @@ func (c *Cache) DeletePage(ctx context.Context, shopID int, slug string) {
 		c.log.Warn("render cache page delete failed", "shop", shopID, "slug", slug, "err", err)
 	}
 }
+
+// ── content documents (change headless-content-store slice 2, design D2) ──
+//
+//	cache:shop:{shop_id}:v{ver}:content:{key}    one published document body
+//	cache:shop:{shop_id}:v{ver}:content:_list    the list body
+//	cache:shop:{shop_id}:v{ver}:content:_all     the include=content body
+//
+// Same versioned scheme and singleflight as the page bundles; "_" cannot start
+// a document key, so the list names never collide with a key.
+
+const (
+	ContentListName = "_list"
+	ContentAllName  = "_all"
+)
+
+func contentKey(shopID int, ver int64, name string) string {
+	return fmt.Sprintf("cache:shop:%d:v%d:content:%s", shopID, ver, name)
+}
+
+// GetContent returns the cached public body named name or assembles (and
+// caches) it. Errors from assemble (including not-found) are never cached.
+func (c *Cache) GetContent(ctx context.Context, shopID int, name string, assemble func(context.Context) ([]byte, error)) ([]byte, bool, error) {
+	ver, redisOK := c.version(ctx, shopID)
+	if !redisOK {
+		if c.redis != nil {
+			c.log.Warn("content cache degraded to DB", "shop", shopID)
+		}
+		out, err := assemble(ctx)
+		return out, false, err
+	}
+	key := contentKey(shopID, ver, name)
+	if raw, err := c.redis.Get(ctx, key).Bytes(); err == nil {
+		return raw, true, nil
+	}
+	v, err, _ := c.sf.Do(key, func() (any, error) {
+		if raw, err := c.redis.Get(ctx, key).Bytes(); err == nil {
+			return raw, nil
+		}
+		out, err := assemble(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := c.redis.Set(ctx, key, out, bundleTTL).Err(); err != nil {
+			c.log.Warn("content cache set failed", "key", key, "err", err)
+		}
+		return out, nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return v.([]byte), false, nil
+}
+
+// DeleteContent drops the cached bodies of one document and both lists.
+func (c *Cache) DeleteContent(ctx context.Context, shopID int, docKey string) {
+	if c.redis == nil {
+		return
+	}
+	ver, ok := c.version(ctx, shopID)
+	if !ok {
+		return
+	}
+	keys := []string{
+		contentKey(shopID, ver, docKey),
+		contentKey(shopID, ver, ContentListName),
+		contentKey(shopID, ver, ContentAllName),
+	}
+	if err := c.redis.Del(ctx, keys...).Err(); err != nil {
+		c.log.Warn("content cache delete failed", "shop", shopID, "key", docKey, "err", err)
+	}
+}

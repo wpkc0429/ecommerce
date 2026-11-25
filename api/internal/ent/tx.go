@@ -24,6 +24,12 @@ type Tx struct {
 	Category *CategoryClient
 	// CheckoutIdempotencyKey is the client for interacting with the CheckoutIdempotencyKey builders.
 	CheckoutIdempotencyKey *CheckoutIdempotencyKeyClient
+	// ContentAuditLog is the client for interacting with the ContentAuditLog builders.
+	ContentAuditLog *ContentAuditLogClient
+	// ContentDocument is the client for interacting with the ContentDocument builders.
+	ContentDocument *ContentDocumentClient
+	// ContentRevision is the client for interacting with the ContentRevision builders.
+	ContentRevision *ContentRevisionClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
@@ -228,6 +234,9 @@ func (tx *Tx) init() {
 	tx.CartItem = NewCartItemClient(tx.config)
 	tx.Category = NewCategoryClient(tx.config)
 	tx.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(tx.config)
+	tx.ContentAuditLog = NewContentAuditLogClient(tx.config)
+	tx.ContentDocument = NewContentDocumentClient(tx.config)
+	tx.ContentRevision = NewContentRevisionClient(tx.config)
 	tx.ContentSchema = NewContentSchemaClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)

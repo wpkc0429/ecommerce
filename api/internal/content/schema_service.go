@@ -6,12 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
 
+	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/contentschema"
+	"ksdevworks/ecommerce/api/internal/contentstore"
 	"ksdevworks/ecommerce/api/internal/ent"
+	entdoc "ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	entrev "ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
 	entshop "ksdevworks/ecommerce/api/internal/ent/shop"
@@ -109,7 +115,10 @@ func (s *SchemaService) Register(ctx context.Context, shopID int, raw []byte, op
 		}
 	}
 
-	docs, err := loadDocuments(ctx, tx.Page.Query(), tx.Shop.Query(), shopID)
+	if err := contentstore.EnsureDocuments(ctx, tx.Client(), shopID); err != nil {
+		return nil, fmt.Errorf("content: ensure documents: %w", err)
+	}
+	docs, err := loadDocuments(ctx, tx.Client(), shopID)
 	if err != nil {
 		return nil, err
 	}
@@ -131,22 +140,30 @@ func (s *SchemaService) Register(ctx context.Context, shopID int, raw []byte, op
 	if opts.ActorUserID > 0 {
 		create.SetCreatedByUserID(opts.ActorUserID)
 	}
-	if snap := snapshotOf(report, docs); snap != nil {
-		create.SetSnapshotJSON(snap)
-	}
 	if _, err := create.Save(ctx); err != nil {
 		return nil, fmt.Errorf("content: write version %d: %w", next, err)
 	}
+	c := tx.Client()
+	// Snapshot what is at risk, then flag the documents (design D4).
 	for _, d := range report.Documents {
-		if d.Kind != KindPage {
-			continue
+		if d.AtRisk() {
+			if err := contentstore.AddSchemaSnapshot(ctx, c, shopID, d.Key, next, opts.ActorUserID); err != nil {
+				return nil, fmt.Errorf("content: snapshot %q: %w", d.Key, err)
+			}
 		}
-		if err := tx.Page.Update().
-			Where(entpage.ShopIDEQ(shopID), entpage.SlugEQ(d.Key)).
-			SetNeedsAttention(d.Status == StatusNeedsAttention).
-			Exec(ctx); err != nil {
-			return nil, fmt.Errorf("content: flag page: %w", err)
+		if err := contentstore.SetFlags(ctx, c, shopID, d.Key, d.Status == StatusNeedsAttention, declaredUnder(parsed, d.Key)); err != nil {
+			return nil, fmt.Errorf("content: flag %q: %w", d.Key, err)
 		}
+	}
+	created, err := createDeclared(ctx, c, shopID, parsed, next, opts.ActorUserID)
+	if err != nil {
+		return nil, err
+	}
+	if err := contentstore.Audit(ctx, c, contentstore.AuditEntry{
+		ShopID: shopID, Actor: opts.ActorUserID, Action: "schema.register",
+		Detail: auditDetail(next, report, created),
+	}); err != nil {
+		return nil, fmt.Errorf("content: audit: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("content: commit: %w", err)
@@ -183,15 +200,17 @@ func (s *SchemaService) dryRun(ctx context.Context, shopID int, parsed *Parsed, 
 			res.WouldRegisterVersion = 0
 			res.Report = Report{Documents: []DocReport{}}
 			s.audit("content.schema.dry_run", shopID, opts.ActorUserID, res.Version, res.Report)
+			s.auditRow(ctx, shopID, opts.ActorUserID, "schema.dry_run", auditDetail(res.Version, res.Report, 0))
 			return res, nil
 		}
 	}
-	docs, err := loadDocuments(ctx, s.Client.Page.Query(), s.Client.Shop.Query(), shopID)
+	docs, err := loadDocuments(ctx, s.Client, shopID)
 	if err != nil {
 		return nil, err
 	}
 	res.Report = Diff(docs.inputs, typeSchemas(parsed), globalSchema(parsed))
 	s.audit("content.schema.dry_run", shopID, opts.ActorUserID, res.Version, res.Report)
+	s.auditRow(ctx, shopID, opts.ActorUserID, "schema.dry_run", auditDetail(res.Version, res.Report, 0))
 	return res, nil
 }
 
@@ -252,61 +271,137 @@ func sameDigest(row *ent.ContentSchema, digest string) (bool, error) {
 
 type loadedDocs struct {
 	inputs []DocInput
-	byKey  map[string]DocInput
 }
 
-func loadDocuments(ctx context.Context, pq *ent.PageQuery, sq *ent.ShopQuery, shopID int) (*loadedDocs, error) {
-	pages, err := pq.Where(entpage.ShopIDEQ(shopID)).Order(entpage.ByID()).All(ctx)
+// loadDocuments reads the shop's documents for the compatibility check. The
+// document table is the source; legacy pages that have no document yet (rows
+// written around the compatibility layer) are read from pages so a dry run,
+// which writes nothing, still sees them.
+func loadDocuments(ctx context.Context, c *ent.Client, shopID int) (*loadedDocs, error) {
+	docs, err := c.ContentDocument.Query().Where(entdoc.ShopIDEQ(shopID)).Order(entdoc.ByID()).All(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("content: load documents: %w", err)
+	}
+	ld := &loadedDocs{}
+	have := map[string]bool{}
+	for _, d := range docs {
+		have[d.Key] = true
+		di := DocInput{Kind: KindPage, Key: d.Key, TypeKey: d.TypeKey, Draft: d.DraftJSON, Published: d.PublishedJSON}
+		if d.Key == contentstore.GlobalKey {
+			di.Kind, di.TypeKey = KindGlobal, "global"
+		}
+		ld.inputs = append(ld.inputs, di)
+	}
+	pages, err := c.Page.Query().Where(entpage.ShopIDEQ(shopID)).Order(entpage.ByID()).All(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("content: load pages: %w", err)
 	}
-	shop, err := sq.Where(entshop.IDEQ(shopID)).Only(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("content: load shop content: %w", err)
-	}
-	ld := &loadedDocs{byKey: map[string]DocInput{}}
 	for _, p := range pages {
-		di := DocInput{Kind: KindPage, Key: p.Slug, TypeKey: p.TypeKey, Draft: p.ContentJSON, Published: p.PublishedJSON}
-		ld.inputs = append(ld.inputs, di)
-		ld.byKey[KindPage+":"+p.Slug] = di
+		if have[p.Slug] {
+			continue
+		}
+		ld.inputs = append(ld.inputs, DocInput{Kind: KindPage, Key: p.Slug, TypeKey: p.TypeKey, Draft: p.ContentJSON, Published: p.PublishedJSON})
 	}
-	if len(shop.ContentJSON) > 0 {
-		di := DocInput{Kind: KindGlobal, Key: "global", TypeKey: "global", Draft: shop.ContentJSON}
-		ld.inputs = append(ld.inputs, di)
-		ld.byKey[KindGlobal+":global"] = di
+	// shops.content_json is the live projection of the global document; when
+	// it was written around the compatibility layer it is what is live.
+	if shop, err := c.Shop.Get(ctx, shopID); err == nil && len(shop.ContentJSON) > 0 {
+		for i := range ld.inputs {
+			if ld.inputs[i].Key == contentstore.GlobalKey && !contentstore.SameJSON(ld.inputs[i].Published, shop.ContentJSON) {
+				ld.inputs[i].Draft, ld.inputs[i].Published = shop.ContentJSON, shop.ContentJSON
+			}
+		}
+		if !have[contentstore.GlobalKey] {
+			ld.inputs = append(ld.inputs, DocInput{Kind: KindGlobal, Key: "global", TypeKey: "global", Draft: shop.ContentJSON})
+		}
 	}
 	return ld, nil
 }
 
-// snapshotOf serializes the at-risk documents as they are right now.
-func snapshotOf(r Report, ld *loadedDocs) json.RawMessage {
-	type entry struct {
-		Kind      string          `json:"kind"`
-		Key       string          `json:"key"`
-		Status    string          `json:"status"`
-		Draft     json.RawMessage `json:"draft"`
-		Published json.RawMessage `json:"published,omitempty"`
+// declaredUnder reports whether key is declared by the registered schema.
+// Format 1 (and the shop-global document) declares everything.
+func declaredUnder(p *Parsed, key string) bool {
+	if key == contentstore.GlobalKey {
+		return true
 	}
-	var list []entry
-	for _, d := range r.Documents {
-		if !d.AtRisk() {
+	if _, ok := p.Documents[key]; ok {
+		return true
+	}
+	for prefix := range p.Collections {
+		if strings.HasPrefix(key, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+// createDeclared creates the fixed documents the schema declares and that do
+// not exist yet, as empty drafts filled with the type's hydrated defaults
+// (design D3). It returns how many it created.
+func createDeclared(ctx context.Context, c *ent.Client, shopID int, p *Parsed, version, actor int) (int, error) {
+	keys := make([]string, 0, len(p.Documents))
+	for k := range p.Documents {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	n := 0
+	for _, key := range keys {
+		if key == contentstore.GlobalKey {
 			continue
 		}
-		in := ld.byKey[d.Kind+":"+d.Key]
-		e := entry{Kind: d.Kind, Key: d.Key, Status: d.Status, Draft: in.Draft}
-		if len(in.Published) > 0 && string(in.Published) != string(in.Draft) {
-			e.Published = in.Published
+		exists, err := c.ContentDocument.Query().Where(entdoc.ShopIDEQ(shopID), entdoc.KeyEQ(key)).Exist(ctx)
+		if err != nil {
+			return n, err
 		}
-		list = append(list, e)
+		if exists {
+			continue
+		}
+		decl := p.Documents[key]
+		t, ok := p.Types[decl.Type]
+		if !ok {
+			continue
+		}
+		draft, err := cms.HydrateJSON(t.Schema, nil)
+		if err != nil {
+			return n, fmt.Errorf("content: hydrate defaults of %q: %w", decl.Type, err)
+		}
+		title := t.Title
+		if title == "" {
+			title = key
+		}
+		if _, _, err := contentstore.SaveDraft(ctx, c, contentstore.SaveInput{
+			ShopID: shopID, Key: key, TypeKey: decl.Type, Title: title, Draft: draft,
+			CreateOnly: true, SchemaVersion: version, Declared: true, Actor: actor,
+		}); err != nil {
+			return n, fmt.Errorf("content: create declared document %q: %w", key, err)
+		}
+		n++
 	}
-	if len(list) == 0 {
-		return nil
+	return n, nil
+}
+
+// auditDetail is the PII-free detail of a schema audit row: identifiers and
+// counts only.
+func auditDetail(version int, r Report, created int) map[string]any {
+	removed, attention, orphaned := 0, 0, 0
+	for _, d := range r.Documents {
+		removed += len(d.RemovedPaths)
+		switch d.Status {
+		case StatusNeedsAttention:
+			attention++
+		case StatusOrphaned:
+			orphaned++
+		}
 	}
-	b, err := json.Marshal(map[string]any{"documents": list})
-	if err != nil {
-		return nil
+	return map[string]any{
+		"schema_version": version, "documents": len(r.Documents), "removed_paths": removed,
+		"needs_attention": attention, "orphaned": orphaned, "created_documents": created,
 	}
-	return b
+}
+
+func (s *SchemaService) auditRow(ctx context.Context, shopID, actor int, action string, detail map[string]any) {
+	if err := contentstore.Audit(ctx, s.Client, contentstore.AuditEntry{ShopID: shopID, Actor: actor, Action: action, Detail: detail}); err != nil {
+		s.log().Warn("content audit row failed", "action", action, "shop_id", shopID, "err", err)
+	}
 }
 
 // ── reads ─────────────────────────────────────────────────────────────
@@ -320,6 +415,41 @@ type VersionInfo struct {
 	CreatedByUserID *int
 	CreatedAt       time.Time
 	HasSnapshot     bool
+}
+
+// snapshotOfVersion rebuilds the version's snapshot ({"documents":[{key,
+// draft, published}]}) from the schema_snapshot revisions it wrote (slice 2
+// moved it out of content_schemas.snapshot_json). nil when nothing was at risk.
+func (s *SchemaService) snapshotOfVersion(ctx context.Context, shopID, version int) json.RawMessage {
+	revs, err := s.Client.ContentRevision.Query().
+		Where(entrev.ShopIDEQ(shopID), entrev.KindEQ(contentstore.KindSchemaSnapshot), entrev.SchemaVersionEQ(version)).
+		Order(entrev.ByDocumentID()).All(ctx)
+	if err != nil || len(revs) == 0 {
+		return nil
+	}
+	type entry struct {
+		Kind      string          `json:"kind"`
+		Key       string          `json:"key"`
+		Draft     json.RawMessage `json:"draft"`
+		Published json.RawMessage `json:"published,omitempty"`
+	}
+	list := make([]entry, 0, len(revs))
+	for _, r := range revs {
+		d, err := s.Client.ContentDocument.Query().Where(entdoc.IDEQ(r.DocumentID), entdoc.ShopIDEQ(shopID)).Only(ctx)
+		if err != nil {
+			continue
+		}
+		kind := KindPage
+		if d.Key == contentstore.GlobalKey {
+			kind = KindGlobal
+		}
+		list = append(list, entry{Kind: kind, Key: d.Key, Draft: r.JSON, Published: r.PublishedJSON})
+	}
+	b, err := json.Marshal(map[string]any{"documents": list})
+	if err != nil {
+		return nil
+	}
+	return b
 }
 
 // VersionDetail is a version with its schema document (and optional snapshot).
@@ -336,7 +466,7 @@ func info(row *ent.ContentSchema) VersionInfo {
 	}
 	return VersionInfo{
 		Version: row.Version, Format: format, SHA256: row.Sha256, Source: row.Source,
-		CreatedByUserID: row.CreatedByUserID, CreatedAt: row.CreatedAt, HasSnapshot: len(row.SnapshotJSON) > 0,
+		CreatedByUserID: row.CreatedByUserID, CreatedAt: row.CreatedAt,
 	}
 }
 
@@ -360,8 +490,9 @@ func (s *SchemaService) Get(ctx context.Context, shopID, version int, withSnapsh
 		return nil, fmt.Errorf("content: load version: %w", err)
 	}
 	d := &VersionDetail{VersionInfo: info(row), Schema: row.SchemaJSON}
+	d.HasSnapshot = s.snapshotVersions(ctx, shopID)[row.Version]
 	if withSnapshot {
-		d.Snapshot = row.SnapshotJSON
+		d.Snapshot = s.snapshotOfVersion(ctx, shopID, row.Version)
 	}
 	return d, nil
 }
@@ -379,8 +510,26 @@ func (s *SchemaService) Versions(ctx context.Context, shopID int) ([]VersionInfo
 		return nil, fmt.Errorf("content: list versions: %w", err)
 	}
 	out := make([]VersionInfo, 0, len(rows))
+	snaps := s.snapshotVersions(ctx, shopID)
 	for _, r := range rows {
-		out = append(out, info(r))
+		i := info(r)
+		i.HasSnapshot = snaps[r.Version]
+		out = append(out, i)
 	}
 	return out, nil
+}
+
+// snapshotVersions is the set of schema versions that wrote snapshot revisions.
+func (s *SchemaService) snapshotVersions(ctx context.Context, shopID int) map[int]bool {
+	vs, err := s.Client.ContentRevision.Query().
+		Where(entrev.ShopIDEQ(shopID), entrev.KindEQ(contentstore.KindSchemaSnapshot)).
+		Select(entrev.FieldSchemaVersion).Ints(ctx)
+	out := map[int]bool{}
+	if err != nil {
+		return out
+	}
+	for _, v := range vs {
+		out[v] = true
+	}
+	return out
 }

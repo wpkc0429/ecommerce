@@ -9,6 +9,9 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
+	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -280,6 +283,154 @@ func init() {
 	checkoutidempotencykeyDescStatus := checkoutidempotencykeyFields[3].Descriptor()
 	// checkoutidempotencykey.DefaultStatus holds the default value on creation for the status field.
 	checkoutidempotencykey.DefaultStatus = checkoutidempotencykeyDescStatus.Default.(int16)
+	contentauditlogFields := schema.ContentAuditLog{}.Fields()
+	_ = contentauditlogFields
+	// contentauditlogDescAction is the schema descriptor for action field.
+	contentauditlogDescAction := contentauditlogFields[2].Descriptor()
+	// contentauditlog.ActionValidator is a validator for the "action" field. It is called by the builders before save.
+	contentauditlog.ActionValidator = func() func(string) error {
+		validators := contentauditlogDescAction.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(action string) error {
+			for _, fn := range fns {
+				if err := fn(action); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentauditlogDescDocKey is the schema descriptor for doc_key field.
+	contentauditlogDescDocKey := contentauditlogFields[3].Descriptor()
+	// contentauditlog.DefaultDocKey holds the default value on creation for the doc_key field.
+	contentauditlog.DefaultDocKey = contentauditlogDescDocKey.Default.(string)
+	// contentauditlog.DocKeyValidator is a validator for the "doc_key" field. It is called by the builders before save.
+	contentauditlog.DocKeyValidator = contentauditlogDescDocKey.Validators[0].(func(string) error)
+	// contentauditlogDescDetail is the schema descriptor for detail field.
+	contentauditlogDescDetail := contentauditlogFields[4].Descriptor()
+	// contentauditlog.DefaultDetail holds the default value on creation for the detail field.
+	contentauditlog.DefaultDetail = contentauditlogDescDetail.Default.(json.RawMessage)
+	// contentauditlogDescCreatedAt is the schema descriptor for created_at field.
+	contentauditlogDescCreatedAt := contentauditlogFields[5].Descriptor()
+	// contentauditlog.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentauditlog.DefaultCreatedAt = contentauditlogDescCreatedAt.Default.(func() time.Time)
+	contentdocumentFields := schema.ContentDocument{}.Fields()
+	_ = contentdocumentFields
+	// contentdocumentDescKey is the schema descriptor for key field.
+	contentdocumentDescKey := contentdocumentFields[1].Descriptor()
+	// contentdocument.KeyValidator is a validator for the "key" field. It is called by the builders before save.
+	contentdocument.KeyValidator = func() func(string) error {
+		validators := contentdocumentDescKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(key string) error {
+			for _, fn := range fns {
+				if err := fn(key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentdocumentDescTypeKey is the schema descriptor for type_key field.
+	contentdocumentDescTypeKey := contentdocumentFields[2].Descriptor()
+	// contentdocument.TypeKeyValidator is a validator for the "type_key" field. It is called by the builders before save.
+	contentdocument.TypeKeyValidator = func() func(string) error {
+		validators := contentdocumentDescTypeKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(type_key string) error {
+			for _, fn := range fns {
+				if err := fn(type_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentdocumentDescTitle is the schema descriptor for title field.
+	contentdocumentDescTitle := contentdocumentFields[3].Descriptor()
+	// contentdocument.DefaultTitle holds the default value on creation for the title field.
+	contentdocument.DefaultTitle = contentdocumentDescTitle.Default.(string)
+	// contentdocument.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	contentdocument.TitleValidator = contentdocumentDescTitle.Validators[0].(func(string) error)
+	// contentdocumentDescStatus is the schema descriptor for status field.
+	contentdocumentDescStatus := contentdocumentFields[4].Descriptor()
+	// contentdocument.DefaultStatus holds the default value on creation for the status field.
+	contentdocument.DefaultStatus = contentdocumentDescStatus.Default.(int16)
+	// contentdocumentDescDraftJSON is the schema descriptor for draft_json field.
+	contentdocumentDescDraftJSON := contentdocumentFields[5].Descriptor()
+	// contentdocument.DefaultDraftJSON holds the default value on creation for the draft_json field.
+	contentdocument.DefaultDraftJSON = contentdocumentDescDraftJSON.Default.(json.RawMessage)
+	// contentdocumentDescMeta is the schema descriptor for meta field.
+	contentdocumentDescMeta := contentdocumentFields[7].Descriptor()
+	// contentdocument.DefaultMeta holds the default value on creation for the meta field.
+	contentdocument.DefaultMeta = contentdocumentDescMeta.Default.(json.RawMessage)
+	// contentdocumentDescDraftRev is the schema descriptor for draft_rev field.
+	contentdocumentDescDraftRev := contentdocumentFields[8].Descriptor()
+	// contentdocument.DefaultDraftRev holds the default value on creation for the draft_rev field.
+	contentdocument.DefaultDraftRev = contentdocumentDescDraftRev.Default.(int64)
+	// contentdocumentDescPublishedRev is the schema descriptor for published_rev field.
+	contentdocumentDescPublishedRev := contentdocumentFields[9].Descriptor()
+	// contentdocument.DefaultPublishedRev holds the default value on creation for the published_rev field.
+	contentdocument.DefaultPublishedRev = contentdocumentDescPublishedRev.Default.(int64)
+	// contentdocumentDescSchemaVersion is the schema descriptor for schema_version field.
+	contentdocumentDescSchemaVersion := contentdocumentFields[10].Descriptor()
+	// contentdocument.DefaultSchemaVersion holds the default value on creation for the schema_version field.
+	contentdocument.DefaultSchemaVersion = contentdocumentDescSchemaVersion.Default.(int)
+	// contentdocumentDescPublishedSchemaVersion is the schema descriptor for published_schema_version field.
+	contentdocumentDescPublishedSchemaVersion := contentdocumentFields[11].Descriptor()
+	// contentdocument.DefaultPublishedSchemaVersion holds the default value on creation for the published_schema_version field.
+	contentdocument.DefaultPublishedSchemaVersion = contentdocumentDescPublishedSchemaVersion.Default.(int)
+	// contentdocumentDescNeedsAttention is the schema descriptor for needs_attention field.
+	contentdocumentDescNeedsAttention := contentdocumentFields[12].Descriptor()
+	// contentdocument.DefaultNeedsAttention holds the default value on creation for the needs_attention field.
+	contentdocument.DefaultNeedsAttention = contentdocumentDescNeedsAttention.Default.(bool)
+	// contentdocumentDescDeclared is the schema descriptor for declared field.
+	contentdocumentDescDeclared := contentdocumentFields[13].Descriptor()
+	// contentdocument.DefaultDeclared holds the default value on creation for the declared field.
+	contentdocument.DefaultDeclared = contentdocumentDescDeclared.Default.(bool)
+	// contentdocumentDescCreatedAt is the schema descriptor for created_at field.
+	contentdocumentDescCreatedAt := contentdocumentFields[14].Descriptor()
+	// contentdocument.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentdocument.DefaultCreatedAt = contentdocumentDescCreatedAt.Default.(func() time.Time)
+	// contentdocumentDescUpdatedAt is the schema descriptor for updated_at field.
+	contentdocumentDescUpdatedAt := contentdocumentFields[15].Descriptor()
+	// contentdocument.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	contentdocument.DefaultUpdatedAt = contentdocumentDescUpdatedAt.Default.(func() time.Time)
+	// contentdocument.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	contentdocument.UpdateDefaultUpdatedAt = contentdocumentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	contentrevisionFields := schema.ContentRevision{}.Fields()
+	_ = contentrevisionFields
+	// contentrevisionDescKind is the schema descriptor for kind field.
+	contentrevisionDescKind := contentrevisionFields[3].Descriptor()
+	// contentrevision.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	contentrevision.KindValidator = contentrevisionDescKind.Validators[0].(func(string) error)
+	// contentrevisionDescTitle is the schema descriptor for title field.
+	contentrevisionDescTitle := contentrevisionFields[6].Descriptor()
+	// contentrevision.DefaultTitle holds the default value on creation for the title field.
+	contentrevision.DefaultTitle = contentrevisionDescTitle.Default.(string)
+	// contentrevision.TitleValidator is a validator for the "title" field. It is called by the builders before save.
+	contentrevision.TitleValidator = contentrevisionDescTitle.Validators[0].(func(string) error)
+	// contentrevisionDescMeta is the schema descriptor for meta field.
+	contentrevisionDescMeta := contentrevisionFields[7].Descriptor()
+	// contentrevision.DefaultMeta holds the default value on creation for the meta field.
+	contentrevision.DefaultMeta = contentrevisionDescMeta.Default.(json.RawMessage)
+	// contentrevisionDescSchemaVersion is the schema descriptor for schema_version field.
+	contentrevisionDescSchemaVersion := contentrevisionFields[8].Descriptor()
+	// contentrevision.DefaultSchemaVersion holds the default value on creation for the schema_version field.
+	contentrevision.DefaultSchemaVersion = contentrevisionDescSchemaVersion.Default.(int)
+	// contentrevisionDescCreatedAt is the schema descriptor for created_at field.
+	contentrevisionDescCreatedAt := contentrevisionFields[10].Descriptor()
+	// contentrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentrevision.DefaultCreatedAt = contentrevisionDescCreatedAt.Default.(func() time.Time)
 	contentschemaFields := schema.ContentSchema{}.Fields()
 	_ = contentschemaFields
 	// contentschemaDescSha256 is the schema descriptor for sha256 field.

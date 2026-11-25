@@ -18,6 +18,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/contentschema"
+	"ksdevworks/ecommerce/api/internal/contentstore"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcategory "ksdevworks/ecommerce/api/internal/ent/category"
@@ -550,6 +551,13 @@ func seedDemoShop(ctx context.Context, tx *ent.Tx, merchantOwnerRoleID, staffRol
 			Save(ctx); err != nil {
 			return fmt.Errorf("seed: demo home page: %w", err)
 		}
+	}
+
+	// The demo shop's documents (change headless-content-store slice 2): the
+	// home page and the global content exist as content documents too, so the
+	// public content API serves the demo shop from the first run.
+	if err := contentstore.EnsureDocuments(ctx, tx.Client(), shopID); err != nil {
+		return fmt.Errorf("seed: demo content documents: %w", err)
 	}
 
 	if err := seedDemoCatalog(ctx, tx, shopID); err != nil {

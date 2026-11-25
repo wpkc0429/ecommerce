@@ -12,6 +12,9 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/cartitem"
 	"ksdevworks/ecommerce/api/internal/ent/category"
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
+	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
+	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -240,6 +243,87 @@ func (f TraverseCheckoutIdempotencyKey) Traverse(ctx context.Context, q ent.Quer
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.CheckoutIdempotencyKeyQuery", q)
+}
+
+// The ContentAuditLogFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentAuditLogFunc func(context.Context, *ent.ContentAuditLogQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentAuditLogFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentAuditLogQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentAuditLogQuery", q)
+}
+
+// The TraverseContentAuditLog type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentAuditLog func(context.Context, *ent.ContentAuditLogQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentAuditLog) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentAuditLog) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentAuditLogQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentAuditLogQuery", q)
+}
+
+// The ContentDocumentFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentDocumentFunc func(context.Context, *ent.ContentDocumentQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentDocumentFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentDocumentQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentDocumentQuery", q)
+}
+
+// The TraverseContentDocument type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentDocument func(context.Context, *ent.ContentDocumentQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentDocument) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentDocument) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentDocumentQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentDocumentQuery", q)
+}
+
+// The ContentRevisionFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentRevisionFunc func(context.Context, *ent.ContentRevisionQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentRevisionFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentRevisionQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentRevisionQuery", q)
+}
+
+// The TraverseContentRevision type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentRevision func(context.Context, *ent.ContentRevisionQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentRevision) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentRevision) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentRevisionQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentRevisionQuery", q)
 }
 
 // The ContentSchemaFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1173,6 +1257,12 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.CategoryQuery, predicate.Category, category.OrderOption]{typ: ent.TypeCategory, tq: q}, nil
 	case *ent.CheckoutIdempotencyKeyQuery:
 		return &query[*ent.CheckoutIdempotencyKeyQuery, predicate.CheckoutIdempotencyKey, checkoutidempotencykey.OrderOption]{typ: ent.TypeCheckoutIdempotencyKey, tq: q}, nil
+	case *ent.ContentAuditLogQuery:
+		return &query[*ent.ContentAuditLogQuery, predicate.ContentAuditLog, contentauditlog.OrderOption]{typ: ent.TypeContentAuditLog, tq: q}, nil
+	case *ent.ContentDocumentQuery:
+		return &query[*ent.ContentDocumentQuery, predicate.ContentDocument, contentdocument.OrderOption]{typ: ent.TypeContentDocument, tq: q}, nil
+	case *ent.ContentRevisionQuery:
+		return &query[*ent.ContentRevisionQuery, predicate.ContentRevision, contentrevision.OrderOption]{typ: ent.TypeContentRevision, tq: q}, nil
 	case *ent.ContentSchemaQuery:
 		return &query[*ent.ContentSchemaQuery, predicate.ContentSchema, contentschema.OrderOption]{typ: ent.TypeContentSchema, tq: q}, nil
 	case *ent.MediaUploadQuery:

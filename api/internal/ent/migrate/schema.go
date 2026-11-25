@@ -232,6 +232,107 @@ var (
 			},
 		},
 	}
+	// ContentAuditLogColumns holds the columns for the "content_audit_log" table.
+	ContentAuditLogColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "actor_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "action", Type: field.TypeString, Size: 30, SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "doc_key", Type: field.TypeString, Size: 63, Default: "", SchemaType: map[string]string{"postgres": "varchar(63)"}},
+		{Name: "detail", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ContentAuditLogTable holds the schema information for the "content_audit_log" table.
+	ContentAuditLogTable = &schema.Table{
+		Name:       "content_audit_log",
+		Columns:    ContentAuditLogColumns,
+		PrimaryKey: []*schema.Column{ContentAuditLogColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentauditlog_shop_id_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ContentAuditLogColumns[1], ContentAuditLogColumns[6]},
+			},
+			{
+				Name:    "contentauditlog_created_at",
+				Unique:  false,
+				Columns: []*schema.Column{ContentAuditLogColumns[6]},
+			},
+		},
+	}
+	// ContentDocumentsColumns holds the columns for the "content_documents" table.
+	ContentDocumentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "key", Type: field.TypeString, Size: 63, SchemaType: map[string]string{"postgres": "varchar(63)"}},
+		{Name: "type_key", Type: field.TypeString, Size: 50, SchemaType: map[string]string{"postgres": "varchar(50)"}},
+		{Name: "title", Type: field.TypeString, Size: 150, Default: "", SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "status", Type: field.TypeInt16, Default: 0},
+		{Name: "draft_json", Type: field.TypeJSON},
+		{Name: "published_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "meta", Type: field.TypeJSON},
+		{Name: "draft_rev", Type: field.TypeInt64, Default: 1},
+		{Name: "published_rev", Type: field.TypeInt64, Default: 0},
+		{Name: "schema_version", Type: field.TypeInt, Default: 0},
+		{Name: "published_schema_version", Type: field.TypeInt, Default: 0},
+		{Name: "needs_attention", Type: field.TypeBool, Default: false},
+		{Name: "declared", Type: field.TypeBool, Default: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "published_at", Type: field.TypeTime, Nullable: true},
+		{Name: "updated_by_user_id", Type: field.TypeInt, Nullable: true},
+	}
+	// ContentDocumentsTable holds the schema information for the "content_documents" table.
+	ContentDocumentsTable = &schema.Table{
+		Name:       "content_documents",
+		Columns:    ContentDocumentsColumns,
+		PrimaryKey: []*schema.Column{ContentDocumentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentdocument_shop_id_key",
+				Unique:  true,
+				Columns: []*schema.Column{ContentDocumentsColumns[1], ContentDocumentsColumns[2]},
+			},
+			{
+				Name:    "contentdocument_shop_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{ContentDocumentsColumns[1], ContentDocumentsColumns[5]},
+			},
+		},
+	}
+	// ContentRevisionsColumns holds the columns for the "content_revisions" table.
+	ContentRevisionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "document_id", Type: field.TypeInt},
+		{Name: "rev_no", Type: field.TypeInt},
+		{Name: "kind", Type: field.TypeString, Size: 20, SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "json", Type: field.TypeJSON},
+		{Name: "published_json", Type: field.TypeJSON, Nullable: true},
+		{Name: "title", Type: field.TypeString, Size: 150, Default: "", SchemaType: map[string]string{"postgres": "varchar(150)"}},
+		{Name: "meta", Type: field.TypeJSON},
+		{Name: "schema_version", Type: field.TypeInt, Default: 0},
+		{Name: "actor_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+	}
+	// ContentRevisionsTable holds the schema information for the "content_revisions" table.
+	ContentRevisionsTable = &schema.Table{
+		Name:       "content_revisions",
+		Columns:    ContentRevisionsColumns,
+		PrimaryKey: []*schema.Column{ContentRevisionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentrevision_document_id_rev_no",
+				Unique:  true,
+				Columns: []*schema.Column{ContentRevisionsColumns[2], ContentRevisionsColumns[3]},
+			},
+			{
+				Name:    "contentrevision_shop_id_document_id_kind",
+				Unique:  false,
+				Columns: []*schema.Column{ContentRevisionsColumns[1], ContentRevisionsColumns[2], ContentRevisionsColumns[4]},
+			},
+		},
+	}
 	// ContentSchemasColumns holds the columns for the "content_schemas" table.
 	ContentSchemasColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1482,6 +1583,9 @@ var (
 		CartItemsTable,
 		CategoriesTable,
 		CheckoutIdempotencyKeysTable,
+		ContentAuditLogTable,
+		ContentDocumentsTable,
+		ContentRevisionsTable,
 		ContentSchemasTable,
 		MediaUploadsTable,
 		MembersTable,
@@ -1555,6 +1659,23 @@ func init() {
 	CheckoutIdempotencyKeysTable.Annotation.Checks = map[string]string{
 		"checkout_idempotency_keys_order_id_check": "(status = 0 AND order_id IS NULL) OR (status = 1 AND order_id IS NOT NULL)",
 		"checkout_idempotency_keys_status_check":   "status IN (0, 1)",
+	}
+	ContentAuditLogTable.Annotation = &entsql.Annotation{
+		Table: "content_audit_log",
+	}
+	ContentDocumentsTable.Annotation = &entsql.Annotation{
+		Table: "content_documents",
+	}
+	ContentDocumentsTable.Annotation.Checks = map[string]string{
+		"content_documents_key_check":    "key ~ '^[a-z0-9][a-z0-9-]{0,62}$'",
+		"content_documents_status_check": "status IN (0, 1)",
+	}
+	ContentRevisionsTable.Annotation = &entsql.Annotation{
+		Table: "content_revisions",
+	}
+	ContentRevisionsTable.Annotation.Checks = map[string]string{
+		"content_revisions_kind_check":   "kind IN ('publish', 'schema_snapshot')",
+		"content_revisions_rev_no_check": "rev_no >= 1",
 	}
 	ContentSchemasTable.ForeignKeys[0].RefTable = ShopsTable
 	ContentSchemasTable.Annotation = &entsql.Annotation{

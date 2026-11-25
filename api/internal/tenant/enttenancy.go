@@ -14,6 +14,10 @@ import (
 // (Phase 2: products, orders, ...).
 var tenantOwned = map[string]bool{
 	"Page": true,
+	// change headless-content-store slice 2: all three carry a direct shop_id.
+	"ContentDocument": true,
+	"ContentRevision": true,
+	"ContentAuditLog": true,
 	// change retire-hosted-storefront-and-themes (group 1): per-shop content
 	// schema versions carry a direct shop_id column.
 	"ContentSchema": true,

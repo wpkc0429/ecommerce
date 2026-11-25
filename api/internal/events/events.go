@@ -33,6 +33,25 @@ type ShopContentUpdated struct{ ShopID int }
 
 func (ShopContentUpdated) EventName() string { return "shop.content_updated" }
 
+// ContentPublished — a content document was published (or, for the global
+// document, replaced). Fired by both the new document API and the legacy page
+// endpoints (change headless-content-store slice 2). Subscriber: the render
+// cache invalidator.
+type ContentPublished struct {
+	ShopID int
+	Key    string
+}
+
+func (ContentPublished) EventName() string { return "content.published" }
+
+// ContentUnpublished — a content document was taken offline or deleted.
+type ContentUnpublished struct {
+	ShopID int
+	Key    string
+}
+
+func (ContentUnpublished) EventName() string { return "content.unpublished" }
+
 // ContentSchemaRegistered — a human registered a new content schema version for
 // the shop (change headless-content-store). Hydrated output of every cached
 // page and the bundle's global content depends on the schema, so the whole

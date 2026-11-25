@@ -141,6 +141,14 @@ func (s *Service) validateAndSanitize(schema, payload json.RawMessage) (json.Raw
 	if len(bad) > 0 {
 		return nil, &ValidationError{Message: "image fields must use the configured image domain", Details: bad}
 	}
+	// change headless-content-store slice 2 (design D6): link fields.
+	badLinks, err := CheckLinkFields(schema, payload)
+	if err != nil {
+		return nil, err
+	}
+	if len(badLinks) > 0 {
+		return nil, &ValidationError{Message: "link fields must be https://, http://, mailto:, tel: or a site path", Details: badLinks}
+	}
 	clean, changed, err := sanitizeRichText(schema, payload, s.imagePrefixes)
 	if err != nil {
 		return nil, err
@@ -151,4 +159,12 @@ func (s *Service) validateAndSanitize(schema, payload json.RawMessage) (json.Raw
 		}
 	}
 	return clean, nil
+}
+
+// ValidateAndSanitize is the exported write-side gate (change
+// headless-content-store slice 2): the content service validates and
+// sanitizes document payloads through the very function the legacy page
+// endpoints use, so there is one gate.
+func (s *Service) ValidateAndSanitize(schema, payload json.RawMessage) (json.RawMessage, error) {
+	return s.validateAndSanitize(schema, payload)
 }
