@@ -1187,7 +1187,7 @@ async function commercePath() {
 // 開店是平台操作：優先沿用 happy-path 已取得的平台權杖（登入限流 5 次／5 分鐘，
 // happy-path 已用掉大半），單獨執行時才自己登入；限流若擋下是環境問題不是程式問題。
 async function contentSchemaPath() {
-  section("⑮ Content schema: provision a new shop, dry run, register, create + publish a page, read it publicly");
+  section("⑮ Content schema: provision a new shop, dry run, register, create + publish a page, read it publicly; content documents, ETag/304, preview, revisions");
   const platformEmail =
     process.env.E2E_ADMIN_EMAIL || process.env.SEED_ADMIN_EMAIL || dotEnvValue("SEED_ADMIN_EMAIL") || "admin@example.com";
   const platformPassword =
@@ -1271,9 +1271,16 @@ async function contentSchemaPath() {
   check("the active schema is readable", active.status === 200 && active.json?.version === 1 && active.json?.format === 2, brief(active));
 
   // 5. Create, edit, publish, and read through the public API.
-  const created = await req("POST", sp("/pages"), { token: owner, body: { type_key: "story", title: "Our story", slug: "story" } });
+  // Registering the schema created the documents it declares (story among
+  // them) as empty drafts; creating one more page of that type still works.
+  const list0 = await req("GET", sp("/pages"), { token: owner });
+  const declaredStory = (list0.json?.pages ?? []).find((p) => p.slug === "story");
+  check("registration created the declared documents as pages too (story, faq, product-info)",
+    Boolean(declaredStory) && ["faq", "product-info"].every((k) => (list0.json?.pages ?? []).some((p) => p.slug === k)),
+    JSON.stringify((list0.json?.pages ?? []).map((p) => p.slug)));
+  const created = await req("POST", sp("/pages"), { token: owner, body: { type_key: "story", title: "Another story", slug: `story-${runID}` } });
   need(created.status === 201, `page creation failed after registration: ${brief(created)}`);
-  const pageID = created.json.id;
+  const pageID = declaredStory.id;
   const saved = await req("PUT", sp(`/pages/${pageID}`), {
     token: owner, body: { content: { eyebrow: "ABOUT", title: `Hello ${runID}` } },
   });
@@ -1316,7 +1323,83 @@ async function contentSchemaPath() {
   check("a fixed draft clears needs_attention and publishes",
     fixed.status === 200 && republished.status === 200 && republished.json?.needs_attention === false, brief(republished));
 
-  // 7. The demo shop's owner cannot register for this shop.
+  // 7. Content documents and the public read API (headless-content-store slice 2).
+  const dp = (k = "") => sp(`/content/documents${k}`);
+  const dlist = await req("GET", dp(), { token: owner });
+  const dkeys = (dlist.json?.documents ?? []).map((d) => d.key);
+  check("the document list has the declared documents and the global content",
+    dlist.status === 200 && ["faq", "story", "product-info", "home", "global"].every((k) => dkeys.includes(k)), JSON.stringify(dkeys));
+  const noPre = await req("PUT", dp("/faq"), { token: owner, body: { content: { items: [] } } });
+  check("saving a document without a precondition is refused (428)", noPre.status === 428, brief(noPre));
+  const gotFaq = await req("GET", dp("/faq"), { token: owner });
+  const rev1 = gotFaq.headers.get("etag");
+  check("a document's GET carries its draft_rev as ETag", gotFaq.status === 200 && /^"\d+"$/.test(rev1 ?? ""), String(rev1));
+  const faqBody = (q) => ({ content: { items: [{ q, a: `answer ${runID}` }] } });
+  const faqSave = await req("PUT", dp("/faq"), { token: owner, headers: { "If-Match": rev1 }, body: faqBody(`Question ${runID}`) });
+  check("saving with If-Match updates the draft and returns the new ETag",
+    faqSave.status === 200 && faqSave.headers.get("etag") !== rev1, brief(faqSave));
+  const staleSave = await req("PUT", dp("/faq"), { token: owner, headers: { "If-Match": rev1 }, body: faqBody("stale") });
+  check("a stale If-Match is refused with 412 and the current revision",
+    staleSave.status === 412 && staleSave.json?.error?.details?.current_rev >= 2, brief(staleSave));
+
+  const missing = await req("GET", "/api/v1/shop/content/no-such-key", { pk });
+  const draftOnlyDoc = await req("GET", "/api/v1/shop/content/faq", { pk });
+  check("a draft-only document and a missing one are the same 404, byte for byte",
+    draftOnlyDoc.status === 404 && draftOnlyDoc.text === missing.text, brief(draftOnlyDoc));
+  const pubFaq = await req("POST", dp("/faq/publish"), { token: owner });
+  check("the document publishes", pubFaq.status === 200 && pubFaq.json?.status === 1, brief(pubFaq));
+  const readFaq = await req("GET", "/api/v1/shop/content/faq", { pk });
+  const etag = readFaq.headers.get("etag");
+  check("the public API serves it with ETag, Cache-Control max-age=60 and Vary",
+    readFaq.status === 200 && readFaq.json?.content?.items?.[0]?.q === `Question ${runID}` && Boolean(etag) &&
+      readFaq.headers.get("cache-control") === "public, max-age=60, stale-while-revalidate=300" &&
+      (readFaq.headers.get("vary") ?? "").includes("X-Publishable-Key"),
+    `${brief(readFaq)} ${readFaq.headers.get("cache-control")}`);
+  const cond = await req("GET", "/api/v1/shop/content/faq", { pk, headers: { "If-None-Match": etag } });
+  check("If-None-Match with the current ETag answers 304 and no body", cond.status === 304 && cond.text === "", brief(cond));
+  const bulk = await req("GET", "/api/v1/shop/content?include=content", { pk });
+  const faqEntry = (bulk.json?.documents ?? []).find((d) => d.key === "faq");
+  check("the bulk read carries content and the same ETag as the single read",
+    bulk.status === 200 && faqEntry?.etag === etag && faqEntry?.content?.items?.[0]?.q === `Question ${runID}`, brief(bulk));
+  const demoSees = await req("GET", "/api/v1/shop/content/faq", { pk: PK });
+  check("another shop's key does not see the document", demoSees.status === 404, brief(demoSees));
+
+  // Preview: draft visible only with a token in the header.
+  const faqNow = await req("GET", dp("/faq"), { token: owner });
+  const draft2 = await req("PUT", dp("/faq"), { token: owner, headers: { "If-Match": faqNow.headers.get("etag") }, body: faqBody(`Draft ${runID}`) });
+  need(draft2.status === 200, `second draft save failed: ${brief(draft2)}`);
+  const tokRes = await req("POST", dp("/faq/preview-token"), { token: owner });
+  check("a preview token is issued", tokRes.status === 200 && Boolean(tokRes.json?.preview_token), brief(tokRes));
+  const prev = await req("GET", "/api/v1/shop/content/faq/preview", { pk, headers: { "X-Preview-Token": tokRes.json.preview_token } });
+  check("the preview serves the draft, uncached and noindex",
+    prev.status === 200 && prev.json?.content?.items?.[0]?.q === `Draft ${runID}` &&
+      prev.headers.get("cache-control") === "no-store" && (prev.headers.get("x-robots-tag") ?? "").includes("noindex"), brief(prev));
+  const prevQuery = await req("GET", `/api/v1/shop/content/faq/preview?token=${tokRes.json.preview_token}`, { pk });
+  check("a token in the query string is not accepted (401)", prevQuery.status === 401, brief(prevQuery));
+  const stillLive = await req("GET", "/api/v1/shop/content/faq", { pk });
+  check("the public document is still the published one", stillLive.json?.content?.items?.[0]?.q === `Question ${runID}`, brief(stillLive));
+
+  // Revisions and restore: restore only writes the draft.
+  const pub2 = await req("POST", dp("/faq/publish"), { token: owner });
+  check("the second draft publishes", pub2.status === 200, brief(pub2));
+  const revs = await req("GET", dp("/faq/revisions"), { token: owner });
+  const publishRevs = (revs.json?.revisions ?? []).filter((r) => r.kind === "publish");
+  check("each publish left a revision", revs.status === 200 && publishRevs.length >= 2, brief(revs));
+  const oldest = publishRevs[publishRevs.length - 1];
+  const restored = await req("POST", dp(`/faq/revisions/${oldest.rev_no}/restore`), { token: owner });
+  check("restore puts the old content back as the draft",
+    restored.status === 200 && restored.json?.draft?.items?.[0]?.q === `Question ${runID}`, brief(restored));
+  const afterRestore = await req("GET", "/api/v1/shop/content/faq", { pk });
+  check("restore did not publish anything", afterRestore.json?.content?.items?.[0]?.q === `Draft ${runID}`, brief(afterRestore));
+  // The old page endpoint sees the same document.
+  const legacy = await req("GET", "/api/v1/render/page?path=/faq", { pk });
+  check("the compatibility render endpoint serves the same published content",
+    legacy.status === 200 && legacy.json?.page?.content?.items?.[0]?.q === `Draft ${runID}`, brief(legacy));
+  const unp = await req("POST", dp("/faq/unpublish"), { token: owner });
+  const gone = await req("GET", "/api/v1/shop/content/faq", { pk });
+  check("unpublishing makes it the same 404 again", unp.status === 200 && gone.status === 404 && gone.text === missing.text, brief(gone));
+
+  // 8. The demo shop's owner cannot register for this shop.
   const demoOwner = await req("POST", "/api/v1/admin/auth/login", { body: { email: OWNER_EMAIL, password: OWNER_PASSWORD } });
   if (demoOwner.json?.access_token) {
     const cross = await req("PUT", sp("/content/schema?dry_run=true"), { token: demoOwner.json.access_token, body: starter });

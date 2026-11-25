@@ -316,3 +316,14 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 - `GET …/content/schema`（生效版本與 schema 本文，沒有時 404 `content_schema_not_found`）、`GET …/content/schema/versions`、`GET …/content/schema?version=N&include=snapshot`。
 - `PUT …/content/schema?dry_run=true` 先看報告，再 `PUT …/content/schema` 註冊；回 409 `removals_require_confirmation` 時要把 `details.report` 展示給人、由人確認後才帶 `confirm_removals=true` 重送。422 的 `details[].pointer` 指向送出文件的位置。**註冊必須是人在畫面上按下的動作**；不要做成自動同步。
 - 頁面（`pages`）回應與列表多了 `needs_attention`：true 時要提示「內容 schema 已變更，草稿需要修正」；已發佈內容仍在線上。
+
+### 內容文件（`/content/documents`）
+
+自帶後台前端的內容畫面（change `headless-content-store` 第二個切片；完整參考見 [`docs/content-store.md`](content-store.md)）：
+
+- 清單 `GET …/content/documents`；單一文件 `GET …/content/documents/{key}`（`draft`、`published`、`schema_node`，回應標頭 `ETag: "<draft_rev>"`）。
+- **儲存 `PUT …/content/documents/{key}` 必須帶前置條件**：更新用 `If-Match: "<draft_rev>"`（取自上次 `GET`／`PUT` 的 `ETag`），建立用 `If-None-Match: *`。**412** `precondition_failed`（`details.current_rev`）＝「他人已更新，請重新載入」，不要靜默覆寫；**428** 是程式錯誤（忘了帶標頭）。**422** 的 `details[].pointer` 指向 `content` 內的欄位。儲存後請以**回應**重建表單（rich text 會被伺服器改寫成 allowlist 版本）。
+- 發佈／下架／刪除需要 `content.publish`（`editor` 沒有，UI 依 `/shops/{id}/me` 的節點隱藏）；發佈前伺服器會重新驗證，422 時要把 pointer 對應到欄位。
+- 版本歷史 `GET …/revisions`、`GET …/revisions/{rev}`；**還原 `POST …/revisions/{rev}/restore` 只放回草稿**，畫面要明說「已放回草稿，尚未發佈」；回應 `restored_valid:false` 表示那是舊 schema 的內容，草稿需要修正後才能發佈。
+- 預覽：`POST …/preview-token`（`scope`：`document`｜`shop`），把 token 交給站台的預覽模式（站台用 `X-Preview-Token` 標頭，不是網址）。
+- 文件有 `needs_attention`（schema 變更後不再通過驗證）與 `declared:false`（孤兒，可刪除）時要在清單上標示。

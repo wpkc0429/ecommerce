@@ -689,3 +689,7 @@ make openapi-ui       # npx @redocly/cli preview-docs api/openapi/openapi.yaml �
 那是為了讓平台的契約測試抓得到「實作多回了一個沒記載的鍵」；
 它描述的是「截至本版本，回應有這些鍵」，**不是**「未來永遠只會有這些鍵」。
 把契約檔釘住並嚴格驗證的前端，會在下一次純新增的變更中壞掉。
+
+### 內容文件的公開讀取（`GET /api/v1/shop/content*`）
+
+除了上面的 `render/page`（依頁面 slug 取整頁 bundle），商家站台可以直接讀**以穩定鍵識別的內容文件**：`GET /api/v1/shop/content?include=content`（整批，建議的執行期用法）、`GET /api/v1/shop/content/{key}`、`GET /api/v1/shop/content/{key}/preview`（標頭 `X-Preview-Token`）。只回已發佈的內容；「不存在」與「未發佈」回逐位元組相同的 404；支援 `ETag`／`If-None-Match`（304）與 `Cache-Control: public, max-age=60`；CORS 已放行 `If-None-Match`、`X-Preview-Token`，並公開 `ETag`。端點、快取語意、呈現規則（`richtext` 只可呈現消毒後的 DOM、`link` 只進 `href` 且再檢查 scheme）與 build-time 對 runtime 的取捨，全在 [`docs/content-store.md`](content-store.md)。
