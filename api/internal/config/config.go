@@ -187,6 +187,9 @@ type Config struct {
 	// ContentOps: publish hook, scheduled publishing and audit retention of the
 	// headless content store (slice 3).
 	ContentOps ContentOpsConfig
+
+	// Design: the design history (change design-history).
+	Design DesignConfig
 }
 
 // CFAccessConfig is the Cloudflare Access verification setup (design D2).
@@ -531,6 +534,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if err := loadContentOps(cfg); err != nil {
+		return nil, err
+	}
+	if err := loadDesign(cfg); err != nil {
 		return nil, err
 	}
 

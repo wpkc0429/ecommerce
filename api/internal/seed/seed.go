@@ -101,6 +101,16 @@ var PermissionCatalog = []struct{ Name, Description string }{
 	{"content.edit", "編輯內容文件草稿"},
 	{"content.publish", "發佈與下架內容文件"},
 	{"content.manage", "註冊內容 schema（人工、整合動作）"},
+	// change design-history (design D9): who may see, request, approve and
+	// restore AI redesigns. design.approve is held by humans only (owner and
+	// super_admin); no automation account ever holds any of these. The platform
+	// node design_service.manage issues the AI edit service's per-shop
+	// credential: super_admin only, never a merchant role.
+	{"design.view", "檢視設計歷史、請求詳情、事件與截圖"},
+	{"design.request", "發起或取消 AI 重新設計請求"},
+	{"design.approve", "核准、拒絕或要求修改 AI 重新設計（讓改動上線）"},
+	{"design.revert", "請求還原到過去已發佈的設計"},
+	{"design_service.manage", "簽發與撤銷設計服務憑證（平台層）"},
 	{"user.view", "檢視商家成員"},
 	{"user.manage_roles", "指派與移除商家角色"},
 	{"category.view", "檢視商品分類"},
@@ -175,6 +185,7 @@ var roleDefs = []struct {
 		"shop.view", "shop.update",
 		"page.view", "page.create", "page.edit", "page.delete", "page.publish",
 		"content.view", "content.edit", "content.publish", "content.manage",
+		"design.view", "design.request", "design.approve", "design.revert",
 		"user.view", "user.manage_roles",
 		"category.view", "category.create", "category.edit", "category.delete",
 		"product.view", "product.create", "product.edit", "product.delete",
@@ -213,6 +224,10 @@ var roleDefs = []struct {
 		// change headless-content-store (Q5): view and edit, never publish or
 		// manage - the same reach as page.view/create/edit above.
 		"content.view", "content.edit",
+		// change design-history: the editor may read the history (it already
+		// reads orders and customers, so this opens no new information) but
+		// never requests, approves or restores a redesign.
+		"design.view",
 		"category.view", "category.create", "category.edit",
 		"product.view", "product.create", "product.edit",
 		"order.view",

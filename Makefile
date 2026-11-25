@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications purge-content-audit content-scheduler admin-dev openapi openapi-mock openapi-ui
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications purge-content-audit purge-design-history design-sweep content-scheduler admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -69,6 +69,10 @@ purge-applications: ## DRY RUN: report merchant applications past their retentio
 	cd api && go run ./cmd/purge-applications
 purge-content-audit: ## DRY RUN: report content audit rows and finished schedules past their retention (add -apply manually)
 	cd api && go run ./cmd/purge-content-audit
+purge-design-history: ## DRY RUN: report design history past its retention (add -apply manually; needs cron)
+	cd api && go run ./cmd/purge-design-history
+design-sweep: ## DRY RUN: report stuck design requests; -verify checks the event hash chains (add -apply to fail them)
+	cd api && go run ./cmd/design-sweep
 content-scheduler: ## Publish due scheduled content documents once (run every minute from cron / Task Scheduler)
 	cd api && go run ./cmd/content-scheduler
 
