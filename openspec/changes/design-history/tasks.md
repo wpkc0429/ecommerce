@@ -1,17 +1,18 @@
-> 本 change 目前**只有提案**；以下全部未做。design.md 的 Q1–Q10 已於 2026-11-25 由使用者定案（採用建議原文）；Q9（publish grant）與 Q10（通知信）為附條件決議，見 design.md。每組可獨立部署；切片對應 design 的 Migration Plan。
+> **切片 1（資料與 API，無截圖、無簽章 permit）已於 2026-11-26 實作**，已勾選的項目即其內容；切片 2（截圖與儲存）、切片 3（選用）與 template 後續任務仍未做。
+> design.md 的 Q1–Q10 已於 2026-11-25 由使用者定案（採用建議原文）；Q9（publish grant）與 Q10（通知信）為附條件決議，見 design.md。每組可獨立部署；切片對應 design 的 Migration Plan。
 
 ## 1. 平台資料與 API（切片 1，design D2／D4／D8／D15／D16）
 
-- [ ] 1.1 `api/internal/ent/schema/design.go`：`DesignRequest`、`DesignRequestEvent`、`DesignScreenshot`、`DesignSiteState`、`DesignUntrackedChange`（欄位、CHECK、索引、部分唯一索引「每 `(shop_id, site)` 至多一筆非終態」、複合 FK 同店約束，見 D2）；`api/internal/ent/schema/designcredential.go`：`DesignServiceCredential`
-- [ ] 1.2 `go generate ./internal/ent`（`GOTOOLCHAIN=go1.26.4`）；`make migrate-gen name=add_design_history`；**手寫**：部分唯一索引、複合 FK、所有 CHECK 運算式（atlas 不偵測 CHECK 運算式變更）、剪除 atlas 夾帶的 `members` 與 `role_user`／`user_permission` 假差異、重算 `atlas.sum`；up→down→up
-- [ ] 1.3 手寫 migration `…_add_design_history_append_only_triggers`：`design_request_events`、`design_screenshots`（除 `purged_at`）、`design_untracked_changes`（除 ack 欄）禁止 UPDATE／DELETE；`design_requests` 不可變欄位禁止 UPDATE；放行條件 `current_setting('design.retention', true) = 'on'`（D3）；down 移除 trigger
-- [ ] 1.4 `api/internal/tenant/enttenancy.go`：`tenantOwned` 登記五個租戶型別；`enttenancy_internal_test.go`：`notTenantOwned` 登記 `design_service_credentials` 並寫理由（認證先以雜湊查找）
-- [ ] 1.5 新套件 `api/internal/design/`：`service.go`（建立、認領、head、守門員結果、預覽、送審、核准、拒絕、要求修改、取消、發佈、失敗）、`machine.go`（轉移表與前置條件，**單一處定義**）、`chain.go`（事件雜湊串）、`redact.go`（prompt 個資遮蔽：email、台灣手機、Luhn 卡號、控制與雙向覆寫字元）、`revert.go`（D13 的目標檢查與 core 下限）、`purge.go`、`sweep.go`；所有轉移以條件式 UPDATE ＋ 影響列數，且在同一交易內寫事件
-- [ ] 1.6 `api/internal/httpapi/design_admin.go`（人，D15 表）：`MountShopAdmin`；`design_service.go`（機器）：`MountService`；`design_service_auth.go`：`DesignServiceAuth` 中介層（Bearer、雜湊查找、CIDR、`{shopID}` 對照憑證、失敗一律同樣的 401／404）；`design_credentials.go`：平台層憑證管理（`design_service.manage`，簽發只顯示一次、撤銷、輪替）
-- [ ] 1.7 `api/internal/httpapi/router.go`：`Deps` 新增 `Design`、`DesignService`、`DesignCredentials`；機器路由族掛在 `/api/v1/design-service`（**不在 `/admin` 群組**，不經 `AdminAccessMW`）；`api/internal/app/wire.go` 接線（`wiring_integration_test.go` ⑤⑥ 必須綠）
-- [ ] 1.8 限流：`ratelimitmw.go` 新增 `NewDesignServiceRateLimit`（每憑證）、`NewDesignApproveRateLimit`（每商家＋呼叫者）；每店每日請求上限（資料庫 `COUNT`，不依賴 Redis）
-- [ ] 1.9 `api/internal/config/design.go`：`DESIGN_APPROVAL_TTL`、`DESIGN_MIN_PREVIEW_REMAINING`、`DESIGN_DAILY_REQUEST_CAP`、`DESIGN_CLAIM_LEASE`、`DESIGN_APPROVAL_PENDING_TIMEOUT`（含 min/max 檢查，同 `contentops.go`）；`.env.example`
-- [ ] 1.10 `cmd/design-sweep`（dry run 預設、`-apply`、`-verify` 驗證事件雜湊串、`-orphans` 報告）；`Makefile` 目標 `design-sweep`
+- [x] 1.1 `api/internal/ent/schema/design.go`：`DesignRequest`、`DesignRequestEvent`、`DesignScreenshot`、`DesignSiteState`、`DesignUntrackedChange`（欄位、CHECK、索引、部分唯一索引「每 `(shop_id, site)` 至多一筆非終態」、複合 FK 同店約束，見 D2）；`api/internal/ent/schema/designcredential.go`：`DesignServiceCredential`
+- [x] 1.2 `go generate ./internal/ent`（`GOTOOLCHAIN=go1.26.4`）；`make migrate-gen name=add_design_history`；**手寫**：部分唯一索引、複合 FK、所有 CHECK 運算式（atlas 不偵測 CHECK 運算式變更）、剪除 atlas 夾帶的 `members` 與 `role_user`／`user_permission` 假差異、重算 `atlas.sum`；up→down→up
+- [x] 1.3 手寫 migration `…_add_design_history_append_only_triggers`：`design_request_events`、`design_screenshots`（除 `purged_at`）、`design_untracked_changes`（除 ack 欄）禁止 UPDATE／DELETE；`design_requests` 不可變欄位禁止 UPDATE；放行條件 `current_setting('design.retention', true) = 'on'`（D3）；down 移除 trigger
+- [x] 1.4 `api/internal/tenant/enttenancy.go`：`tenantOwned` 登記五個租戶型別；`enttenancy_internal_test.go`：`notTenantOwned` 登記 `design_service_credentials` 並寫理由（認證先以雜湊查找）
+- [x] 1.5 新套件 `api/internal/design/`：`service.go`（建立、認領、head、守門員結果、預覽、送審、核准、拒絕、要求修改、取消、發佈、失敗）、`machine.go`（轉移表與前置條件，**單一處定義**）、`chain.go`（事件雜湊串）、`redact.go`（prompt 個資遮蔽：email、台灣手機、Luhn 卡號、控制與雙向覆寫字元）、`revert.go`（D13 的目標檢查與 core 下限）、`purge.go`、`sweep.go`；所有轉移以條件式 UPDATE ＋ 影響列數，且在同一交易內寫事件 （實作註記：還原檢查在 `ops_human.go`、請求寫入在 `ops_service.go`、核准在 `ops_human.go`，非單檔；轉移表仍只在 `machine.go`）
+- [x] 1.6 `api/internal/httpapi/design_admin.go`（人，D15 表）：`MountShopAdmin`；`design_service.go`（機器）：`MountService`；`design_service_auth.go`：`DesignServiceAuth` 中介層（Bearer、雜湊查找、CIDR、`{shopID}` 對照憑證、失敗一律同樣的 401／404）；`design_credentials.go`：平台層憑證管理（`design_service.manage`，簽發只顯示一次、撤銷、輪替）
+- [x] 1.7 `api/internal/httpapi/router.go`：`Deps` 新增 `Design`、`DesignService`、`DesignCredentials`；機器路由族掛在 `/api/v1/design-service`（**不在 `/admin` 群組**，不經 `AdminAccessMW`）；`api/internal/app/wire.go` 接線（`wiring_integration_test.go` ⑤⑥ 必須綠）
+- [x] 1.8 限流：`ratelimitmw.go` 新增 `NewDesignServiceRateLimit`（每憑證）、`NewDesignApproveRateLimit`（每商家＋呼叫者）；每店每日請求上限（資料庫 `COUNT`，不依賴 Redis） （實作註記：每憑證限流在 `design_service_auth.go`，每商家＋呼叫者的核准限流在 `DesignAdminHandler`，非 `ratelimitmw.go`）
+- [x] 1.9 `api/internal/config/design.go`：`DESIGN_APPROVAL_TTL`、`DESIGN_MIN_PREVIEW_REMAINING`、`DESIGN_DAILY_REQUEST_CAP`、`DESIGN_CLAIM_LEASE`、`DESIGN_APPROVAL_PENDING_TIMEOUT`（含 min/max 檢查，同 `contentops.go`）；`.env.example`
+- [ ] 1.10 `cmd/design-sweep`（dry run 預設、`-apply`、`-verify` 驗證事件雜湊串、`-orphans` 報告）；`Makefile` 目標 `design-sweep` （切片 1 已完成 dry run／`-apply`／`-verify` 與 Makefile 目標；`-orphans` 只是占位，需要切片 2 的物件儲存才有意義，所以此項尚未勾選）
 
 ## 2. 截圖與儲存（切片 2，design D5／D6／D11／D12）
 
@@ -24,34 +25,34 @@
 
 ## 3. 安全與權限（design D8／D9／D10／D24）
 
-- [ ] 3.1 `api/internal/seed/seed.go`：`PermissionCatalog` 新增 `design.view`、`design.request`、`design.approve`、`design.revert`、`design_service.manage`；`roleDefs`：`merchant_owner` 加前四個、`editor` 只加 `design.view`、`staff` 不加、`super_admin` 經 `*`；`seed_integration_test.go`：各角色節點集合**相等**比對、`design_service.manage` 不在任何商家角色、冪等
-- [ ] 3.2 核准前置條件單一函式（D10）：狀態、`candidate_sha`、`If-Match`、`approval_expires_at`；`published` 前置條件（存在核准後的 `guard_rechecked` 通過事件、SHA 與 tag 相等）；請求建立時驗證 `requested_by_user_id` 是啟用成員且持 `design.request`
-- [ ] 3.3 憑證：產生、SHA-256、`last_used_at` 更新（節流寫入，避免每請求一次 UPDATE）、撤銷即時生效、過期、CIDR；錯誤的 key 只計限流並記 WARN（不印 key）
-- [ ] 3.4 XSS 與注入防護：回應 `X-Content-Type-Options: nosniff`；入庫剔除控制與雙向覆寫字元；列表只回 `prompt_excerpt`；服務路由族的 GET 不回 prompt 全文
-- [ ] 3.5 `api/internal/design/*_integration_test.go`：核准重放、`head_moved`、服務憑證打核准端點（404／403）、跨店（憑證與使用者各一）、`requester_not_permitted`、狀態機轉移矩陣（所有合法與非法轉移）、第二個並發核准只有一個成功、核准過期後 `published` 被拒、無 after 截圖不得送審、trigger 擋 UPDATE／DELETE、雜湊串驗證偵測到中間列被改
-- [ ] 3.6 PII 整合測試（slog 導入 buffer）：prompt、簽名網址、preview origin、diff 路徑、憑證 key 在所有路徑的日誌中找不到
+- [x] 3.1 `api/internal/seed/seed.go`：`PermissionCatalog` 新增 `design.view`、`design.request`、`design.approve`、`design.revert`、`design_service.manage`；`roleDefs`：`merchant_owner` 加前四個、`editor` 只加 `design.view`、`staff` 不加、`super_admin` 經 `*`；`seed_integration_test.go`：各角色節點集合**相等**比對、`design_service.manage` 不在任何商家角色、冪等
+- [x] 3.2 核准前置條件單一函式（D10）：狀態、`candidate_sha`、`If-Match`、`approval_expires_at`；`published` 前置條件（存在核准後的 `guard_rechecked` 通過事件、SHA 與 tag 相等）；請求建立時驗證 `requested_by_user_id` 是啟用成員且持 `design.request`
+- [x] 3.3 憑證：產生、SHA-256、`last_used_at` 更新（節流寫入，避免每請求一次 UPDATE）、撤銷即時生效、過期、CIDR；錯誤的 key 只計限流並記 WARN（不印 key）
+- [x] 3.4 XSS 與注入防護：回應 `X-Content-Type-Options: nosniff`；入庫剔除控制與雙向覆寫字元；列表只回 `prompt_excerpt`；服務路由族的 GET 不回 prompt 全文
+- [x] 3.5 `api/internal/design/*_integration_test.go`：核准重放、`head_moved`、服務憑證打核准端點（404／403）、跨店（憑證與使用者各一）、`requester_not_permitted`、狀態機轉移矩陣（所有合法與非法轉移）、第二個並發核准只有一個成功、核准過期後 `published` 被拒、無 after 截圖不得送審、trigger 擋 UPDATE／DELETE、雜湊串驗證偵測到中間列被改
+- [x] 3.6 PII 整合測試（slog 導入 buffer）：prompt、簽名網址、preview origin、diff 路徑、憑證 key 在所有路徑的日誌中找不到
 
 ## 4. 保存與清除（design D21）
 
-- [ ] 4.1 `api/internal/config/design.go`：六個 `DESIGN_*_RETENTION`（含 min/max）
-- [ ] 4.2 `api/cmd/purge-design-history/main.go`：dry run 預設、`-apply`、`-shop`、`-export-shop N`、`-all-for-shop N`；分批 1000、冪等；交易內 `SET LOCAL design.retention = 'on'`；prompt 遮蔽（保留雜湊）；物件在 commit 後 best-effort 刪除；只印計數與時間範圍
-- [ ] 4.3 `Makefile`：`purge-design-history`（dry run）；測試仿 `content_purge_integration_test.go`（保存邊界、`pending` 類永不清除、冪等、不碰他店）
-- [ ] 4.4 `docs/deploy/design-history-operations.md`：排程（cron／工作排程）、第二個 bucket 的建立（**不綁自訂網域、不開 r2.dev**、token 只限該 bucket）、憑證簽發與輪替、sandbox 堆疊、Cloudflare 規則建議、保存期限調整
+- [x] 4.1 `api/internal/config/design.go`：六個 `DESIGN_*_RETENTION`（含 min/max）
+- [x] 4.2 `api/cmd/purge-design-history/main.go`：dry run 預設、`-apply`、`-shop`、`-export-shop N`、`-all-for-shop N`；分批 1000、冪等；交易內 `SET LOCAL design.retention = 'on'`；prompt 遮蔽（保留雜湊）；物件在 commit 後 best-effort 刪除；只印計數與時間範圍
+- [x] 4.3 `Makefile`：`purge-design-history`（dry run）；測試仿 `content_purge_integration_test.go`（保存邊界、`pending` 類永不清除、冪等、不碰他店）
+- [ ] 4.4 `docs/deploy/design-history-operations.md`：排程（cron／工作排程）、第二個 bucket 的建立（**不綁自訂網域、不開 r2.dev**、token 只限該 bucket）、憑證簽發與輪替、sandbox 堆疊、Cloudflare 規則建議、保存期限調整 （切片 1 已寫排程、憑證簽發與輪替、保存期限；第二個 bucket、sandbox 堆疊與 Cloudflare 規則留給切片 2，此項尚未勾選）
 
 ## 5. OpenAPI 與文件
 
-- [ ] 5.1 `api/openapi/openapi.yaml`：約 24 條新路由與 schema（`DesignRequest`、`DesignRequestSummary`、`DesignEvent`、`DesignScreenshot`、`DesignState`、`DesignUntrackedChange`、`DesignServiceCredential`、錯誤碼敘述）；`Idempotency-Key`、`If-Match`、`ETag`、`Retry-After` 依既有形式；**只新增**
-- [ ] 5.2 `cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface`，確認 `v1-surface.txt` **只新增行**；`make openapi` 四道檢查全綠
-- [ ] 5.3 `docs/design-history.md`（資料模型、狀態機、API 清單、保存期限、sandbox 規則）
-- [ ] 5.4 `docs/admin-frontend-integration.md`：新增「設計歷史」章節（任何後台前端的契約：核准必帶 `head_sha` 與 `If-Match`、prompt 一律文字渲染、簽名網址不得快取或記錄、可見性來源是 `/me` 的 `design.*`）
-- [ ] 5.5 `CLAUDE.md`：以現有「內容儲存」條目的格式新增一條（決定、權限集合、trigger 是第一個、第二個 bucket 的理由）；`docs/PLATFORM-ROADMAP.md` 指標（本 change 已加）隨狀態更新
+- [x] 5.1 `api/openapi/openapi.yaml`：約 24 條新路由與 schema（`DesignRequest`、`DesignRequestSummary`、`DesignEvent`、`DesignScreenshot`、`DesignState`、`DesignUntrackedChange`、`DesignServiceCredential`、錯誤碼敘述）；`Idempotency-Key`、`If-Match`、`ETag`、`Retry-After` 依既有形式；**只新增**
+- [x] 5.2 `cd api && go test ./internal/httpapi/ -run TestOpenAPIV1SurfaceLock -openapi.update-surface`，確認 `v1-surface.txt` **只新增行**；`make openapi` 四道檢查全綠
+- [x] 5.3 `docs/design-history.md`（資料模型、狀態機、API 清單、保存期限、sandbox 規則）
+- [x] 5.4 `docs/admin-frontend-integration.md`：新增「設計歷史」章節（任何後台前端的契約：核准必帶 `head_sha` 與 `If-Match`、prompt 一律文字渲染、簽名網址不得快取或記錄、可見性來源是 `/me` 的 `design.*`）
+- [x] 5.5 `CLAUDE.md`：以現有「內容儲存」條目的格式新增一條（決定、權限集合、trigger 是第一個、第二個 bucket 的理由）；`docs/PLATFORM-ROADMAP.md` 指標（本 change 已加）隨狀態更新
 
 ## 6. E2E 與測試
 
 - [ ] 6.1 `e2e/design-history-path.mjs`（無瀏覽器）：**假服務腳本**走完 design D17 的順序（建立→head→guard→preview→截圖→submit→人核准→recheck→published）、各種拒絕路徑（head 移動、核准逾期、缺截圖、服務嘗試核准、他店憑證）、revert 流程與連結、`reverted` 標記、未追蹤變更；需要 MinIO 私有 bucket；由 `happy-path.mjs` 匯入，未設定儲存時略過（同 content-ops 慣例）
 - [ ] 6.2 `e2e/lib.mjs`：服務憑證簽發 helper（平台 token）；斷言計數更新到 `CLAUDE.md`
-- [ ] 6.3 單元測試：`redact`（email、台灣手機、Luhn、雙向字元）、`machine`（轉移表）、`chain`、截圖驗證（尺寸、炸彈、錯誤格式、中繼資料去除）
-- [ ] 6.4 整合測試：保存期限邊界、配額、每日上限、認領租約與 sweep、`design-sweep -verify`
+- [ ] 6.3 單元測試：`redact`（email、台灣手機、Luhn、雙向字元）、`machine`（轉移表）、`chain`、截圖驗證（尺寸、炸彈、錯誤格式、中繼資料去除） （切片 1 已完成 `redact`／`machine`／`chain` 的單元測試；截圖驗證屬切片 2，此項尚未勾選）
+- [ ] 6.4 整合測試：保存期限邊界、配額、每日上限、認領租約與 sweep、`design-sweep -verify` （切片 1 已完成保存期限邊界、每日上限、認領租約與 sweep、`-verify`；配額屬切片 2，此項尚未勾選）
 
 ## 7. Template 後續任務（**template repo，不在本 change 實作；每項都是人工審查的核心變更，走 `.claude/skills/core-change`**）
 

@@ -327,3 +327,15 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 - 版本歷史 `GET …/revisions`、`GET …/revisions/{rev}`；**還原 `POST …/revisions/{rev}/restore` 只放回草稿**，畫面要明說「已放回草稿，尚未發佈」；回應 `restored_valid:false` 表示那是舊 schema 的內容，草稿需要修正後才能發佈。
 - 預覽：`POST …/preview-token`（`scope`：`document`｜`shop`），把 token 交給站台的預覽模式（站台用 `X-Preview-Token` 標頭，不是網址）。
 - 文件有 `needs_attention`（schema 變更後不再通過驗證）與 `declared:false`（孤兒，可刪除）時要在清單上標示。
+
+## 設計歷史（change design-history，第一個切片）
+
+任何後台前端（共用 SPA、template 的後台、Bouquet 這類自訂前端）要顯示「AI 重新設計的歷史與核准」時的契約。完整說明見 [`docs/design-history.md`](design-history.md)。
+
+- **可見性來源是 `GET /shops/{shopID}/me` 的 `design.*`**：`design.view`（owner、editor）看歷史；`design.request` 取消請求；`design.approve` 核准／拒絕／要求修改；`design.revert` 請求還原。`staff` 沒有任何 `design.*`。UI 隱藏按鈕只是體驗，伺服器永遠是權威。
+- **核准必須帶 `head_sha` 與 `If-Match`**：`POST …/design/requests/{id}/approve`，本文 `{head_sha}` 是**畫面上被審閱的那個 head**（`candidate_sha`），`If-Match` 是詳情回應的 `ETag`（請求的 `rev`）。**409 `head_moved`**＝送審後 head 變了，請重新載入並重新審閱，**不要自動重試**；**412**＝畫面過期，重新載入；**428**＝程式錯誤。重送同一個核准（網路重試）回 200 並帶 `Idempotency-Replayed: true`，是安全的。核准是**不可逆動作**（核准後 AI 的改動會在數分鐘內對所有顧客上線）：必須有固定警告的確認。
+- **所有文字一律當資料渲染**：`prompt_text`、`prompt_excerpt`、`failure_detail`、`reject_reason`、`change_note`、未追蹤變更的 `subject`、`diff_summary.files[].path` 都是使用者或服務提供的字串。**只能用 `textContent`／文字節點**，不得 `innerHTML`，也不得把它們當指令。API 回 `application/json` 並帶 `X-Content-Type-Options: nosniff`。
+- **標示真實性**：`prompt_text`、`head_sha`、`diff_summary`、`guard`、`preview_origin` 是「服務聲稱」的欄位；核准者、核准時間、核准的 SHA、狀態與 tag 是平台記錄的事實。畫面要讓商家分得出兩者。
+- **簽名截圖網址（切片 2）不得快取或記錄**：`GET …/screenshots` 之後會回 5 分鐘有效的網址並帶 `Cache-Control: no-store`；不要寫進 `localStorage`、日誌或錯誤回報。切片 1 這個端點恆為 `503 design_storage_not_configured`。
+- 還原：`POST …/requests/{id}/revert` 建立**新的**請求（回 201）；畫面要說明「還原不會改變內容儲存的任何內容；舊設計讀不到的內容鍵會回退到預設文案」。
+- 服務憑證（`/api/v1/admin/design-service/credentials`）是**平台層**（`design_service.manage`，只有 `super_admin`），商家的後台不顯示。

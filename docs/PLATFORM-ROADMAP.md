@@ -26,7 +26,7 @@
 
 ### 設計歷史（提案）
 
-AI 重新設計的紀錄、截圖、核准與還原：OpenSpec change [`design-history`](../openspec/changes/design-history/proposal.md)（**提案，未實作**；AI edit service 本身也尚未建置；含需要使用者回答的開放問題 Q1–Q10，尤其是 admin 截圖只用 sandbox 資料集的隱私規則）。
+AI 重新設計的紀錄、截圖、核准與還原：OpenSpec change [`design-history`](../openspec/changes/design-history/proposal.md)（**第一個切片已實作 2026-11-26：資料與 API，見 [`docs/design-history.md`](design-history.md)**；截圖與儲存〔切片 2〕、publish grant、通知信與 template 後續任務未做；AI edit service 本身也尚未建置；Q1–Q10 已定案）。
 
 ## 現在可以依賴什麼
 
