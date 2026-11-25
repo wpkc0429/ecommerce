@@ -1,0 +1,234 @@
+name: E2E
+
+# Browser + API end-to-end suites (e2e/happy-path.mjs). Kept out of ci.yml on
+# purpose: it takes minutes, not seconds, and it must not slow the fast CI down.
+# Never triggered by a push to main. It is NOT a required check; its result is
+# visible on the PR and in the Actions tab. No repository secrets are used:
+# every credential below is generated per run and masked.
+# Design notes and the cost estimate: CLAUDE.md, section "CI".
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Daily, 19:17 UTC = 03:17 Asia/Taipei (off-peak on both ends).
+    - cron: "17 19 * * *"
+  pull_request:
+    paths:
+      - "api/**"
+      - "admin/**"
+      - "e2e/**"
+      - "docker-compose.yml"
+      - "docker/**"
+      - ".github/workflows/e2e.yml"
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E (happy-path)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      API_PORT: "8180"
+      ADMIN_PORT: "3001"
+      S3_PORT: "9000"
+      E2E_BUCKET: ecommerce-media-e2e
+      LOGDIR: ${{ github.workspace }}/e2e-logs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Generate per-run credentials (masked, never printed)
+        run: |
+          set -eu
+          gen() { # gen NAME BYTES  -> masked, exported to later steps
+            local v; v="$(openssl rand -hex "$2")"
+            echo "::add-mask::$v"
+            echo "$1=$v" >> "$GITHUB_ENV"
+          }
+          gen POSTGRES_PASSWORD 24
+          gen REDIS_PASSWORD 24
+          gen ADMIN_JWT_SECRET 32
+          gen MEMBER_JWT_SECRET 32
+          gen PAYMENT_MOCK_WEBHOOK_SECRET 32
+          gen PAYMENT_CREDENTIALS_ENCRYPTION_KEY 32
+          gen SEED_ADMIN_PASSWORD 18
+          gen R2_ACCESS_KEY_ID 10
+          gen R2_SECRET_ACCESS_KEY 20
+          mkdir -p "$GITHUB_WORKSPACE/e2e-logs" "$GITHUB_WORKSPACE/e2e-shots"
+
+      - name: Start Postgres 16, Redis 7 and the S3-compatible store
+        run: |
+          set -eu
+          docker run -d --name pg -p 127.0.0.1:5432:5432 \
+            -e POSTGRES_USER=ecommerce -e POSTGRES_PASSWORD -e POSTGRES_DB=ecommerce_e2e \
+            postgres:16-alpine >/dev/null
+          docker run -d --name redis -p 127.0.0.1:6379:6379 -e REDIS_PASSWORD \
+            redis:7-alpine sh -c 'exec redis-server --requirepass "$REDIS_PASSWORD"' >/dev/null
+          # S3-compatible store for the media tests: Adobe S3Mock (maintained,
+          # Apache-2.0, single container, path-style, anonymous reads, CORS open).
+          # The compose file's MinIO image is a legacy local-dev pin and MinIO no
+          # longer ships images or binaries. S3Mock does not verify signatures,
+          # which is acceptable here: presigning is covered by the Go unit tests.
+          docker run -d --name s3 -p 127.0.0.1:${S3_PORT}:9090 \
+            -e COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS="${E2E_BUCKET}" \
+            adobe/s3mock:5.2.3 >/dev/null
+          for i in $(seq 1 60); do
+            docker exec pg pg_isready -U ecommerce -d ecommerce_e2e >/dev/null 2>&1 && break
+            sleep 1
+          done
+          docker exec pg pg_isready -U ecommerce -d ecommerce_e2e
+          for i in $(seq 1 60); do
+            docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" redis redis-cli ping 2>/dev/null | grep -q PONG && break
+            sleep 1
+          done
+          docker exec -e REDISCLI_AUTH="$REDIS_PASSWORD" redis redis-cli ping
+          for i in $(seq 1 90); do
+            curl -s -o /dev/null "http://127.0.0.1:${S3_PORT}/${E2E_BUCKET}/" && break
+            sleep 1
+          done
+          curl -s -o /dev/null -w 'S3 bucket probe: HTTP %{http_code}\n' "http://127.0.0.1:${S3_PORT}/${E2E_BUCKET}/"
+
+      - name: Compose the API environment
+        run: |
+          set -eu
+          {
+            echo "DATABASE_URL=postgres://ecommerce:${POSTGRES_PASSWORD}@127.0.0.1:5432/ecommerce_e2e?sslmode=disable"
+            echo "E2E_DATABASE_URL=postgres://ecommerce:${POSTGRES_PASSWORD}@127.0.0.1:5432/ecommerce_e2e?sslmode=disable"
+            echo "APP_ENV=development"
+            echo "API_ADDR=127.0.0.1:${API_PORT}"
+            echo "LOG_LEVEL=info"
+            echo "REDIS_ADDR=127.0.0.1:6379"
+            echo "REDIS_DB=1"
+            echo "PAYMENT_DEFAULT_PROVIDER=mock"
+            echo "SEED_ADMIN_EMAIL=admin@example.com"
+            echo "R2_ACCOUNT_ID=local"
+            echo "R2_BUCKET=${E2E_BUCKET}"
+            echo "R2_ENDPOINT=http://127.0.0.1:${S3_PORT}"
+            echo "IMAGE_PUBLIC_BASE_URL=http://127.0.0.1:${S3_PORT}/${E2E_BUCKET}"
+            # content-ops suite: publish hook to a local stub + fast scheduler (CLAUDE.md)
+            echo "CONTENT_HOOK_DEV_INSECURE=1"
+            echo "CONTENT_HOOK_ALLOWED_HOSTS=localhost"
+            echo "CONTENT_HOOK_DEBOUNCE=1s"
+            echo "CONTENT_HOOK_MIN_INTERVAL=0s"
+            echo "CONTENT_HOOK_FLUSH_INTERVAL=500ms"
+            echo "CONTENT_SCHEDULE_MIN_LEAD=0s"
+            echo "E2E_REQUIRE_CONTENT_OPS=1"
+            echo "E2E_API_BASE_URL=http://127.0.0.1:${API_PORT}"
+            echo "E2E_ADMIN_BASE_URL=http://localhost:${ADMIN_PORT}"
+            echo "E2E_ADMIN_EMAIL=admin@example.com"
+            echo "E2E_ADMIN_PASSWORD=${SEED_ADMIN_PASSWORD}"
+            echo "E2E_SHOTS_DIR=${GITHUB_WORKSPACE}/e2e-shots"
+          } >> "$GITHUB_ENV"
+
+      - name: Build API binaries, migrate and seed (fresh database)
+        working-directory: api
+        run: |
+          set -eu
+          mkdir -p bin
+          go build -o bin/ ./cmd/server ./cmd/migrate ./cmd/seed
+          ./bin/migrate -direction up
+          ./bin/seed -demo
+
+      - name: Start the API and the admin static server
+        run: |
+          set -eu
+          (cd api && nohup ./bin/server > "$LOGDIR/api.log" 2>&1 &)
+          (cd admin && HOST=127.0.0.1 PORT="$ADMIN_PORT" nohup node scripts/serve.mjs > "$LOGDIR/admin.log" 2>&1 &)
+          for i in $(seq 1 60); do
+            curl -fsS "http://127.0.0.1:${API_PORT}/healthz" >/dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -fsS -o /dev/null -w 'API /healthz: HTTP %{http_code}\n' "http://127.0.0.1:${API_PORT}/healthz"
+          curl -fsS -o /dev/null -w 'admin /: HTTP %{http_code}\n' "http://127.0.0.1:${ADMIN_PORT}/"
+
+      - name: Install e2e dependencies
+        working-directory: e2e
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('e2e/package-lock.json') }}
+
+      - name: Install Chromium
+        working-directory: e2e
+        run: |
+          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Run happy-path (browser CMS, catalog, operations, commerce chain, applications, content ops, design)
+        id: suite
+        working-directory: e2e
+        run: |
+          set -o pipefail
+          start=$(date +%s)
+          rc=0
+          node happy-path.mjs 2>&1 | tee "$LOGDIR/happy-path.log" || rc=$?
+          echo "duration=$(( $(date +%s) - start ))" >> "$GITHUB_OUTPUT"
+          exit "$rc"
+
+      - name: Job summary
+        if: always()
+        run: |
+          log="$LOGDIR/happy-path.log"
+          pass=$(grep -c '^  ✓' "$log" 2>/dev/null || true)
+          failn=$(grep -c '^  ✗' "$log" 2>/dev/null || true)
+          {
+            echo "### E2E results"
+            echo
+            echo "| Suite | Assertions passed | Failed | Duration |"
+            echo "|---|---|---|---|"
+            echo "| happy-path (includes commerce-path, application-path, content-ops-path, content-ui-path, design-path) | ${pass:-0} | ${failn:-0} | ${{ steps.suite.outputs.duration }}s |"
+            echo
+            echo "Not covered: real ECPay, real Cloudflare (hooks, Access, R2), real SMTP, real Turnstile."
+            if [ "${failn:-0}" != "0" ]; then
+              echo
+              echo "Failed assertions:"
+              echo '```'
+              grep '^  ✗' "$log" | head -40
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect container logs
+        if: always()
+        run: |
+          for c in pg redis s3; do docker logs "$c" > "$LOGDIR/$c.log" 2>&1 || true; done
+          # Defence in depth: scrub this run's generated secrets from anything uploaded.
+          for f in "$LOGDIR"/*.log; do
+            for v in "$POSTGRES_PASSWORD" "$REDIS_PASSWORD" "$ADMIN_JWT_SECRET" "$MEMBER_JWT_SECRET" "$PAYMENT_MOCK_WEBHOOK_SECRET" "$PAYMENT_CREDENTIALS_ENCRYPTION_KEY" "$SEED_ADMIN_PASSWORD" "$R2_ACCESS_KEY_ID" "$R2_SECRET_ACCESS_KEY"; do
+              [ -n "$v" ] && sed -i "s/${v}/***/g" "$f"
+            done
+          done
+
+      - name: Upload logs and screenshots (failure only)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            e2e-logs/*.log
+            e2e-shots/
+          if-no-files-found: ignore
+          retention-days: 7
