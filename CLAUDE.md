@@ -46,7 +46,7 @@ make openapi-mock  # 由契約起 Prism mock server（:4010，npx，無需 DB/Re
 make openapi-ui    # 由契約起 Redocly 可瀏覽文件（:8081，npx）
 make ecpay-sim     # 本機模擬綠界收銀台（:8090）——手動走完整付款流程用，測試不需要它
 
-cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 營運後台 ＋ 電商鏈（需 API 與 admin 兩個服務 + seed-demo 後的乾淨狀態；487 項斷言，2026-11-25 實測；含開店申請的 API 流程與審核 UI 與內容文件流程）
+cd e2e && node happy-path.mjs    # 全部 E2E：瀏覽器 CMS 流程 ＋ 商品目錄後台 ＋ 營運後台 ＋ 電商鏈（需 API 與 admin 兩個服務 + seed-demo 後的乾淨狀態；527 項斷言，2026-11-25 實測；含開店申請的 API 流程與審核 UI、內容文件流程，以及內容營運流程 `content-ops-path.mjs`〔發佈 hook／排程發佈／清除，40 項，**需要為它設定的 API**，見「發佈 hook、排程發佈與稽核清除」⑦，沒設定時該節略過〕）
 cd e2e && node commerce-path.mjs # 只跑電商鏈（無瀏覽器，只需 API；222 項斷言，2026-11-25 實測，可重複執行）
 ```
 

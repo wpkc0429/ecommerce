@@ -31,6 +31,7 @@ ADR `docs/decisions/0001-headless-platform-and-merchant-template.md` 的「修�
 - `content-store`：每店 schema、內容文件、版本歷史、權限與稽核。
 - `content-delivery`：公開讀取 API、預覽、快取與 ETag、相容轉接層。
 - `content-publish-hook`：發佈通知（deploy hook）與其防護。
+- `content-scheduled-publish`：排程發佈（綁定草稿版本、到點重新驗證、錯過視窗、冪等；2026-11-25 加入）。
 
 ### Modified Capabilities
 - `page-management`、`content-rendering`：行為不變，其需求改由新 capability 擴充；實際的 spec 增量在實作時以 MODIFIED 對齊（本提案不在這裡動它們，避免與 `retire-hosted-storefront-and-themes` 同時修改同一批 spec）。
