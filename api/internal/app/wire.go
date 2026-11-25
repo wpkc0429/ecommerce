@@ -205,6 +205,16 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Authz:   authz, Limiter: limiter, Log: a.log,
 	}
 
+	deps.ContentDocuments = &httpapi.ContentDocumentsHandler{
+		Service: &content.Service{Client: client, Dispatcher: dispatcher, Gate: cmsService, Log: a.log},
+		Issuer:  issuer, Authz: authz, Limiter: limiter, PreviewTTL: cfg.ContentPreviewTTL, Log: a.log,
+	}
+	deps.ContentPublic = &httpapi.ContentPublicHandler{
+		Reader: &content.Reader{Client: client}, Cache: renderCache, Issuer: issuer, Engine: engine,
+		MaxAge: cfg.ContentPublicMaxAge, Log: a.log,
+	}
+	deps.ContentPublicRateLimit = httpapi.NewContentPublicRateLimit(limiter, cfg.ContentPublicRateLimit, cfg.ContentPublicRateWindow)
+
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 
 	// Product catalog (change product-catalog): no cache/events involved

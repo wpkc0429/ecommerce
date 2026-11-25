@@ -143,11 +143,17 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry, opts ..
 				// cross-origin request through a preflight this middleware
 				// answers only for the shop's own admin origin.
 				h.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+
-					PublishableKeyHeader+", "+IdempotencyKeyHeader+", "+AdminRefreshHeader)
+					PublishableKeyHeader+", "+IdempotencyKeyHeader+", "+AdminRefreshHeader+", "+
+					PreviewTokenHeader+", If-None-Match, If-Match")
 				// Idempotency-Replayed is exposed so a storefront can verify its
 				// own retry logic; without Expose-Headers, JS cannot read it and
 				// the header's entire diagnostic value is lost.
-				h.Set("Access-Control-Expose-Headers", "X-Cache, "+IdempotencyReplayedHeader)
+				//
+				// ETag is exposed for the public content API (change
+				// headless-content-store slice 2): a browser cannot read it
+				// otherwise, and X-Preview-Token / If-None-Match above are
+				// request headers a cross-origin fetch must be allowed to send.
+				h.Set("Access-Control-Expose-Headers", "X-Cache, ETag, "+IdempotencyReplayedHeader)
 				h.Set("Access-Control-Max-Age", "600")
 				if r.Method == http.MethodOptions {
 					w.WriteHeader(http.StatusNoContent)

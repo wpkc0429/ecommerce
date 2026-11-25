@@ -88,9 +88,66 @@ CategoryProductOrder.products
 CategorySummary.id
 CategorySummary.name
 CategorySummary.slug
+ContentDocument.declared
+ContentDocument.draft
+ContentDocument.draft_rev
+ContentDocument.key
+ContentDocument.meta
+ContentDocument.needs_attention
+ContentDocument.published
+ContentDocument.published_at
+ContentDocument.published_rev
+ContentDocument.published_schema_version
+ContentDocument.restored_valid
+ContentDocument.schema_node
+ContentDocument.schema_version
+ContentDocument.status
+ContentDocument.title
+ContentDocument.type_key
+ContentDocument.type_title
+ContentDocument.updated_at
+ContentDocument.updated_by_user_id
+ContentDocumentList.documents
+ContentDocumentSaveRequest.content
+ContentDocumentSaveRequest.meta
+ContentDocumentSaveRequest.title
+ContentDocumentSaveRequest.type_key
+ContentDocumentSummary.declared
+ContentDocumentSummary.draft_rev
+ContentDocumentSummary.key
+ContentDocumentSummary.needs_attention
+ContentDocumentSummary.published_at
+ContentDocumentSummary.published_rev
+ContentDocumentSummary.published_schema_version
+ContentDocumentSummary.schema_version
+ContentDocumentSummary.status
+ContentDocumentSummary.title
+ContentDocumentSummary.type_key
+ContentDocumentSummary.updated_at
+ContentDocumentSummary.updated_by_user_id
 ContentImage.height
 ContentImage.urls
 ContentImage.width
+ContentPreviewToken.expires_in
+ContentPreviewToken.key
+ContentPreviewToken.preview_token
+ContentPreviewToken.scope
+ContentRevision.actor_user_id
+ContentRevision.content
+ContentRevision.created_at
+ContentRevision.kind
+ContentRevision.meta
+ContentRevision.published_content
+ContentRevision.rev_no
+ContentRevision.schema_version
+ContentRevision.title
+ContentRevisionInfo.actor_user_id
+ContentRevisionInfo.created_at
+ContentRevisionInfo.kind
+ContentRevisionInfo.rev_no
+ContentRevisionInfo.schema_version
+ContentRevisionInfo.title
+ContentRevisionList.revisions
 ContentSchemaDocumentReport.invalid
 ContentSchemaDocumentReport.key
 ContentSchemaDocumentReport.kind
@@ -133,6 +190,10 @@ DELETE /api/v1/admin/shops/{shopID}/allowed-origins/{originID} path shopID
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID}
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path categoryID
 DELETE /api/v1/admin/shops/{shopID}/categories/{categoryID} path shopID
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path key
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID}
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path invitationID
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path shopID
@@ -228,6 +289,19 @@ GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path cate
 GET /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 GET /api/v1/admin/shops/{shopID}/content
 GET /api/v1/admin/shops/{shopID}/content path shopID
+GET /api/v1/admin/shops/{shopID}/content/documents
+GET /api/v1/admin/shops/{shopID}/content/documents path shopID
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}
+GET /api/v1/admin/shops/{shopID}/content/documents/{key} path key
+GET /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
+GET /api/v1/admin/shops/{shopID}/content/documents/{key} response 200 ETag
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions path key
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions path shopID
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path key
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path rev
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path shopID
 GET /api/v1/admin/shops/{shopID}/content/schema
 GET /api/v1/admin/shops/{shopID}/content/schema path shopID
 GET /api/v1/admin/shops/{shopID}/content/schema query include
@@ -372,6 +446,34 @@ GET /api/v1/shop/cart header X-Publishable-Key optional
 GET /api/v1/shop/categories
 GET /api/v1/shop/categories header X-Publishable-Key
 GET /api/v1/shop/categories header X-Publishable-Key optional
+GET /api/v1/shop/content
+GET /api/v1/shop/content header If-None-Match
+GET /api/v1/shop/content header If-None-Match optional
+GET /api/v1/shop/content header X-Publishable-Key
+GET /api/v1/shop/content header X-Publishable-Key optional
+GET /api/v1/shop/content query include
+GET /api/v1/shop/content query include optional
+GET /api/v1/shop/content query keys
+GET /api/v1/shop/content query keys optional
+GET /api/v1/shop/content response 200 Cache-Control
+GET /api/v1/shop/content response 200 ETag
+GET /api/v1/shop/content response 429 Retry-After
+GET /api/v1/shop/content/{key}
+GET /api/v1/shop/content/{key} header If-None-Match
+GET /api/v1/shop/content/{key} header If-None-Match optional
+GET /api/v1/shop/content/{key} header X-Publishable-Key
+GET /api/v1/shop/content/{key} header X-Publishable-Key optional
+GET /api/v1/shop/content/{key} path key
+GET /api/v1/shop/content/{key} response 200 Cache-Control
+GET /api/v1/shop/content/{key} response 200 ETag
+GET /api/v1/shop/content/{key} response 429 Retry-After
+GET /api/v1/shop/content/{key}/preview
+GET /api/v1/shop/content/{key}/preview header X-Preview-Token
+GET /api/v1/shop/content/{key}/preview header X-Publishable-Key
+GET /api/v1/shop/content/{key}/preview header X-Publishable-Key optional
+GET /api/v1/shop/content/{key}/preview path key
+GET /api/v1/shop/content/{key}/preview response 200 Cache-Control
+GET /api/v1/shop/content/{key}/preview response 429 Retry-After
 GET /api/v1/shop/guest/order
 GET /api/v1/shop/guest/order header X-Publishable-Key
 GET /api/v1/shop/guest/order header X-Publishable-Key optional
@@ -589,6 +691,28 @@ POST /api/v1/admin/shops/{shopID}/allowed-origins
 POST /api/v1/admin/shops/{shopID}/allowed-origins path shopID
 POST /api/v1/admin/shops/{shopID}/categories
 POST /api/v1/admin/shops/{shopID}/categories path shopID
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/preview-token
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/preview-token path key
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/preview-token path shopID
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish header If-Match
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish header If-Match optional
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish path key
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish path shopID
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish response 200 ETag
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/publish response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore header If-Match
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore header If-Match optional
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore path key
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore path rev
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore path shopID
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore response 200 ETag
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish path key
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish path shopID
+POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish response 429 Retry-After
 POST /api/v1/admin/shops/{shopID}/invitations
 POST /api/v1/admin/shops/{shopID}/invitations path shopID
 POST /api/v1/admin/shops/{shopID}/invitations response 429 Retry-After
@@ -698,6 +822,16 @@ PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path cate
 PUT /api/v1/admin/shops/{shopID}/categories/{categoryID}/product-order path shopID
 PUT /api/v1/admin/shops/{shopID}/content
 PUT /api/v1/admin/shops/{shopID}/content path shopID
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} header If-Match
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} header If-Match optional
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} header If-None-Match
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} header If-None-Match optional
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} path key
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 200 ETag
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 201 ETag
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
 PUT /api/v1/admin/shops/{shopID}/content/schema
 PUT /api/v1/admin/shops/{shopID}/content/schema path shopID
 PUT /api/v1/admin/shops/{shopID}/content/schema query confirm_removals
@@ -850,6 +984,32 @@ ProductSalesRow.sku_code
 ProvisionResult.owner
 ProvisionResult.shop
 ProvisionResult.storefront_origins
+PublicContentDocument.content
+PublicContentDocument.key
+PublicContentDocument.meta
+PublicContentDocument.published_at
+PublicContentDocument.schema_version
+PublicContentDocument.title
+PublicContentDocument.type_key
+PublicContentList.documents
+PublicContentList.schema_version
+PublicContentListEntry.content
+PublicContentListEntry.etag
+PublicContentListEntry.key
+PublicContentListEntry.meta
+PublicContentListEntry.published_at
+PublicContentListEntry.title
+PublicContentListEntry.type_key
+PublicContentPreviewDocument.content
+PublicContentPreviewDocument.draft_rev
+PublicContentPreviewDocument.key
+PublicContentPreviewDocument.meta
+PublicContentPreviewDocument.preview
+PublicContentPreviewDocument.published_at
+PublicContentPreviewDocument.schema_version
+PublicContentPreviewDocument.status
+PublicContentPreviewDocument.title
+PublicContentPreviewDocument.type_key
 PublicShippingMethod.carrier
 PublicShippingMethod.flat_rate
 PublicShippingMethod.id

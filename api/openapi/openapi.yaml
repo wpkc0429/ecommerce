@@ -108,6 +108,8 @@ servers:
 tags:
   - name: health
     description: 健康檢查。
+  - name: storefront-content
+    description: 前台公開內容讀取（headless 內容儲存；無認證，僅需租戶解析）。
   - name: storefront-catalog
     description: 前台公開目錄（無認證，僅需租戶解析）。
   - name: storefront-auth
@@ -367,6 +369,19 @@ components:
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
+    PreconditionFailed:
+      description: |
+        樂觀鎖失敗：`If-Match`／`expected_rev` 與文件目前的 `draft_rev` 不符（有人先更新了），或建立時帶 `If-None-Match: *` 但鍵已存在。
+        `code = precondition_failed`；前者 `details.current_rev` 是目前版本，請重新載入再合併。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    PreconditionRequired:
+      description: |
+        儲存內容文件必須帶 `If-Match`（更新）或 `If-None-Match: *`（建立）。`code = precondition_required`。
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
     NoContent:
       description: 成功，無回應主體。
 
@@ -436,6 +451,8 @@ components:
         | 422 | `invalid_idempotency_key` | `Idempotency-Key` 不符 8–255 個可見 ASCII 字元 |
         | 422 | `idempotency_key_reused` | 同一把 `Idempotency-Key` 配上**不同的**請求（改了主體，或換了顧客／端點） |
         | 409 | `idempotency_key_in_progress` | 帶同一把 `Idempotency-Key` 的另一個請求仍在處理中，結果尚未確定。**稍後重試是安全的**（不附 `Retry-After`：那是限流專屬的標頭） |
+        | 412 | `precondition_failed` | 內容文件的樂觀鎖失敗（`If-Match` 過期）或建立時鍵已存在 |
+        | 428 | `precondition_required` | 儲存內容文件缺少 `If-Match`／`If-None-Match: *` |
         | 429 | `rate_limited` | 超過速率限制，附 `Retry-After` |
         | 500 | `internal` | 伺服器內部錯誤 |
         | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
@@ -2337,6 +2354,201 @@ components:
           type: array
           items: { $ref: '#/components/schemas/ContentSchemaVersionInfo' }
 
+    # ── 後台與公開：內容文件（change headless-content-store 第二個切片）──
+    ContentDocumentSummary:
+      type: object
+      additionalProperties: false
+      required: [key, type_key, title, status, needs_attention, declared, draft_rev, published_rev, schema_version, published_schema_version, updated_at, published_at, updated_by_user_id]
+      properties:
+        key:
+          type: string
+          description: 文件的穩定鍵（`^[a-z0-9][a-z0-9-]{0,62}$`）。**不是路由**；哪個鍵對應哪個畫面由商家站台決定。
+        type_key: { type: string, description: 作用中 schema 的 type；`global` 是店家全域內容。 }
+        title: { type: string }
+        status: { type: integer, enum: [0, 1], description: "`0` 草稿、`1` 已發佈。" }
+        needs_attention:
+          type: boolean
+          description: schema 變更後草稿（或已發佈內容）不再通過驗證。已發佈內容照常提供；草稿須修到通過才能再儲存或發佈。
+        declared:
+          type: boolean
+          description: 鍵是否仍被作用中 schema 宣告（`false`＝孤兒：仍保留、仍照常提供已發佈內容，可手動刪除）。
+        draft_rev: { type: integer, minimum: 1, description: 每次儲存草稿 +1；樂觀鎖與 `ETag` 的依據。 }
+        published_rev: { type: integer, minimum: 0, description: 發佈當時的 `draft_rev`（從未發佈為 `0`）。 }
+        schema_version: { type: integer, description: 草稿最後一次驗證所用的 schema 版本。 }
+        published_schema_version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        published_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        updated_by_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+
+    ContentDocumentList:
+      type: object
+      additionalProperties: false
+      required: [documents]
+      properties:
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/ContentDocumentSummary' }
+
+    ContentDocument:
+      type: object
+      additionalProperties: false
+      required: [key, type_key, title, status, needs_attention, declared, draft_rev, published_rev, schema_version, published_schema_version, updated_at, published_at, updated_by_user_id, draft, published, meta]
+      properties:
+        key: { type: string }
+        type_key: { type: string }
+        title: { type: string }
+        status: { type: integer, enum: [0, 1] }
+        needs_attention: { type: boolean }
+        declared: { type: boolean }
+        draft_rev: { type: integer, minimum: 1 }
+        published_rev: { type: integer, minimum: 0 }
+        schema_version: { type: integer }
+        published_schema_version: { type: integer }
+        updated_at: { type: string, format: date-time }
+        published_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        updated_by_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        draft: { type: object, description: 草稿內容（寫入時已驗證與消毒；儲存後的回應是**實際存下的值**）。 }
+        published:
+          oneOf: [{ type: object }, { type: 'null' }]
+          description: 已發佈內容；從未發佈為 `null`。
+        meta: { type: object, description: 自由欄位（SEO 之類），≤ 4 KiB。 }
+        schema_node:
+          oneOf: [{ type: object }, { type: 'null' }]
+          description: 僅 `GET` 單一文件：此文件的 type 在作用中 schema 內的 JSON Schema（type 已不在 schema 內為 `null`）。
+        type_title: { type: string, description: 僅 `GET` 單一文件。 }
+        restored_valid:
+          type: boolean
+          description: 僅還原的回應：還原的內容是否通過目前 schema。`false` 時草稿 `needs_attention`，須修正並儲存後才能發佈。
+
+    ContentDocumentSaveRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        type_key:
+          type: string
+          description: 僅建立時、且 schema 沒有宣告此鍵的 type（format 1）才需要；format 2 由 `documents`／`collections` 決定。
+        title: { type: string, maxLength: 150 }
+        content: { type: object, description: 依此文件 type 的 schema 驗證，上限 128 KiB。 }
+        meta: { type: object, description: 上限 4 KiB。 }
+
+    ContentRevisionInfo:
+      type: object
+      additionalProperties: false
+      required: [rev_no, kind, title, schema_version, actor_user_id, created_at]
+      properties:
+        rev_no: { type: integer, minimum: 1 }
+        kind:
+          type: string
+          enum: [publish, schema_snapshot]
+          description: "`publish`：每次發佈一筆（保留最近 20 筆）；`schema_snapshot`：schema 變更讓文件有風險時保存的內容（每文件保留最近 5 個 schema 版本）。"
+        title: { type: string }
+        schema_version: { type: integer }
+        actor_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        created_at: { type: string, format: date-time }
+
+    ContentRevisionList:
+      type: object
+      additionalProperties: false
+      required: [revisions]
+      properties:
+        revisions:
+          type: array
+          items: { $ref: '#/components/schemas/ContentRevisionInfo' }
+
+    ContentRevision:
+      type: object
+      additionalProperties: false
+      required: [rev_no, kind, title, schema_version, actor_user_id, created_at, content, published_content, meta]
+      properties:
+        rev_no: { type: integer, minimum: 1 }
+        kind: { type: string, enum: [publish, schema_snapshot] }
+        title: { type: string }
+        schema_version: { type: integer }
+        actor_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        created_at: { type: string, format: date-time }
+        content: { type: object }
+        published_content:
+          oneOf: [{ type: object }, { type: 'null' }]
+          description: 僅 `schema_snapshot` 且當時已發佈內容與草稿不同時有值。
+        meta: { type: object }
+
+    ContentPreviewToken:
+      type: object
+      additionalProperties: false
+      required: [preview_token, expires_in, scope, key]
+      properties:
+        preview_token:
+          type: string
+          description: 短效權杖（預設 10 分鐘）。以 `X-Preview-Token` **標頭**送給 `GET /api/v1/shop/content/{key}/preview`；不要放進網址。
+        expires_in: { type: integer, description: 剩餘秒數。 }
+        scope: { type: string, enum: [document, shop] }
+        key: { type: string }
+
+    PublicContentDocument:
+      type: object
+      additionalProperties: false
+      required: [key, type_key, title, schema_version, published_at, content, meta]
+      properties:
+        key: { type: string }
+        type_key: { type: string }
+        title: { type: string }
+        schema_version:
+          type: integer
+          description: 發佈當時的 schema 版本。內容在新 schema 下不再通過驗證時仍照原樣提供，站台可用它判斷。
+        published_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        content: { type: object, description: 已發佈內容，經 hydrate（補預設值、丟棄 schema 未定義的鍵），總是完整形狀。 }
+        meta: { type: object }
+
+    PublicContentPreviewDocument:
+      type: object
+      additionalProperties: false
+      required: [key, type_key, title, schema_version, published_at, content, meta, status, draft_rev, preview]
+      properties:
+        key: { type: string }
+        type_key: { type: string }
+        title: { type: string }
+        schema_version: { type: integer }
+        published_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        content: { type: object, description: 草稿內容，經 hydrate。 }
+        meta: { type: object }
+        status: { type: integer, enum: [0, 1] }
+        draft_rev: { type: integer }
+        preview: { type: boolean, enum: [true] }
+
+    PublicContentListEntry:
+      type: object
+      additionalProperties: false
+      required: [key, type_key, title, published_at, etag]
+      properties:
+        key: { type: string }
+        type_key: { type: string }
+        title: { type: string }
+        published_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        etag:
+          type: string
+          description: 單一文件端點對同一份內容回的 `ETag`（含引號）；可用來決定哪些文件需要重抓。
+        content: { type: object, description: 僅 `include=content`。 }
+        meta: { type: object, description: 僅 `include=content`。 }
+
+    PublicContentList:
+      type: object
+      additionalProperties: false
+      required: [schema_version, documents]
+      properties:
+        schema_version: { type: integer, description: 作用中 schema 版本；商家尚無 schema 為 `0`。 }
+        documents:
+          type: array
+          items: { $ref: '#/components/schemas/PublicContentListEntry' }
+
     # ── 後台：RBAC ────────────────────────────────────────────
     Permission:
       type: object
@@ -2529,6 +2741,125 @@ paths:
                     items: { $ref: '#/components/schemas/CategoryNode' }
         "404": { $ref: '#/components/responses/NotFound' }
         "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/content:
+    get:
+      tags: [storefront-content]
+      operationId: listPublicContent
+      summary: 列出已發佈的內容文件（可整批取回內容）
+      description: |
+        **無需認證**，只需租戶解析（`X-Publishable-Key`，識別碼不是憑證）。只回已發佈的文件。
+        `?include=content` 每筆帶 hydrate 後的 `content` 與 `meta`（上界由每店已發佈總量 ≤ 2 MiB 保證）——
+        供建置期與執行期整批抓取。`?keys=a,b` 只取指定鍵（最多 50 個）。
+
+        **快取**：`ETag`（回應主體 SHA-256 前 16 hex，含引號）、`If-None-Match` → 304、
+        `Cache-Control: public, max-age=60, stale-while-revalidate=300`（`CONTENT_PUBLIC_MAX_AGE`，預設 60）、
+        `Vary: X-Publishable-Key, Origin`、`X-Cache: HIT|MISS`。發佈／下架／schema 註冊後伺服端快取立即失效；
+        瀏覽器端最多再舊 `max-age` 秒。每商家每 IP 每分鐘 120 次（`429`）。商家尚無 schema 回 `schema_version: 0` 與空清單。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: include
+          in: query
+          required: false
+          schema: { type: string, enum: [content] }
+        - name: keys
+          in: query
+          required: false
+          schema: { type: string }
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: 已發佈文件清單。
+          headers:
+            ETag:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicContentList' }
+        "304":
+          description: 內容未變（`If-None-Match` 與目前 `ETag` 相符）；無主體。
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/content/{key}:
+    get:
+      tags: [storefront-content]
+      operationId: getPublicContent
+      summary: 讀一份已發佈的內容文件
+      description: |
+        **無需認證**。回 hydrate 後的已發佈內容（補預設值、丟棄 schema 未定義的鍵，所以總是完整形狀）。
+        **「不存在」「只有草稿」「已下架」「鍵格式不符」回逐位元組相同的 404**，不洩漏草稿存在；跨商家一律 404。
+        已發佈內容在新 schema 下不再通過驗證時仍照原樣提供，`schema_version` 是發佈當時的版本。
+        快取語意同清單端點（`ETag`／304／`Cache-Control`）。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+        - name: If-None-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: 文件。
+          headers:
+            ETag:
+              schema: { type: string }
+            Cache-Control:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicContentDocument' }
+        "304":
+          description: 內容未變；無主體。
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "503": { $ref: '#/components/responses/ShopDisabled' }
+
+  /api/v1/shop/content/{key}/preview:
+    get:
+      tags: [storefront-content]
+      operationId: previewPublicContent
+      summary: 預覽文件草稿（需預覽權杖）
+      description: |
+        以後台簽發的預覽權杖放在 **`X-Preview-Token` 標頭**（不放網址：避免進日誌與 Referer；網址上的 `token` 參數被忽略）。
+        權杖綁商家與範圍（單一鍵或整店），不能跨店、不能跨文件使用；使用時再檢查持有者仍有 `content.view` 且商家未停用。
+        回應 `Cache-Control: no-store`、`X-Robots-Tag: noindex, nofollow`，永不快取。
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/PublishableKey'
+        - name: key
+          in: path
+          required: true
+          schema: { type: string }
+        - name: X-Preview-Token
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: hydrate 後的草稿。
+          headers:
+            Cache-Control:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublicContentPreviewDocument' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
 
   /api/v1/shop/products/{slug}:
     get:
@@ -5248,6 +5579,320 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content/documents:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: listContentDocuments
+      summary: 列出商家的內容文件
+      description: 需要商家層 `content.view`。草稿與已發佈的都列出（不含內容）；一次最多 100 份。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 文件清單（依 `key`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocumentList' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin-cms]
+      operationId: getContentDocument
+      summary: 讀取一份內容文件（草稿、已發佈內容與 schema 節點）
+      description: |
+        需要 `content.view`。回應標頭 `ETag: "<draft_rev>"`；儲存時把它放進 `If-Match`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 文件。
+          headers:
+            ETag:
+              description: 草稿版本（`draft_rev`，含引號）。
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocument' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-cms]
+      operationId: saveContentDocument
+      summary: 建立或更新文件草稿（樂觀鎖）
+      description: |
+        需要 `content.edit`；每商家每呼叫者每分鐘 60 次。**必須帶前置條件**，否則 428：
+        更新帶 `If-Match: "<draft_rev>"`（不符回 412，`details.current_rev` 是目前版本）；建立帶 `If-None-Match: *`
+        （鍵已存在回 412）。只能建立 schema 宣告的鍵（`documents`）或符合 `collections` 前綴的鍵（受 `max` 限制）；
+        每店最多 100 份。內容依文件 type 的 schema 驗證（422 帶 JSON Pointer）、`x-editor: link` 欄位檢查 scheme、
+        `x-editor: image` 欄位檢查圖片網域、`x-editor: richtext` 欄位**改寫**（不拒絕）為 allowlist 版本；內容上限 128 KiB、`meta` 4 KiB。
+        回應是**實際存下的值**與新的 `ETag`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: If-Match
+          in: header
+          required: false
+          description: 更新：呼叫者載入時的 `draft_rev`，例如 `"3"`。
+          schema: { type: string }
+        - name: If-None-Match
+          in: header
+          required: false
+          description: 建立：必須是 `*`。
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ContentDocumentSaveRequest' }
+      responses:
+        "200":
+          description: 已更新。
+          headers:
+            ETag:
+              description: 新的 `draft_rev`。
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocument' }
+        "201":
+          description: 已建立。
+          headers:
+            ETag:
+              description: 新的 `draft_rev`。
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocument' }
+        "400": { $ref: '#/components/responses/BadRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [admin-cms]
+      operationId: deleteContentDocument
+      summary: 刪除文件（只限集合成員與孤兒）
+      description: |
+        需要 `content.publish`。schema 在 `documents` 宣告的固定文件、`global`、format 1 的 `home` 不可刪（409，只能清空）。
+        一併刪除其 revisions 與對應的舊頁面列。每商家每呼叫者每分鐘 20 次。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { $ref: '#/components/responses/NoContent' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/publish:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin-cms]
+      operationId: publishContentDocument
+      summary: 發佈文件
+      description: |
+        需要 `content.publish`（`editor` 沒有）；每商家每呼叫者每分鐘 20 次。對作用中 schema **重新驗證**草稿
+        （422 帶 Pointer）、檢查每店已發佈內容總量 ≤ 2 MiB、寫一筆 `publish` revision（同交易裁剪到最近 20 筆）、
+        更新舊頁面／`shops.content_json` 投影，commit 後失效快取。可帶 `If-Match` 或 body `expected_rev`（審閱過的 `draft_rev`），不符回 412。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: If-Match
+          in: header
+          required: false
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                expected_rev: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 已發佈。
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocumentSummary' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin-cms]
+      operationId: unpublishContentDocument
+      summary: 下架文件
+      description: 需要 `content.publish`。公開端點之後回與「不存在」相同的 404。`global` 不可下架（409）。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已下架。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocumentSummary' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin-cms]
+      operationId: listContentRevisions
+      summary: 列出文件的版本歷史（新到舊，不含內容）
+      description: 需要 `content.view`。最近 20 筆 `publish` 與每個 schema 版本的 `schema_snapshot`（每文件最近 5 個）。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 版本清單。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentRevisionList' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+      - name: rev
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    get:
+      tags: [admin-cms]
+      operationId: getContentRevision
+      summary: 讀取一筆版本的內容
+      description: 需要 `content.view`。已被裁剪的版本回 404。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 版本與其內容。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentRevision' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}/restore:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+      - name: rev
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [admin-cms]
+      operationId: restoreContentRevision
+      summary: 把某版本放回草稿（不發佈）
+      description: |
+        需要 `content.edit`。**只改草稿**，從不自動發佈——發佈另需 `content.publish`，所以回滾是兩步、各有自己的權限與稽核。
+        內容會重新驗證與消毒；舊 schema 的快照若不再通過目前 schema，仍會放回草稿以找回數值，但 `restored_valid: false`、
+        文件 `needs_attention`，修正並儲存後才能發佈。可帶 `If-Match`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: If-Match
+          in: header
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: 還原後的文件。
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentDocument' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/preview-token:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin-cms]
+      operationId: createContentPreviewToken
+      summary: 簽發草稿預覽權杖
+      description: |
+        需要 `content.view`。`scope: "document"`（預設）只能預覽此鍵；`scope: "shop"` 預覽該店所有草稿
+        （供站台的預覽模式）。短效（`CONTENT_PREVIEW_TTL`，預設同 `PREVIEW_TOKEN_TTL`＝10 分鐘）。
+        使用時會再檢查持有者仍有 `content.view`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                scope: { type: string, enum: [document, shop] }
+      responses:
+        "200":
+          description: 權杖。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentPreviewToken' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
 
   # ═══════════════════════ 商家層：RBAC ═══════════════════════
   /api/v1/admin/shops/{shopID}/me:

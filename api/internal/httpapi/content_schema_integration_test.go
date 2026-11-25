@@ -15,6 +15,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/config"
@@ -47,6 +49,7 @@ type schemaEnv struct {
 	issuer *auth.TokenIssuer
 	cms    *cms.Service
 	buf    *bytes.Buffer
+	rdb    *redis.Client
 
 	platform                          int
 	shopA, shopB                      int
@@ -92,7 +95,17 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 			Resolver: resolver, Assembler: &render.Assembler{Client: client},
 			Cache: renderCache, Issuer: issuer, Engine: engine, Log: log,
 		},
+		ContentDocuments: &httpapi.ContentDocumentsHandler{
+			Service: &content.Service{Client: client, Dispatcher: dispatcher, Gate: e.cms, Log: log},
+			Issuer:  issuer, Authz: authz, Limiter: ratelimit.New(rdb, log), PreviewTTL: 10 * time.Minute, Log: log,
+		},
+		ContentPublic: &httpapi.ContentPublicHandler{
+			Reader: &content.Reader{Client: client}, Cache: renderCache, Issuer: issuer, Engine: engine,
+			MaxAge: 60, Log: log,
+		},
+		ContentPublicRateLimit: httpapi.NewContentPublicRateLimit(ratelimit.New(rdb, log), 10000, time.Minute),
 	})
+	e.rdb = rdb
 
 	e.platform = client.User.Query().OnlyX(ctx).ID
 	shopA, err := e.cms.CreateShop(ctx, cms.ShopInput{Name: "Shop A"})
@@ -296,12 +309,15 @@ func TestSchemaRegistrationOnANewShopEndToEnd(t *testing.T) {
 	}
 
 	// Create, edit, publish a page; the public API serves it hydrated.
-	code, body, raw = e.doJSON(t, e.ownerA, "POST", e.path(shop, "/pages"), map[string]any{"type_key": "story", "title": "故事", "slug": "story"})
+	// Registration (slice 2) already created the documents the schema declares,
+	// so the declared "story" page exists as an empty draft; creating a second
+	// page of that type exercises the create contract.
+	code, _, raw = e.doJSON(t, e.ownerA, "POST", e.path(shop, "/pages"), map[string]any{"type_key": "story", "title": "故事", "slug": "story-extra"})
 	if code != 201 {
 		t.Fatalf("create page: %d %s", code, raw)
 	}
-	pid := int(body["id"].(float64))
 	v.AssertResponse(t, "/api/v1/admin/shops/{shopID}/pages", "POST", 201, []byte(raw))
+	pid := e.client.Page.Query().Where(entpage.ShopIDEQ(shop), entpage.SlugEQ("story")).OnlyX(ctx).ID
 	if code, _, raw := e.doJSON(t, e.ownerA, "PUT", e.path(shop, fmt.Sprintf("/pages/%d", pid)),
 		map[string]any{"content": map[string]any{"eyebrow": "ABOUT", "title": "我們的故事"}}); code != 200 {
 		t.Fatalf("update page: %d %s", code, raw)

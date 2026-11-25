@@ -262,3 +262,62 @@ func (ti *TokenIssuer) VerifyOrderAccess(token string, shopID int) (int, error) 
 	}
 	return oid, nil
 }
+
+// ContentPreviewClaims bind a short-lived content preview token to (user, shop,
+// scope, key) (change headless-content-store slice 2, design D2). Signed with
+// the admin secret but with its own audience, so it is unusable as an access
+// token or as a page preview token, and vice versa.
+type ContentPreviewClaims struct {
+	ShopID int    `json:"shop_id"`
+	Scope  string `json:"scope"`
+	Key    string `json:"key,omitempty"`
+	jwt.RegisteredClaims
+}
+
+const contentPreviewAudience = "content-preview"
+
+// Scopes of a content preview token.
+const (
+	PreviewScopeDocument = "document"
+	PreviewScopeShop     = "shop"
+)
+
+// IssueContentPreview signs a content preview token. scope "document" is bound
+// to one key; scope "shop" previews every draft of the shop.
+func (ti *TokenIssuer) IssueContentPreview(userID, shopID int, scope, key string, ttl time.Duration) (string, error) {
+	now := ti.now()
+	claims := ContentPreviewClaims{
+		ShopID: shopID, Scope: scope, Key: key,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   strconv.Itoa(userID),
+			Issuer:    ti.issuer,
+			Audience:  jwt.ClaimStrings{contentPreviewAudience},
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(ttl)),
+		},
+	}
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(ti.adminSecret)
+}
+
+// VerifyContentPreview validates a content preview token.
+func (ti *TokenIssuer) VerifyContentPreview(token string) (*ContentPreviewClaims, int, error) {
+	claims := &ContentPreviewClaims{}
+	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (any, error) {
+		return ti.adminSecret, nil
+	},
+		jwt.WithValidMethods([]string{"HS256"}),
+		jwt.WithIssuer(ti.issuer),
+		jwt.WithAudience(contentPreviewAudience),
+		jwt.WithExpirationRequired(),
+	)
+	if err != nil || !parsed.Valid {
+		return nil, 0, ErrInvalidToken
+	}
+	uid, err := strconv.Atoi(claims.Subject)
+	if err != nil || uid <= 0 || claims.ShopID <= 0 ||
+		(claims.Scope != PreviewScopeDocument && claims.Scope != PreviewScopeShop) ||
+		(claims.Scope == PreviewScopeDocument && claims.Key == "") {
+		return nil, 0, ErrInvalidToken
+	}
+	return claims, uid, nil
+}

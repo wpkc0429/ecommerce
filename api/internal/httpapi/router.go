@@ -30,6 +30,11 @@ type Deps struct {
 	// ContentSchema: per-shop content schema registration (change
 	// headless-content-store, first slice).
 	ContentSchema *ContentSchemaHandler
+	// ContentDocuments: the admin document API; ContentPublic: the public
+	// read API (change headless-content-store slice 2).
+	ContentDocuments       *ContentDocumentsHandler
+	ContentPublic          *ContentPublicHandler
+	ContentPublicRateLimit func(http.Handler) http.Handler
 	Render        *RenderHandler
 	Categories    *CategoriesHandler // change product-catalog
 	Products      *ProductsHandler   // change product-catalog (merchant CRUD + public read)
@@ -185,6 +190,9 @@ func New(d Deps) http.Handler {
 						if d.ContentSchema != nil {
 							d.ContentSchema.MountShopAdmin(sh)
 						}
+						if d.ContentDocuments != nil {
+							d.ContentDocuments.MountShopAdmin(sh)
+						}
 						if d.Categories != nil {
 							d.Categories.MountShop(sh)
 						}
@@ -334,6 +342,9 @@ func New(d Deps) http.Handler {
 				}
 				if d.Categories != nil {
 					d.Categories.MountPublic(sr)
+				}
+				if d.ContentPublic != nil {
+					d.ContentPublic.MountPublic(sr, d.ContentPublicRateLimit)
 				}
 				// change order-extras: the storefront needs the shop's
 				// selectable shipping methods (and their fees) before any

@@ -3,6 +3,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"net/netip"
 	"net/url"
@@ -41,6 +42,16 @@ type Config struct {
 	AccessTokenTTL  time.Duration
 	RefreshTokenTTL time.Duration
 	PreviewTokenTTL time.Duration
+
+	// Content store public read API (change headless-content-store slice 2).
+	// ContentPreviewTTL is the lifetime of a content preview token (default:
+	// PREVIEW_TOKEN_TTL). ContentPublicMaxAge is the Cache-Control max-age, in
+	// seconds, of GET /shop/content*. The per-IP limit protects the public
+	// read endpoints; ETag and caching keep it generous.
+	ContentPreviewTTL       time.Duration
+	ContentPublicMaxAge     int
+	ContentPublicRateLimit  int
+	ContentPublicRateWindow time.Duration
 
 	// OrderAccessTokenTTL bounds how long a guest's order access token stays
 	// usable (change guest-checkout, design D3). Its lower bound is the payment
@@ -393,6 +404,21 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.PreviewTokenTTL, err = parseDuration("PREVIEW_TOKEN_TTL", 10*time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.ContentPreviewTTL, err = parseDuration("CONTENT_PREVIEW_TTL", cfg.PreviewTokenTTL); err != nil {
+		return nil, err
+	}
+	if cfg.ContentPublicMaxAge, err = parseInt("CONTENT_PUBLIC_MAX_AGE", 60); err != nil {
+		return nil, err
+	}
+	if cfg.ContentPublicMaxAge < 0 || cfg.ContentPublicMaxAge > 86400 {
+		return nil, errors.New("config: CONTENT_PUBLIC_MAX_AGE must be between 0 and 86400 seconds")
+	}
+	if cfg.ContentPublicRateLimit, err = parseInt("RATE_LIMIT_CONTENT_PUBLIC_LIMIT", 120); err != nil {
+		return nil, err
+	}
+	if cfg.ContentPublicRateWindow, err = parseDuration("RATE_LIMIT_CONTENT_PUBLIC_WINDOW", time.Minute); err != nil {
 		return nil, err
 	}
 	if cfg.AdminSetupTokenTTL, err = parseDuration("ADMIN_SETUP_TOKEN_TTL", 72*time.Hour); err != nil {
