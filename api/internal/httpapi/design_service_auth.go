@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"ksdevworks/ecommerce/api/internal/design"
@@ -23,9 +24,10 @@ func designCredentialFrom(ctx context.Context) (*ent.DesignServiceCredential, bo
 
 // Limits of the machine route family (design D8): per credential and minute.
 const (
-	designServiceWriteLimit = 120
-	designServiceAuthFails  = 30 // failed attempts per client IP and minute
-	designServiceWindow     = time.Minute
+	designServiceWriteLimit  = 120
+	designServiceUploadLimit = 60
+	designServiceAuthFails   = 30 // failed attempts per client IP and minute
+	designServiceWindow      = time.Minute
 )
 
 // NewDesignServiceAuth authenticates the AI edit service: Authorization:
@@ -85,7 +87,12 @@ func NewDesignServiceRateLimit(l *ratelimit.Limiter) func(http.Handler) http.Han
 				httpx.Unauthorized(w)
 				return
 			}
-			if res := l.Allow(r.Context(), fmt.Sprintf("design_service_write:%d", cred.ID), designServiceWriteLimit, designServiceWindow); !res.Allowed {
+			key, limit := fmt.Sprintf("design_service_write:%d", cred.ID), designServiceWriteLimit
+			if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/screenshots/") {
+				// Uploads are heavier (decode + re-encode): their own, tighter budget.
+				key, limit = fmt.Sprintf("design_service_upload:%d", cred.ID), designServiceUploadLimit
+			}
+			if res := l.Allow(r.Context(), key, limit, designServiceWindow); !res.Allowed {
 				httpx.TooManyRequests(w, res.RetryAfter)
 				return
 			}

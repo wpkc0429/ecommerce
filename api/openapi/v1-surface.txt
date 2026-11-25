@@ -340,6 +340,45 @@ DesignRequestSummary.reverted_by_request_id
 DesignRequestSummary.site
 DesignRequestSummary.status
 DesignRequestSummary.updated_at
+DesignScreenshot.attempt
+DesignScreenshot.byte_size
+DesignScreenshot.capture_manifest
+DesignScreenshot.commit_sha
+DesignScreenshot.content_type
+DesignScreenshot.created_at
+DesignScreenshot.diff_ppm
+DesignScreenshot.height
+DesignScreenshot.id
+DesignScreenshot.phase
+DesignScreenshot.purged_at
+DesignScreenshot.request_id
+DesignScreenshot.role
+DesignScreenshot.sha256
+DesignScreenshot.site
+DesignScreenshot.view_key
+DesignScreenshot.viewport
+DesignScreenshot.width
+DesignScreenshotList.screenshots
+DesignScreenshotRead.attempt
+DesignScreenshotRead.byte_size
+DesignScreenshotRead.capture_manifest
+DesignScreenshotRead.commit_sha
+DesignScreenshotRead.content_type
+DesignScreenshotRead.created_at
+DesignScreenshotRead.diff_ppm
+DesignScreenshotRead.height
+DesignScreenshotRead.id
+DesignScreenshotRead.phase
+DesignScreenshotRead.purged_at
+DesignScreenshotRead.request_id
+DesignScreenshotRead.role
+DesignScreenshotRead.sha256
+DesignScreenshotRead.site
+DesignScreenshotRead.url
+DesignScreenshotRead.url_expires_at
+DesignScreenshotRead.view_key
+DesignScreenshotRead.viewport
+DesignScreenshotRead.width
 DesignServiceCredential.allowed_cidrs
 DesignServiceCredential.created_at
 DesignServiceCredential.created_by_user_id
@@ -539,6 +578,11 @@ GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events query page_s
 GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots
 GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots path requestID
 GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots path shopID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots query all
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots query all optional
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots query phase
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots query phase optional
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots response 200 Cache-Control
 GET /api/v1/admin/shops/{shopID}/design/state
 GET /api/v1/admin/shops/{shopID}/design/state path shopID
 GET /api/v1/admin/shops/{shopID}/design/untracked-changes
@@ -1187,6 +1231,21 @@ PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/head path shopID
 PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview
 PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview path requestID
 PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview path shopID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey}
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} header X-Capture-Manifest
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} header X-Content-SHA256
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} header X-Content-SHA256 optional
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} header X-Diff-Ppm
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} header X-Diff-Ppm optional
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path phase
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path requestID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path role
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path shopID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path viewKey
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} path viewport
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} response 200 Idempotency-Replayed
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} response 201 Cache-Control
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey} response 429 Retry-After
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path shopID
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path site

@@ -33,6 +33,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/design"
+	"ksdevworks/ecommerce/api/internal/media"
 )
 
 func main() {
@@ -56,6 +57,12 @@ func main() {
 	}
 	defer func() { _ = client.Close() }()
 	p := &design.Purger{Client: client, DB: db}
+	if cfg.Design.Enabled() {
+		p.Store = design.DeleterOf(media.NewS3Store(config.MediaConfig{
+			Endpoint: cfg.Design.R2Endpoint, AccessKeyID: cfg.Design.R2AccessKeyID,
+			SecretAccessKey: cfg.Design.R2SecretKey, Bucket: cfg.Design.R2Bucket,
+		}))
+	}
 
 	switch {
 	case *exportShop > 0:

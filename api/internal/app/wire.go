@@ -237,13 +237,29 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	// Design history (change design-history, slice 1). The record is the
 	// platform's; the AI edit service reaches it only through the machine route
 	// family behind its own credential (no approval route exists there).
-	// Screenshots need storage that slice 2 adds, so submit answers 503 for now.
+	// Screenshots live in a SECOND, private bucket with its own credentials (the
+	// same S3 client code as media, different bucket/keys/config). Unconfigured:
+	// Store stays nil, upload/read/submit answer 503 design_storage_not_configured.
+	var designStore design.ObjectStore
+	if cfg.Design.Enabled() {
+		designStore = media.NewS3Store(config.MediaConfig{
+			Endpoint: cfg.Design.R2Endpoint, AccessKeyID: cfg.Design.R2AccessKeyID,
+			SecretAccessKey: cfg.Design.R2SecretKey, Bucket: cfg.Design.R2Bucket,
+		})
+	} else {
+		designStore = media.NullStore{} // never nil (wiring audit); ScreenshotsEnabled=false gates it
+		a.log.Info("design screenshot storage not configured - requests cannot be submitted for approval")
+	}
 	designService := &design.Service{
+		Store:  designStore,
 		Client: client, Authz: design.RBACAuthorizer{Engine: engine}, Log: a.log, Now: time.Now,
 		Cfg: design.Config{
 			ApprovalTTL: cfg.Design.ApprovalTTL, MinPreviewRemaining: cfg.Design.MinPreviewRemaining,
 			DailyRequestCap: cfg.Design.DailyRequestCap, ClaimLease: cfg.Design.ClaimLease,
 			ApprovalPendingTimeout: cfg.Design.ApprovalPendingTimeout,
+			ScreenshotsEnabled:     cfg.Design.Enabled(),
+			ShopQuotaBytes:         cfg.Design.ShopQuotaBytes, ScreenshotURLTTL: cfg.Design.ScreenshotTTL,
+			ProcessConcurrency: cfg.Media.ProcessConcurrency,
 		},
 	}
 	designCreds := &design.Credentials{Client: client, Now: time.Now}

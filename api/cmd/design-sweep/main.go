@@ -25,6 +25,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/design"
+	"ksdevworks/ecommerce/api/internal/media"
 )
 
 func main() {
@@ -69,7 +70,28 @@ func main() {
 		return
 	}
 	if *orphans {
-		fmt.Println("orphan report: screenshot storage is not part of this slice (slice 2); nothing to compare yet")
+		if !cfg.Design.Enabled() {
+			fmt.Println("orphan report: design screenshot storage is not configured; nothing to compare")
+			return
+		}
+		svc.Cfg.ScreenshotsEnabled = true
+		svc.Store = media.NewS3Store(config.MediaConfig{
+			Endpoint: cfg.Design.R2Endpoint, AccessKeyID: cfg.Design.R2AccessKeyID,
+			SecretAccessKey: cfg.Design.R2SecretKey, Bucket: cfg.Design.R2Bucket,
+		})
+		rep, err := svc.Orphans(ctx, *shop)
+		if err != nil {
+			log.Fatalf("orphans: %v", err)
+		}
+		fmt.Printf("objects in bucket: %d, referenced by a live row: %d\n", rep.Objects, rep.Referenced)
+		fmt.Printf("orphan objects (no row, or row already purged): %d\n", len(rep.Orphans))
+		fmt.Printf("rows whose object is missing: %d\n", rep.Missing)
+		for _, k := range rep.Orphans {
+			fmt.Println("  orphan", k)
+		}
+		if len(rep.Orphans)+rep.Missing > 0 {
+			os.Exit(1)
+		}
 		return
 	}
 

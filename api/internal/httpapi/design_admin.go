@@ -192,9 +192,10 @@ func (h *DesignAdminHandler) events(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"events": out, "page": page, "page_size": size, "total": total})
 }
 
-// screenshots answers 503 in slice 1: no private bucket exists yet. The
-// permission and the request's existence are checked first, so a caller learns
-// nothing about the deployment before being authorised.
+// screenshots lists the request's screenshots with short-lived signed read
+// URLs (design D5). The permission and the request's existence are checked
+// first, so a caller learns nothing about the deployment before being
+// authorised; the URLs are never logged and the response is never cached.
 func (h *DesignAdminHandler) screenshots(w http.ResponseWriter, r *http.Request) {
 	shopID, _ := shopIDParam(r)
 	id, ok := requestIDParam(r)
@@ -202,12 +203,24 @@ func (h *DesignAdminHandler) screenshots(w http.ResponseWriter, r *http.Request)
 		httpx.NotFound(w)
 		return
 	}
-	if _, err := h.Service.Get(r.Context(), shopID, id); err != nil {
+	w.Header().Set("Cache-Control", "no-store")
+	q := r.URL.Query()
+	views, err := h.Service.ListScreenshots(r.Context(), shopID, id, q.Get("phase"), q.Get("all") == "true")
+	if err != nil {
 		writeDesignError(w, h.Log, err)
 		return
 	}
-	w.Header().Set("Cache-Control", "no-store")
-	httpx.WriteError(w, http.StatusServiceUnavailable, "design_storage_not_configured", "screenshot storage is not configured on this server", nil)
+	out := make([]map[string]any, 0, len(views))
+	for _, v := range views {
+		m := screenshotJSON(v.Row)
+		if v.URL != "" {
+			m["url"], m["url_expires_at"] = v.URL, v.URLExpiresAt.UTC()
+		} else {
+			m["url"], m["url_expires_at"] = nil, nil
+		}
+		out = append(out, m)
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"screenshots": out})
 }
 
 type approveBody struct {

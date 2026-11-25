@@ -481,6 +481,11 @@ components:
         | 409 | `already_revoked` / `already_acknowledged` | 憑證已撤銷／未追蹤變更已確認 |
         | 429 | `daily_cap_reached` | 該店今日的設計請求已達上限 |
         | 503 | `design_storage_not_configured` | 截圖儲存尚未設定 |
+        | 409 | `quota_exceeded` | 截圖已達每請求（80 張／40 MiB）或每店（`DESIGN_SHOP_QUOTA_BYTES`）上限 |
+        | 409 | `head_not_set` | 還沒回報 head 就上傳 after 截圖 |
+        | 422 | `invalid_screenshot` | 截圖不是合法 PNG、寬度不等於視口、太高、雜湊或 manifest 無效（過大為 413） |
+        | 422 | `live_data_capture_refused` | admin 截圖不是來自 sandbox 資料集，或 storefront 截圖不是匿名／資料集宣告不一致 |
+        | 502 | `storage_unavailable` | 截圖物件儲存暫時不可用，可重試 |
         | 500 | `internal` | 伺服器內部錯誤 |
         | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
         | 503 | `unhealthy` | `/healthz` 的相依檢查失敗 |
@@ -2915,6 +2920,65 @@ components:
         preview_origin: { type: [string, "null"] }
         claim_expires_at: { type: [string, "null"], format: date-time }
         change_note: { type: [string, "null"] }
+    DesignScreenshot:
+      type: object
+      additionalProperties: false
+      required: [id, request_id, phase, site, role, viewport, view_key, attempt, commit_sha, content_type, byte_size, width, height, sha256, diff_ppm, capture_manifest, purged_at, created_at]
+      description: |
+        一張已存截圖的中繼資料。**沒有物件鍵、沒有網址**：讀取只經 `GET …/screenshots` 的簽名網址。
+      properties:
+        id: { type: string, format: uuid }
+        request_id: { type: string, format: uuid }
+        phase: { type: string, enum: [before, after] }
+        site: { type: string, enum: [storefront, admin] }
+        role: { type: string, enum: [owner, staff, anon] }
+        viewport: { type: integer, enum: [390, 1280] }
+        view_key: { type: string }
+        attempt: { type: integer }
+        commit_sha: { type: string }
+        content_type: { type: string, enum: [image/png] }
+        byte_size: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        sha256: { type: string }
+        diff_ppm: { type: [integer, "null"], description: 服務自報的差異像素百萬分比；平台只存、不信、不做閘門。 }
+        capture_manifest: { type: [object, "null"], additionalProperties: true }
+        purged_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+    DesignScreenshotRead:
+      type: object
+      additionalProperties: false
+      required: [id, request_id, phase, site, role, viewport, view_key, attempt, commit_sha, content_type, byte_size, width, height, sha256, diff_ppm, capture_manifest, purged_at, created_at, url, url_expires_at]
+      description: 與 `DesignScreenshot` 相同的欄位，另加簽名讀取網址。
+      properties:
+        id: { type: string, format: uuid }
+        request_id: { type: string, format: uuid }
+        phase: { type: string, enum: [before, after] }
+        site: { type: string, enum: [storefront, admin] }
+        role: { type: string, enum: [owner, staff, anon] }
+        viewport: { type: integer, enum: [390, 1280] }
+        view_key: { type: string }
+        attempt: { type: integer }
+        commit_sha: { type: string }
+        content_type: { type: string, enum: [image/png] }
+        byte_size: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        sha256: { type: string }
+        diff_ppm: { type: [integer, "null"] }
+        capture_manifest: { type: [object, "null"], additionalProperties: true }
+        purged_at: { type: [string, "null"], format: date-time }
+        created_at: { type: string, format: date-time }
+        url: { type: [string, "null"], description: 簽名讀取網址（預設 5 分鐘）；已清除者為 null。不得快取或記錄。 }
+        url_expires_at: { type: [string, "null"], format: date-time }
+    DesignScreenshotList:
+      type: object
+      additionalProperties: false
+      required: [screenshots]
+      properties:
+        screenshots:
+          type: array
+          items: { $ref: '#/components/schemas/DesignScreenshotRead' }
     DesignEvent:
       type: object
       additionalProperties: false
@@ -8501,10 +8565,22 @@ paths:
       operationId: listDesignRequestScreenshots
       summary: 請求的截圖（簽名網址）
       description: |
-        需要 `design.view`。**目前永遠回 503 `design_storage_not_configured`**（截圖儲存是下一個切片；授權與請求存在性先檢查）。
-        之後的版本會回 5 分鐘有效的簽名網址並帶 `Cache-Control: no-store`。
+        需要 `design.view`（授權與請求存在性先檢查，之後才可能 503）。每張回一個**簽名讀取網址**（`url`，預設 5 分鐘，`DESIGN_SCREENSHOT_URL_TTL`）與 `url_expires_at`；
+        回應帶 `Cache-Control: no-store`，網址不得快取、不得記錄、不得存進任何資料表。預設每個槽位（phase／role／viewport／view_key）只回最新一次 `attempt`，`?all=true` 回全部。
+        已被保存期限清除的截圖仍列出，`url` 為 null、`purged_at` 有值。bucket 是私有的、沒有公開網域；物件鍵不會出現在任何回應。
+        **未設定截圖儲存時回 503 `design_storage_not_configured`。**
       security: [{ adminJWT: [] }]
+      parameters:
+        - { name: phase, in: query, required: false, schema: { type: string, enum: [before, after] } }
+        - { name: all, in: query, required: false, schema: { type: boolean } }
       responses:
+        "200":
+          description: 截圖與簽名網址。
+          headers:
+            Cache-Control: { schema: { type: string }, description: 恆為 `no-store`。 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignScreenshotList' }
         "503":
           description: 截圖儲存尚未設定（`design_storage_not_configured`）。
           content:
@@ -8513,6 +8589,7 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
 
   /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve:
     parameters:
@@ -9147,6 +9224,81 @@ paths:
         "404": { $ref: '#/components/responses/NotFound' }
         "409": { $ref: '#/components/responses/Conflict' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+      - { name: phase, in: path, required: true, schema: { type: string, enum: [before, after] } }
+      - { name: role, in: path, required: true, schema: { type: string, enum: [owner, staff, anon] } }
+      - { name: viewport, in: path, required: true, schema: { type: integer, enum: [390, 1280] } }
+      - { name: viewKey, in: path, required: true, schema: { type: string, pattern: "^[a-z0-9-]{1,40}$" } }
+    put:
+      tags: [design-service]
+      operationId: uploadDesignServiceScreenshot
+      summary: 上傳一張標準化截圖
+      description: |
+        **服務憑證。** 槽位由路徑決定，不接受自由檔名。本文是 PNG 位元組（`Content-Type: image/png`，≤ 2 MiB）。平台驗證寬度等於視口、高度 ≤ 10,000、PNG 可完整解碼，
+        然後**重新編碼**（去除所有中繼資料）再存進私有 bucket；`sha256` 是**存入位元組**的雜湊，`X-Content-SHA256`（選填）必須等於**上傳位元組**的雜湊（否則 422 `invalid_screenshot`）。
+        `X-Capture-Manifest` 是 base64 的 JSON（≤ 2 KiB：`tool`、`tool_version`、`dataset`、`api_origin_class`、`captured_at`、`set_version`，其餘欄位丟棄）。
+        **隱私規則（Q5）**：admin 站台必須 `dataset=sandbox-v1` 且 `api_origin_class=sandbox`；storefront 只收匿名（`role=anon`），資料集為 `sandbox-v1`（sandbox 來源）或 `public-live`（公開來源）；
+        違反回 422 `live_data_capture_refused`。平台無法驗真，這是契約與縱深防禦。
+        同位元組、同 commit 重放回 200（`Idempotency-Replayed: true`）；不同位元組新增 `attempt`（舊的保留）。before 的 `commit_sha` 是 `base_sha`，after 是目前 `head_sha`。
+        只在 `drafting`／`previewing` 可上傳（409 `invalid_state`）。每請求最多 80 張、40 MiB，每店 `DESIGN_SHOP_QUOTA_BYTES`（預設 2 GiB），超過 409 `quota_exceeded`；每憑證每分鐘 60 次上傳。
+        **未設定截圖儲存時回 503 `design_storage_not_configured`**（認證與請求存在性之後）。
+      security: [{ designServiceKey: [] }]
+      parameters:
+        - { name: X-Capture-Manifest, in: header, required: true, schema: { type: string, maxLength: 4096 } }
+        - { name: X-Content-SHA256, in: header, required: false, schema: { type: string, pattern: "^[0-9a-fA-F]{64}$" } }
+        - { name: X-Diff-Ppm, in: header, required: false, schema: { type: integer, minimum: 0, maximum: 1000000 } }
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema: { type: string, format: binary }
+      responses:
+        "201":
+          description: 已存入（新的 attempt）。
+          headers:
+            Cache-Control: { schema: { type: string }, description: 恆為 `no-store`。 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignScreenshot' }
+        "200":
+          description: 同位元組重放，沒有新增。
+          headers:
+            Idempotency-Replayed: { schema: { type: string }, description: 恆為 `true`。 }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignScreenshot' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "413":
+          description: 影像超過 2 MiB（`invalid_screenshot`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "415":
+          description: "`Content-Type` 不是 `image/png`。"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+        "502":
+          description: 物件儲存暫時不可用（`storage_unavailable`），可重試。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "503":
+          description: 截圖儲存尚未設定（`design_storage_not_configured`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
 
   /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit:
     parameters:

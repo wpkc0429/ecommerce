@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,6 +34,11 @@ type Config struct {
 	// ScreenshotsEnabled is false in slice 1: no storage exists yet, so submit
 	// answers 503 design_storage_not_configured (design D18, migration plan).
 	ScreenshotsEnabled bool
+
+	// Slice 2 (screenshots). Zero values mean the documented defaults.
+	ShopQuotaBytes     int64         // stored screenshot bytes per shop (default none = unlimited in unit tests; config defaults 2 GiB)
+	ScreenshotURLTTL   time.Duration // signed read URL lifetime (default 5m)
+	ProcessConcurrency int           // concurrent PNG decode/encode (default 2)
 }
 
 // DefaultConfig returns the documented defaults.
@@ -49,8 +55,14 @@ type Service struct {
 	Authz  Authorizer
 	Cfg    Config
 	Log    *slog.Logger
+	// Store is the PRIVATE screenshot bucket; nil = not configured (uploads and
+	// reads answer 503 design_storage_not_configured).
+	Store ObjectStore
 	// Now is the clock; nil means time.Now. Tests inject a fake one.
 	Now func() time.Time
+
+	semOnce sync.Once
+	sem     chan struct{}
 }
 
 func (s *Service) now() time.Time {

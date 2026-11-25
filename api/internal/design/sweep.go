@@ -2,6 +2,7 @@ package design
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,6 +10,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/designrequest"
 	"ksdevworks/ecommerce/api/internal/ent/designrequestevent"
+	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
 	"ksdevworks/ecommerce/api/internal/ent/predicate"
 )
 
@@ -139,6 +141,66 @@ func (s *Service) VerifyChains(ctx context.Context, shopID int) (*SweepReport, e
 			continue
 		}
 		rep.Verified++
+	}
+	return rep, nil
+}
+
+// deleter adapts a variadic-delete object store to ObjectDeleter.
+type deleter struct{ s ObjectStore }
+
+func (d deleter) Delete(ctx context.Context, key string) error { return d.s.Delete(ctx, key) }
+
+// DeleterOf wraps an ObjectStore as the purge command's ObjectDeleter.
+func DeleterOf(s ObjectStore) ObjectDeleter { return deleter{s} }
+
+// OrphanReport compares the bucket with the screenshots table. It only reads.
+type OrphanReport struct {
+	Objects    int      // objects listed under the prefix
+	Referenced int      // of those, referenced by a row that still holds its object
+	Orphans    []string // objects no live row points at (upload that lost its row, purge that lost its delete)
+	Missing    int      // live rows whose object is not in the bucket
+}
+
+// Orphans lists the private bucket (shop 0 = every shop) and diffs it against
+// design_screenshots.
+func (s *Service) Orphans(ctx context.Context, shop int) (*OrphanReport, error) {
+	if !s.storageOn() {
+		return nil, errStorageNotConfigured()
+	}
+	prefix := "shops/"
+	if shop > 0 {
+		prefix = fmt.Sprintf("shops/%d/design/", shop)
+	}
+	keys, err := s.Store.List(ctx, prefix)
+	if err != nil {
+		return nil, err
+	}
+	q := s.Client.DesignScreenshot.Query().Where(designscreenshot.PurgedAtIsNil())
+	if shop > 0 {
+		q = q.Where(designscreenshot.ShopIDEQ(shop))
+	}
+	live, err := q.Select(designscreenshot.FieldObjectKey).Strings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	liveSet := make(map[string]bool, len(live))
+	for _, k := range live {
+		liveSet[k] = true
+	}
+	rep := &OrphanReport{Objects: len(keys)}
+	inBucket := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		inBucket[k] = true
+		if liveSet[k] {
+			rep.Referenced++
+		} else {
+			rep.Orphans = append(rep.Orphans, k)
+		}
+	}
+	for _, k := range live {
+		if !inBucket[k] {
+			rep.Missing++
+		}
 	}
 	return rep, nil
 }

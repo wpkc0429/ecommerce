@@ -1,8 +1,11 @@
 package httpapi
 
 import (
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +38,7 @@ func (h *DesignServiceHandler) MountService(r chi.Router) {
 	r.Put("/requests/{requestID}/head", h.head)
 	r.Post("/requests/{requestID}/guard-runs", h.guard)
 	r.Put("/requests/{requestID}/preview", h.preview)
+	r.Put("/requests/{requestID}/screenshots/{phase}/{role}/{viewport}/{viewKey}", h.uploadScreenshot)
 	r.Post("/requests/{requestID}/submit", h.submit)
 	r.Post("/requests/{requestID}/published", h.published)
 	r.Post("/requests/{requestID}/failed", h.failed)
@@ -278,4 +282,62 @@ func (h *DesignServiceHandler) untracked(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"received": len(in), "added": n})
+}
+
+// uploadScreenshot stores one screenshot (design D5/D6/D11). The path decides
+// the slot; no free-form file name is accepted. 201 for a new image, 200 when
+// the same bytes were already stored for the slot.
+func (h *DesignServiceHandler) uploadScreenshot(w http.ResponseWriter, r *http.Request) {
+	shopID, _ := shopIDParam(r)
+	id, ok := requestIDParam(r)
+	if !ok {
+		httpx.NotFound(w)
+		return
+	}
+	if ct := r.Header.Get("Content-Type"); ct != "image/png" {
+		httpx.WriteError(w, http.StatusUnsupportedMediaType, "invalid_screenshot", "Content-Type must be image/png", nil)
+		return
+	}
+	viewport, err := strconv.Atoi(chi.URLParam(r, "viewport"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusUnprocessableEntity, "validation_failed", "viewport must be 390 or 1280", nil)
+		return
+	}
+	// One byte over the limit is enough to know it is too large.
+	r.Body = http.MaxBytesReader(w, r.Body, design.MaxScreenshotBytes)
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			httpx.WriteError(w, http.StatusRequestEntityTooLarge, "invalid_screenshot", "the image is larger than 2 MiB", nil)
+			return
+		}
+		httpx.WriteError(w, http.StatusBadRequest, "bad_request", "the request body could not be read", nil)
+		return
+	}
+	in := design.UploadInput{
+		ShopID: shopID, RequestID: id, Phase: chi.URLParam(r, "phase"), Role: chi.URLParam(r, "role"),
+		Viewport: viewport, ViewKey: chi.URLParam(r, "viewKey"), Body: body,
+		ClaimedSHA256: r.Header.Get("X-Content-SHA256"), Manifest: r.Header.Get("X-Capture-Manifest"),
+	}
+	if v := r.Header.Get("X-Diff-Ppm"); v != "" {
+		n, perr := strconv.Atoi(v)
+		if perr != nil {
+			httpx.WriteError(w, http.StatusUnprocessableEntity, "invalid_screenshot", "X-Diff-Ppm must be an integer", nil)
+			return
+		}
+		in.DiffPPM = &n
+	}
+	row, replay, err := h.Service.UploadScreenshot(r.Context(), in)
+	if err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
+	status := http.StatusCreated
+	if replay {
+		status = http.StatusOK
+		w.Header().Set("Idempotency-Replayed", "true")
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	httpx.WriteJSON(w, status, screenshotJSON(row))
 }

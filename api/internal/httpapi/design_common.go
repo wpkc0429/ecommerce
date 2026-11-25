@@ -152,3 +152,15 @@ func atoiOr(s string, def int) int {
 	}
 	return n
 }
+
+// screenshotJSON is the metadata of a stored screenshot: never the object key
+// (a storage detail) and never a URL (those are minted per read).
+func screenshotJSON(r *ent.DesignScreenshot) map[string]any {
+	return map[string]any{
+		"id": r.ID.String(), "request_id": r.RequestID.String(), "phase": r.Phase, "site": r.Site, "role": r.Role,
+		"viewport": r.Viewport, "view_key": r.ViewKey, "attempt": r.Attempt, "commit_sha": r.CommitSha,
+		"content_type": r.ContentType, "byte_size": r.ByteSize, "width": r.Width, "height": r.Height,
+		"sha256": r.Sha256, "diff_ppm": r.DiffPpm, "capture_manifest": rawJSON(r.CaptureManifest),
+		"purged_at": ts(r.PurgedAt), "created_at": r.CreatedAt.UTC(),
+	}
+}
