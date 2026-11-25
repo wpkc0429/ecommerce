@@ -130,6 +130,11 @@ func (c *Config) validateSecrets() error {
 		weak("R2_SECRET_ACCESS_KEY", c.Media.SecretAccessKey)
 	}
 
+	// Design screenshot storage (change design-history): same rule.
+	if c.Design.Enabled() {
+		weak("DESIGN_R2_SECRET_ACCESS_KEY", c.Design.R2SecretKey)
+	}
+
 	if len(errs) == 0 {
 		return nil
 	}

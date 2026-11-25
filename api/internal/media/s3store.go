@@ -135,3 +135,15 @@ func (s *S3Store) List(ctx context.Context, prefix string) ([]string, error) {
 	}
 	return keys, nil
 }
+
+// PresignGet signs a GET for key valid for ttl.
+func (s *S3Store) PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error) {
+	req, err := s.presign.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(ttl))
+	if err != nil {
+		return "", fmt.Errorf("media: presign get: %w", err)
+	}
+	return req.URL, nil
+}

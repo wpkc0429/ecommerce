@@ -21,6 +21,7 @@ type FakeStore struct {
 	mu      sync.Mutex
 	objects map[string]fakeObject
 	pending map[string]fakePresign // token -> expectation
+	reads   map[string]fakeRead    // token -> signed GET
 	srv     *httptest.Server
 	seq     int
 
@@ -42,7 +43,7 @@ type fakePresign struct {
 
 // NewFakeStore starts the presign endpoint; Close stops it.
 func NewFakeStore() *FakeStore {
-	f := &FakeStore{objects: map[string]fakeObject{}, pending: map[string]fakePresign{}}
+	f := &FakeStore{objects: map[string]fakeObject{}, pending: map[string]fakePresign{}, reads: map[string]fakeRead{}}
 	f.srv = httptest.NewServer(http.HandlerFunc(f.servePut))
 	return f
 }
@@ -50,6 +51,10 @@ func NewFakeStore() *FakeStore {
 func (f *FakeStore) Close() { f.srv.Close() }
 
 func (f *FakeStore) servePut(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		f.serveGet(w, r)
+		return
+	}
 	if r.Method != http.MethodPut {
 		http.Error(w, "method", http.StatusMethodNotAllowed)
 		return
@@ -75,6 +80,35 @@ func (f *FakeStore) servePut(w http.ResponseWriter, r *http.Request) {
 	f.objects[exp.key] = fakeObject{body: body, contentType: exp.contentType}
 	f.mu.Unlock()
 	w.WriteHeader(http.StatusOK)
+}
+
+type fakeRead struct {
+	key     string
+	expires time.Time
+}
+
+func (f *FakeStore) serveGet(w http.ResponseWriter, r *http.Request) {
+	tok := strings.TrimPrefix(r.URL.Path, "/")
+	f.mu.Lock()
+	rd, ok := f.reads[tok]
+	o, have := f.objects[rd.key]
+	f.mu.Unlock()
+	if !ok || !have || time.Now().After(rd.expires) {
+		http.Error(w, "unknown or expired signature", http.StatusForbidden)
+		return
+	}
+	w.Header().Set("Content-Type", o.contentType)
+	_, _ = w.Write(o.body)
+}
+
+// PresignGet returns a URL on the private test server, valid for ttl.
+func (f *FakeStore) PresignGet(_ context.Context, key string, ttl time.Duration) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.seq++
+	tok := "get" + strconv.Itoa(f.seq)
+	f.reads[tok] = fakeRead{key: key, expires: time.Now().Add(ttl)}
+	return f.srv.URL + "/" + tok, nil
 }
 
 func (f *FakeStore) PresignPut(_ context.Context, key, contentType string, size int64, _ time.Duration) (PresignedPut, error) {

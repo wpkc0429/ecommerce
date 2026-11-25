@@ -60,7 +60,10 @@ services:
       # Buckets created at first start; ":download" = anonymous read-only (the
       # public image domain). The second bucket is for e2e runs, so their
       # objects can be wiped without touching development images.
-      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-ecommerce-media}:download,${MINIO_BUCKET_E2E:-ecommerce-media-e2e}:download
+      # The last two are PRIVATE (":none" = no anonymous access, ever): the design
+      # history screenshots (change design-history). Reads are only through short
+      # signed URLs minted by the API; the second one is for e2e runs.
+      MINIO_DEFAULT_BUCKETS: ${MINIO_BUCKET:-ecommerce-media}:download,${MINIO_BUCKET_E2E:-ecommerce-media-e2e}:download,${MINIO_BUCKET_DESIGN:-ecommerce-design-history}:none,${MINIO_BUCKET_DESIGN_E2E:-ecommerce-design-history-e2e}:none
       # MinIO has no bucket-level CORS API; this is its server-wide equivalent.
       # Browsers PUT presigned uploads straight from the admin origin (design D2).
       MINIO_API_CORS_ALLOW_ORIGIN: ${MINIO_CORS_ALLOW_ORIGIN:-http://localhost:3001,http://127.0.0.1:3001}

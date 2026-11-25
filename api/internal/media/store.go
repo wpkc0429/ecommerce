@@ -42,6 +42,10 @@ type ObjectStore interface {
 	Delete(ctx context.Context, keys ...string) error
 	// List returns every key with the given prefix.
 	List(ctx context.Context, prefix string) ([]string, error)
+	// PresignGet returns a time-limited GET URL for one object (change
+	// design-history: the private screenshot bucket has no public domain, so
+	// reads are only ever through such a URL).
+	PresignGet(ctx context.Context, key string, ttl time.Duration) (string, error)
 }
 
 // NullStore backs a disabled Service: every call fails with ErrNotConfigured.
@@ -57,4 +61,7 @@ func (NullStore) Put(context.Context, string, []byte, string, string) error {
 	return ErrNotConfigured
 }
 func (NullStore) Delete(context.Context, ...string) error        { return ErrNotConfigured }
+func (NullStore) PresignGet(context.Context, string, time.Duration) (string, error) {
+	return "", ErrNotConfigured
+}
 func (NullStore) List(context.Context, string) ([]string, error) { return nil, ErrNotConfigured }
