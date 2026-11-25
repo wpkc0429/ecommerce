@@ -1,4 +1,4 @@
-> 本 change 目前**只有提案**；以下全部未做。實作前先請使用者回答 design.md 的 Q1–Q10（尤其 Q5 sandbox、Q7 core 相容下限、Q9 publish grant）。每組可獨立部署；切片對應 design 的 Migration Plan。
+> 本 change 目前**只有提案**；以下全部未做。design.md 的 Q1–Q10 已於 2026-11-25 由使用者定案（採用建議原文）；Q9（publish grant）與 Q10（通知信）為附條件決議，見 design.md。每組可獨立部署；切片對應 design 的 Migration Plan。
 
 ## 1. 平台資料與 API（切片 1，design D2／D4／D8／D15／D16）
 

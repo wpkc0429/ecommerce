@@ -119,7 +119,7 @@ published ──(之後某筆還原發佈)──► reverted（見 D15）
 - 核准端點本文必帶 `head_sha`、必帶 `If-Match`（ETag＝`rev`）。伺服器條件：狀態＝`awaiting_approval`、`body.head_sha == candidate_sha == head_sha`、`If-Match` 吻合；條件式 UPDATE `WHERE status='awaiting_approval' AND candidate_sha=$sha AND rev=$rev`＋影響列數；失敗回 409 `head_moved`／412。成功時寫 `approved_head_sha`、`approval_expires_at`、配發 `publish_tag`。
 - **重放**：核准是單次消耗——只有 `awaiting_approval → approved` 一條路；重送同一請求（同使用者、同 SHA）在已核准時回 200（同一結果，便於網路重試），其他情況 409；`published` 的條件式轉移（`WHERE status='approved' AND approval_expires_at > now()`）使一次核准只能換一次發佈。
 - **發佈前重檢**：`published` 事件被接受的條件是：已核准未逾期、存在 `guard_rechecked` 事件滿足 `head_sha == approved_head_sha` 且 `passed` 且發生於核准**之後**、本文的 `published_sha == approved_head_sha`、`tag == publish_tag`。服務有義務在發佈前 `check-design --base` 於**該確切 SHA**重跑（AI-EDIT-SERVICE-NOTES 第 5 步已有此要求）。
-- **誠實的邊界**：平台**無法**阻止一個握有 git 寫入權的服務直接推 `main`——API 的「不能發佈」只意味著它**無法讓平台承認一次未經核准的發佈**，而不是 git 層的物理阻擋。縱深：①服務的 git token 限該商家 repo、`main` 設分支保護（template notes 第 1 步已要求）；②**第三切片（選用，需使用者決定）**：核准時平台簽發 **publish grant**（Ed25519 簽章，內含 shop、request、`approved_head_sha`、tag、到期），商家 repo 的部署 CI 在 `main` 推送時驗證 grant（公鑰由平台公開端點提供、固定在 repo 的鎖定檔）。這才讓「無核准就無法上線」成為物理事實。③`reconciliation`（D19）會把繞過者列為「未追蹤的變更」。
+- **誠實的邊界**：平台**無法**阻止一個握有 git 寫入權的服務直接推 `main`——API 的「不能發佈」只意味著它**無法讓平台承認一次未經核准的發佈**，而不是 git 層的物理阻擋。縱深：①服務的 git token 限該商家 repo、`main` 設分支保護（template notes 第 1 步已要求）；②**第三切片（選用；Q9 決議：僅在服務持有 `main` 寫入權時建置）**：核准時平台簽發 **publish grant**（Ed25519 簽章，內含 shop、request、`approved_head_sha`、tag、到期），商家 repo 的部署 CI 在 `main` 推送時驗證 grant（公鑰由平台公開端點提供、固定在 repo 的鎖定檔）。這才讓「無核准就無法上線」成為物理事實。③`reconciliation`（D19）會把繞過者列為「未追蹤的變更」。
 
 ### D11：隱私——擷取什麼、從哪裡擷取
 **規則（建議，需使用者確認）**：
@@ -233,7 +233,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 - 新 `ctx.data`：`listDesignRequests({site,status,page})`、`getDesignRequest(id)`（含簽名截圖網址與事件）、`getDesignState()`、`listUntrackedChanges()`；`ctx.actions`：`approveDesignRequest(id, {headSha})`（**核心顯示確認**，新的**不可逆動作**：固定警告說明「核准後 AI 的改動會在數分鐘內對所有顧客上線」，須加進 `warnings.js` 與 `WARNED_CONFIRM_IDS`）、`rejectDesignRequest`、`requestDesignChanges`、`cancelDesignRequest`、`revertDesign(id)`（固定警告：「將以新的版本還原設計，期間需再次核准；內容文件不受影響」）。權限由核心在動作內以 `design.*` 檢查。
 - **核心擁有的前後對照元件** `ctx.ui.beforeAfter({before, after, labels})`（並排與滑桿兩模式，鍵盤可操作，`alt` 文字來自 `copy.js`；圖片以 `<img src>` 載入簽名網址，CSP `img-src` 需放行截圖簽名網址的來源——**這是 CSP 變更，是人工審查的核心變更**，因為嚴格 CSP 目前是 `img-src 'self' data: <image-public-domain>`；替代方案：由核心以 `fetch` 取回後轉 `blob:`，但 `blob:` 同樣需要 `img-src`，故仍要改 CSP，建議 `img-src` 增列私有 bucket 的簽名網址主機）。
 - 預設設計層畫面（`design-defaults/views/`）：歷史列表、詳情（並排截圖、請求原文——**一律 `textContent`**、事件時間軸、守門員摘要、diff 摘要、核准／拒絕）、還原按鈕與確認。新增 copy 鍵須同步 `design/copy.js` 與 `design-defaults/copy.js`；`CORE-CHANGELOG` 的 `Design-layer action:` 行；`lib/public-api.json`、`DESIGN-LAYER.md`、守門員 fixtures、e2e。
-- 「歷史／還原 UI 放在哪裡」見開放問題 Q8。
+- 「歷史／還原 UI 放在哪裡」見決議 Q8。
 - **新增 `ctx` 函式是人工審查的核心變更**（`.claude/skills/core-change`，template `docs/DECISIONS.md` D4）；AI 設計工作階段不得自行新增。
 
 ### D24：濫用情境與對策
@@ -245,7 +245,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 | **跨店存取** | URL 的 `{shopID}` 對照憑證／RBAC；所有查詢顯式帶 `shop_id`；composite FK 強制還原連結同店；測試：A 店憑證打 B 店 → 404；A 店使用者讀 B 店請求 → 403／404（有權限的店內 id 屬他店 → 404，同 member-directory 慣例）。 |
 | **惡意 prompt 被存下並在後台渲染（XSS）** | 一律以文字呈現：API 回 JSON（`Content-Type: application/json`、`X-Content-Type-Options: nosniff`）；入庫時剔除控制字元與雙向覆寫字元（U+202A–202E、U+2066–2069）；長度上限；**template 契約**：歷史畫面以 `textContent`／`ctx.ui` 的文字節點渲染，設計層禁用 `innerHTML`（守門員既有規則）；`failure_detail`、`reject_reason`、`subject`、`files[].path` 同理。 |
 | **儲存於歷史的提示詞注入** | 歷史是資料：服務契約第 15 條；平台不把 prompt 回傳給任何會餵給模型的端點以外之處（服務路由族的唯讀 GET 不回 prompt 全文，只回狀態與 `prompt_sha256`）；`request-changes` 的 note 標示為「商家備註（資料）」。 |
-| **核准者被冒用（竊取 owner session）** | 核准端點要求有效 access token＋`design.approve`；建議（開放問題）核准時**要求近期重新輸入密碼**或寄通知信給所有 owner（`internal/notify` 已有 SMTP；但目前只用於訂單與申請，擴充需另議）。 |
+| **核准者被冒用（竊取 owner session）** | 核准端點要求有效 access token＋`design.approve`；核准時寄通知信給所有 owner（Q10，附條件；重新輸入密碼不在決議內）給所有 owner（`internal/notify` 已有 SMTP；但目前只用於訂單與申請，擴充需另議）。 |
 | **TOCTOU：分支在核准後移動** | D10。 |
 | **服務／repo 被攻破而繞過平台** | D10 的誠實邊界；branch protection；選用的 publish grant；對帳。 |
 | **歷史被竄改** | D3：trigger＋雜湊串；限制已述。 |
@@ -254,7 +254,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 
 ## Risks / Trade-offs
 
-- [**「不能發佈」只是 API 層的承諾**] → D10：誠實標示；分支保護；選用的 publish grant（第三切片，需決定）；對帳偵測。
+- [**「不能發佈」只是 API 層的承諾**] → D10：誠實標示；分支保護；選用的 publish grant（第三切片，Q9 附條件）；對帳偵測。
 - [**第一個資料庫 trigger**，增加 migration 與測試複雜度] → 僅三張表，`down` 明確，整合測試斷言 UPDATE／DELETE 被擋；替代方案（只靠應用層）被否決，因為「只能追加」是本 change 的主張，值得一道資料庫層的防線。
 - [**sandbox 堆疊是新的營運負擔**] → 可按需拋棄式；若使用者不願，退回「只拍 storefront＋admin 以遮罩 live 資料」並接受更高隱私風險（不建議）。
 - [**截圖不是證明**] → 並排即時預覽；標示來源；紀錄本身誠實分級（D1）。
@@ -282,17 +282,17 @@ Template 後續任務與平台切片互相獨立（平台 API 不依賴 template
 - **還原不保證設計與目前內容或目前 core 完全相容**（只有下限檢查＋守門員＋預覽）。
 - **人工 workaround（在服務蓋好之前）**：每次人工改設計前，在 sandbox 堆疊執行 `node e2e/parity.mjs capture <dir>`（改前、改後各一次，`compare` 看差異），把兩個資料夾與請求原文放進專案資料夾；提交後打 tag（`design-<site>-YYYYMMDD-N`），並在 commit message 記請求者與核准者。這是紀律不是系統。
 
-## Decided 與 Open Questions（需使用者回答；附建議）
+## 決議（Q1–Q10，2026-11-25 已定案）
 
-沒有任何一項已被使用者定案，除了使用者在任務中指定的前提（服務永不核准、核准綁 head_sha、歷史只能追加、核准需要截圖）。
+Q1–Q10 已於 2026-11-25 由使用者定案（採用 design.md 建議原文）。另有使用者在任務中指定的前提（服務永不核准、核准綁 head_sha、歷史只能追加、核准需要截圖）。以下保留各項理由。
 
-- **Q1 保存期限**：見 D21 的表。建議：prompt 365 天遮蔽、已發佈截圖 365 天、其餘截圖 30 天、請求與事件 730 天。
-- **Q2 誰能核准**：建議只有 `merchant_owner`（`design.approve`）與平台 `super_admin`；`editor` 不行。若店只有一位 owner，核准者即請求者，不強制不同人。
-- **Q3 staff／editor 能看歷史嗎**：建議 `editor` 可看（`design.view`）、`staff` 不可看。
-- **Q4 prompt 是否全文保存**：建議全文保存（追溯需要），入庫即遮蔽 email／電話／卡號、365 天後遮蔽整段、聊天 UI 警語；若使用者更重視隱私，可改為只存摘要與雜湊（代價：客訴時看不到原話）。
-- **Q5 admin 截圖：sandbox 或 live**：建議**只用 sandbox（選項 A：拋棄式堆疊）**；storefront 允許 live 公開資料。需要使用者決定是否願意維運 sandbox 堆疊。
-- **Q6 tag 命名**：建議 `design-{site}-{YYYYMMDD}-{N}`（如 `design-admin-20261125-1`；日期為 UTC、N 由平台於核准時配發並以 `UNIQUE(shop_id, publish_tag)` 保證不重複），因為 admin 與 storefront 在同一個 repo。使用者原提議 `design-YYYYMMDD-N` 在兩站同日發佈時需另外區分，故加上 site。還原發佈同樣配發新 tag。
-- **Q7 core 相容檢查的解讀**：建議「相容下限制」（D13）；替代「target.core_version ≥ 目前 core」過於嚴格。
-- **Q8 對照 UI 放哪裡**：建議由**核心擁有元件**、預設畫面在 `design-defaults`（設計層可重新排版，但不能移除核准／還原確認與固定警告）；並同時在平台的共用 merchant admin 提供相同畫面（因為商家的後台可能是 template 也可能是 Bouquet 這類自訂前端，契約寫入 `docs/admin-frontend-integration.md`）。
-- **Q9 publish grant（切片 3）要不要做**：建議先做切片 1–2，上線前若服務將持有 `main` 寫入權則一併做 grant；若 `main` 有分支保護且服務只推分支、由平台外的人工或 CI 合併，則可不做。
-- **Q10 核准時是否要求重新輸入密碼／通知信**：建議至少寄通知信給所有 owner（核准、發佈、還原各一封）；需要先處理 Gmail 額度（見 CLAUDE.md 通知信一節）。
+- **Q1 保存期限（已定案）**：見 D21 的表。prompt 全文 365 天（遮蔽）、已發佈截圖 365 天、其餘截圖 30 天、請求與事件 730 天。
+- **Q2 誰能核准（已定案）**：只有 `merchant_owner`（`design.approve`）與平台 `super_admin`；`editor` 不行。若店只有一位 owner，核准者即請求者，不強制不同人。
+- **Q3 staff／editor 能看歷史嗎（已定案）**：`editor` 可看（`design.view`）、`staff` 不可看。
+- **Q4 prompt 是否全文保存（已定案）**：全文保存（追溯需要），入庫即遮蔽 email／電話／卡號、365 天後遮蔽整段、聊天 UI 警語。（理由：若只存摘要與雜湊，客訴時看不到原話。）
+- **Q5 admin 截圖（已定案）**：admin **只用 sandbox（選項 A：拋棄式堆疊，合成資料）**；storefront 允許 live 公開資料。
+- **Q6 tag 命名（已定案）**：`design-{site}-{YYYYMMDD}-{N}`（如 `design-admin-20261125-1`；日期為 UTC、N 由平台於核准時配發並以 `UNIQUE(shop_id, publish_tag)` 保證不重複），因為 admin 與 storefront 在同一個 repo。原提議 `design-YYYYMMDD-N` 在兩站同日發佈時需另外區分，故加上 site。還原發佈同樣配發新 tag。
+- **Q7 core 相容檢查的解讀（已定案）**：「不低於設計下限」（D13）；替代「target.core_version ≥ 目前 core」過於嚴格。
+- **Q8 對照 UI 放哪裡（已定案）**：由**核心擁有元件**、預設畫面在 `design-defaults`（設計層的預設備份；設計層可重新排版，但不能移除核准／還原確認與固定警告）；並同時在平台的共用 merchant admin 提供相同畫面（商家的後台可能是 template 也可能是 Bouquet 這類自訂前端，契約寫入 `docs/admin-frontend-integration.md`）。
+- **Q9 publish grant（切片 3）（已定案，附條件）**：先做切片 1–2；僅當服務將持有 `main` 寫入權才建置 grant；若服務只推分支、由人工合併，則省略。分支保護（branch protection）仍延後處理，不屬本次決議。
+- **Q10 核准通知信（已定案，附條件）**：核准、發佈、還原各寄一封通知信給店主（所有 owner）；以 email 額度／SMTP 處理完成為前提（見 CLAUDE.md 通知信一節），未完成前此項不開工。
