@@ -21,6 +21,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/content/hook"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/database"
+	"ksdevworks/ecommerce/api/internal/design"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/guest"
 	"ksdevworks/ecommerce/api/internal/httpapi"
@@ -232,6 +233,28 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		MaxAge: cfg.ContentPublicMaxAge, Log: a.log,
 	}
 	deps.ContentPublicRateLimit = httpapi.NewContentPublicRateLimit(limiter, cfg.ContentPublicRateLimit, cfg.ContentPublicRateWindow)
+
+	// Design history (change design-history, slice 1). The record is the
+	// platform's; the AI edit service reaches it only through the machine route
+	// family behind its own credential (no approval route exists there).
+	// Screenshots need storage that slice 2 adds, so submit answers 503 for now.
+	designService := &design.Service{
+		Client: client, Authz: design.RBACAuthorizer{Engine: engine}, Log: a.log, Now: time.Now,
+		Cfg: design.Config{
+			ApprovalTTL: cfg.Design.ApprovalTTL, MinPreviewRemaining: cfg.Design.MinPreviewRemaining,
+			DailyRequestCap: cfg.Design.DailyRequestCap, ClaimLease: cfg.Design.ClaimLease,
+			ApprovalPendingTimeout: cfg.Design.ApprovalPendingTimeout,
+		},
+	}
+	designCreds := &design.Credentials{Client: client, Now: time.Now}
+	deps.Design = &httpapi.DesignAdminHandler{
+		Service: designService, Client: client, Authz: authz, Limiter: limiter,
+		DefaultTZ: cfg.ReportDefaultTimezone, Log: a.log,
+	}
+	deps.DesignService = &httpapi.DesignServiceHandler{Service: designService, Log: a.log}
+	deps.DesignCredentials = &httpapi.DesignCredentialsHandler{Credentials: designCreds, Authz: authz, Log: a.log}
+	deps.DesignServiceAuthMW = httpapi.NewDesignServiceAuth(designCreds, limiter, a.log)
+	deps.DesignServiceRateLimit = httpapi.NewDesignServiceRateLimit(limiter)
 
 	deps.Pages = &httpapi.PagesHandler{Client: client, Service: cmsService, Issuer: issuer, Cfg: cfg, Authz: authz, Log: a.log}
 

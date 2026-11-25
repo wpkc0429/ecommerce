@@ -57,6 +57,16 @@ type Deps struct {
 	// PaymentCredentials: change ecpay-per-shop-credentials (merchant-scoped
 	// management of its own ecpay MerchantID/HashKey/HashIV/ChoosePayment).
 	PaymentCredentials *PaymentCredentialsHandler
+	// Design: change design-history. Design is the human (admin) side;
+	// DesignService the machine side, mounted OUTSIDE /admin behind its own
+	// credential; DesignCredentials issues those credentials (platform level).
+	Design            *DesignAdminHandler
+	DesignService     *DesignServiceHandler
+	DesignCredentials *DesignCredentialsHandler
+	// DesignServiceAuthMW authenticates the AI edit service's credential;
+	// DesignServiceRateLimit limits its writes per credential.
+	DesignServiceAuthMW    func(http.Handler) http.Handler
+	DesignServiceRateLimit func(http.Handler) http.Handler
 	// Media: change product-images-r2 (upload intents, product image
 	// sub-resource, CMS content images, media config). Always set in
 	// production: with storage unconfigured its routes stay mounted and answer
@@ -245,6 +255,9 @@ func New(d Deps) http.Handler {
 						if d.Team != nil {
 							d.Team.MountShopAdmin(sh, d.AdminInviteRateLimit)
 						}
+						if d.Design != nil {
+							d.Design.MountShopAdmin(sh)
+						}
 						if d.Branding != nil {
 							d.Branding.MountShopAdmin(sh)
 						}
@@ -271,9 +284,25 @@ func New(d Deps) http.Handler {
 					if d.Applications != nil {
 						d.Applications.MountPlatform(pr)
 					}
+					if d.DesignCredentials != nil {
+						d.DesignCredentials.MountPlatform(pr)
+					}
 				})
 			}
 		})
+
+		// ── Design service (change design-history D8) ───────────────────
+		// The AI edit service's own route family. Deliberately NOT under
+		// /admin: no user JWT, no RBAC, no Cloudflare Access or host binding
+		// applies to a machine, and the credential authenticates nowhere else.
+		// There is no approval route here.
+		if d.DesignService != nil && d.DesignServiceAuthMW != nil {
+			v1.Route("/design-service/shops/{shopID}", func(sr chi.Router) {
+				sr.Use(d.DesignServiceAuthMW)
+				sr.Use(orPassthrough(d.DesignServiceRateLimit))
+				d.DesignService.MountService(sr)
+			})
+		}
 
 		// ── Public, unauthenticated APIs (change platform-website) ──────
 		// No tenant, member or admin middleware: the caller is an anonymous

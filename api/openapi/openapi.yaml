@@ -146,6 +146,10 @@ tags:
     description: 平台官網的公開開店申請（無認證；Cloudflare Turnstile；CORS 只放行官網 origin）。
   - name: admin-applications
     description: 平台層開店申請審核（`shop_application.view`／`.review`，僅 super_admin）。
+  - name: admin-design
+    description: 設計歷史（人類側）：AI 重新設計的紀錄、核准、拒絕、還原，與平台層的服務憑證管理（`design.*`、`design_service.manage`）。
+  - name: design-service
+    description: 設計歷史（機器側）：AI edit service 以每店憑證寫入紀錄。**沒有核准端點**。
 
 security: []
 
@@ -193,6 +197,14 @@ components:
 
         遺失即失效——顧客要再次取得訂單存取權，正確路徑是以同一個 email 註冊會員身分
         （見 `POST /api/v1/shop/auth/register` 的「認領」說明）。
+    designServiceKey:
+      type: http
+      scheme: bearer
+      bearerFormat: dsk_
+      description: |
+        AI edit service 的**每店一把**憑證（`dsk_` 開頭，change design-history）。由平台層 `design_service.manage` 簽發，只顯示一次，資料庫只存 SHA-256；
+        預設 90 天到期、可立即撤銷、可限制來源 CIDR。只能呼叫 `/api/v1/design-service/shops/{shopID}/**`，且 URL 的 `{shopID}` 必須是憑證綁定的商家
+        （否則 404）；**不能核准、拒絕、取消或還原，也不能打 `/api/v1/admin/**`**。失敗一律同一個 401。
     providerSignature:
       type: apiKey
       in: header
@@ -454,6 +466,21 @@ components:
         | 412 | `precondition_failed` | 內容文件的樂觀鎖失敗（`If-Match` 過期）或建立時鍵已存在 |
         | 428 | `precondition_required` | 儲存內容文件缺少 `If-Match`／`If-None-Match: *` |
         | 429 | `rate_limited` | 超過速率限制，附 `Retry-After` |
+        | 403 | `requester_not_permitted` | 設計請求的 `requested_by_user_id` 不是該店啟用中且持 `design.request` 的成員 |
+        | 409 | `invalid_state` | 設計請求目前的狀態不允許這個動作 |
+        | 409 | `head_moved` | 核准時的 `head_sha` 不等於送審鎖定的 `candidate_sha` |
+        | 409 | `request_in_progress` | 該站台已有進行中的設計請求 |
+        | 409 | `guard_not_passed` | 守門員未對目前 head（或核准的確切 SHA）通過 |
+        | 409 | `screenshots_incomplete` | before／after 截圖集不完整或視圖集版本不同 |
+        | 409 | `preview_expired` | 預覽已過期或剩餘時間不足 |
+        | 409 | `approval_expired` | 核准已過期，不能再記錄為已發佈 |
+        | 409 | `already_current` | 還原的目標已是目前設計 |
+        | 409 | `revert_below_core_floor` | 還原目標早於 core 相容下限 |
+        | 409 | `site_state_unknown` | 服務尚未回報該站台目前的設計 |
+        | 409 | `claim_conflict` | 另一個工作者持有認領租約 |
+        | 409 | `already_revoked` / `already_acknowledged` | 憑證已撤銷／未追蹤變更已確認 |
+        | 429 | `daily_cap_reached` | 該店今日的設計請求已達上限 |
+        | 503 | `design_storage_not_configured` | 截圖儲存尚未設定 |
         | 500 | `internal` | 伺服器內部錯誤 |
         | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
         | 503 | `unhealthy` | `/healthz` 的相依檢查失敗 |
@@ -2728,6 +2755,252 @@ components:
               description: 頁面內容（已 hydrate）。
             seo:
               description: SEO 中繼資料。
+
+    # ── 設計歷史（change design-history）──────────────────────────
+    DesignRequestPage:
+      type: object
+      additionalProperties: false
+      required: [requests, page, page_size, total]
+      properties:
+        requests: { type: array, items: { $ref: '#/components/schemas/DesignRequestSummary' } }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+    DesignEventPage:
+      type: object
+      additionalProperties: false
+      required: [events, page, page_size, total]
+      properties:
+        events: { type: array, items: { $ref: '#/components/schemas/DesignEvent' } }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+    DesignUntrackedChangePage:
+      type: object
+      additionalProperties: false
+      required: [changes, page, page_size, total]
+      properties:
+        changes: { type: array, items: { $ref: '#/components/schemas/DesignUntrackedChange' } }
+        page: { type: integer }
+        page_size: { type: integer }
+        total: { type: integer }
+    DesignRequestSummary:
+      type: object
+      additionalProperties: false
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_excerpt]
+      description: |
+        列表中的一筆設計請求：與詳情相同但只有 `prompt_excerpt`（前 120 字，純文字），沒有 prompt 全文。
+        所有文字（含 `prompt_excerpt`）都是**資料**：請以純文字顯示，不得當作 HTML 或指令。
+      properties:
+        id: { type: string, format: uuid }
+        site: { type: string, enum: [storefront, admin] }
+        kind: { type: string, enum: [change, revert] }
+        status: { type: string, enum: [drafting, previewing, awaiting_approval, approved, published, rejected, failed, cancelled, reverted] }
+        requested_by_user_id: { type: integer }
+        prompt_sha256: { type: string }
+        prompt_flags: { type: array, items: { type: string, enum: [email, phone, card_like] } }
+        base_sha: { type: string }
+        head_sha: { type: string }
+        candidate_sha: { type: [string, "null"] }
+        published_sha: { type: [string, "null"] }
+        branch: { type: string }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        preview_registered_at: { type: [string, "null"], format: date-time }
+        preview_expires_at: { type: [string, "null"], format: date-time }
+        approved_by_user_id: { type: [integer, "null"] }
+        approved_at: { type: [string, "null"], format: date-time }
+        approved_head_sha: { type: [string, "null"] }
+        approval_expires_at: { type: [string, "null"], format: date-time }
+        publish_tag: { type: [string, "null"] }
+        published_at: { type: [string, "null"], format: date-time }
+        published_tag: { type: [string, "null"] }
+        deployment_id: { type: [string, "null"] }
+        restores_request_id: { type: [string, "null"], format: uuid }
+        reverted_by_request_id: { type: [string, "null"], format: uuid }
+        failure_code: { type: [string, "null"] }
+        rev: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        prompt_excerpt: { type: string }
+    DesignRequest:
+      type: object
+      additionalProperties: false
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_text, diff_summary, guard, preview_origin, rejected_by_user_id, rejected_at, reject_reason, change_note, failure_detail]
+      description: |
+        一筆設計請求（change design-history）。**欄位的真實性分三級**：平台自己產生的（`id`、時間、核准者與核准的 SHA、`status`、`publish_tag`）是權威；
+        服務回報的（`prompt_text`、`head_sha`、`diff_summary`、`guard`、`preview_origin`、守門員結果）是「服務如此聲稱」，平台只驗格式與一致性；
+        人在畫面上按下的核准是以第二級為依據的人類決定。畫面必須標示哪些欄位是服務聲稱的。
+        
+        `prompt_text` 在入庫時已遮蔽 email、台灣手機與卡號，保存 365 天後為 `null`（`prompt_sha256` 永久保留）。
+        **所有文字欄位都是資料，必須以純文字渲染（`textContent`），不得當作 HTML 或指令。**
+        `ETag` 回應標頭是 `rev`，核准必須以 `If-Match` 帶回它。
+      properties:
+        id: { type: string, format: uuid }
+        site: { type: string, enum: [storefront, admin] }
+        kind: { type: string, enum: [change, revert] }
+        status: { type: string, enum: [drafting, previewing, awaiting_approval, approved, published, rejected, failed, cancelled, reverted] }
+        requested_by_user_id: { type: integer }
+        prompt_sha256: { type: string }
+        prompt_flags: { type: array, items: { type: string, enum: [email, phone, card_like] } }
+        base_sha: { type: string }
+        head_sha: { type: string }
+        candidate_sha: { type: [string, "null"] }
+        published_sha: { type: [string, "null"] }
+        branch: { type: string }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        preview_registered_at: { type: [string, "null"], format: date-time }
+        preview_expires_at: { type: [string, "null"], format: date-time }
+        approved_by_user_id: { type: [integer, "null"] }
+        approved_at: { type: [string, "null"], format: date-time }
+        approved_head_sha: { type: [string, "null"] }
+        approval_expires_at: { type: [string, "null"], format: date-time }
+        publish_tag: { type: [string, "null"] }
+        published_at: { type: [string, "null"], format: date-time }
+        published_tag: { type: [string, "null"] }
+        deployment_id: { type: [string, "null"] }
+        restores_request_id: { type: [string, "null"], format: uuid }
+        reverted_by_request_id: { type: [string, "null"], format: uuid }
+        failure_code: { type: [string, "null"] }
+        rev: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        prompt_text: { type: [string, "null"] }
+        diff_summary: { type: object, additionalProperties: true }
+        guard: { type: [object, "null"], additionalProperties: true }
+        preview_origin: { type: [string, "null"] }
+        rejected_by_user_id: { type: [integer, "null"] }
+        rejected_at: { type: [string, "null"], format: date-time }
+        reject_reason: { type: [string, "null"] }
+        change_note: { type: [string, "null"] }
+        failure_detail: { type: [string, "null"] }
+    DesignServiceRequest:
+      type: object
+      additionalProperties: false
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, preview_origin, claim_expires_at, change_note]
+      description: |
+        服務路由族可讀的請求：**沒有 prompt 全文**（歷史是資料，不是給 agent 的指令），只有 `prompt_sha256`、狀態與核准欄位。
+      properties:
+        id: { type: string, format: uuid }
+        site: { type: string, enum: [storefront, admin] }
+        kind: { type: string, enum: [change, revert] }
+        status: { type: string, enum: [drafting, previewing, awaiting_approval, approved, published, rejected, failed, cancelled, reverted] }
+        requested_by_user_id: { type: integer }
+        prompt_sha256: { type: string }
+        prompt_flags: { type: array, items: { type: string, enum: [email, phone, card_like] } }
+        base_sha: { type: string }
+        head_sha: { type: string }
+        candidate_sha: { type: [string, "null"] }
+        published_sha: { type: [string, "null"] }
+        branch: { type: string }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        preview_registered_at: { type: [string, "null"], format: date-time }
+        preview_expires_at: { type: [string, "null"], format: date-time }
+        approved_by_user_id: { type: [integer, "null"] }
+        approved_at: { type: [string, "null"], format: date-time }
+        approved_head_sha: { type: [string, "null"] }
+        approval_expires_at: { type: [string, "null"], format: date-time }
+        publish_tag: { type: [string, "null"] }
+        published_at: { type: [string, "null"], format: date-time }
+        published_tag: { type: [string, "null"] }
+        deployment_id: { type: [string, "null"] }
+        restores_request_id: { type: [string, "null"], format: uuid }
+        reverted_by_request_id: { type: [string, "null"], format: uuid }
+        failure_code: { type: [string, "null"] }
+        rev: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        preview_origin: { type: [string, "null"] }
+        claim_expires_at: { type: [string, "null"], format: date-time }
+        change_note: { type: [string, "null"] }
+    DesignEvent:
+      type: object
+      additionalProperties: false
+      required: [seq, kind, from_status, to_status, actor_type, actor_user_id, actor_credential_id, head_sha, detail, hash, created_at]
+      description: |
+        只能追加的事件。`hash` 串接前一筆（`design-sweep -verify` 重算）。`detail` 只有 id、計數、規則 id 與原因碼。
+      properties:
+        seq: { type: integer }
+        kind: { type: string }
+        from_status: { type: string }
+        to_status: { type: string }
+        actor_type: { type: string, enum: [service, user, system] }
+        actor_user_id: { type: [integer, "null"] }
+        actor_credential_id: { type: [integer, "null"] }
+        head_sha: { type: string }
+        detail: { type: [object, "null"], additionalProperties: true }
+        hash: { type: string }
+        created_at: { type: string, format: date-time }
+    DesignState:
+      type: object
+      additionalProperties: false
+      required: [site, untracked_changes, current_request_id, current_tag, current_sha, core_version, design_floor_version, last_seen_main_sha, updated_at]
+      description: |
+        一個站台目前的設計與尚未確認的未追蹤變更數。
+      properties:
+        site: { type: string, enum: [storefront, admin] }
+        untracked_changes: { type: integer }
+        current_request_id: { type: [string, "null"], format: uuid }
+        current_tag: { type: string }
+        current_sha: { type: string }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        last_seen_main_sha: { type: string }
+        updated_at: { type: [string, "null"], format: date-time }
+    DesignUntrackedChange:
+      type: object
+      additionalProperties: false
+      required: [site, commit_sha, committed_at, subject, files_changed, additions, deletions, detected_at, acknowledged_by_user_id, acknowledged_at]
+      description: |
+        在服務之外進入 main 的設計提交。不含作者姓名或信箱。`subject` 是純文字。
+      properties:
+        site: { type: string, enum: [storefront, admin] }
+        commit_sha: { type: string }
+        committed_at: { type: string, format: date-time }
+        subject: { type: string }
+        files_changed: { type: integer }
+        additions: { type: integer }
+        deletions: { type: integer }
+        detected_at: { type: string, format: date-time }
+        acknowledged_by_user_id: { type: [integer, "null"] }
+        acknowledged_at: { type: [string, "null"], format: date-time }
+    DesignServiceCredential:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, name, key_prefix, allowed_cidrs, created_by_user_id, created_at, expires_at, last_used_at, revoked_at]
+      description: |
+        設計服務憑證的詮釋資料。**永遠不含金鑰**：金鑰只在簽發與輪替的回應出現一次（`DesignServiceCredentialIssued`），資料庫只存 SHA-256。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        name: { type: string }
+        key_prefix: { type: string }
+        allowed_cidrs: { type: array, items: { type: string } }
+        created_by_user_id: { type: integer }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        last_used_at: { type: [string, "null"], format: date-time }
+        revoked_at: { type: [string, "null"], format: date-time }
+    DesignServiceCredentialIssued:
+      type: object
+      additionalProperties: false
+      required: [id, shop_id, name, key_prefix, allowed_cidrs, created_by_user_id, created_at, expires_at, last_used_at, revoked_at, key]
+      description: |
+        簽發與輪替的回應：多一個 `key`（`dsk_` 開頭，**只顯示這一次**，回應帶 `Cache-Control: no-store`）。
+      properties:
+        id: { type: integer }
+        shop_id: { type: integer }
+        name: { type: string }
+        key_prefix: { type: string }
+        allowed_cidrs: { type: array, items: { type: string } }
+        created_by_user_id: { type: integer }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        last_used_at: { type: [string, "null"], format: date-time }
+        revoked_at: { type: [string, "null"], format: date-time }
+        key: { type: string }
 
 paths:
 
@@ -8118,3 +8391,945 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
+
+  # ═══════════════════════ design history (change design-history) ═══════════════════════
+  /api/v1/admin/shops/{shopID}/design/requests:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-design]
+      operationId: listDesignRequests
+      summary: 設計請求列表
+      description: |
+        需要 `design.view`（`merchant_owner` 與 `editor`；`staff` 沒有）。依 `created_at` 降冪、再依 `id`。每筆只有 `prompt_excerpt`，沒有 prompt 全文。
+        `from`／`to` 是 `YYYY-MM-DD`（以商家時區換算，與報表相同；`to` 含當日）或 RFC 3339。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: site
+          in: query
+          required: false
+          schema: { type: string, enum: [storefront, admin] }
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: kind
+          in: query
+          required: false
+          schema: { type: string, enum: [change, revert] }
+        - name: from
+          in: query
+          required: false
+          schema: { type: string }
+        - name: to
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: 一頁請求。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequestPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [admin-design]
+      operationId: getDesignRequest
+      summary: 設計請求詳情
+      description: |
+        需要 `design.view`。回應帶 `ETag: "<rev>"`；`If-None-Match` 吻合回 304。他店的請求 id 回 404。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 請求。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "304": { description: 未變更。 }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [admin-design]
+      operationId: listDesignRequestEvents
+      summary: 請求的事件
+      description: |
+        需要 `design.view`。依 `seq` 升冪。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        "200":
+          description: 一頁事件。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignEventPage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [admin-design]
+      operationId: listDesignRequestScreenshots
+      summary: 請求的截圖（簽名網址）
+      description: |
+        需要 `design.view`。**目前永遠回 503 `design_storage_not_configured`**（截圖儲存是下一個切片；授權與請求存在性先檢查）。
+        之後的版本會回 5 分鐘有效的簽名網址並帶 `Cache-Control: no-store`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "503":
+          description: 截圖儲存尚未設定（`design_storage_not_configured`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: approveDesignRequest
+      summary: 核准設計請求
+      description: |
+        需要 `design.approve`（只有 `merchant_owner`；服務憑證沒有任何路徑能核准）；每商家每呼叫者每分鐘 20 次。**必須帶 `If-Match`（請求的 `rev`）與本文的 `head_sha`**：
+        只有狀態為 `awaiting_approval`、`head_sha` 等於送審時鎖定的 `candidate_sha`、`rev` 吻合時才成功（條件式 UPDATE）。成功時平台配發 `publish_tag` 與 `approval_expires_at`（預設 1 小時）。
+        核准是單次消耗：對已核准的同一請求以同一使用者與同一 `head_sha` 重送回 200（帶 `Idempotency-Replayed: true`，不產生新事件）；其他人重送回 409 `invalid_state`。
+        `head_moved`（409）＝送審後 head 變了，請重新審閱；`precondition_failed`（412）＝你看到的版本已過期。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          description: 你審閱時看到的 `ETag`（請求的 `rev`）。缺少回 428、不符回 412。
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [head_sha]
+              properties:
+                head_sha: { type: string, description: "你審閱的那個 head（必須等於 candidate_sha）。" }
+                note: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 已核准（或重放）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/reject:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: rejectDesignRequest
+      summary: 拒絕設計請求
+      description: |
+        需要 `design.approve`。只有 `awaiting_approval` 可拒絕；其他狀態 409 `invalid_state`。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "200":
+          description: 已拒絕。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/request-changes:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: requestDesignChanges
+      summary: 要求修改
+      description: |
+        需要 `design.approve`。把 `awaiting_approval` 的請求退回 `drafting` 並使 `candidate_sha` 作廢，先前的審閱不可能再被核准。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 500, description: "給服務的修改說明（純文字，視為資料）。" }
+      responses:
+        "200":
+          description: 已退回。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: cancelDesignRequest
+      summary: 取消設計請求
+      description: |
+        需要 `design.request`。任何非終態的請求都可取消。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已取消。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: revertDesignRequest
+      summary: 請求還原到這個已發佈的設計
+      description: |
+        需要 `design.revert`。建立**新的** `kind=revert` 請求（歷史不改寫），之後走與一般請求相同的守門員、預覽、截圖與人類核准。
+        目標必須曾發佈（`published` 或 `reverted`）；已是目前設計回 409 `already_current`；該站台已有進行中的請求回 409 `request_in_progress`；
+        目標早於該站台的 core 相容下限回 409 `revert_below_core_floor`；站台目前狀態尚未被服務回報回 409 `site_state_unknown`。
+        還原只涉及設計層檔案，**不會**改變內容儲存的任何資料，也不會註冊內容 schema；舊設計若讀取不存在的內容鍵會回退到設計層的預設文案。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        "201":
+          description: 已建立還原請求。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/design/state:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-design]
+      operationId: getDesignState
+      summary: 各站台目前的設計
+      description: |
+        需要 `design.view`。storefront 與 admin 各一筆，附未確認的未追蹤變更數。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 兩個站台。
+          content:
+            application/json:
+              schema: 
+                type: object
+                additionalProperties: false
+                required: [sites]
+                properties:
+                  sites: { type: array, items: { $ref: '#/components/schemas/DesignState' } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/shops/{shopID}/design/untracked-changes:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-design]
+      operationId: listDesignUntrackedChanges
+      summary: 未追蹤的變更
+      description: |
+        需要 `design.view`。在服務之外進入 main 的設計提交（由對帳回報）。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: site
+          in: query
+          required: false
+          schema: { type: string, enum: [storefront, admin] }
+      responses:
+        "200":
+          description: 一頁。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignUntrackedChangePage' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: sha
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      tags: [admin-design]
+      operationId: acknowledgeDesignUntrackedChange
+      summary: 確認已知悉未追蹤的變更
+      description: |
+        需要 `design.approve`。只能設定一次（再次確認回 409 `already_acknowledged`）。同一個提交觸及兩個站台時兩列一併確認。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已確認。
+          content:
+            application/json:
+              schema: 
+                type: object
+                additionalProperties: false
+                required: [changes]
+                properties:
+                  changes: { type: array, items: { $ref: '#/components/schemas/DesignUntrackedChange' } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/design-service/credentials:
+    get:
+      tags: [admin-design]
+      operationId: listDesignServiceCredentials
+      summary: 設計服務憑證列表
+      description: |
+        **需要平台層 `design_service.manage`**（只有 `super_admin`）。必須帶 `shop_id`。永遠不含金鑰。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: shop_id
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: 憑證。
+          content:
+            application/json:
+              schema: 
+                type: object
+                additionalProperties: false
+                required: [credentials]
+                properties:
+                  credentials: { type: array, items: { $ref: '#/components/schemas/DesignServiceCredential' } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+    post:
+      tags: [admin-design]
+      operationId: issueDesignServiceCredential
+      summary: 簽發設計服務憑證
+      description: |
+        **需要平台層 `design_service.manage`**。憑證綁定單一商家，只能呼叫 `/api/v1/design-service/shops/{shopID}/…`，**不能核准、不能打 `/admin`**。
+        回應是金鑰**唯一**出現的地方（`Cache-Control: no-store`），資料庫只存 SHA-256。預設 90 天到期（`expires_in_days` 1–365）；`allowed_cidrs` 可限制來源。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [shop_id, name]
+              properties:
+                shop_id: { type: integer, minimum: 1 }
+                name: { type: string, minLength: 1, maxLength: 100 }
+                allowed_cidrs: { type: array, items: { type: string }, maxItems: 20 }
+                expires_in_days: { type: integer, minimum: 1, maximum: 365 }
+      responses:
+        "201":
+          description: 已簽發（含金鑰）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceCredentialIssued' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/design-service/credentials/{credentialID}/revoke:
+    parameters:
+      - name: credentialID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [admin-design]
+      operationId: revokeDesignServiceCredential
+      summary: 撤銷設計服務憑證
+      description: |
+        **需要平台層 `design_service.manage`**。立即生效（驗證不快取）。已撤銷回 409 `already_revoked`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 已撤銷。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceCredential' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/design-service/credentials/{credentialID}/rotate:
+    parameters:
+      - name: credentialID
+        in: path
+        required: true
+        schema: { type: integer, minimum: 1 }
+    post:
+      tags: [admin-design]
+      operationId: rotateDesignServiceCredential
+      summary: 輪替設計服務憑證
+      description: |
+        **需要平台層 `design_service.manage`**。簽發同名同商家的新憑證，舊憑證保留 7 天重疊後到期，讓服務有時間換上新金鑰。
+      security: [{ adminJWT: [] }]
+      responses:
+        "201":
+          description: 新憑證（含金鑰）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceCredentialIssued' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/design-service/shops/{shopID}/requests:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [design-service]
+      operationId: createDesignServiceRequest
+      summary: 建立設計請求
+      description: |
+        **服務憑證。** 以 `Idempotency-Key` 建立請求（`drafting`）。`requested_by_user_id` 必須是該店**啟用中**且持 `design.request` 的成員，否則 403 `requester_not_permitted`——被攻破的服務不能把請求掛在任意人頭上。
+        `prompt` 在入庫時遮蔽 email、台灣手機與卡號（`[redacted]`）並剔除控制與雙向覆寫字元，`prompt_sha256` 對遮蔽後文字計算。`request_id`（選填 uuid）讓服務能先決定分支名；`branch` 省略時為 `ai/shop-{id}/{request id}`。
+        同站台已有非終態請求回 409 `request_in_progress`；當日已達 `DESIGN_DAILY_REQUEST_CAP` 回 429 `daily_cap_reached`。
+      security: [{ designServiceKey: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          description: 8–255 個可見 ASCII 字元。同鍵同內容回 200 既有請求；同鍵不同內容回 422 `idempotency_key_reused`。
+          schema: { type: string, minLength: 8, maxLength: 255 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [site, requested_by_user_id, prompt, base_sha]
+              properties:
+                request_id: { type: string, format: uuid }
+                site: { type: string, enum: [storefront, admin] }
+                requested_by_user_id: { type: integer, minimum: 1 }
+                prompt: { type: string, minLength: 1, maxLength: 4000 }
+                base_sha: { type: string, pattern: "^[0-9a-f]{40}$" }
+                branch: { type: string, maxLength: 120 }
+                core_version: { type: string, maxLength: 20 }
+                design_floor_version: { type: string, maxLength: 20 }
+      responses:
+        "201":
+          description: 已建立。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "200":
+          description: "冪等重送（`Idempotency-Replayed: true` 標頭）。"
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+    get:
+      tags: [design-service]
+      operationId: listDesignServiceRequests
+      summary: 工作佇列
+      description: |
+        **服務憑證。** `status`（預設所有非終態）、`claimed=false` 只列未被認領或租約已過期的（revert 請求由此被服務發現）。
+      security: [{ designServiceKey: [] }]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema: { type: string }
+        - name: claimed
+          in: query
+          required: false
+          schema: { type: string, enum: ["false"] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 100 }
+      responses:
+        "200":
+          description: 請求。
+          content:
+            application/json:
+              schema: 
+                type: object
+                additionalProperties: false
+                required: [requests]
+                properties:
+                  requests: { type: array, items: { $ref: '#/components/schemas/DesignServiceRequest' } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [design-service]
+      operationId: getDesignServiceRequest
+      summary: 請求狀態（唯讀）
+      description: |
+        **服務憑證。** 不含 prompt 全文，只有 `prompt_sha256`、狀態、`candidate_sha` 與核准欄位。服務以它輪詢人類是否已核准；**只有平台的 `approved` 算數**。
+      security: [{ designServiceKey: [] }]
+      responses:
+        "200":
+          description: 請求。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/claim:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: claimDesignServiceRequest
+      summary: 認領（15 分鐘租約）
+      description: |
+        **服務憑證。** 只對 `drafting`／`previewing` 的請求。同一憑證可續約；他人持有未過期的租約回 409 `claim_conflict`。過期未續約由 `design-sweep` 標為 `failed(service_lost)`。
+      security: [{ designServiceKey: [] }]
+      responses:
+        "200":
+          description: 已認領。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/head:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [design-service]
+      operationId: updateDesignServiceRequestHead
+      summary: 更新 head 與 diff 摘要
+      description: |
+        **服務憑證。** 只在 `drafting`；`previewing`／`awaiting_approval` 必須帶 `reset: true` 並回到 `drafting`（使 candidate 與預覽作廢）；核准後 head 鎖死（409）。diff 摘要只有路徑與行數（≤ 16 KiB、≤ 300 檔），沒有內容。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [head_sha]
+              properties:
+                head_sha: { type: string, pattern: "^[0-9a-f]{40}$" }
+                reset: { type: boolean }
+                diff_summary:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    files_changed: { type: integer, minimum: 0 }
+                    additions: { type: integer, minimum: 0 }
+                    deletions: { type: integer, minimum: 0 }
+                    files:
+                      type: array
+                      maxItems: 300
+                      items:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          path: { type: string, maxLength: 300 }
+                          status: { type: string, maxLength: 20 }
+                          additions: { type: integer, minimum: 0 }
+                          deletions: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: 已更新。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/guard-runs:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: recordDesignServiceGuardRun
+      summary: 回報守門員結果
+      description: |
+        **服務憑證。** `phase: initial`（預設）記錄對目前 head 的檢查；`phase: recheck` 只在 `approved` 時接受，是 `published` 的前置條件（必須對**確切的核准 SHA**重跑）。不含 stderr 全文。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [checked_sha, passed]
+              properties:
+                phase: { type: string, enum: [initial, recheck] }
+                checked_sha: { type: string, pattern: "^[0-9a-f]{40}$" }
+                passed: { type: boolean }
+                exit_code: { type: integer }
+                rule_ids: { type: array, maxItems: 50, items: { type: string, maxLength: 80 } }
+                violation_count: { type: integer, minimum: 0 }
+                guard_version: { type: string, maxLength: 40 }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [design-service]
+      operationId: registerDesignServicePreview
+      summary: 登記預覽
+      description: |
+        **服務憑證。** `drafting` → `previewing`。需要對**目前 head** 通過的守門員結果（否則 409 `guard_not_passed`）。只存 origin（`scheme://host[:port]`，沒有路徑或查詢字串）與到期時間，不存永久連結。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [origin, expires_at]
+              properties:
+                origin: { type: string, maxLength: 255 }
+                expires_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 已登記。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: submitDesignServiceRequest
+      summary: 送審
+      description: |
+        **服務憑證。** `previewing` → `awaiting_approval`，並鎖定 `candidate_sha := head_sha`。需要：同一 head 的 before 與 after 截圖集完整且視圖集版本相同（409 `screenshots_incomplete`）、預覽至少還剩 `DESIGN_MIN_PREVIEW_REMAINING`（409 `preview_expired`）。
+        **截圖儲存尚未設定時回 503 `design_storage_not_configured`**（這是刻意的：沒有 after 截圖就不能被核准）。
+      security: [{ designServiceKey: [] }]
+      responses:
+        "200":
+          description: 已送審。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/published:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: reportDesignServicePublished
+      summary: 回報已發佈
+      description: |
+        **服務憑證。** 平台只在以下全部成立時接受：請求是 `approved` 且未逾期（409 `approval_expired`）、核准之後有對 `approved_head_sha` 通過的 `guard_rechecked`（409 `guard_not_passed`）、`published_sha` 等於核准的 SHA、`tag` 等於核准時配發的 `publish_tag`（422）。
+        對 `awaiting_approval` 的請求回報會得到 409 `invalid_state`：服務無法讓平台承認一次未經核准的發佈。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [published_sha, tag]
+              properties:
+                published_sha: { type: string, pattern: "^[0-9a-f]{40}$" }
+                tag: { type: string }
+                deployment_id: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/requests/{requestID}/failed:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: reportDesignServiceFailure
+      summary: 回報失敗
+      description: |
+        **服務憑證。** 任何非終態請求 → `failed`。`detail` 是純文字（≤ 300 字）。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, pattern: "^[a-z0-9_]{1,40}$" }
+                detail: { type: string, maxLength: 300 }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/sites/{site}/state:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: site
+        in: path
+        required: true
+        schema: { type: string, enum: [storefront, admin] }
+    put:
+      tags: [design-service]
+      operationId: putDesignServiceSiteState
+      summary: 回報站台狀態
+      description: |
+        **服務憑證。** 回報 main 的 SHA、core 版本與設計相容下限。**不會**改變哪個請求是目前設計——只有被記錄的發佈能改。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                main_sha: { type: string }
+                core_version: { type: string, maxLength: 20 }
+                design_floor_version: { type: string, maxLength: 20 }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignState' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/untracked-changes:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [design-service]
+      operationId: reportDesignServiceUntrackedChanges
+      summary: 批次回報未追蹤的變更
+      description: |
+        **服務憑證。** 對帳工作的輸出，1–100 筆；`(site, commit_sha)` 已存在者被忽略。不要送作者姓名或信箱。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [changes]
+              properties:
+                changes:
+                  type: array
+                  minItems: 1
+                  maxItems: 100
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [site, commit_sha, committed_at]
+                    properties:
+                      site: { type: string, enum: [storefront, admin] }
+                      commit_sha: { type: string }
+                      committed_at: { type: string, format: date-time }
+                      subject: { type: string, maxLength: 200 }
+                      files_changed: { type: integer, minimum: 0 }
+                      additions: { type: integer, minimum: 0 }
+                      deletions: { type: integer, minimum: 0 }
+      responses:
+        "200":
+          description: 結果。
+          content:
+            application/json:
+              schema: 
+                type: object
+                additionalProperties: false
+                required: [received, added]
+                properties:
+                  received: { type: integer }
+                  added: { type: integer }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+

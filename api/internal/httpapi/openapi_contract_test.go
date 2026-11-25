@@ -372,14 +372,17 @@ var moneyExemptions = map[string]string{
 	// Pagination counts, not amounts. `total` is unfortunately the natural name
 	// for both "how many rows match" and "how much does this cost"; the two are
 	// told apart by which schema they live in, not by the key.
-	"/components/schemas/ProductPage/properties/total":          "pagination count",
-	"/components/schemas/OrderPage/properties/total":            "pagination count",
-	"/components/schemas/ShopPage/properties/total":             "pagination count",
-	"/components/schemas/PointTransactionPage/properties/total": "pagination count",
-	"/components/schemas/MemberPage/properties/total":           "pagination count",
-	"/components/schemas/AccountPage/properties/total":          "pagination count",
-	"/components/schemas/PaymentPage/properties/total":          "pagination count",
-	"/components/schemas/ShopApplicationList/properties/total":   "pagination count",
+	"/components/schemas/ProductPage/properties/total":               "pagination count",
+	"/components/schemas/OrderPage/properties/total":                 "pagination count",
+	"/components/schemas/ShopPage/properties/total":                  "pagination count",
+	"/components/schemas/PointTransactionPage/properties/total":      "pagination count",
+	"/components/schemas/MemberPage/properties/total":                "pagination count",
+	"/components/schemas/AccountPage/properties/total":               "pagination count",
+	"/components/schemas/PaymentPage/properties/total":               "pagination count",
+	"/components/schemas/ShopApplicationList/properties/total":       "pagination count",
+	"/components/schemas/DesignRequestPage/properties/total":         "pagination count",
+	"/components/schemas/DesignEventPage/properties/total":           "pagination count",
+	"/components/schemas/DesignUntrackedChangePage/properties/total": "pagination count",
 }
 
 // **A money field this check is known NOT to see** (change

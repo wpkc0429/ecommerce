@@ -251,6 +251,172 @@ DELETE /api/v1/shop/cart/items/{itemID}
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
 DELETE /api/v1/shop/cart/items/{itemID} path itemID
+DesignEvent.actor_credential_id
+DesignEvent.actor_type
+DesignEvent.actor_user_id
+DesignEvent.created_at
+DesignEvent.detail
+DesignEvent.from_status
+DesignEvent.hash
+DesignEvent.head_sha
+DesignEvent.kind
+DesignEvent.seq
+DesignEvent.to_status
+DesignEventPage.events
+DesignEventPage.page
+DesignEventPage.page_size
+DesignEventPage.total
+DesignRequest.approval_expires_at
+DesignRequest.approved_at
+DesignRequest.approved_by_user_id
+DesignRequest.approved_head_sha
+DesignRequest.base_sha
+DesignRequest.branch
+DesignRequest.candidate_sha
+DesignRequest.change_note
+DesignRequest.core_version
+DesignRequest.created_at
+DesignRequest.deployment_id
+DesignRequest.design_floor_version
+DesignRequest.diff_summary
+DesignRequest.failure_code
+DesignRequest.failure_detail
+DesignRequest.guard
+DesignRequest.head_sha
+DesignRequest.id
+DesignRequest.kind
+DesignRequest.preview_expires_at
+DesignRequest.preview_origin
+DesignRequest.preview_registered_at
+DesignRequest.prompt_flags
+DesignRequest.prompt_sha256
+DesignRequest.prompt_text
+DesignRequest.publish_tag
+DesignRequest.published_at
+DesignRequest.published_sha
+DesignRequest.published_tag
+DesignRequest.reject_reason
+DesignRequest.rejected_at
+DesignRequest.rejected_by_user_id
+DesignRequest.requested_by_user_id
+DesignRequest.restores_request_id
+DesignRequest.rev
+DesignRequest.reverted_by_request_id
+DesignRequest.site
+DesignRequest.status
+DesignRequest.updated_at
+DesignRequestPage.page
+DesignRequestPage.page_size
+DesignRequestPage.requests
+DesignRequestPage.total
+DesignRequestSummary.approval_expires_at
+DesignRequestSummary.approved_at
+DesignRequestSummary.approved_by_user_id
+DesignRequestSummary.approved_head_sha
+DesignRequestSummary.base_sha
+DesignRequestSummary.branch
+DesignRequestSummary.candidate_sha
+DesignRequestSummary.core_version
+DesignRequestSummary.created_at
+DesignRequestSummary.deployment_id
+DesignRequestSummary.design_floor_version
+DesignRequestSummary.failure_code
+DesignRequestSummary.head_sha
+DesignRequestSummary.id
+DesignRequestSummary.kind
+DesignRequestSummary.preview_expires_at
+DesignRequestSummary.preview_registered_at
+DesignRequestSummary.prompt_excerpt
+DesignRequestSummary.prompt_flags
+DesignRequestSummary.prompt_sha256
+DesignRequestSummary.publish_tag
+DesignRequestSummary.published_at
+DesignRequestSummary.published_sha
+DesignRequestSummary.published_tag
+DesignRequestSummary.requested_by_user_id
+DesignRequestSummary.restores_request_id
+DesignRequestSummary.rev
+DesignRequestSummary.reverted_by_request_id
+DesignRequestSummary.site
+DesignRequestSummary.status
+DesignRequestSummary.updated_at
+DesignServiceCredential.allowed_cidrs
+DesignServiceCredential.created_at
+DesignServiceCredential.created_by_user_id
+DesignServiceCredential.expires_at
+DesignServiceCredential.id
+DesignServiceCredential.key_prefix
+DesignServiceCredential.last_used_at
+DesignServiceCredential.name
+DesignServiceCredential.revoked_at
+DesignServiceCredential.shop_id
+DesignServiceCredentialIssued.allowed_cidrs
+DesignServiceCredentialIssued.created_at
+DesignServiceCredentialIssued.created_by_user_id
+DesignServiceCredentialIssued.expires_at
+DesignServiceCredentialIssued.id
+DesignServiceCredentialIssued.key
+DesignServiceCredentialIssued.key_prefix
+DesignServiceCredentialIssued.last_used_at
+DesignServiceCredentialIssued.name
+DesignServiceCredentialIssued.revoked_at
+DesignServiceCredentialIssued.shop_id
+DesignServiceRequest.approval_expires_at
+DesignServiceRequest.approved_at
+DesignServiceRequest.approved_by_user_id
+DesignServiceRequest.approved_head_sha
+DesignServiceRequest.base_sha
+DesignServiceRequest.branch
+DesignServiceRequest.candidate_sha
+DesignServiceRequest.change_note
+DesignServiceRequest.claim_expires_at
+DesignServiceRequest.core_version
+DesignServiceRequest.created_at
+DesignServiceRequest.deployment_id
+DesignServiceRequest.design_floor_version
+DesignServiceRequest.failure_code
+DesignServiceRequest.head_sha
+DesignServiceRequest.id
+DesignServiceRequest.kind
+DesignServiceRequest.preview_expires_at
+DesignServiceRequest.preview_origin
+DesignServiceRequest.preview_registered_at
+DesignServiceRequest.prompt_flags
+DesignServiceRequest.prompt_sha256
+DesignServiceRequest.publish_tag
+DesignServiceRequest.published_at
+DesignServiceRequest.published_sha
+DesignServiceRequest.published_tag
+DesignServiceRequest.requested_by_user_id
+DesignServiceRequest.restores_request_id
+DesignServiceRequest.rev
+DesignServiceRequest.reverted_by_request_id
+DesignServiceRequest.site
+DesignServiceRequest.status
+DesignServiceRequest.updated_at
+DesignState.core_version
+DesignState.current_request_id
+DesignState.current_sha
+DesignState.current_tag
+DesignState.design_floor_version
+DesignState.last_seen_main_sha
+DesignState.site
+DesignState.untracked_changes
+DesignState.updated_at
+DesignUntrackedChange.acknowledged_at
+DesignUntrackedChange.acknowledged_by_user_id
+DesignUntrackedChange.additions
+DesignUntrackedChange.commit_sha
+DesignUntrackedChange.committed_at
+DesignUntrackedChange.deletions
+DesignUntrackedChange.detected_at
+DesignUntrackedChange.files_changed
+DesignUntrackedChange.site
+DesignUntrackedChange.subject
+DesignUntrackedChangePage.changes
+DesignUntrackedChangePage.page
+DesignUntrackedChangePage.page_size
+DesignUntrackedChangePage.total
 ECPayCredentials.choose_payment
 ECPayCredentials.configured
 ECPayCredentials.hash_iv_configured
@@ -272,6 +438,8 @@ GET /api/v1/admin/accounts query q optional
 GET /api/v1/admin/accounts/{userID}
 GET /api/v1/admin/accounts/{userID} path userID
 GET /api/v1/admin/branding
+GET /api/v1/admin/design-service/credentials
+GET /api/v1/admin/design-service/credentials query shop_id
 GET /api/v1/admin/me
 GET /api/v1/admin/media/config
 GET /api/v1/admin/permissions
@@ -342,6 +510,45 @@ GET /api/v1/admin/shops/{shopID}/content/schema query version
 GET /api/v1/admin/shops/{shopID}/content/schema query version optional
 GET /api/v1/admin/shops/{shopID}/content/schema/versions
 GET /api/v1/admin/shops/{shopID}/content/schema/versions path shopID
+GET /api/v1/admin/shops/{shopID}/design/requests
+GET /api/v1/admin/shops/{shopID}/design/requests path shopID
+GET /api/v1/admin/shops/{shopID}/design/requests query from
+GET /api/v1/admin/shops/{shopID}/design/requests query from optional
+GET /api/v1/admin/shops/{shopID}/design/requests query kind
+GET /api/v1/admin/shops/{shopID}/design/requests query kind optional
+GET /api/v1/admin/shops/{shopID}/design/requests query page
+GET /api/v1/admin/shops/{shopID}/design/requests query page optional
+GET /api/v1/admin/shops/{shopID}/design/requests query page_size
+GET /api/v1/admin/shops/{shopID}/design/requests query page_size optional
+GET /api/v1/admin/shops/{shopID}/design/requests query site
+GET /api/v1/admin/shops/{shopID}/design/requests query site optional
+GET /api/v1/admin/shops/{shopID}/design/requests query status
+GET /api/v1/admin/shops/{shopID}/design/requests query status optional
+GET /api/v1/admin/shops/{shopID}/design/requests query to
+GET /api/v1/admin/shops/{shopID}/design/requests query to optional
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID} path requestID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID} path shopID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events path requestID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events path shopID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events query page
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events query page optional
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events query page_size
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/events query page_size optional
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots path requestID
+GET /api/v1/admin/shops/{shopID}/design/requests/{requestID}/screenshots path shopID
+GET /api/v1/admin/shops/{shopID}/design/state
+GET /api/v1/admin/shops/{shopID}/design/state path shopID
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes path shopID
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page optional
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page_size
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page_size optional
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query site
+GET /api/v1/admin/shops/{shopID}/design/untracked-changes query site optional
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 GET /api/v1/admin/shops/{shopID}/invitations
@@ -464,6 +671,17 @@ GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippi
 GET /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
 GET /api/v1/admin/shops/{shopID}/users
 GET /api/v1/admin/shops/{shopID}/users path shopID
+GET /api/v1/design-service/shops/{shopID}/requests
+GET /api/v1/design-service/shops/{shopID}/requests path shopID
+GET /api/v1/design-service/shops/{shopID}/requests query claimed
+GET /api/v1/design-service/shops/{shopID}/requests query claimed optional
+GET /api/v1/design-service/shops/{shopID}/requests query limit
+GET /api/v1/design-service/shops/{shopID}/requests query limit optional
+GET /api/v1/design-service/shops/{shopID}/requests query status
+GET /api/v1/design-service/shops/{shopID}/requests query status optional
+GET /api/v1/design-service/shops/{shopID}/requests/{requestID}
+GET /api/v1/design-service/shops/{shopID}/requests/{requestID} path requestID
+GET /api/v1/design-service/shops/{shopID}/requests/{requestID} path shopID
 GET /api/v1/render/page
 GET /api/v1/render/page header X-Publishable-Key
 GET /api/v1/render/page header X-Publishable-Key optional
@@ -705,6 +923,11 @@ POST /api/v1/admin/auth/refresh header X-Admin-Refresh
 POST /api/v1/admin/auth/refresh header X-Admin-Refresh optional
 POST /api/v1/admin/auth/refresh response 200 Set-Cookie
 POST /api/v1/admin/auth/refresh response 429 Retry-After
+POST /api/v1/admin/design-service/credentials
+POST /api/v1/admin/design-service/credentials/{credentialID}/revoke
+POST /api/v1/admin/design-service/credentials/{credentialID}/revoke path credentialID
+POST /api/v1/admin/design-service/credentials/{credentialID}/rotate
+POST /api/v1/admin/design-service/credentials/{credentialID}/rotate path credentialID
 POST /api/v1/admin/invitations/accept
 POST /api/v1/admin/permissions
 POST /api/v1/admin/roles
@@ -754,6 +977,26 @@ POST /api/v1/admin/shops/{shopID}/content/publish-hook/signing-secret response 4
 POST /api/v1/admin/shops/{shopID}/content/publish-hook/test
 POST /api/v1/admin/shops/{shopID}/content/publish-hook/test path shopID
 POST /api/v1/admin/shops/{shopID}/content/publish-hook/test response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve header If-Match
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/approve response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/cancel
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/cancel path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/cancel path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/reject
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/reject path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/reject path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/request-changes
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/request-changes path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/request-changes path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert path shopID
+POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge
+POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge path sha
+POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge path shopID
 POST /api/v1/admin/shops/{shopID}/invitations
 POST /api/v1/admin/shops/{shopID}/invitations path shopID
 POST /api/v1/admin/shops/{shopID}/invitations response 429 Retry-After
@@ -800,6 +1043,27 @@ POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path shopID
 POST /api/v1/admin/shops/{shopID}/users/{userID}/roles path userID
 POST /api/v1/admin/users/{userID}/roles
 POST /api/v1/admin/users/{userID}/roles path userID
+POST /api/v1/design-service/shops/{shopID}/requests
+POST /api/v1/design-service/shops/{shopID}/requests header Idempotency-Key
+POST /api/v1/design-service/shops/{shopID}/requests path shopID
+POST /api/v1/design-service/shops/{shopID}/requests response 429 Retry-After
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/claim
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/claim path requestID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/claim path shopID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/failed
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/failed path requestID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/failed path shopID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/guard-runs
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/guard-runs path requestID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/guard-runs path shopID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/published
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/published path requestID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/published path shopID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit path requestID
+POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit path shopID
+POST /api/v1/design-service/shops/{shopID}/untracked-changes
+POST /api/v1/design-service/shops/{shopID}/untracked-changes path shopID
 POST /api/v1/public/shop-applications
 POST /api/v1/public/shop-applications response 429 Retry-After
 POST /api/v1/public/shop-applications/verify
@@ -917,6 +1181,15 @@ PUT /api/v1/admin/shops/{shopID}/settings path shopID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID}
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shippingMethodID
 PUT /api/v1/admin/shops/{shopID}/shipping-methods/{shippingMethodID} path shopID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/head
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/head path requestID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/head path shopID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview path requestID
+PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/preview path shopID
+PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state
+PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path shopID
+PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path site
 PUT /api/v1/shop/cart/items/{itemID}
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
