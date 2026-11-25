@@ -11,6 +11,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
@@ -407,6 +408,76 @@ func init() {
 	contentdocument.DefaultUpdatedAt = contentdocumentDescUpdatedAt.Default.(func() time.Time)
 	// contentdocument.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	contentdocument.UpdateDefaultUpdatedAt = contentdocumentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	contentpublishhookFields := schema.ContentPublishHook{}.Fields()
+	_ = contentpublishhookFields
+	// contentpublishhookDescHost is the schema descriptor for host field.
+	contentpublishhookDescHost := contentpublishhookFields[2].Descriptor()
+	// contentpublishhook.HostValidator is a validator for the "host" field. It is called by the builders before save.
+	contentpublishhook.HostValidator = contentpublishhookDescHost.Validators[0].(func(string) error)
+	// contentpublishhookDescURLHint is the schema descriptor for url_hint field.
+	contentpublishhookDescURLHint := contentpublishhookFields[3].Descriptor()
+	// contentpublishhook.DefaultURLHint holds the default value on creation for the url_hint field.
+	contentpublishhook.DefaultURLHint = contentpublishhookDescURLHint.Default.(string)
+	// contentpublishhook.URLHintValidator is a validator for the "url_hint" field. It is called by the builders before save.
+	contentpublishhook.URLHintValidator = contentpublishhookDescURLHint.Validators[0].(func(string) error)
+	// contentpublishhookDescEnabled is the schema descriptor for enabled field.
+	contentpublishhookDescEnabled := contentpublishhookFields[5].Descriptor()
+	// contentpublishhook.DefaultEnabled holds the default value on creation for the enabled field.
+	contentpublishhook.DefaultEnabled = contentpublishhookDescEnabled.Default.(bool)
+	// contentpublishhookDescDisabledReason is the schema descriptor for disabled_reason field.
+	contentpublishhookDescDisabledReason := contentpublishhookFields[6].Descriptor()
+	// contentpublishhook.DefaultDisabledReason holds the default value on creation for the disabled_reason field.
+	contentpublishhook.DefaultDisabledReason = contentpublishhookDescDisabledReason.Default.(string)
+	// contentpublishhook.DisabledReasonValidator is a validator for the "disabled_reason" field. It is called by the builders before save.
+	contentpublishhook.DisabledReasonValidator = contentpublishhookDescDisabledReason.Validators[0].(func(string) error)
+	// contentpublishhookDescLastStatus is the schema descriptor for last_status field.
+	contentpublishhookDescLastStatus := contentpublishhookFields[7].Descriptor()
+	// contentpublishhook.DefaultLastStatus holds the default value on creation for the last_status field.
+	contentpublishhook.DefaultLastStatus = contentpublishhookDescLastStatus.Default.(string)
+	// contentpublishhook.LastStatusValidator is a validator for the "last_status" field. It is called by the builders before save.
+	contentpublishhook.LastStatusValidator = contentpublishhookDescLastStatus.Validators[0].(func(string) error)
+	// contentpublishhookDescLastHTTPStatus is the schema descriptor for last_http_status field.
+	contentpublishhookDescLastHTTPStatus := contentpublishhookFields[8].Descriptor()
+	// contentpublishhook.DefaultLastHTTPStatus holds the default value on creation for the last_http_status field.
+	contentpublishhook.DefaultLastHTTPStatus = contentpublishhookDescLastHTTPStatus.Default.(int)
+	// contentpublishhookDescConsecutiveFailures is the schema descriptor for consecutive_failures field.
+	contentpublishhookDescConsecutiveFailures := contentpublishhookFields[11].Descriptor()
+	// contentpublishhook.DefaultConsecutiveFailures holds the default value on creation for the consecutive_failures field.
+	contentpublishhook.DefaultConsecutiveFailures = contentpublishhookDescConsecutiveFailures.Default.(int)
+	// contentpublishhookDescCapCount is the schema descriptor for cap_count field.
+	contentpublishhookDescCapCount := contentpublishhookFields[13].Descriptor()
+	// contentpublishhook.DefaultCapCount holds the default value on creation for the cap_count field.
+	contentpublishhook.DefaultCapCount = contentpublishhookDescCapCount.Default.(int)
+	// contentpublishhookDescPendingEvent is the schema descriptor for pending_event field.
+	contentpublishhookDescPendingEvent := contentpublishhookFields[16].Descriptor()
+	// contentpublishhook.DefaultPendingEvent holds the default value on creation for the pending_event field.
+	contentpublishhook.DefaultPendingEvent = contentpublishhookDescPendingEvent.Default.(string)
+	// contentpublishhook.PendingEventValidator is a validator for the "pending_event" field. It is called by the builders before save.
+	contentpublishhook.PendingEventValidator = contentpublishhookDescPendingEvent.Validators[0].(func(string) error)
+	// contentpublishhookDescPendingKey is the schema descriptor for pending_key field.
+	contentpublishhookDescPendingKey := contentpublishhookFields[17].Descriptor()
+	// contentpublishhook.DefaultPendingKey holds the default value on creation for the pending_key field.
+	contentpublishhook.DefaultPendingKey = contentpublishhookDescPendingKey.Default.(string)
+	// contentpublishhook.PendingKeyValidator is a validator for the "pending_key" field. It is called by the builders before save.
+	contentpublishhook.PendingKeyValidator = contentpublishhookDescPendingKey.Validators[0].(func(string) error)
+	// contentpublishhookDescPendingRev is the schema descriptor for pending_rev field.
+	contentpublishhookDescPendingRev := contentpublishhookFields[18].Descriptor()
+	// contentpublishhook.DefaultPendingRev holds the default value on creation for the pending_rev field.
+	contentpublishhook.DefaultPendingRev = contentpublishhookDescPendingRev.Default.(int64)
+	// contentpublishhookDescPendingCount is the schema descriptor for pending_count field.
+	contentpublishhookDescPendingCount := contentpublishhookFields[19].Descriptor()
+	// contentpublishhook.DefaultPendingCount holds the default value on creation for the pending_count field.
+	contentpublishhook.DefaultPendingCount = contentpublishhookDescPendingCount.Default.(int)
+	// contentpublishhookDescCreatedAt is the schema descriptor for created_at field.
+	contentpublishhookDescCreatedAt := contentpublishhookFields[20].Descriptor()
+	// contentpublishhook.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentpublishhook.DefaultCreatedAt = contentpublishhookDescCreatedAt.Default.(func() time.Time)
+	// contentpublishhookDescUpdatedAt is the schema descriptor for updated_at field.
+	contentpublishhookDescUpdatedAt := contentpublishhookFields[21].Descriptor()
+	// contentpublishhook.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	contentpublishhook.DefaultUpdatedAt = contentpublishhookDescUpdatedAt.Default.(func() time.Time)
+	// contentpublishhook.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	contentpublishhook.UpdateDefaultUpdatedAt = contentpublishhookDescUpdatedAt.UpdateDefault.(func() time.Time)
 	contentrevisionFields := schema.ContentRevision{}.Fields()
 	_ = contentrevisionFields
 	// contentrevisionDescKind is the schema descriptor for kind field.

@@ -432,7 +432,7 @@ func (s *Service) Publish(ctx context.Context, shopID int, key string, expectedR
 	if err != nil {
 		return nil, s.mapLockErr(ctx, shopID, key, err)
 	}
-	s.afterPublish(ctx, shopID, key)
+	s.afterPublish(ctx, shopID, key, out.DraftRev)
 	s.log().Info("content audit", "action", "doc.publish", "shop_id", shopID, "actor_user_id", actor,
 		"doc_key", key, "rev", out.DraftRev, "schema_version", v.Version)
 	return out, nil
@@ -440,8 +440,8 @@ func (s *Service) Publish(ctx context.Context, shopID int, key string, expectedR
 
 // afterPublish fires the events: the new content namespace, plus the legacy
 // ones that keep the compatibility render cache correct.
-func (s *Service) afterPublish(ctx context.Context, shopID int, key string) {
-	s.publish(ctx, events.ContentPublished{ShopID: shopID, Key: key})
+func (s *Service) afterPublish(ctx context.Context, shopID int, key string, rev int64) {
+	s.publish(ctx, events.ContentPublished{ShopID: shopID, Key: key, Rev: rev})
 	if key == contentstore.GlobalKey {
 		s.publish(ctx, events.ShopContentUpdated{ShopID: shopID})
 	} else {

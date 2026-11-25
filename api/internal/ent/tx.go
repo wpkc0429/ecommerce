@@ -28,6 +28,8 @@ type Tx struct {
 	ContentAuditLog *ContentAuditLogClient
 	// ContentDocument is the client for interacting with the ContentDocument builders.
 	ContentDocument *ContentDocumentClient
+	// ContentPublishHook is the client for interacting with the ContentPublishHook builders.
+	ContentPublishHook *ContentPublishHookClient
 	// ContentRevision is the client for interacting with the ContentRevision builders.
 	ContentRevision *ContentRevisionClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
@@ -236,6 +238,7 @@ func (tx *Tx) init() {
 	tx.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(tx.config)
 	tx.ContentAuditLog = NewContentAuditLogClient(tx.config)
 	tx.ContentDocument = NewContentDocumentClient(tx.config)
+	tx.ContentPublishHook = NewContentPublishHookClient(tx.config)
 	tx.ContentRevision = NewContentRevisionClient(tx.config)
 	tx.ContentSchema = NewContentSchemaClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)

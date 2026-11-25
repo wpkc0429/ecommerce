@@ -14,6 +14,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
@@ -297,6 +298,33 @@ func (f TraverseContentDocument) Traverse(ctx context.Context, q ent.Query) erro
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.ContentDocumentQuery", q)
+}
+
+// The ContentPublishHookFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentPublishHookFunc func(context.Context, *ent.ContentPublishHookQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentPublishHookFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentPublishHookQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentPublishHookQuery", q)
+}
+
+// The TraverseContentPublishHook type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentPublishHook func(context.Context, *ent.ContentPublishHookQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentPublishHook) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentPublishHook) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentPublishHookQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentPublishHookQuery", q)
 }
 
 // The ContentRevisionFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1261,6 +1289,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ContentAuditLogQuery, predicate.ContentAuditLog, contentauditlog.OrderOption]{typ: ent.TypeContentAuditLog, tq: q}, nil
 	case *ent.ContentDocumentQuery:
 		return &query[*ent.ContentDocumentQuery, predicate.ContentDocument, contentdocument.OrderOption]{typ: ent.TypeContentDocument, tq: q}, nil
+	case *ent.ContentPublishHookQuery:
+		return &query[*ent.ContentPublishHookQuery, predicate.ContentPublishHook, contentpublishhook.OrderOption]{typ: ent.TypeContentPublishHook, tq: q}, nil
 	case *ent.ContentRevisionQuery:
 		return &query[*ent.ContentRevisionQuery, predicate.ContentRevision, contentrevision.OrderOption]{typ: ent.TypeContentRevision, tq: q}, nil
 	case *ent.ContentSchemaQuery:

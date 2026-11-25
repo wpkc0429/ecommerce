@@ -1,4 +1,4 @@
-h1:yOqONXjQiDMhzyYFhA2v52Xeu4AUGSX0TE7KaZM8nYI=
+h1:wmUB8fIcnju28bScpg0jx0VZXmSPV5CHqGGgp37NCPk=
 20260718063844_init_schema.up.sql h1:wv7KzKfeUwzPi6/BwJcp4vrf5O6TNNAtRXO5YhJVxWI=
 20260718063900_rbac_unique_nulls_not_distinct.up.sql h1:yi40MEFUEo5OLvMs7yGfitQ76iHbyaOtoWNuug3VnB0=
 20260718102453_add_product_catalog.up.sql h1:sJopT0LbEaOTx+rd4I3Gwd4VL43iE2EIx0yAi07DV+0=
@@ -29,3 +29,4 @@ h1:yOqONXjQiDMhzyYFhA2v52Xeu4AUGSX0TE7KaZM8nYI=
 20261124181226_add_content_schema_registration.up.sql h1:7vcEqTCYQHJnwCJqA4v/gMDef+8rnhOfcJJep2HShC0=
 20261124200226_add_shop_applications.up.sql h1:1d2rFCDurDaXDB4fpbz8qbTEljzagylAI5qyIzKBXYk=
 20261125051318_add_content_documents.up.sql h1:DvHsTYg1HNaFOSALt+PfTL/AFi3xKuHcrSBiyRxmq0c=
+20261125081316_add_content_publish_hooks.up.sql h1:bIDNKbUre28P1NOWJswdLBL3VxtGj9Jgo6qiAtzc9Bc=

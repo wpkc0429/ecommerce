@@ -14,6 +14,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
@@ -74,6 +75,7 @@ const (
 	TypeCheckoutIdempotencyKey        = "CheckoutIdempotencyKey"
 	TypeContentAuditLog               = "ContentAuditLog"
 	TypeContentDocument               = "ContentDocument"
+	TypeContentPublishHook            = "ContentPublishHook"
 	TypeContentRevision               = "ContentRevision"
 	TypeContentSchema                 = "ContentSchema"
 	TypeMediaUpload                   = "MediaUpload"
@@ -7139,6 +7141,1872 @@ func (m *ContentDocumentMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ContentDocumentMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ContentDocument edge %s", name)
+}
+
+// ContentPublishHookMutation represents an operation that mutates the ContentPublishHook nodes in the graph.
+type ContentPublishHookMutation struct {
+	config
+	op                        Op
+	typ                       string
+	id                        *int
+	shop_id                   *int
+	addshop_id                *int
+	url_ciphertext            *[]byte
+	host                      *string
+	url_hint                  *string
+	signing_secret_ciphertext *[]byte
+	enabled                   *bool
+	disabled_reason           *string
+	last_status               *string
+	last_http_status          *int
+	addlast_http_status       *int
+	last_attempt_at           *time.Time
+	last_success_at           *time.Time
+	consecutive_failures      *int
+	addconsecutive_failures   *int
+	cap_day                   *time.Time
+	cap_count                 *int
+	addcap_count              *int
+	pending_since             *time.Time
+	pending_last_at           *time.Time
+	pending_event             *string
+	pending_key               *string
+	pending_rev               *int64
+	addpending_rev            *int64
+	pending_count             *int
+	addpending_count          *int
+	created_at                *time.Time
+	updated_at                *time.Time
+	updated_by_user_id        *int
+	addupdated_by_user_id     *int
+	clearedFields             map[string]struct{}
+	done                      bool
+	oldValue                  func(context.Context) (*ContentPublishHook, error)
+	predicates                []predicate.ContentPublishHook
+}
+
+var _ ent.Mutation = (*ContentPublishHookMutation)(nil)
+
+// contentpublishhookOption allows management of the mutation configuration using functional options.
+type contentpublishhookOption func(*ContentPublishHookMutation)
+
+// newContentPublishHookMutation creates new mutation for the ContentPublishHook entity.
+func newContentPublishHookMutation(c config, op Op, opts ...contentpublishhookOption) *ContentPublishHookMutation {
+	m := &ContentPublishHookMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeContentPublishHook,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withContentPublishHookID sets the ID field of the mutation.
+func withContentPublishHookID(id int) contentpublishhookOption {
+	return func(m *ContentPublishHookMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ContentPublishHook
+		)
+		m.oldValue = func(ctx context.Context) (*ContentPublishHook, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ContentPublishHook.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withContentPublishHook sets the old ContentPublishHook of the mutation.
+func withContentPublishHook(node *ContentPublishHook) contentpublishhookOption {
+	return func(m *ContentPublishHookMutation) {
+		m.oldValue = func(context.Context) (*ContentPublishHook, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ContentPublishHookMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ContentPublishHookMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ContentPublishHookMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ContentPublishHookMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ContentPublishHook.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *ContentPublishHookMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *ContentPublishHookMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *ContentPublishHookMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *ContentPublishHookMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *ContentPublishHookMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetURLCiphertext sets the "url_ciphertext" field.
+func (m *ContentPublishHookMutation) SetURLCiphertext(b []byte) {
+	m.url_ciphertext = &b
+}
+
+// URLCiphertext returns the value of the "url_ciphertext" field in the mutation.
+func (m *ContentPublishHookMutation) URLCiphertext() (r []byte, exists bool) {
+	v := m.url_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldURLCiphertext returns the old "url_ciphertext" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldURLCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldURLCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldURLCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldURLCiphertext: %w", err)
+	}
+	return oldValue.URLCiphertext, nil
+}
+
+// ResetURLCiphertext resets all changes to the "url_ciphertext" field.
+func (m *ContentPublishHookMutation) ResetURLCiphertext() {
+	m.url_ciphertext = nil
+}
+
+// SetHost sets the "host" field.
+func (m *ContentPublishHookMutation) SetHost(s string) {
+	m.host = &s
+}
+
+// Host returns the value of the "host" field in the mutation.
+func (m *ContentPublishHookMutation) Host() (r string, exists bool) {
+	v := m.host
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHost returns the old "host" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldHost(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHost is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHost requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHost: %w", err)
+	}
+	return oldValue.Host, nil
+}
+
+// ResetHost resets all changes to the "host" field.
+func (m *ContentPublishHookMutation) ResetHost() {
+	m.host = nil
+}
+
+// SetURLHint sets the "url_hint" field.
+func (m *ContentPublishHookMutation) SetURLHint(s string) {
+	m.url_hint = &s
+}
+
+// URLHint returns the value of the "url_hint" field in the mutation.
+func (m *ContentPublishHookMutation) URLHint() (r string, exists bool) {
+	v := m.url_hint
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldURLHint returns the old "url_hint" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldURLHint(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldURLHint is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldURLHint requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldURLHint: %w", err)
+	}
+	return oldValue.URLHint, nil
+}
+
+// ResetURLHint resets all changes to the "url_hint" field.
+func (m *ContentPublishHookMutation) ResetURLHint() {
+	m.url_hint = nil
+}
+
+// SetSigningSecretCiphertext sets the "signing_secret_ciphertext" field.
+func (m *ContentPublishHookMutation) SetSigningSecretCiphertext(b []byte) {
+	m.signing_secret_ciphertext = &b
+}
+
+// SigningSecretCiphertext returns the value of the "signing_secret_ciphertext" field in the mutation.
+func (m *ContentPublishHookMutation) SigningSecretCiphertext() (r []byte, exists bool) {
+	v := m.signing_secret_ciphertext
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSigningSecretCiphertext returns the old "signing_secret_ciphertext" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldSigningSecretCiphertext(ctx context.Context) (v []byte, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSigningSecretCiphertext is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSigningSecretCiphertext requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSigningSecretCiphertext: %w", err)
+	}
+	return oldValue.SigningSecretCiphertext, nil
+}
+
+// ResetSigningSecretCiphertext resets all changes to the "signing_secret_ciphertext" field.
+func (m *ContentPublishHookMutation) ResetSigningSecretCiphertext() {
+	m.signing_secret_ciphertext = nil
+}
+
+// SetEnabled sets the "enabled" field.
+func (m *ContentPublishHookMutation) SetEnabled(b bool) {
+	m.enabled = &b
+}
+
+// Enabled returns the value of the "enabled" field in the mutation.
+func (m *ContentPublishHookMutation) Enabled() (r bool, exists bool) {
+	v := m.enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEnabled returns the old "enabled" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEnabled: %w", err)
+	}
+	return oldValue.Enabled, nil
+}
+
+// ResetEnabled resets all changes to the "enabled" field.
+func (m *ContentPublishHookMutation) ResetEnabled() {
+	m.enabled = nil
+}
+
+// SetDisabledReason sets the "disabled_reason" field.
+func (m *ContentPublishHookMutation) SetDisabledReason(s string) {
+	m.disabled_reason = &s
+}
+
+// DisabledReason returns the value of the "disabled_reason" field in the mutation.
+func (m *ContentPublishHookMutation) DisabledReason() (r string, exists bool) {
+	v := m.disabled_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisabledReason returns the old "disabled_reason" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldDisabledReason(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisabledReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisabledReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisabledReason: %w", err)
+	}
+	return oldValue.DisabledReason, nil
+}
+
+// ResetDisabledReason resets all changes to the "disabled_reason" field.
+func (m *ContentPublishHookMutation) ResetDisabledReason() {
+	m.disabled_reason = nil
+}
+
+// SetLastStatus sets the "last_status" field.
+func (m *ContentPublishHookMutation) SetLastStatus(s string) {
+	m.last_status = &s
+}
+
+// LastStatus returns the value of the "last_status" field in the mutation.
+func (m *ContentPublishHookMutation) LastStatus() (r string, exists bool) {
+	v := m.last_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastStatus returns the old "last_status" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldLastStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastStatus: %w", err)
+	}
+	return oldValue.LastStatus, nil
+}
+
+// ResetLastStatus resets all changes to the "last_status" field.
+func (m *ContentPublishHookMutation) ResetLastStatus() {
+	m.last_status = nil
+}
+
+// SetLastHTTPStatus sets the "last_http_status" field.
+func (m *ContentPublishHookMutation) SetLastHTTPStatus(i int) {
+	m.last_http_status = &i
+	m.addlast_http_status = nil
+}
+
+// LastHTTPStatus returns the value of the "last_http_status" field in the mutation.
+func (m *ContentPublishHookMutation) LastHTTPStatus() (r int, exists bool) {
+	v := m.last_http_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastHTTPStatus returns the old "last_http_status" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldLastHTTPStatus(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastHTTPStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastHTTPStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastHTTPStatus: %w", err)
+	}
+	return oldValue.LastHTTPStatus, nil
+}
+
+// AddLastHTTPStatus adds i to the "last_http_status" field.
+func (m *ContentPublishHookMutation) AddLastHTTPStatus(i int) {
+	if m.addlast_http_status != nil {
+		*m.addlast_http_status += i
+	} else {
+		m.addlast_http_status = &i
+	}
+}
+
+// AddedLastHTTPStatus returns the value that was added to the "last_http_status" field in this mutation.
+func (m *ContentPublishHookMutation) AddedLastHTTPStatus() (r int, exists bool) {
+	v := m.addlast_http_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLastHTTPStatus resets all changes to the "last_http_status" field.
+func (m *ContentPublishHookMutation) ResetLastHTTPStatus() {
+	m.last_http_status = nil
+	m.addlast_http_status = nil
+}
+
+// SetLastAttemptAt sets the "last_attempt_at" field.
+func (m *ContentPublishHookMutation) SetLastAttemptAt(t time.Time) {
+	m.last_attempt_at = &t
+}
+
+// LastAttemptAt returns the value of the "last_attempt_at" field in the mutation.
+func (m *ContentPublishHookMutation) LastAttemptAt() (r time.Time, exists bool) {
+	v := m.last_attempt_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastAttemptAt returns the old "last_attempt_at" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldLastAttemptAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastAttemptAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastAttemptAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastAttemptAt: %w", err)
+	}
+	return oldValue.LastAttemptAt, nil
+}
+
+// ClearLastAttemptAt clears the value of the "last_attempt_at" field.
+func (m *ContentPublishHookMutation) ClearLastAttemptAt() {
+	m.last_attempt_at = nil
+	m.clearedFields[contentpublishhook.FieldLastAttemptAt] = struct{}{}
+}
+
+// LastAttemptAtCleared returns if the "last_attempt_at" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) LastAttemptAtCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldLastAttemptAt]
+	return ok
+}
+
+// ResetLastAttemptAt resets all changes to the "last_attempt_at" field.
+func (m *ContentPublishHookMutation) ResetLastAttemptAt() {
+	m.last_attempt_at = nil
+	delete(m.clearedFields, contentpublishhook.FieldLastAttemptAt)
+}
+
+// SetLastSuccessAt sets the "last_success_at" field.
+func (m *ContentPublishHookMutation) SetLastSuccessAt(t time.Time) {
+	m.last_success_at = &t
+}
+
+// LastSuccessAt returns the value of the "last_success_at" field in the mutation.
+func (m *ContentPublishHookMutation) LastSuccessAt() (r time.Time, exists bool) {
+	v := m.last_success_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastSuccessAt returns the old "last_success_at" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldLastSuccessAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastSuccessAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastSuccessAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastSuccessAt: %w", err)
+	}
+	return oldValue.LastSuccessAt, nil
+}
+
+// ClearLastSuccessAt clears the value of the "last_success_at" field.
+func (m *ContentPublishHookMutation) ClearLastSuccessAt() {
+	m.last_success_at = nil
+	m.clearedFields[contentpublishhook.FieldLastSuccessAt] = struct{}{}
+}
+
+// LastSuccessAtCleared returns if the "last_success_at" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) LastSuccessAtCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldLastSuccessAt]
+	return ok
+}
+
+// ResetLastSuccessAt resets all changes to the "last_success_at" field.
+func (m *ContentPublishHookMutation) ResetLastSuccessAt() {
+	m.last_success_at = nil
+	delete(m.clearedFields, contentpublishhook.FieldLastSuccessAt)
+}
+
+// SetConsecutiveFailures sets the "consecutive_failures" field.
+func (m *ContentPublishHookMutation) SetConsecutiveFailures(i int) {
+	m.consecutive_failures = &i
+	m.addconsecutive_failures = nil
+}
+
+// ConsecutiveFailures returns the value of the "consecutive_failures" field in the mutation.
+func (m *ContentPublishHookMutation) ConsecutiveFailures() (r int, exists bool) {
+	v := m.consecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConsecutiveFailures returns the old "consecutive_failures" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldConsecutiveFailures(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConsecutiveFailures is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConsecutiveFailures requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConsecutiveFailures: %w", err)
+	}
+	return oldValue.ConsecutiveFailures, nil
+}
+
+// AddConsecutiveFailures adds i to the "consecutive_failures" field.
+func (m *ContentPublishHookMutation) AddConsecutiveFailures(i int) {
+	if m.addconsecutive_failures != nil {
+		*m.addconsecutive_failures += i
+	} else {
+		m.addconsecutive_failures = &i
+	}
+}
+
+// AddedConsecutiveFailures returns the value that was added to the "consecutive_failures" field in this mutation.
+func (m *ContentPublishHookMutation) AddedConsecutiveFailures() (r int, exists bool) {
+	v := m.addconsecutive_failures
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConsecutiveFailures resets all changes to the "consecutive_failures" field.
+func (m *ContentPublishHookMutation) ResetConsecutiveFailures() {
+	m.consecutive_failures = nil
+	m.addconsecutive_failures = nil
+}
+
+// SetCapDay sets the "cap_day" field.
+func (m *ContentPublishHookMutation) SetCapDay(t time.Time) {
+	m.cap_day = &t
+}
+
+// CapDay returns the value of the "cap_day" field in the mutation.
+func (m *ContentPublishHookMutation) CapDay() (r time.Time, exists bool) {
+	v := m.cap_day
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCapDay returns the old "cap_day" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldCapDay(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCapDay is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCapDay requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCapDay: %w", err)
+	}
+	return oldValue.CapDay, nil
+}
+
+// ClearCapDay clears the value of the "cap_day" field.
+func (m *ContentPublishHookMutation) ClearCapDay() {
+	m.cap_day = nil
+	m.clearedFields[contentpublishhook.FieldCapDay] = struct{}{}
+}
+
+// CapDayCleared returns if the "cap_day" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) CapDayCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldCapDay]
+	return ok
+}
+
+// ResetCapDay resets all changes to the "cap_day" field.
+func (m *ContentPublishHookMutation) ResetCapDay() {
+	m.cap_day = nil
+	delete(m.clearedFields, contentpublishhook.FieldCapDay)
+}
+
+// SetCapCount sets the "cap_count" field.
+func (m *ContentPublishHookMutation) SetCapCount(i int) {
+	m.cap_count = &i
+	m.addcap_count = nil
+}
+
+// CapCount returns the value of the "cap_count" field in the mutation.
+func (m *ContentPublishHookMutation) CapCount() (r int, exists bool) {
+	v := m.cap_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCapCount returns the old "cap_count" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldCapCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCapCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCapCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCapCount: %w", err)
+	}
+	return oldValue.CapCount, nil
+}
+
+// AddCapCount adds i to the "cap_count" field.
+func (m *ContentPublishHookMutation) AddCapCount(i int) {
+	if m.addcap_count != nil {
+		*m.addcap_count += i
+	} else {
+		m.addcap_count = &i
+	}
+}
+
+// AddedCapCount returns the value that was added to the "cap_count" field in this mutation.
+func (m *ContentPublishHookMutation) AddedCapCount() (r int, exists bool) {
+	v := m.addcap_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetCapCount resets all changes to the "cap_count" field.
+func (m *ContentPublishHookMutation) ResetCapCount() {
+	m.cap_count = nil
+	m.addcap_count = nil
+}
+
+// SetPendingSince sets the "pending_since" field.
+func (m *ContentPublishHookMutation) SetPendingSince(t time.Time) {
+	m.pending_since = &t
+}
+
+// PendingSince returns the value of the "pending_since" field in the mutation.
+func (m *ContentPublishHookMutation) PendingSince() (r time.Time, exists bool) {
+	v := m.pending_since
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingSince returns the old "pending_since" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingSince(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingSince is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingSince requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingSince: %w", err)
+	}
+	return oldValue.PendingSince, nil
+}
+
+// ClearPendingSince clears the value of the "pending_since" field.
+func (m *ContentPublishHookMutation) ClearPendingSince() {
+	m.pending_since = nil
+	m.clearedFields[contentpublishhook.FieldPendingSince] = struct{}{}
+}
+
+// PendingSinceCleared returns if the "pending_since" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) PendingSinceCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldPendingSince]
+	return ok
+}
+
+// ResetPendingSince resets all changes to the "pending_since" field.
+func (m *ContentPublishHookMutation) ResetPendingSince() {
+	m.pending_since = nil
+	delete(m.clearedFields, contentpublishhook.FieldPendingSince)
+}
+
+// SetPendingLastAt sets the "pending_last_at" field.
+func (m *ContentPublishHookMutation) SetPendingLastAt(t time.Time) {
+	m.pending_last_at = &t
+}
+
+// PendingLastAt returns the value of the "pending_last_at" field in the mutation.
+func (m *ContentPublishHookMutation) PendingLastAt() (r time.Time, exists bool) {
+	v := m.pending_last_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingLastAt returns the old "pending_last_at" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingLastAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingLastAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingLastAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingLastAt: %w", err)
+	}
+	return oldValue.PendingLastAt, nil
+}
+
+// ClearPendingLastAt clears the value of the "pending_last_at" field.
+func (m *ContentPublishHookMutation) ClearPendingLastAt() {
+	m.pending_last_at = nil
+	m.clearedFields[contentpublishhook.FieldPendingLastAt] = struct{}{}
+}
+
+// PendingLastAtCleared returns if the "pending_last_at" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) PendingLastAtCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldPendingLastAt]
+	return ok
+}
+
+// ResetPendingLastAt resets all changes to the "pending_last_at" field.
+func (m *ContentPublishHookMutation) ResetPendingLastAt() {
+	m.pending_last_at = nil
+	delete(m.clearedFields, contentpublishhook.FieldPendingLastAt)
+}
+
+// SetPendingEvent sets the "pending_event" field.
+func (m *ContentPublishHookMutation) SetPendingEvent(s string) {
+	m.pending_event = &s
+}
+
+// PendingEvent returns the value of the "pending_event" field in the mutation.
+func (m *ContentPublishHookMutation) PendingEvent() (r string, exists bool) {
+	v := m.pending_event
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingEvent returns the old "pending_event" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingEvent(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingEvent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingEvent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingEvent: %w", err)
+	}
+	return oldValue.PendingEvent, nil
+}
+
+// ResetPendingEvent resets all changes to the "pending_event" field.
+func (m *ContentPublishHookMutation) ResetPendingEvent() {
+	m.pending_event = nil
+}
+
+// SetPendingKey sets the "pending_key" field.
+func (m *ContentPublishHookMutation) SetPendingKey(s string) {
+	m.pending_key = &s
+}
+
+// PendingKey returns the value of the "pending_key" field in the mutation.
+func (m *ContentPublishHookMutation) PendingKey() (r string, exists bool) {
+	v := m.pending_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingKey returns the old "pending_key" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingKey: %w", err)
+	}
+	return oldValue.PendingKey, nil
+}
+
+// ResetPendingKey resets all changes to the "pending_key" field.
+func (m *ContentPublishHookMutation) ResetPendingKey() {
+	m.pending_key = nil
+}
+
+// SetPendingRev sets the "pending_rev" field.
+func (m *ContentPublishHookMutation) SetPendingRev(i int64) {
+	m.pending_rev = &i
+	m.addpending_rev = nil
+}
+
+// PendingRev returns the value of the "pending_rev" field in the mutation.
+func (m *ContentPublishHookMutation) PendingRev() (r int64, exists bool) {
+	v := m.pending_rev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingRev returns the old "pending_rev" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingRev(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingRev is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingRev requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingRev: %w", err)
+	}
+	return oldValue.PendingRev, nil
+}
+
+// AddPendingRev adds i to the "pending_rev" field.
+func (m *ContentPublishHookMutation) AddPendingRev(i int64) {
+	if m.addpending_rev != nil {
+		*m.addpending_rev += i
+	} else {
+		m.addpending_rev = &i
+	}
+}
+
+// AddedPendingRev returns the value that was added to the "pending_rev" field in this mutation.
+func (m *ContentPublishHookMutation) AddedPendingRev() (r int64, exists bool) {
+	v := m.addpending_rev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPendingRev resets all changes to the "pending_rev" field.
+func (m *ContentPublishHookMutation) ResetPendingRev() {
+	m.pending_rev = nil
+	m.addpending_rev = nil
+}
+
+// SetPendingCount sets the "pending_count" field.
+func (m *ContentPublishHookMutation) SetPendingCount(i int) {
+	m.pending_count = &i
+	m.addpending_count = nil
+}
+
+// PendingCount returns the value of the "pending_count" field in the mutation.
+func (m *ContentPublishHookMutation) PendingCount() (r int, exists bool) {
+	v := m.pending_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPendingCount returns the old "pending_count" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldPendingCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPendingCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPendingCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPendingCount: %w", err)
+	}
+	return oldValue.PendingCount, nil
+}
+
+// AddPendingCount adds i to the "pending_count" field.
+func (m *ContentPublishHookMutation) AddPendingCount(i int) {
+	if m.addpending_count != nil {
+		*m.addpending_count += i
+	} else {
+		m.addpending_count = &i
+	}
+}
+
+// AddedPendingCount returns the value that was added to the "pending_count" field in this mutation.
+func (m *ContentPublishHookMutation) AddedPendingCount() (r int, exists bool) {
+	v := m.addpending_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPendingCount resets all changes to the "pending_count" field.
+func (m *ContentPublishHookMutation) ResetPendingCount() {
+	m.pending_count = nil
+	m.addpending_count = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ContentPublishHookMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ContentPublishHookMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ContentPublishHookMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ContentPublishHookMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ContentPublishHookMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ContentPublishHookMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetUpdatedByUserID sets the "updated_by_user_id" field.
+func (m *ContentPublishHookMutation) SetUpdatedByUserID(i int) {
+	m.updated_by_user_id = &i
+	m.addupdated_by_user_id = nil
+}
+
+// UpdatedByUserID returns the value of the "updated_by_user_id" field in the mutation.
+func (m *ContentPublishHookMutation) UpdatedByUserID() (r int, exists bool) {
+	v := m.updated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedByUserID returns the old "updated_by_user_id" field's value of the ContentPublishHook entity.
+// If the ContentPublishHook object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentPublishHookMutation) OldUpdatedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedByUserID: %w", err)
+	}
+	return oldValue.UpdatedByUserID, nil
+}
+
+// AddUpdatedByUserID adds i to the "updated_by_user_id" field.
+func (m *ContentPublishHookMutation) AddUpdatedByUserID(i int) {
+	if m.addupdated_by_user_id != nil {
+		*m.addupdated_by_user_id += i
+	} else {
+		m.addupdated_by_user_id = &i
+	}
+}
+
+// AddedUpdatedByUserID returns the value that was added to the "updated_by_user_id" field in this mutation.
+func (m *ContentPublishHookMutation) AddedUpdatedByUserID() (r int, exists bool) {
+	v := m.addupdated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearUpdatedByUserID clears the value of the "updated_by_user_id" field.
+func (m *ContentPublishHookMutation) ClearUpdatedByUserID() {
+	m.updated_by_user_id = nil
+	m.addupdated_by_user_id = nil
+	m.clearedFields[contentpublishhook.FieldUpdatedByUserID] = struct{}{}
+}
+
+// UpdatedByUserIDCleared returns if the "updated_by_user_id" field was cleared in this mutation.
+func (m *ContentPublishHookMutation) UpdatedByUserIDCleared() bool {
+	_, ok := m.clearedFields[contentpublishhook.FieldUpdatedByUserID]
+	return ok
+}
+
+// ResetUpdatedByUserID resets all changes to the "updated_by_user_id" field.
+func (m *ContentPublishHookMutation) ResetUpdatedByUserID() {
+	m.updated_by_user_id = nil
+	m.addupdated_by_user_id = nil
+	delete(m.clearedFields, contentpublishhook.FieldUpdatedByUserID)
+}
+
+// Where appends a list predicates to the ContentPublishHookMutation builder.
+func (m *ContentPublishHookMutation) Where(ps ...predicate.ContentPublishHook) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ContentPublishHookMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ContentPublishHookMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ContentPublishHook, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ContentPublishHookMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ContentPublishHookMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ContentPublishHook).
+func (m *ContentPublishHookMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ContentPublishHookMutation) Fields() []string {
+	fields := make([]string, 0, 23)
+	if m.shop_id != nil {
+		fields = append(fields, contentpublishhook.FieldShopID)
+	}
+	if m.url_ciphertext != nil {
+		fields = append(fields, contentpublishhook.FieldURLCiphertext)
+	}
+	if m.host != nil {
+		fields = append(fields, contentpublishhook.FieldHost)
+	}
+	if m.url_hint != nil {
+		fields = append(fields, contentpublishhook.FieldURLHint)
+	}
+	if m.signing_secret_ciphertext != nil {
+		fields = append(fields, contentpublishhook.FieldSigningSecretCiphertext)
+	}
+	if m.enabled != nil {
+		fields = append(fields, contentpublishhook.FieldEnabled)
+	}
+	if m.disabled_reason != nil {
+		fields = append(fields, contentpublishhook.FieldDisabledReason)
+	}
+	if m.last_status != nil {
+		fields = append(fields, contentpublishhook.FieldLastStatus)
+	}
+	if m.last_http_status != nil {
+		fields = append(fields, contentpublishhook.FieldLastHTTPStatus)
+	}
+	if m.last_attempt_at != nil {
+		fields = append(fields, contentpublishhook.FieldLastAttemptAt)
+	}
+	if m.last_success_at != nil {
+		fields = append(fields, contentpublishhook.FieldLastSuccessAt)
+	}
+	if m.consecutive_failures != nil {
+		fields = append(fields, contentpublishhook.FieldConsecutiveFailures)
+	}
+	if m.cap_day != nil {
+		fields = append(fields, contentpublishhook.FieldCapDay)
+	}
+	if m.cap_count != nil {
+		fields = append(fields, contentpublishhook.FieldCapCount)
+	}
+	if m.pending_since != nil {
+		fields = append(fields, contentpublishhook.FieldPendingSince)
+	}
+	if m.pending_last_at != nil {
+		fields = append(fields, contentpublishhook.FieldPendingLastAt)
+	}
+	if m.pending_event != nil {
+		fields = append(fields, contentpublishhook.FieldPendingEvent)
+	}
+	if m.pending_key != nil {
+		fields = append(fields, contentpublishhook.FieldPendingKey)
+	}
+	if m.pending_rev != nil {
+		fields = append(fields, contentpublishhook.FieldPendingRev)
+	}
+	if m.pending_count != nil {
+		fields = append(fields, contentpublishhook.FieldPendingCount)
+	}
+	if m.created_at != nil {
+		fields = append(fields, contentpublishhook.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, contentpublishhook.FieldUpdatedAt)
+	}
+	if m.updated_by_user_id != nil {
+		fields = append(fields, contentpublishhook.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ContentPublishHookMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		return m.ShopID()
+	case contentpublishhook.FieldURLCiphertext:
+		return m.URLCiphertext()
+	case contentpublishhook.FieldHost:
+		return m.Host()
+	case contentpublishhook.FieldURLHint:
+		return m.URLHint()
+	case contentpublishhook.FieldSigningSecretCiphertext:
+		return m.SigningSecretCiphertext()
+	case contentpublishhook.FieldEnabled:
+		return m.Enabled()
+	case contentpublishhook.FieldDisabledReason:
+		return m.DisabledReason()
+	case contentpublishhook.FieldLastStatus:
+		return m.LastStatus()
+	case contentpublishhook.FieldLastHTTPStatus:
+		return m.LastHTTPStatus()
+	case contentpublishhook.FieldLastAttemptAt:
+		return m.LastAttemptAt()
+	case contentpublishhook.FieldLastSuccessAt:
+		return m.LastSuccessAt()
+	case contentpublishhook.FieldConsecutiveFailures:
+		return m.ConsecutiveFailures()
+	case contentpublishhook.FieldCapDay:
+		return m.CapDay()
+	case contentpublishhook.FieldCapCount:
+		return m.CapCount()
+	case contentpublishhook.FieldPendingSince:
+		return m.PendingSince()
+	case contentpublishhook.FieldPendingLastAt:
+		return m.PendingLastAt()
+	case contentpublishhook.FieldPendingEvent:
+		return m.PendingEvent()
+	case contentpublishhook.FieldPendingKey:
+		return m.PendingKey()
+	case contentpublishhook.FieldPendingRev:
+		return m.PendingRev()
+	case contentpublishhook.FieldPendingCount:
+		return m.PendingCount()
+	case contentpublishhook.FieldCreatedAt:
+		return m.CreatedAt()
+	case contentpublishhook.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case contentpublishhook.FieldUpdatedByUserID:
+		return m.UpdatedByUserID()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ContentPublishHookMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		return m.OldShopID(ctx)
+	case contentpublishhook.FieldURLCiphertext:
+		return m.OldURLCiphertext(ctx)
+	case contentpublishhook.FieldHost:
+		return m.OldHost(ctx)
+	case contentpublishhook.FieldURLHint:
+		return m.OldURLHint(ctx)
+	case contentpublishhook.FieldSigningSecretCiphertext:
+		return m.OldSigningSecretCiphertext(ctx)
+	case contentpublishhook.FieldEnabled:
+		return m.OldEnabled(ctx)
+	case contentpublishhook.FieldDisabledReason:
+		return m.OldDisabledReason(ctx)
+	case contentpublishhook.FieldLastStatus:
+		return m.OldLastStatus(ctx)
+	case contentpublishhook.FieldLastHTTPStatus:
+		return m.OldLastHTTPStatus(ctx)
+	case contentpublishhook.FieldLastAttemptAt:
+		return m.OldLastAttemptAt(ctx)
+	case contentpublishhook.FieldLastSuccessAt:
+		return m.OldLastSuccessAt(ctx)
+	case contentpublishhook.FieldConsecutiveFailures:
+		return m.OldConsecutiveFailures(ctx)
+	case contentpublishhook.FieldCapDay:
+		return m.OldCapDay(ctx)
+	case contentpublishhook.FieldCapCount:
+		return m.OldCapCount(ctx)
+	case contentpublishhook.FieldPendingSince:
+		return m.OldPendingSince(ctx)
+	case contentpublishhook.FieldPendingLastAt:
+		return m.OldPendingLastAt(ctx)
+	case contentpublishhook.FieldPendingEvent:
+		return m.OldPendingEvent(ctx)
+	case contentpublishhook.FieldPendingKey:
+		return m.OldPendingKey(ctx)
+	case contentpublishhook.FieldPendingRev:
+		return m.OldPendingRev(ctx)
+	case contentpublishhook.FieldPendingCount:
+		return m.OldPendingCount(ctx)
+	case contentpublishhook.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case contentpublishhook.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case contentpublishhook.FieldUpdatedByUserID:
+		return m.OldUpdatedByUserID(ctx)
+	}
+	return nil, fmt.Errorf("unknown ContentPublishHook field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentPublishHookMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case contentpublishhook.FieldURLCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetURLCiphertext(v)
+		return nil
+	case contentpublishhook.FieldHost:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHost(v)
+		return nil
+	case contentpublishhook.FieldURLHint:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetURLHint(v)
+		return nil
+	case contentpublishhook.FieldSigningSecretCiphertext:
+		v, ok := value.([]byte)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSigningSecretCiphertext(v)
+		return nil
+	case contentpublishhook.FieldEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEnabled(v)
+		return nil
+	case contentpublishhook.FieldDisabledReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisabledReason(v)
+		return nil
+	case contentpublishhook.FieldLastStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastStatus(v)
+		return nil
+	case contentpublishhook.FieldLastHTTPStatus:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastHTTPStatus(v)
+		return nil
+	case contentpublishhook.FieldLastAttemptAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastAttemptAt(v)
+		return nil
+	case contentpublishhook.FieldLastSuccessAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastSuccessAt(v)
+		return nil
+	case contentpublishhook.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConsecutiveFailures(v)
+		return nil
+	case contentpublishhook.FieldCapDay:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCapDay(v)
+		return nil
+	case contentpublishhook.FieldCapCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCapCount(v)
+		return nil
+	case contentpublishhook.FieldPendingSince:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingSince(v)
+		return nil
+	case contentpublishhook.FieldPendingLastAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingLastAt(v)
+		return nil
+	case contentpublishhook.FieldPendingEvent:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingEvent(v)
+		return nil
+	case contentpublishhook.FieldPendingKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingKey(v)
+		return nil
+	case contentpublishhook.FieldPendingRev:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingRev(v)
+		return nil
+	case contentpublishhook.FieldPendingCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPendingCount(v)
+		return nil
+	case contentpublishhook.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case contentpublishhook.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case contentpublishhook.FieldUpdatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentPublishHook field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ContentPublishHookMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, contentpublishhook.FieldShopID)
+	}
+	if m.addlast_http_status != nil {
+		fields = append(fields, contentpublishhook.FieldLastHTTPStatus)
+	}
+	if m.addconsecutive_failures != nil {
+		fields = append(fields, contentpublishhook.FieldConsecutiveFailures)
+	}
+	if m.addcap_count != nil {
+		fields = append(fields, contentpublishhook.FieldCapCount)
+	}
+	if m.addpending_rev != nil {
+		fields = append(fields, contentpublishhook.FieldPendingRev)
+	}
+	if m.addpending_count != nil {
+		fields = append(fields, contentpublishhook.FieldPendingCount)
+	}
+	if m.addupdated_by_user_id != nil {
+		fields = append(fields, contentpublishhook.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ContentPublishHookMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		return m.AddedShopID()
+	case contentpublishhook.FieldLastHTTPStatus:
+		return m.AddedLastHTTPStatus()
+	case contentpublishhook.FieldConsecutiveFailures:
+		return m.AddedConsecutiveFailures()
+	case contentpublishhook.FieldCapCount:
+		return m.AddedCapCount()
+	case contentpublishhook.FieldPendingRev:
+		return m.AddedPendingRev()
+	case contentpublishhook.FieldPendingCount:
+		return m.AddedPendingCount()
+	case contentpublishhook.FieldUpdatedByUserID:
+		return m.AddedUpdatedByUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentPublishHookMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case contentpublishhook.FieldLastHTTPStatus:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLastHTTPStatus(v)
+		return nil
+	case contentpublishhook.FieldConsecutiveFailures:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConsecutiveFailures(v)
+		return nil
+	case contentpublishhook.FieldCapCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCapCount(v)
+		return nil
+	case contentpublishhook.FieldPendingRev:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPendingRev(v)
+		return nil
+	case contentpublishhook.FieldPendingCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPendingCount(v)
+		return nil
+	case contentpublishhook.FieldUpdatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUpdatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentPublishHook numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ContentPublishHookMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(contentpublishhook.FieldLastAttemptAt) {
+		fields = append(fields, contentpublishhook.FieldLastAttemptAt)
+	}
+	if m.FieldCleared(contentpublishhook.FieldLastSuccessAt) {
+		fields = append(fields, contentpublishhook.FieldLastSuccessAt)
+	}
+	if m.FieldCleared(contentpublishhook.FieldCapDay) {
+		fields = append(fields, contentpublishhook.FieldCapDay)
+	}
+	if m.FieldCleared(contentpublishhook.FieldPendingSince) {
+		fields = append(fields, contentpublishhook.FieldPendingSince)
+	}
+	if m.FieldCleared(contentpublishhook.FieldPendingLastAt) {
+		fields = append(fields, contentpublishhook.FieldPendingLastAt)
+	}
+	if m.FieldCleared(contentpublishhook.FieldUpdatedByUserID) {
+		fields = append(fields, contentpublishhook.FieldUpdatedByUserID)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ContentPublishHookMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ContentPublishHookMutation) ClearField(name string) error {
+	switch name {
+	case contentpublishhook.FieldLastAttemptAt:
+		m.ClearLastAttemptAt()
+		return nil
+	case contentpublishhook.FieldLastSuccessAt:
+		m.ClearLastSuccessAt()
+		return nil
+	case contentpublishhook.FieldCapDay:
+		m.ClearCapDay()
+		return nil
+	case contentpublishhook.FieldPendingSince:
+		m.ClearPendingSince()
+		return nil
+	case contentpublishhook.FieldPendingLastAt:
+		m.ClearPendingLastAt()
+		return nil
+	case contentpublishhook.FieldUpdatedByUserID:
+		m.ClearUpdatedByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentPublishHook nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ContentPublishHookMutation) ResetField(name string) error {
+	switch name {
+	case contentpublishhook.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case contentpublishhook.FieldURLCiphertext:
+		m.ResetURLCiphertext()
+		return nil
+	case contentpublishhook.FieldHost:
+		m.ResetHost()
+		return nil
+	case contentpublishhook.FieldURLHint:
+		m.ResetURLHint()
+		return nil
+	case contentpublishhook.FieldSigningSecretCiphertext:
+		m.ResetSigningSecretCiphertext()
+		return nil
+	case contentpublishhook.FieldEnabled:
+		m.ResetEnabled()
+		return nil
+	case contentpublishhook.FieldDisabledReason:
+		m.ResetDisabledReason()
+		return nil
+	case contentpublishhook.FieldLastStatus:
+		m.ResetLastStatus()
+		return nil
+	case contentpublishhook.FieldLastHTTPStatus:
+		m.ResetLastHTTPStatus()
+		return nil
+	case contentpublishhook.FieldLastAttemptAt:
+		m.ResetLastAttemptAt()
+		return nil
+	case contentpublishhook.FieldLastSuccessAt:
+		m.ResetLastSuccessAt()
+		return nil
+	case contentpublishhook.FieldConsecutiveFailures:
+		m.ResetConsecutiveFailures()
+		return nil
+	case contentpublishhook.FieldCapDay:
+		m.ResetCapDay()
+		return nil
+	case contentpublishhook.FieldCapCount:
+		m.ResetCapCount()
+		return nil
+	case contentpublishhook.FieldPendingSince:
+		m.ResetPendingSince()
+		return nil
+	case contentpublishhook.FieldPendingLastAt:
+		m.ResetPendingLastAt()
+		return nil
+	case contentpublishhook.FieldPendingEvent:
+		m.ResetPendingEvent()
+		return nil
+	case contentpublishhook.FieldPendingKey:
+		m.ResetPendingKey()
+		return nil
+	case contentpublishhook.FieldPendingRev:
+		m.ResetPendingRev()
+		return nil
+	case contentpublishhook.FieldPendingCount:
+		m.ResetPendingCount()
+		return nil
+	case contentpublishhook.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case contentpublishhook.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case contentpublishhook.FieldUpdatedByUserID:
+		m.ResetUpdatedByUserID()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentPublishHook field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ContentPublishHookMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ContentPublishHookMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ContentPublishHookMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ContentPublishHookMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ContentPublishHookMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ContentPublishHookMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ContentPublishHookMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ContentPublishHook unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ContentPublishHookMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ContentPublishHook edge %s", name)
 }
 
 // ContentRevisionMutation represents an operation that mutates the ContentRevision nodes in the graph.

@@ -300,6 +300,46 @@ var (
 			},
 		},
 	}
+	// ContentPublishHooksColumns holds the columns for the "content_publish_hooks" table.
+	ContentPublishHooksColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "url_ciphertext", Type: field.TypeBytes},
+		{Name: "host", Type: field.TypeString, Size: 253, SchemaType: map[string]string{"postgres": "varchar(253)"}},
+		{Name: "url_hint", Type: field.TypeString, Size: 8, Default: "", SchemaType: map[string]string{"postgres": "varchar(8)"}},
+		{Name: "signing_secret_ciphertext", Type: field.TypeBytes},
+		{Name: "enabled", Type: field.TypeBool, Default: true},
+		{Name: "disabled_reason", Type: field.TypeString, Size: 30, Default: "", SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "last_status", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "last_http_status", Type: field.TypeInt, Default: 0},
+		{Name: "last_attempt_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_success_at", Type: field.TypeTime, Nullable: true},
+		{Name: "consecutive_failures", Type: field.TypeInt, Default: 0},
+		{Name: "cap_day", Type: field.TypeTime, Nullable: true, SchemaType: map[string]string{"postgres": "date"}},
+		{Name: "cap_count", Type: field.TypeInt, Default: 0},
+		{Name: "pending_since", Type: field.TypeTime, Nullable: true},
+		{Name: "pending_last_at", Type: field.TypeTime, Nullable: true},
+		{Name: "pending_event", Type: field.TypeString, Size: 30, Default: "", SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "pending_key", Type: field.TypeString, Size: 63, Default: "", SchemaType: map[string]string{"postgres": "varchar(63)"}},
+		{Name: "pending_rev", Type: field.TypeInt64, Default: 0},
+		{Name: "pending_count", Type: field.TypeInt, Default: 0},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "updated_by_user_id", Type: field.TypeInt, Nullable: true},
+	}
+	// ContentPublishHooksTable holds the schema information for the "content_publish_hooks" table.
+	ContentPublishHooksTable = &schema.Table{
+		Name:       "content_publish_hooks",
+		Columns:    ContentPublishHooksColumns,
+		PrimaryKey: []*schema.Column{ContentPublishHooksColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentpublishhook_shop_id",
+				Unique:  true,
+				Columns: []*schema.Column{ContentPublishHooksColumns[1]},
+			},
+		},
+	}
 	// ContentRevisionsColumns holds the columns for the "content_revisions" table.
 	ContentRevisionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1585,6 +1625,7 @@ var (
 		CheckoutIdempotencyKeysTable,
 		ContentAuditLogTable,
 		ContentDocumentsTable,
+		ContentPublishHooksTable,
 		ContentRevisionsTable,
 		ContentSchemasTable,
 		MediaUploadsTable,
@@ -1669,6 +1710,9 @@ func init() {
 	ContentDocumentsTable.Annotation.Checks = map[string]string{
 		"content_documents_key_check":    "key ~ '^[a-z0-9][a-z0-9-]{0,62}$'",
 		"content_documents_status_check": "status IN (0, 1)",
+	}
+	ContentPublishHooksTable.Annotation = &entsql.Annotation{
+		Table: "content_publish_hooks",
 	}
 	ContentRevisionsTable.Annotation = &entsql.Annotation{
 		Table: "content_revisions",

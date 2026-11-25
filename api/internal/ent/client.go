@@ -18,6 +18,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
@@ -82,6 +83,8 @@ type Client struct {
 	ContentAuditLog *ContentAuditLogClient
 	// ContentDocument is the client for interacting with the ContentDocument builders.
 	ContentDocument *ContentDocumentClient
+	// ContentPublishHook is the client for interacting with the ContentPublishHook builders.
+	ContentPublishHook *ContentPublishHookClient
 	// ContentRevision is the client for interacting with the ContentRevision builders.
 	ContentRevision *ContentRevisionClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
@@ -170,6 +173,7 @@ func (c *Client) init() {
 	c.CheckoutIdempotencyKey = NewCheckoutIdempotencyKeyClient(c.config)
 	c.ContentAuditLog = NewContentAuditLogClient(c.config)
 	c.ContentDocument = NewContentDocumentClient(c.config)
+	c.ContentPublishHook = NewContentPublishHookClient(c.config)
 	c.ContentRevision = NewContentRevisionClient(c.config)
 	c.ContentSchema = NewContentSchemaClient(c.config)
 	c.MediaUpload = NewMediaUploadClient(c.config)
@@ -304,6 +308,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
 		ContentAuditLog:               NewContentAuditLogClient(cfg),
 		ContentDocument:               NewContentDocumentClient(cfg),
+		ContentPublishHook:            NewContentPublishHookClient(cfg),
 		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
@@ -365,6 +370,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		CheckoutIdempotencyKey:        NewCheckoutIdempotencyKeyClient(cfg),
 		ContentAuditLog:               NewContentAuditLogClient(cfg),
 		ContentDocument:               NewContentDocumentClient(cfg),
+		ContentPublishHook:            NewContentPublishHookClient(cfg),
 		ContentRevision:               NewContentRevisionClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
@@ -431,13 +437,13 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
-		c.ContentRevision, c.ContentSchema, c.MediaUpload, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
-		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
-		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
-		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
-		c.Shop, c.ShopAllowedOrigin, c.ShopApplication, c.ShopApplicationEvent,
-		c.ShopApplicationMessage, c.ShopApplicationToken,
+		c.ContentPublishHook, c.ContentRevision, c.ContentSchema, c.MediaUpload,
+		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
+		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
+		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
+		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopApplication,
+		c.ShopApplicationEvent, c.ShopApplicationMessage, c.ShopApplicationToken,
 		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
 		c.UserRefreshToken,
 	} {
@@ -451,13 +457,13 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
-		c.ContentRevision, c.ContentSchema, c.MediaUpload, c.Member,
-		c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem, c.OrderNotification,
-		c.Page, c.Payment, c.Permission, c.PointTransaction, c.Product,
-		c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey, c.Role,
-		c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem, c.ShippingMethod,
-		c.Shop, c.ShopAllowedOrigin, c.ShopApplication, c.ShopApplicationEvent,
-		c.ShopApplicationMessage, c.ShopApplicationToken,
+		c.ContentPublishHook, c.ContentRevision, c.ContentSchema, c.MediaUpload,
+		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
+		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
+		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
+		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
+		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopApplication,
+		c.ShopApplicationEvent, c.ShopApplicationMessage, c.ShopApplicationToken,
 		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
 		c.UserRefreshToken,
 	} {
@@ -482,6 +488,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ContentAuditLog.mutate(ctx, m)
 	case *ContentDocumentMutation:
 		return c.ContentDocument.mutate(ctx, m)
+	case *ContentPublishHookMutation:
+		return c.ContentPublishHook.mutate(ctx, m)
 	case *ContentRevisionMutation:
 		return c.ContentRevision.mutate(ctx, m)
 	case *ContentSchemaMutation:
@@ -1709,6 +1717,139 @@ func (c *ContentDocumentClient) mutate(ctx context.Context, m *ContentDocumentMu
 		return (&ContentDocumentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ContentDocument mutation op: %q", m.Op())
+	}
+}
+
+// ContentPublishHookClient is a client for the ContentPublishHook schema.
+type ContentPublishHookClient struct {
+	config
+}
+
+// NewContentPublishHookClient returns a client for the ContentPublishHook from the given config.
+func NewContentPublishHookClient(c config) *ContentPublishHookClient {
+	return &ContentPublishHookClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentpublishhook.Hooks(f(g(h())))`.
+func (c *ContentPublishHookClient) Use(hooks ...Hook) {
+	c.hooks.ContentPublishHook = append(c.hooks.ContentPublishHook, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentpublishhook.Intercept(f(g(h())))`.
+func (c *ContentPublishHookClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentPublishHook = append(c.inters.ContentPublishHook, interceptors...)
+}
+
+// Create returns a builder for creating a ContentPublishHook entity.
+func (c *ContentPublishHookClient) Create() *ContentPublishHookCreate {
+	mutation := newContentPublishHookMutation(c.config, OpCreate)
+	return &ContentPublishHookCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentPublishHook entities.
+func (c *ContentPublishHookClient) CreateBulk(builders ...*ContentPublishHookCreate) *ContentPublishHookCreateBulk {
+	return &ContentPublishHookCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentPublishHookClient) MapCreateBulk(slice any, setFunc func(*ContentPublishHookCreate, int)) *ContentPublishHookCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentPublishHookCreateBulk{err: fmt.Errorf("calling to ContentPublishHookClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentPublishHookCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentPublishHookCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentPublishHook.
+func (c *ContentPublishHookClient) Update() *ContentPublishHookUpdate {
+	mutation := newContentPublishHookMutation(c.config, OpUpdate)
+	return &ContentPublishHookUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentPublishHookClient) UpdateOne(_m *ContentPublishHook) *ContentPublishHookUpdateOne {
+	mutation := newContentPublishHookMutation(c.config, OpUpdateOne, withContentPublishHook(_m))
+	return &ContentPublishHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentPublishHookClient) UpdateOneID(id int) *ContentPublishHookUpdateOne {
+	mutation := newContentPublishHookMutation(c.config, OpUpdateOne, withContentPublishHookID(id))
+	return &ContentPublishHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentPublishHook.
+func (c *ContentPublishHookClient) Delete() *ContentPublishHookDelete {
+	mutation := newContentPublishHookMutation(c.config, OpDelete)
+	return &ContentPublishHookDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentPublishHookClient) DeleteOne(_m *ContentPublishHook) *ContentPublishHookDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentPublishHookClient) DeleteOneID(id int) *ContentPublishHookDeleteOne {
+	builder := c.Delete().Where(contentpublishhook.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentPublishHookDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentPublishHook.
+func (c *ContentPublishHookClient) Query() *ContentPublishHookQuery {
+	return &ContentPublishHookQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentPublishHook},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentPublishHook entity by its id.
+func (c *ContentPublishHookClient) Get(ctx context.Context, id int) (*ContentPublishHook, error) {
+	return c.Query().Where(contentpublishhook.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentPublishHookClient) GetX(ctx context.Context, id int) *ContentPublishHook {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentPublishHookClient) Hooks() []Hook {
+	return c.hooks.ContentPublishHook
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentPublishHookClient) Interceptors() []Interceptor {
+	return c.inters.ContentPublishHook
+}
+
+func (c *ContentPublishHookClient) mutate(ctx context.Context, m *ContentPublishHookMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentPublishHookCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentPublishHookUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentPublishHookUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentPublishHookDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentPublishHook mutation op: %q", m.Op())
 	}
 }
 
@@ -7352,25 +7493,25 @@ func (c *UserRefreshTokenClient) mutate(ctx context.Context, m *UserRefreshToken
 type (
 	hooks struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
-		ContentAuditLog, ContentDocument, ContentRevision, ContentSchema, MediaUpload,
-		Member, MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification,
-		Page, Payment, Permission, PointTransaction, Product, ProductCategory,
-		ProductImage, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
-		Shipment, ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
-		ShopApplication, ShopApplicationEvent, ShopApplicationMessage,
-		ShopApplicationToken, ShopPaymentProviderCredential, ShopUser, User,
-		UserPermission, UserRefreshToken []ent.Hook
+		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
+		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
+		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
+		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
+		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
+		ShopUser, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
-		ContentAuditLog, ContentDocument, ContentRevision, ContentSchema, MediaUpload,
-		Member, MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification,
-		Page, Payment, Permission, PointTransaction, Product, ProductCategory,
-		ProductImage, ProductSKU, PublishableKey, Role, RolePermission, RoleUser,
-		Shipment, ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin,
-		ShopApplication, ShopApplicationEvent, ShopApplicationMessage,
-		ShopApplicationToken, ShopPaymentProviderCredential, ShopUser, User,
-		UserPermission, UserRefreshToken []ent.Interceptor
+		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
+		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
+		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
+		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
+		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
+		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
+		ShopUser, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}
 )
 

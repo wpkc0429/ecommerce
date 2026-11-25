@@ -2382,6 +2382,44 @@ components:
         updated_by_user_id:
           oneOf: [{ type: integer }, { type: 'null' }]
 
+    PublishHookStatus:
+      type: object
+      additionalProperties: false
+      required: [configured, enabled, host, url_masked, last_status, last_http_status, last_attempt_at, last_success_at, consecutive_failures, disabled_reason, failed, pending, pending_count, daily_count, daily_cap, updated_at]
+      description: |
+        發佈 hook 的狀態。**不含完整 URL、簽章 secret 與接收端回應**。`configured: false` 時其餘欄位為零值。
+      properties:
+        configured: { type: boolean }
+        enabled: { type: boolean }
+        host: { type: string }
+        url_masked: { type: string, description: "`https://host/…` + URL 末四碼。" }
+        last_status:
+          type: string
+          description: "`''`（尚未呼叫）｜`ok`｜`http_error`｜`timeout`｜`blocked`（解析到被禁位址）｜`network_error`｜`not_allowed`（主機／URL 不再符合 allowlist）｜`rate_limited`（被每日上限擋下）。"
+        last_http_status: { type: integer }
+        last_attempt_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        last_success_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+        consecutive_failures: { type: integer }
+        disabled_reason: { type: string, description: "`''`｜`manual`｜`consecutive_failures`。" }
+        failed: { type: boolean, description: 連續失敗達上限而被自動停用（最終失敗狀態）。 }
+        pending: { type: boolean, description: 有尚未送出的發佈（去抖動中）。 }
+        pending_count: { type: integer }
+        daily_count: { type: integer, description: 今天（UTC）已用的呼叫數。 }
+        daily_cap: { type: integer }
+        updated_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+
+    PublishHookCallResult:
+      type: object
+      additionalProperties: false
+      required: [ok, result, http_status]
+      properties:
+        ok: { type: boolean }
+        result: { type: string, description: 同 `PublishHookStatus.last_status` 的類別。 }
+        http_status: { type: integer }
+
     ContentDocumentList:
       type: object
       additionalProperties: false
@@ -5695,6 +5733,147 @@ paths:
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
         "409": { $ref: '#/components/responses/Conflict' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/publish-hook:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: getContentPublishHook
+      summary: 發佈 hook 狀態
+      description: |
+        需要 `content.manage`。回傳主機、**遮罩後**的 URL（`https://host/…末四碼`）與狀態；**絕不回完整 URL、簽章 secret 或接收端的回應內容**（URL 是祕密，只寫不讀）。
+        未設定時 `configured: false`。`failed: true` 表示連續失敗達上限而被自動停用（最終失敗狀態，需手動重新啟用）。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 狀態。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishHookStatus' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+    put:
+      tags: [admin-cms]
+      operationId: setContentPublishHook
+      summary: 設定、更換或啟停發佈 hook
+      description: |
+        需要 `content.manage`；每商家每呼叫者每分鐘 30 次。`url` 必須通過平台的主機 allowlist 與 URL 規則（https、埠 443、無 userinfo、非 IP 字面值、≤ 512、
+        Cloudflare 的主機路徑形狀 `api.cloudflare.com/client/v4/{workers/builds|pages/webhooks}/deploy_hooks/<id>`），否則 422（訊息不回顯 URL）。
+        URL 加密儲存、之後不可讀回。只送 `enabled` 可啟停（重新啟用會清除失敗計數）；新 URL 會啟用並清除失敗計數。
+        `?dry_run=true` 只驗證 URL 形狀與 allowlist，**不儲存也不呼叫**。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: dry_run
+          in: query
+          required: false
+          schema: { type: boolean }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                url: { type: string, maxLength: 512 }
+                enabled: { type: boolean }
+      responses:
+        "200":
+          description: 新狀態（dry run 時只有 `host` 與 `url_masked`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishHookStatus' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [admin-cms]
+      operationId: deleteContentPublishHook
+      summary: 刪除發佈 hook
+      description: 需要 `content.manage`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { description: 已刪除。 }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/publish-hook/test:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [admin-cms]
+      operationId: testContentPublishHook
+      summary: 對已儲存的 URL 做一次測試呼叫
+      description: |
+        需要 `content.manage`；每商家每分鐘 3 次（與 `fire` 共用）。單次嘗試、不重試、不影響失敗計數與每日上限；事件為 `content.test`。
+        呼叫走與正式發送同一條路徑（allowlist、解析後檢查 IP、釘住連線、不跟隨重導向、5 秒逾時）。只回結果類別與接收端的狀態碼，**不回接收端內容**。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 結果。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishHookCallResult' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/publish-hook/fire:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [admin-cms]
+      operationId: fireContentPublishHook
+      summary: 手動重建（立即呼叫一次）
+      description: |
+        需要 `content.manage`；每商家每分鐘 3 次（與 `test` 共用）。略過去抖動與最短間隔，**仍佔用每日上限**（達上限回 429 `hook_daily_cap_reached`）；
+        hook 被停用時 409。結果更新狀態與失敗計數，與自動呼叫相同。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 結果。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PublishHookCallResult' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/publish-hook/signing-secret:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    post:
+      tags: [admin-cms]
+      operationId: rotateContentPublishHookSecret
+      summary: 產生新的簽章 secret（只顯示一次）
+      description: |
+        需要 `content.manage`。回傳新 secret **一次**（`Cache-Control: no-store`），之後任何端點都讀不回。接收端以
+        `X-Content-Signature: sha256=HMAC-SHA256(secret, X-Content-Timestamp + "." + body)` 驗證。Cloudflare deploy hook 不驗簽，這是給 allowlist 上的自訂主機用的。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 新 secret。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [signing_secret, note]
+                properties:
+                  signing_secret: { type: string }
+                  note: { type: string }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
         "429": { $ref: '#/components/responses/TooManyRequests' }
 
   /api/v1/admin/shops/{shopID}/content/documents/{key}/publish:

@@ -13,6 +13,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/checkoutidempotencykey"
 	"ksdevworks/ecommerce/api/internal/ent/contentauditlog"
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
+	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
@@ -121,6 +122,7 @@ func checkColumn(t, c string) error {
 			checkoutidempotencykey.Table:        checkoutidempotencykey.ValidColumn,
 			contentauditlog.Table:               contentauditlog.ValidColumn,
 			contentdocument.Table:               contentdocument.ValidColumn,
+			contentpublishhook.Table:            contentpublishhook.ValidColumn,
 			contentrevision.Table:               contentrevision.ValidColumn,
 			contentschema.Table:                 contentschema.ValidColumn,
 			mediaupload.Table:                   mediaupload.ValidColumn,

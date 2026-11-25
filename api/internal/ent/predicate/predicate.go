@@ -27,6 +27,9 @@ type ContentAuditLog func(*sql.Selector)
 // ContentDocument is the predicate function for contentdocument builders.
 type ContentDocument func(*sql.Selector)
 
+// ContentPublishHook is the predicate function for contentpublishhook builders.
+type ContentPublishHook func(*sql.Selector)
+
 // ContentRevision is the predicate function for contentrevision builders.
 type ContentRevision func(*sql.Selector)
 

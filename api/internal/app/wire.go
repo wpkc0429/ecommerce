@@ -18,6 +18,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/content"
+	"ksdevworks/ecommerce/api/internal/content/hook"
 	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/events"
@@ -402,6 +403,22 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Client: client, Authz: authz, Log: a.log, Box: credentialsBox,
 	}
 
+	// Publish hook (change headless-content-store slice 3, design D7). The
+	// notifier is a dispatcher subscriber that ONLY enqueues (no I/O on the
+	// publishing request); its writer and flusher goroutines are started here
+	// and drained on Close. The subscription is unconditional (wiring check 7);
+	// a shop without a hook costs one cheap indexed lookup per publish.
+	contentHookNotifier := &hook.Notifier{
+		Client: client, Box: credentialsBox, Log: a.log,
+		Sender: &hook.Sender{Policy: hookPolicy(cfg)},
+		Cfg:    hookConfig(cfg),
+	}
+	contentHookNotifier.SetPolicy(hookPolicy(cfg))
+	contentHookNotifier.Start()
+	a.closers = append(a.closers, contentHookNotifier.Close)
+	dispatcher.Subscribe(contentHookNotifier.Handle)
+	deps.ContentHook = &httpapi.ContentHookHandler{Notifier: contentHookNotifier, Authz: authz, Limiter: limiter, Log: a.log}
+
 	// Shipping logistics (change shipping-logistics): shipping methods CRUD
 	// + shipment records, no external carrier integration (design D9 — no
 	// new config values needed, unlike payment's mock webhook secret).
@@ -472,4 +489,18 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	}
 
 	return nil
+}
+
+// hookPolicy is the outbound policy of the publish hook: the built-in
+// Cloudflare deploy-hook host plus the operator's CONTENT_HOOK_ALLOWED_HOSTS.
+func hookPolicy(cfg *config.Config) hook.Policy {
+	return hook.Policy{ExtraHosts: cfg.ContentOps.HookExtraHosts, DevInsecure: cfg.ContentOps.HookDevInsecure}
+}
+
+func hookConfig(cfg *config.Config) hook.Config {
+	c := hook.DefaultConfig()
+	o := cfg.ContentOps
+	c.Debounce, c.MaxWait, c.MinInterval = o.HookDebounce, o.HookMaxWait, o.HookMinInterval
+	c.DailyCap, c.QueueSize, c.FlushInterval = o.HookDailyCap, o.HookQueueSize, o.HookFlushInterval
+	return c
 }

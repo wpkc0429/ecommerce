@@ -15,7 +15,7 @@
 ## Goals / Non-Goals
 
 **Goals**：①商家站台能擁有自己的內容形狀（schema）；②商家以表單編輯、草稿／發佈、可預覽、可回滾；③公開讀取快、可快取、不洩漏草稿；④所有輸入在寫入時被驗證與消毒；⑤schema 變更永不遺失資料；⑥發佈可選擇觸發商家站台重建；⑦現有端點在遷移期間行為不變。
-**Non-Goals**：多語系內容（`key` 可自行加語系後綴，系統不管）；內容的全文搜尋；內容的關聯或查詢語言；二進位資產管理（圖片走既有 `media` 流程）；排程發佈（記為後續）；多人同時編輯的合併（只做樂觀鎖）；在 ecommerce 內渲染內容（這正是被退役的東西）。
+**Non-Goals**：多語系內容（`key` 可自行加語系後綴，系統不管）；內容的全文搜尋；內容的關聯或查詢語言；二進位資產管理（圖片走既有 `media` 流程）；排程發佈（**已改為做，見 D11**）；多人同時編輯的合併（只做樂觀鎖）；在 ecommerce 內渲染內容（這正是被退役的東西）。
 
 ## Decisions
 
@@ -217,8 +217,54 @@
 6. **Q6 公開快取 `max-age=60`、`stale-while-revalidate=300`**：DECIDED 2026-11-25（decided by the user）。
 7. **Q7 版本歷史保留 20 筆發佈（`schema_snapshot` 另計）**：DECIDED 2026-11-25（decided by the user）。
 8. **Q8 每店 100 份文件／2 MiB 已發佈總量，可由平台設定覆寫**：DECIDED 2026-11-25（decided by the user）。
-9. **Q9 Cloudflare deploy hook 的確切主機：仍然開放（OPEN）**——實作前以 Cloudflare 官方文件核對，再放進預設 allowlist。
+9. **Q9 Cloudflare deploy hook 的確切主機：DECIDED 2026-11-25（查證於官方文件，decided by the user 的要求）**——預設 allowlist ＝ `api.cloudflare.com`，且只放行 `/client/v4/workers/builds/deploy_hooks/<id>` 與 `/client/v4/pages/webhooks/deploy_hooks/<id>`；證據與文件網址見下方「第三切片的決定」。
 10. **Q10 內容預覽 token TTL 30 分鐘**（與 `PREVIEW_TOKEN_TTL`＝10 分鐘分開設定）：DECIDED 2026-11-25（decided by the user）。
-11. **Q11 排程發佈：第一版不做**（等第一個商家要求）：DECIDED 2026-11-25（decided by the user）。
+11. **Q11 排程發佈：~~第一版不做~~ → 2026-11-25 由使用者推翻，進本 change**（DECIDED 2026-11-25，decided by the user；語意見 D11）。
 
-**仍開放**：只有 Q9（實作時查官方文件，不需要使用者回答）。
+**仍開放**：無（Q9 已於第三切片查證並決定）。
+
+
+## 第三切片的決定（發佈 hook、排程發佈、稽核清除；DECIDED 2026-11-25，decided by the user）
+
+使用者 2026-11-25 明確要求依序做：①發佈 hook ②**排程發佈** ③稽核清除 ④後台內容畫面（④ 在下一個 task、於 platform-admin 的 core/design 分流內做，本切片只提供它需要的 API 並寫成文件）。**Q11（「第一版不做排程發佈」）因此被使用者本人推翻**：DECIDED 2026-11-25（decided by the user）——排程發佈進本 change，見 D11。
+
+### Q9 的答案（DECIDED 2026-11-25；查證於官方文件）
+
+Cloudflare 的兩種 deploy hook 都是對 **`api.cloudflare.com`**（埠 443、`POST`、不需 `Authorization` 標頭，URL 內的識別碼就是憑證）送出：
+
+| 產品 | URL 形狀 | 官方文件 |
+| --- | --- | --- |
+| Workers Builds | `https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/<DEPLOY_HOOK_ID>` | https://developers.cloudflare.com/workers/ci-cd/builds/deploy-hooks/ 與 https://developers.cloudflare.com/changelog/post/2026-04-01-deploy-hooks/（文件原文：`curl -X POST "https://api.cloudflare.com/client/v4/workers/builds/deploy_hooks/<DEPLOY_HOOK_ID>"`；「No `Authorization` header is needed. The unique identifier embedded in the URL acts as the authentication credential.」；回應含 `build_uuid`；限流為每 Worker 每分鐘 10 次、每帳號每分鐘 100 次；相同 hook 在前一次 build 尚在 `queued`／`initializing` 時再觸發不會重複建置，回 `already_exists: true`） |
+| Pages | `https://api.cloudflare.com/client/v4/pages/webhooks/deploy_hooks/<ID>` | https://developers.cloudflare.com/pages/configuration/deploy-hooks/ ——**誠實記錄**：這一頁只在儀表板截圖裡展示 URL（「You will see both the URL as well as the POST request snippet available to copy」），文字沒有印出路徑；`/pages/webhooks/deploy_hooks/` 這個形狀是 Pages 長期使用的形狀（來自先前對儀表板的了解，不是本次文件文字），所以**上線時由操作員貼上儀表板給的 URL，dry run 通過才算數**；若 Cloudflare 改了形狀，預設 allowlist 會拒絕它（失敗是安全的方向），只需更新 `builtinHosts` 的路徑樣式 |
+
+**預設 allowlist 因此恰好是一個主機：`api.cloudflare.com`，且只放行上述兩個路徑樣式**（`/client/v4/(workers/builds|pages/webhooks)/deploy_hooks/<8–128 位 [A-Za-z0-9_-]>`，無 query）——`api.cloudflare.com` 是整個 Cloudflare API 的主機，只放主機就會讓商家的 hook 能指向該 API 的任何路徑。環境變數 `CONTENT_HOOK_ALLOWED_HOSTS`（逗號分隔，精確名稱或 `*.suffix`）**只能新增**操作員核准的主機（對它們不限路徑），不能移除內建項，也不能放寬位址檢查（私有／loopback／link-local／中繼資料位址永遠被擋）。測試與 e2e **從不呼叫真實的 Cloudflare**（`httptest` 與假解析器）；e2e 為了打本機 stub 接收器，額外有 `CONTENT_HOOK_DEV_INSECURE=1`（允許 http、任意埠與 loopback，但**主機仍須在 allowlist**；`APP_ENV=production` 時設定檔拒絕啟動）。
+
+### D7 的修訂（發佈 hook 的實作決定）
+
+1. **去抖動狀態持久化在 `content_publish_hooks` 的 `pending_*` 欄位**，不再只在記憶體（design D7 原文接受「行程重啟丟一次觸發」）。理由有二：①排程發佈在**另一個行程**（`cmd/content-scheduler`，一次性執行後離開）裡發佈，記憶體中的去抖動計時器在它結束時就消失；②多個 API 實例時，記憶體去抖動會各送一次。做法：`Handle` 仍**只入隊**（有界 channel，滿了丟棄並 log，不做 I/O，所以不拖慢發佈請求）；背景 writer 把「待送」記到該店的 hook 列（沒有啟用中的 hook 的店什麼都不寫）；flusher 每 5 秒找「安靜 ≥ 30 秒」（或自第一次起 ≥ 5 分鐘 `CONTENT_HOOK_MAX_WAIT`，防止連續發佈餓死）的列，以**條件式 UPDATE 認領**（`pending_since` 比對 ＋ 影響列數）後才送，所以多實例與一次性行程不會重複呼叫。
+2. **最短間隔 60 秒、每日上限 30 次**都存在 DB 欄位（`last_attempt_at`、`cap_day`＋`cap_count`，UTC 日），**不依賴 Redis**（design 原寫 Redis 限流＋DB 最短間隔；每日上限放 DB 讓 Redis 故障時仍然有效、且可用假時鐘測試）。最短間隔未到：觸發**保留為待送**、不丟棄；每日上限用完：**丟棄**該次並記為 `rate_limited`（不算失敗、不累積失敗計數）。手動 `fire` 與 `test` 另有每商家每分鐘 3 次（Redis 限流，fail open，與 DB 的上限疊加）。
+3. **重試**：逾時、5xx、429 才重試，最多 2 次（退避 2 秒、4 秒）；4xx（含 3xx 因不跟隨重導向而視為失敗）不重試。**連續 5 次失敗自動停用**（`disabled_reason = consecutive_failures`，狀態 `failed: true`，寫 `hook.disable` 稽核），這就是「最終失敗狀態」；手動重新啟用（`PUT {enabled:true}`）或換 URL 會清除計數。
+4. **簽章 secret 的顯示**：design 寫「絕不回 URL 或 secret」。secret 若從不可讀，簽章就沒有任何接收端能驗證。決定：secret 由伺服器產生並加密儲存，**只在 `POST …/publish-hook/signing-secret`（輪替）的回應中顯示一次**（`Cache-Control: no-store`），狀態與 PUT 回應永遠不含；URL 則**永不**可讀回。Cloudflare deploy hook 不驗簽（設定畫面如實說明）。
+5. **不在 schema 註冊時觸發**：design D7 的事件只有 `content.published`／`content.unpublished`，所以 `ContentSchemaRegistered` 不觸發 hook（schema 改動伴隨設計層重新部署，那個部署本身會重建）。
+6. **`hook.test` 的語意**：單次嘗試、不影響失敗計數、不消耗每日上限、不更新 `last_attempt_at`；`PUT …?dry_run=true` 只驗證 URL 形狀與 allowlist，不儲存也不呼叫。
+7. 稽核動作新增 `hook.delete`、`hook.disable`、`hook.secret_rotate`（`content_audit_log.action` 沒有 CHECK）；detail 只有主機、結果類別、HTTP 狀態碼、嘗試次數、合併數。
+
+### D11：排程發佈（新；DECIDED 2026-11-25）
+
+**語意（選「綁定草稿版本」，不選「發佈當時的草稿」）**：排程記錄 `(shop_id, doc_key, draft_rev, publish_at)`。**到點時只在文件的 `draft_rev` 仍等於排程時的值才發佈**，用的就是手動發佈的 `expected_rev` 樂觀鎖（`content.Service.Publish(…, &draft_rev, …)`）。理由：商家排程的是「我審閱過、決定在 X 時發佈的那一版」；若允許排程之後的編輯被自動發佈，一次沒審閱過的修改會在凌晨三點上線，而編輯者也許以為只是在改下一版草稿。因此：
+- **之後任何草稿儲存（含 `restore`、相容端點寫入）立即讓排程變為 `superseded`**（同交易，原因 `edited`；顯式可見、不是等到點才發現），到點的檢查是權威的後盾。要發佈新版本就重新排程（`If-Match` 帶現在的 `draft_rev`）。
+- 手動發佈同一版草稿 → 排程 `superseded`（`published_manually`）；刪除文件 → `cancelled`（`document_deleted`）。下架不影響排程。
+- 每份文件同時至多一筆 `pending` 排程（部分唯一索引 `UNIQUE(shop_id, doc_key) WHERE status = 'pending'`）；改期 = 同一端點再 PUT（更新該筆的 `publish_at`，並以請求的 `If-Match` 重新綁定到**現在的** `draft_rev`——這是明示的重新確認）；取消 = DELETE。
+- **到點重新驗證**：發佈路徑本來就對作用中 schema 重新驗證草稿（schema 可能在排程之後被註冊新版本）。驗證失敗 → 排程 `failed`（`failure_code = invalid`，附最多 5 個 JSON pointer）、文件 `needs_attention = true`、寫 `doc.schedule_failed` 稽核、**不發佈**、不重試（內容問題不會自己好；修好草稿後重新排程）。
+- 時間：`publish_at` 以 `timestamptz`（UTC）儲存，API 接受帶偏移的 RFC 3339，**無偏移一律 422**（不猜時區）；進位到下一個整分鐘（粒度一分鐘，回應回傳實際儲存值）；最短提前量 2 分鐘（`CONTENT_SCHEDULE_MIN_LEAD`）、最遠 90 天（`CONTENT_SCHEDULE_MAX_AHEAD`）。**時鐘權威是資料庫**：排程器以 DB 的 `now()` 決定「到點」，不用各行程的牆上時鐘，所以多機時鐘偏差不會讓某台提早或延後發佈；建立排程時的最短提前量檢查用 API 行程的時鐘（誤差只影響 2 分鐘邊界）。
+- **錯過視窗**（API 或排程器停機）：排程器每次執行處理所有 `publish_at <= now` 的 `pending`；**遲到在寬限內（`CONTENT_SCHEDULE_GRACE`，預設 1 小時）照常發佈**（`late_seconds` 記在稽核）；**超過寬限 → `missed`，不發佈**，寫 `doc.schedule_missed` 稽核。理由：「週五 18:00 開賣」的內容在週一才上線可能是錯的，由人決定是否補排比系統默默補發更安全。
+- **冪等與並發**：認領 = 條件式 UPDATE（`status: pending → running`，影響列數 1 才處理），所以兩個排程器同時跑只有一個處理某筆；整輪另用 Postgres advisory lock（`pg_try_advisory_xact_lock`）讓第二個排程器**整輪跳過**（in-process ticker 與 cron 的一次性指令可並存）。`running` 超過 10 分鐘視為崩潰遺留，重置為 `pending`（再處理時 `published_rev == draft_rev` 且已發佈 → 記為 `done`／`already_published`，不重複寫 revision）。
+- **權限與到點時的資格**：排程、改期、取消需 `content.publish`（`editor` 沒有）；列出與查看需 `content.view`。排程記錄 `created_by_user_id`，**到點時重新確認該使用者仍是該店成員且仍有 `content.publish`**（被停用、移出或降權 → `failed`／`permission_revoked`，不發佈）。發佈的 actor 記為排程者，稽核 detail 標 `scheduled: true`。
+- **走同一條服務路徑**：排程器呼叫的就是 `content.Service.Publish`，所以 revision、稽核（`doc.publish`）、事件（`ContentPublished` → 渲染快取失效、發佈 hook）都與手動發佈相同。一次性指令行程需要 Redis（失效快取）：**Redis 不可達時指令在認領任何排程之前就失敗退出**（靜默留下過期快取比晚發佈更糟，排程維持 `pending` 下一輪再試）。
+- **執行方式**：`cmd/content-scheduler`（一次性，適合 cron／Windows 工作排程，預設每分鐘；結束前 `Tick(force)` 送出累積的 hook）＋ API 內的選用 ticker（`CONTENT_SCHEDULER_ENABLED=1`，預設關閉，`CONTENT_SCHEDULER_INTERVAL` 預設 1 分鐘）。兩者呼叫同一個 `content.Scheduler.RunOnce`。
+- **後台 API**（供下一個 task 的畫面使用）：`PUT/DELETE/GET /documents/{key}/schedule`、`GET /content/schedules`（本店即將發佈與近期結果）；文件列表與詳情多一個 `scheduled_publish_at`（pending 排程的時間或 `null`）。
+- **資料保留**：`content_publish_schedules` 的已結束列保留 90 天（`CONTENT_SCHEDULE_RETENTION`），由 `cmd/purge-content-audit` 一併清除（同樣預設 dry run）。
+
+### D12：稽核清除（`cmd/purge-content-audit`；DECIDED 2026-11-25）
+
+`content_audit_log` 保留 180 天（`CONTENT_AUDIT_RETENTION`）。指令預設 **dry run**，`-apply` 才刪；分批刪除（每批 1000 筆）所以不會長交易；冪等（重跑只刪新過期的）；輸出只有**計數與時間範圍**（不印 id 以外的內容；稽核列本來就不含個資，但仍計數與回報）。同時清除超過保留期的已結束排程列。`-shop N` 可只處理一家。Makefile 目標 `purge-content-audit`（dry run）。repo 沒有排程器，需由操作員每日排程（見 `docs/deploy/content-store-operations.md`）。

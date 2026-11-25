@@ -21,6 +21,8 @@ import (
 	"ksdevworks/ecommerce/api/internal/cms"
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/content"
+	"ksdevworks/ecommerce/api/internal/content/hook"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
@@ -50,6 +52,9 @@ type schemaEnv struct {
 	cms    *cms.Service
 	buf    *bytes.Buffer
 	rdb    *redis.Client
+	// publish hook (slice 3): the real notifier with a stub poster.
+	hookN      *hook.Notifier
+	hookPoster *stubPoster
 
 	platform                          int
 	shopA, shopB                      int
@@ -78,6 +83,13 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 	engine := rbac.NewEngine(client, rdb, log)
 	authz := &httpapi.AuthzMW{Engine: engine}
 	e.cms = &cms.Service{Client: client, Dispatcher: dispatcher}
+	e.hookPoster = &stubPoster{}
+	hookBox, err := cryptbox.ParseKey("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff")
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.hookN = &hook.Notifier{Client: client, Box: hookBox, Sender: e.hookPoster, Log: log, Cfg: hook.DefaultConfig()}
+	dispatcher.Subscribe(e.hookN.Handle)
 	resolver := tenant.NewResolver(client, rdb, log)
 	cfg := &config.Config{PreviewTokenTTL: 10 * time.Minute}
 
@@ -104,6 +116,7 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 			MaxAge: 60, Log: log,
 		},
 		ContentPublicRateLimit: httpapi.NewContentPublicRateLimit(ratelimit.New(rdb, log), 10000, time.Minute),
+		ContentHook:            &httpapi.ContentHookHandler{Notifier: e.hookN, Authz: authz, Limiter: ratelimit.New(rdb, log), Log: log},
 	})
 	e.rdb = rdb
 

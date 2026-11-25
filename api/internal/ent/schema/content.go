@@ -143,3 +143,59 @@ func (ContentAuditLog) Indexes() []ent.Index {
 func (ContentAuditLog) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Table: "content_audit_log"}}
 }
+
+// ContentPublishHook is the shop's single publish hook (design D7): the URL of
+// a deploy hook that is called after content is published. The URL is a
+// credential (a Cloudflare deploy hook URL IS the authorization), so it is
+// stored encrypted and never read back through any API; only the host and the
+// last four characters are kept in the clear for display.
+//
+// The pending_* columns are the durable debounce state: a publish marks the row
+// pending, the flusher sends one call once the shop has been quiet for the
+// debounce window (or the max wait elapsed) and claims the row atomically, so
+// several API instances and the one-shot scheduler never double-send.
+type ContentPublishHook struct {
+	ent.Schema
+}
+
+func (ContentPublishHook) Fields() []ent.Field {
+	return []ent.Field{
+		field.Int("shop_id"),
+		field.Bytes("url_ciphertext"),
+		field.String("host").MaxLen(253).SchemaType(map[string]string{dialect.Postgres: "varchar(253)"}),
+		field.String("url_hint").MaxLen(8).SchemaType(map[string]string{dialect.Postgres: "varchar(8)"}).Default(""),
+		field.Bytes("signing_secret_ciphertext"),
+		field.Bool("enabled").Default(true),
+		// disabled_reason: "" | manual | consecutive_failures.
+		field.String("disabled_reason").MaxLen(30).SchemaType(map[string]string{dialect.Postgres: "varchar(30)"}).Default(""),
+		// last_status: "" | ok | http_error | timeout | blocked | network_error | not_allowed.
+		field.String("last_status").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}).Default(""),
+		field.Int("last_http_status").Default(0),
+		field.Time("last_attempt_at").Optional().Nillable(),
+		field.Time("last_success_at").Optional().Nillable(),
+		field.Int("consecutive_failures").Default(0),
+		// Daily cap bookkeeping (UTC day).
+		field.Time("cap_day").Optional().Nillable().SchemaType(map[string]string{dialect.Postgres: "date"}),
+		field.Int("cap_count").Default(0),
+		// Pending (debounce) state.
+		field.Time("pending_since").Optional().Nillable(),
+		field.Time("pending_last_at").Optional().Nillable(),
+		field.String("pending_event").MaxLen(30).SchemaType(map[string]string{dialect.Postgres: "varchar(30)"}).Default(""),
+		field.String("pending_key").MaxLen(63).SchemaType(map[string]string{dialect.Postgres: "varchar(63)"}).Default(""),
+		field.Int64("pending_rev").Default(0),
+		field.Int("pending_count").Default(0),
+		field.Time("created_at").Immutable().Default(time.Now),
+		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
+		field.Int("updated_by_user_id").Optional().Nillable(),
+	}
+}
+
+func (ContentPublishHook) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("shop_id").Unique(),
+	}
+}
+
+func (ContentPublishHook) Annotations() []schema.Annotation {
+	return []schema.Annotation{entsql.Annotation{Table: "content_publish_hooks"}}
+}

@@ -183,6 +183,10 @@ type Config struct {
 	Turnstile   TurnstileConfig
 	WebsiteURL  string
 	Application ApplicationConfig
+
+	// ContentOps: publish hook, scheduled publishing and audit retention of the
+	// headless content store (slice 3).
+	ContentOps ContentOpsConfig
 }
 
 // CFAccessConfig is the Cloudflare Access verification setup (design D2).
@@ -524,6 +528,9 @@ func Load() (*Config, error) {
 	}
 
 	if err := loadApplication(cfg); err != nil {
+		return nil, err
+	}
+	if err := loadContentOps(cfg); err != nil {
 		return nil, err
 	}
 

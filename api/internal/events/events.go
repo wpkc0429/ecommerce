@@ -40,6 +40,9 @@ func (ShopContentUpdated) EventName() string { return "shop.content_updated" }
 type ContentPublished struct {
 	ShopID int
 	Key    string
+	// Rev is the draft_rev that was published (0 when the publisher does not
+	// know it, e.g. the legacy page endpoints). Only the publish hook reads it.
+	Rev int64
 }
 
 func (ContentPublished) EventName() string { return "content.published" }

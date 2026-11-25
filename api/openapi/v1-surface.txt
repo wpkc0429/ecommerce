@@ -194,6 +194,9 @@ DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path key
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
+DELETE /api/v1/admin/shops/{shopID}/content/publish-hook
+DELETE /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
+DELETE /api/v1/admin/shops/{shopID}/content/publish-hook response 429 Retry-After
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID}
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path invitationID
 DELETE /api/v1/admin/shops/{shopID}/invitations/{invitationID} path shopID
@@ -302,6 +305,8 @@ GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path key
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path rev
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path shopID
+GET /api/v1/admin/shops/{shopID}/content/publish-hook
+GET /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
 GET /api/v1/admin/shops/{shopID}/content/schema
 GET /api/v1/admin/shops/{shopID}/content/schema path shopID
 GET /api/v1/admin/shops/{shopID}/content/schema query include
@@ -713,6 +718,15 @@ POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish
 POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish path key
 POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish path shopID
 POST /api/v1/admin/shops/{shopID}/content/documents/{key}/unpublish response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/fire
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/fire path shopID
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/fire response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/signing-secret
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/signing-secret path shopID
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/signing-secret response 429 Retry-After
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/test
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/test path shopID
+POST /api/v1/admin/shops/{shopID}/content/publish-hook/test response 429 Retry-After
 POST /api/v1/admin/shops/{shopID}/invitations
 POST /api/v1/admin/shops/{shopID}/invitations path shopID
 POST /api/v1/admin/shops/{shopID}/invitations response 429 Retry-After
@@ -832,6 +846,11 @@ PUT /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 200 ETag
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 201 ETag
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
+PUT /api/v1/admin/shops/{shopID}/content/publish-hook
+PUT /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
+PUT /api/v1/admin/shops/{shopID}/content/publish-hook query dry_run
+PUT /api/v1/admin/shops/{shopID}/content/publish-hook query dry_run optional
+PUT /api/v1/admin/shops/{shopID}/content/publish-hook response 429 Retry-After
 PUT /api/v1/admin/shops/{shopID}/content/schema
 PUT /api/v1/admin/shops/{shopID}/content/schema path shopID
 PUT /api/v1/admin/shops/{shopID}/content/schema query confirm_removals
@@ -1014,6 +1033,25 @@ PublicShippingMethod.carrier
 PublicShippingMethod.flat_rate
 PublicShippingMethod.id
 PublicShippingMethod.name
+PublishHookCallResult.http_status
+PublishHookCallResult.ok
+PublishHookCallResult.result
+PublishHookStatus.configured
+PublishHookStatus.consecutive_failures
+PublishHookStatus.daily_cap
+PublishHookStatus.daily_count
+PublishHookStatus.disabled_reason
+PublishHookStatus.enabled
+PublishHookStatus.failed
+PublishHookStatus.host
+PublishHookStatus.last_attempt_at
+PublishHookStatus.last_http_status
+PublishHookStatus.last_status
+PublishHookStatus.last_success_at
+PublishHookStatus.pending
+PublishHookStatus.pending_count
+PublishHookStatus.updated_at
+PublishHookStatus.url_masked
 PublishableKey.created_at
 PublishableKey.id
 PublishableKey.key

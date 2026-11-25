@@ -30,22 +30,24 @@ type Deps struct {
 	// ContentSchema: per-shop content schema registration (change
 	// headless-content-store, first slice).
 	ContentSchema *ContentSchemaHandler
+	// ContentHook: the publish hook admin API (slice 3).
+	ContentHook *ContentHookHandler
 	// ContentDocuments: the admin document API; ContentPublic: the public
 	// read API (change headless-content-store slice 2).
 	ContentDocuments       *ContentDocumentsHandler
 	ContentPublic          *ContentPublicHandler
 	ContentPublicRateLimit func(http.Handler) http.Handler
-	Render        *RenderHandler
-	Categories    *CategoriesHandler // change product-catalog
-	Products      *ProductsHandler   // change product-catalog (merchant CRUD + public read)
-	Cart          *CartHandler       // change shopping-cart (member self-service, no RBAC)
-	Orders        *OrderHandler      // change order-management (member self-service + merchant back office)
-	Payments      *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
-	Shipping      *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
-	Points        *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
-	Members       *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
-	ClientAuth    *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
-	Guest         *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
+	Render                 *RenderHandler
+	Categories             *CategoriesHandler // change product-catalog
+	Products               *ProductsHandler   // change product-catalog (merchant CRUD + public read)
+	Cart                   *CartHandler       // change shopping-cart (member self-service, no RBAC)
+	Orders                 *OrderHandler      // change order-management (member self-service + merchant back office)
+	Payments               *PaymentHandler    // change payment-integration (member self-service + merchant back office + provider webhook)
+	Shipping               *ShippingHandler   // change shipping-logistics (member self-service + merchant back office)
+	Points                 *PointsHandler     // change member-tiers-and-points (member self-service + merchant back office)
+	Members                *MembersHandler    // change member-directory (merchant back office, read-only customer roster)
+	ClientAuth             *ClientAuthHandler // change storefront-client-auth (publishable keys + allowed origins)
+	Guest                  *GuestHandler      // change guest-checkout (unauthenticated checkout + order access token routes)
 	// change merchant-reports: the platform's first aggregate queries, and the
 	// merchant-scoped settings endpoint that gives them a time zone to cut days by.
 	Reports      *ReportsHandler
@@ -192,6 +194,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.ContentDocuments != nil {
 							d.ContentDocuments.MountShopAdmin(sh)
+						}
+						if d.ContentHook != nil {
+							d.ContentHook.MountShopAdmin(sh)
 						}
 						if d.Categories != nil {
 							d.Categories.MountShop(sh)

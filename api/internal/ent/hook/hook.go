@@ -92,6 +92,18 @@ func (f ContentDocumentFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentDocumentMutation", m)
 }
 
+// The ContentPublishHookFunc type is an adapter to allow the use of ordinary
+// function as ContentPublishHook mutator.
+type ContentPublishHookFunc func(context.Context, *ent.ContentPublishHookMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentPublishHookFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentPublishHookMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentPublishHookMutation", m)
+}
+
 // The ContentRevisionFunc type is an adapter to allow the use of ordinary
 // function as ContentRevision mutator.
 type ContentRevisionFunc func(context.Context, *ent.ContentRevisionMutation) (ent.Value, error)
