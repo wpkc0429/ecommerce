@@ -21,5 +21,8 @@ export default {
   "team": "views/team.js",
   "platformShops": "views/platform-shops.js",
   "platformAccounts": "views/platform-accounts.js",
-  "platformApplications": "views/platform-applications.js"
+  "platformApplications": "views/platform-applications.js",
+  "documents": "views/documents.js",
+  "contentSchema": "views/content-schema.js",
+  "contentPublishing": "views/content-publishing.js"
 };

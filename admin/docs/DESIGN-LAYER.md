@@ -215,7 +215,7 @@ export default function notFound(root, ctx) {
 | `ctx.auth` | 僅在 login／set-password／accept-invite／shell 等畫面提供：`login`、`logout`、`goLogin`、`passwordSetup.inspect/submit`、`invitation.inspect/acceptNew/acceptAsCurrent/loginAndJoin`。**token 永遠不到你手上** |
 | `ctx.ui` | 展示用原件：`h svg append clear $ $$`、`rows renderPager fillSelect repeater copyText`、`schemaForm.{build, collect, showValidationErrors}`（JSON Schema 驅動的內容表單，驗證在核心）、`platformLinkOnce`（核心的一次性連結盒，URL 只存在該 DOM，不儲存） |
 | `ctx.format` | `money`（TWD 整數元，**絕不縮放**）、`points`／`pointsDelta`／`percent`（**點數不是金額，不可經 `money`**）、`parseAmount`、`priceRange`、`time`、報表與平台狀態的格式化（`reportCount`、`platformShopStatus`、`platformApplicationStatus`、……） |
-| `ctx.data` | 查詢，各自先檢查權限並綁定目前的 shop，回傳純資料：頁面與內容（`cmsPages`、`cmsPage`、`cmsContent`、`cmsPageTypes`）、商品與分類（`listProducts`、`getProduct`、`listCategories`、`categoryChoices`、`categoryProductOrder`、`listProductImages`）、訂單（`ordersList`、`orderDetail`、`orderPayments`、`orderShipments`）、運送方式（`shippingMethodsList`）、顧客與點數（`memberRoster`、`memberDetail`、`memberOrders`、`memberTiers`、`pointsBalance`、`pointsLedger`）、報表（`reportLoad`）、設定與團隊（`settingsPublishableKeys`、`settingsAllowedOrigins`、`settingsEcpay`、`teamOverview`）、品牌（`adminBranding`）、平台層（`platformShopsList`、`platformShopSetupStatus`、`platformAccountsList`、`platformAccount`、`platformApplicationsList`、`platformApplication`、`platformMerchantRoles`、`applicationsBadge`） |
+| `ctx.data` | 查詢，各自先檢查權限並綁定目前的 shop，回傳純資料：頁面與內容（`cmsPages`、`cmsPage`、`cmsContent`、`cmsPageTypes`）、商品與分類（`listProducts`、`getProduct`、`listCategories`、`categoryChoices`、`categoryProductOrder`、`listProductImages`）、訂單（`ordersList`、`orderDetail`、`orderPayments`、`orderShipments`）、運送方式（`shippingMethodsList`）、顧客與點數（`memberRoster`、`memberDetail`、`memberOrders`、`memberTiers`、`pointsBalance`、`pointsLedger`）、報表（`reportLoad`）、設定與團隊（`settingsPublishableKeys`、`settingsAllowedOrigins`、`settingsEcpay`、`teamOverview`）、內容儲存（`contentTypes`、`contentDocuments`、`contentDocument`、`contentRevisions`、`contentRevision`、`contentSchemaStatus`、`dryRunContentSchema`）、排程與發佈 hook（`contentSchedulesUpcoming`、`contentSchedulesRecent`、`contentDocumentSchedule`、`publishHookStatus`）、品牌（`adminBranding`）、平台層（`platformShopsList`、`platformShopSetupStatus`、`platformAccountsList`、`platformAccount`、`platformApplicationsList`、`platformApplication`、`platformMerchantRoles`、`applicationsBadge`） |
 | `ctx.logic` | 與狀態規則同步的純函式，用來決定「要提供什麼」：`canCancelOrder`、`hasReturnedShipment`、`outstandingItems`、`shipmentRemaining`、`productMedia`、`memberLabel`、`reportDefaultPeriod`、`settingsErrorText` |
 | `ctx.enums` | 常數：`orderStatus`、`paymentStatus`、`paymentRecordStatus`、`fulfillmentStatus`、`shipmentStatus`、`shipmentCodes`、`platformShopStatuses`、`platformSetupChecks` |
 | `ctx.actions` | 寫入動作，每個都在核心內檢查權限＋狀態規則＋驗證，不可逆者自己顯示固定警告的確認：頁面（`cmsCreatePage`、`cmsSavePage`、`cmsPublishPage`、`cmsUnpublishPage`、`cmsPreviewPage`、`cmsDeletePage`、`cmsSaveContent`、`cmsUploadImage`）、商品（`saveProduct`、`deleteProduct`、`uploadProductImage`、`moveProductImage`、`setProductImageAlt`、`deleteProductImage`）、分類（`saveCategory`、`saveCategoryProductOrder`、`deleteCategory`）、訂單與出貨（`cancelOrder`、`createShipment`、`advanceShipment`）、運送方式（`saveShippingMethod`、`deleteShippingMethod`）、會員（`saveMemberTier`、`deleteMemberTier`、`adjustMemberPoints`）、設定（`setReportTimezone`、`saveAdminBranding`、`settingsCreatePublishableKey`、`settingsRevokePublishableKey`、`settingsAddOrigin`、`settingsRemoveOrigin`、`settingsSaveEcpay`）、團隊（`teamInvite`、`teamRevokeInvite`、`teamSetEnabled`、`teamSetRole`）、平台層（`platformProvisionShop`、`platformCreateAccount`、`platformDisableAccount`、`platformEnableAccount`、`platformResetAccountPassword`、`platformAddMembership`、`platformRemoveMembership`、`platformApproveApplication`、`platformRejectApplication`、`platformVerifyApplicationManually`、`platformMarkMessageSent`） |
@@ -255,6 +255,9 @@ export default function notFound(root, ctx) {
 | `platformShops` | `#/platform-shops` | 平台 `shop.list` | `platform-shops.js` |
 | `platformAccounts` | `#/platform-accounts` | 平台 `account.view` | `platform-accounts.js` |
 | `platformApplications` | `#/platform-applications` | 平台 `shop_application.view` | `platform-applications.js` |
+| `documents` | `#/documents[/{key}[/revisions]]` | `content.view`（儲存／還原／上傳需 `content.edit`，發佈／下架／刪除需 `content.publish`） | `documents.js` + `parts/content-*.js` |
+| `contentSchema` | `#/content-schema` | `content.manage` | `content-schema.js` |
+| `contentPublishing` | `#/content-publishing` | `content.publish` 或 `content.manage` 任一（區塊各自再判） | `content-publishing.js` + `parts/content-schedule.js` |
 
 （權威：`lib/meta/*.js`。頁面的編輯器與商品編輯器是 `pages`／`products` 畫面**內**的面板，不是獨立路由、不改 hash。導覽項目與順序也在 `lib/meta`，`ctx.nav.items` 依權限過濾；你可以重排或省略，不能新增。）
 
@@ -351,3 +354,11 @@ node scripts/check-layers.mjs                    # 只跑分層檢查（check-de
 - 畫面丟錯、不見或卡住：顯示的是內建畫面（那是備援在運作，不是核心的 bug）。修正該畫面，或 revert 該 commit。
 - 守門員失敗：報告會指名規則。常見修法：移除禁用的識別字、用 `ctx.ui.h` 取代原生 DOM、把邏輯搬到既有的 `ctx.actions`、把字串寫成一整個（不要相加）。
 - 想要的功能需要 `ctx` 沒有的東西（新的資料欄位、新的動作）：**停下來並說明**；那是給人類的核心變更，不要繞過。
+
+## 內容儲存畫面（stage C）
+
+- 核心：`lib/content.js`（API；ETag／`If-Match`／`If-None-Match` 走 `lib/api.js` 的 `apiRaw`）、`lib/content-schema.js`（schema 走訪與鎖定的驗證）、`core/content/actions.js`、`core/groups/content.js`、`ui/content-form.js`（schema 驅動表單建構器，`ctx.ui.contentForm`／`contentField`）、`core/groups/publishing.js`＋`core/publishing/logic.js`（排程與發佈 hook）。
+- 儲存一律帶前置條件：412 → `ActionError` `kind "stale"`（請重新載入）、428 → `kind "internal"`（程式錯誤，不給使用者看）、422 → `kind "invalid"` 與 `e.fields`（JSON Pointer → 欄位）。還原只放回草稿（畫面說「已放回草稿，尚未發佈」）。
+- 註冊 schema 是人類動作：`ctx.actions.registerContentSchema(text)` 只收人類貼上的文字，永遠先 dry run、再顯示核心確認（報告＋固定警告；平台回 409 `removals_require_confirmation` 時第二次確認）。需要 `content.manage`。
+- 排程綁定審閱過的 `draft_rev`；hook 網址只寫不讀（只顯示遮罩的主機與狀態）、簽章 secret 只在輪替當下顯示一次、`failed: true` 是最終失敗狀態（畫面提供重新啟用）。固定警告 id：publishContent、unpublishContent、deleteContent、restoreContent、registerContentSchema、registerContentSchemaRemovals、deletePublishHook、rotateHookSecret、cancelSchedule、fireHook。
+- e2e：`e2e/content-ui-path.mjs`（內容畫面，含權限與樂觀鎖）、`e2e/design-path.mjs`（設計層：不可跳過確認／權限、壞設計回退、惡意設計被守門員擋下、嚴格 CSP）。

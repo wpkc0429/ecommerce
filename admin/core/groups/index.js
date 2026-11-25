@@ -8,5 +8,6 @@ import members from "./members.js";
 import settings from "./settings.js";
 import platform from "./platform.js";
 import content from "./content.js";
+import publishing from "./publishing.js";
 
-export const groups = { auth, cms, catalog, orders, members, settings, platform, content };
+export const groups = { auth, cms, catalog, orders, members, settings, platform, content, publishing };

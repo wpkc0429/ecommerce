@@ -117,14 +117,24 @@ export async function refreshTokens() {
 
 // api(): 帶 access token 呼叫；401 時自動 refresh 一次再重試。
 export async function api(method, path, body) {
+  return (await apiRaw(method, path, body)).data;
+}
+
+// apiRaw(): same as api() but accepts extra request headers (If-Match / If-None-Match for the content store) and returns
+// {data, headers, status}. Errors are ApiError with .headers.
+/** Wrap an already-serialised JSON text so apiRaw sends it byte for byte (the content schema registration needs that). */
+export class RawJSON { constructor(text) { this.text = String(text); } }
+
+export async function apiRaw(method, path, body, extraHeaders = {}) {
   const doFetch = () =>
     accessAwareFetch(`${API_BASE}/api/v1${path}`, {
       method,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${tokens.access}`,
+        ...extraHeaders,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : body instanceof RawJSON ? body.text : JSON.stringify(body),
     });
   let res = await doFetch();
   if (res.status === 401 && canRefresh()) {
@@ -148,15 +158,16 @@ export async function api(method, path, body) {
   }
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
-  if (!res.ok) throw new ApiError(res.status, data);
-  return data;
+  if (!res.ok) throw new ApiError(res.status, data, res.headers);
+  return { data, headers: res.headers, status: res.status };
 }
 
 export class ApiError extends Error {
-  constructor(status, body) {
+  constructor(status, body, headers = null) {
     super(body?.error?.message || `HTTP ${status}`);
     this.status = status;
     this.body = body;
+    this.headers = headers;
   }
   get details() { return this.body?.error?.details || []; }
 }

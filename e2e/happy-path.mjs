@@ -9,6 +9,13 @@
 // told to run is a suite nobody runs (design D2). The commerce path needs no
 // browser and can also be run on its own: `node commerce-path.mjs`.
 //
+// The admin UI part ends with two more browser sections: content-ui-path.mjs (the content-store screens: documents, schema
+// registration, schedules, publish hook; as platform admin and as a merchant editor) and design-path.mjs (what the design layer
+// cannot skip or break: confirmations, permissions, fallbacks, guard, strict CSP; it rewrites admin/design/ temporarily and
+// restores it). Both create their own shops and can also run alone: `node content-ui-path.mjs`, `node design-path.mjs`. They
+// need the content-ops API settings (see content-ops-path.mjs) for the hook part and a free login-rate window (the platform
+// admin login is limited to 5 per 5 minutes; a refused login waits for the window).
+//
 // Prereqs: API on :8080, admin on :3001, seeded demo shop
 // (make migrate && make seed-demo). Chromium resolves *.localhost → 127.0.0.1.
 import { fileURLToPath } from "node:url";
@@ -18,6 +25,8 @@ import { applicationBody, runApplicationPath, submitApplication, tokenFromMessag
 import { API, armConfirm, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
 import { runContentOpsPath } from "./content-ops-path.mjs";
+import { runContentUiPath } from "./content-ui-path.mjs";
+import { runDesignPath } from "./design-path.mjs";
 
 // Same source `make seed` used: E2E_* override → env → repo .env → old default.
 const ADMIN_EMAIL =
@@ -1339,6 +1348,19 @@ try {
     } finally {
       for (const id of registered) await req("DELETE", `/api/v1/admin/shops/1/allowed-origins/${id}`, { token: adminToken });
     }
+  }
+  // ── 內容儲存的後台畫面（documents／content-schema／content-publishing）與設計層（design-path）──
+  // 瀏覽器流程，所以放在這個 try 區塊內、browser 關閉之前；各自有自己的 try/catch，一節中止不影響另一節。
+  // content-ui-path 自己建立新商家（format 2 schema）與 editor 帳號，不動 demo 商家；design-path 會暫時改寫 admin/design/ 並於結束前還原。
+  try {
+    await runContentUiPath(browser, { admin: ADMIN });
+  } catch (err) {
+    fail(`content UI path aborted: ${err?.stack ?? err}`);
+  }
+  try {
+    await runDesignPath(browser, { admin: ADMIN });
+  } catch (err) {
+    fail(`design path aborted: ${err?.stack ?? err}`);
   }
 } catch (err) {
   // Record and carry on: an admin/web outage must not hide the commerce

@@ -31,7 +31,7 @@ const LIB_DOM_ALLOW = {
   "lib/upload.js": [/document\.createElement\(\s*"canvas"\s*\)/g, /document\.createElement\(\s*"script"\s*\)/g, /document\.head\.append\(\s*s\s*\)/g],
 };
 // ui/ may import these lib modules only (design.js: t(); upload.js: mediaEnabled for the upload button; money/format: pure).
-const UI_LIB_ALLOW = new Set(["design.js", "upload.js", "money.js", "format.js"]);
+const UI_LIB_ALLOW = new Set(["design.js", "upload.js", "money.js", "format.js", "content-schema.js"]);
 // core/, app.js: raw network/storage snippets that are legitimate (each justified).
 const NET_ALLOW = {
   // one-time link-token flows (password setup / invitation accept) are UNAUTHENTICATED POSTs that must not carry or touch the session tokens

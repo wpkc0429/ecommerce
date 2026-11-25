@@ -9,8 +9,9 @@ import members from "./members.js";
 import settings from "./settings.js";
 import platform from "./platform.js";
 import content from "./content.js";
+import publishing from "./publishing.js";
 
-export const GROUPS = { auth, cms, catalog, orders, members, settings, platform, content };
+export const GROUPS = { auth, cms, catalog, orders, members, settings, platform, content, publishing };
 
 const all = Object.values(GROUPS);
 /** Route definitions: {id, name (the #/name hash segment), perm: [all of], permAny: [any of], platformPerm, nav, transient, public} */

@@ -73,6 +73,11 @@ jobs:
       - name: Guard tests (hostile fixtures must be caught)
         working-directory: admin
         run: node scripts/test-guard.mjs
+      - name: Content core and publishing logic unit tests
+        working-directory: admin
+        run: |
+          node scripts/test-content.mjs
+          node scripts/test-publishing.mjs
       - name: Design branches may change only admin/design/**
         if: startsWith(github.head_ref, 'design/admin-')
         working-directory: admin
