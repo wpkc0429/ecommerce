@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
 	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
+	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -124,6 +125,7 @@ func checkColumn(t, c string) error {
 			contentdocument.Table:               contentdocument.ValidColumn,
 			contentpublishhook.Table:            contentpublishhook.ValidColumn,
 			contentrevision.Table:               contentrevision.ValidColumn,
+			contentschedule.Table:               contentschedule.ValidColumn,
 			contentschema.Table:                 contentschema.ValidColumn,
 			mediaupload.Table:                   mediaupload.ValidColumn,
 			member.Table:                        member.ValidColumn,

@@ -3,6 +3,7 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -22,8 +23,9 @@ import (
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/content"
 	"ksdevworks/ecommerce/api/internal/content/hook"
-	"ksdevworks/ecommerce/api/internal/cryptbox"
 	"ksdevworks/ecommerce/api/internal/contentschema"
+	"ksdevworks/ecommerce/api/internal/cryptbox"
+	"ksdevworks/ecommerce/api/internal/database"
 	"ksdevworks/ecommerce/api/internal/ent"
 	entcs "ksdevworks/ecommerce/api/internal/ent/contentschema"
 	entpage "ksdevworks/ecommerce/api/internal/ent/page"
@@ -55,6 +57,11 @@ type schemaEnv struct {
 	// publish hook (slice 3): the real notifier with a stub poster.
 	hookN      *hook.Notifier
 	hookPoster *stubPoster
+	// scheduled publishing (slice 3): the real scheduler on a fake clock.
+	sched    *content.Scheduler
+	clockNow time.Time
+	engine   *rbac.Engine
+	sqlDB    *sql.DB
 
 	platform                          int
 	shopA, shopB                      int
@@ -81,6 +88,7 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 	renderCache := render.NewCache(rdb, log)
 	dispatcher.Subscribe((&render.Invalidator{Cache: renderCache, Log: log}).Handle)
 	engine := rbac.NewEngine(client, rdb, log)
+	e.engine = engine
 	authz := &httpapi.AuthzMW{Engine: engine}
 	e.cms = &cms.Service{Client: client, Dispatcher: dispatcher}
 	e.hookPoster = &stubPoster{}
@@ -92,6 +100,18 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 	dispatcher.Subscribe(e.hookN.Handle)
 	resolver := tenant.NewResolver(client, rdb, log)
 	cfg := &config.Config{PreviewTokenTTL: 10 * time.Minute}
+	contentSvc := &content.Service{Client: client, Dispatcher: dispatcher, Gate: e.cms, Log: log}
+	_, e.sqlDB, err = database.Open(context.Background(), os.Getenv("TEST_DATABASE_URL"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = e.sqlDB.Close() })
+	e.clockNow = time.Now().UTC()
+	e.sched = &content.Scheduler{
+		Client: client, DB: e.sqlDB, Docs: contentSvc,
+		Clock:     content.FuncClock(func() time.Time { return e.clockNow }),
+		Authorize: content.PublishAuthorizer(engine), Cfg: content.DefaultScheduleConfig(), Log: log,
+	}
 
 	e.router = httpapi.New(httpapi.Deps{
 		Cfg:      cfg,
@@ -108,9 +128,10 @@ func newSchemaEnv(t *testing.T) *schemaEnv {
 			Cache: renderCache, Issuer: issuer, Engine: engine, Log: log,
 		},
 		ContentDocuments: &httpapi.ContentDocumentsHandler{
-			Service: &content.Service{Client: client, Dispatcher: dispatcher, Gate: e.cms, Log: log},
-			Issuer:  issuer, Authz: authz, Limiter: ratelimit.New(rdb, log), PreviewTTL: 10 * time.Minute, Log: log,
+			Service: contentSvc, Schedules: e.sched,
+			Issuer: issuer, Authz: authz, Limiter: ratelimit.New(rdb, log), PreviewTTL: 10 * time.Minute, Log: log,
 		},
+		ContentSchedules: &httpapi.ContentSchedulesHandler{Scheduler: e.sched, Authz: authz, Limiter: ratelimit.New(rdb, log), Log: log},
 		ContentPublic: &httpapi.ContentPublicHandler{
 			Reader: &content.Reader{Client: client}, Cache: renderCache, Issuer: issuer, Engine: engine,
 			MaxAge: 60, Log: log,

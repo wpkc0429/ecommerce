@@ -20,6 +20,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
 	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
+	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -87,6 +88,8 @@ type Client struct {
 	ContentPublishHook *ContentPublishHookClient
 	// ContentRevision is the client for interacting with the ContentRevision builders.
 	ContentRevision *ContentRevisionClient
+	// ContentSchedule is the client for interacting with the ContentSchedule builders.
+	ContentSchedule *ContentScheduleClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
@@ -175,6 +178,7 @@ func (c *Client) init() {
 	c.ContentDocument = NewContentDocumentClient(c.config)
 	c.ContentPublishHook = NewContentPublishHookClient(c.config)
 	c.ContentRevision = NewContentRevisionClient(c.config)
+	c.ContentSchedule = NewContentScheduleClient(c.config)
 	c.ContentSchema = NewContentSchemaClient(c.config)
 	c.MediaUpload = NewMediaUploadClient(c.config)
 	c.Member = NewMemberClient(c.config)
@@ -310,6 +314,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ContentDocument:               NewContentDocumentClient(cfg),
 		ContentPublishHook:            NewContentPublishHookClient(cfg),
 		ContentRevision:               NewContentRevisionClient(cfg),
+		ContentSchedule:               NewContentScheduleClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
@@ -372,6 +377,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ContentDocument:               NewContentDocumentClient(cfg),
 		ContentPublishHook:            NewContentPublishHookClient(cfg),
 		ContentRevision:               NewContentRevisionClient(cfg),
+		ContentSchedule:               NewContentScheduleClient(cfg),
 		ContentSchema:                 NewContentSchemaClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
@@ -437,15 +443,15 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
-		c.ContentPublishHook, c.ContentRevision, c.ContentSchema, c.MediaUpload,
-		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
-		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
-		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopApplication,
-		c.ShopApplicationEvent, c.ShopApplicationMessage, c.ShopApplicationToken,
-		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
+		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
+		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
+		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
+		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
+		c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopApplication, c.ShopApplicationEvent, c.ShopApplicationMessage,
+		c.ShopApplicationToken, c.ShopPaymentProviderCredential, c.ShopUser, c.User,
+		c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Use(hooks...)
 	}
@@ -457,15 +463,15 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AdminCredentialToken, c.Cart, c.CartItem, c.Category,
 		c.CheckoutIdempotencyKey, c.ContentAuditLog, c.ContentDocument,
-		c.ContentPublishHook, c.ContentRevision, c.ContentSchema, c.MediaUpload,
-		c.Member, c.MemberRefreshToken, c.MemberTier, c.Order, c.OrderItem,
-		c.OrderNotification, c.Page, c.Payment, c.Permission, c.PointTransaction,
-		c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU, c.PublishableKey,
-		c.Role, c.RolePermission, c.RoleUser, c.Shipment, c.ShipmentItem,
-		c.ShippingMethod, c.Shop, c.ShopAllowedOrigin, c.ShopApplication,
-		c.ShopApplicationEvent, c.ShopApplicationMessage, c.ShopApplicationToken,
-		c.ShopPaymentProviderCredential, c.ShopUser, c.User, c.UserPermission,
-		c.UserRefreshToken,
+		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
+		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
+		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
+		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
+		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
+		c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.ShopApplication, c.ShopApplicationEvent, c.ShopApplicationMessage,
+		c.ShopApplicationToken, c.ShopPaymentProviderCredential, c.ShopUser, c.User,
+		c.UserPermission, c.UserRefreshToken,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -492,6 +498,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ContentPublishHook.mutate(ctx, m)
 	case *ContentRevisionMutation:
 		return c.ContentRevision.mutate(ctx, m)
+	case *ContentScheduleMutation:
+		return c.ContentSchedule.mutate(ctx, m)
 	case *ContentSchemaMutation:
 		return c.ContentSchema.mutate(ctx, m)
 	case *MediaUploadMutation:
@@ -1983,6 +1991,139 @@ func (c *ContentRevisionClient) mutate(ctx context.Context, m *ContentRevisionMu
 		return (&ContentRevisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ContentRevision mutation op: %q", m.Op())
+	}
+}
+
+// ContentScheduleClient is a client for the ContentSchedule schema.
+type ContentScheduleClient struct {
+	config
+}
+
+// NewContentScheduleClient returns a client for the ContentSchedule from the given config.
+func NewContentScheduleClient(c config) *ContentScheduleClient {
+	return &ContentScheduleClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `contentschedule.Hooks(f(g(h())))`.
+func (c *ContentScheduleClient) Use(hooks ...Hook) {
+	c.hooks.ContentSchedule = append(c.hooks.ContentSchedule, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `contentschedule.Intercept(f(g(h())))`.
+func (c *ContentScheduleClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ContentSchedule = append(c.inters.ContentSchedule, interceptors...)
+}
+
+// Create returns a builder for creating a ContentSchedule entity.
+func (c *ContentScheduleClient) Create() *ContentScheduleCreate {
+	mutation := newContentScheduleMutation(c.config, OpCreate)
+	return &ContentScheduleCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ContentSchedule entities.
+func (c *ContentScheduleClient) CreateBulk(builders ...*ContentScheduleCreate) *ContentScheduleCreateBulk {
+	return &ContentScheduleCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ContentScheduleClient) MapCreateBulk(slice any, setFunc func(*ContentScheduleCreate, int)) *ContentScheduleCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ContentScheduleCreateBulk{err: fmt.Errorf("calling to ContentScheduleClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ContentScheduleCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ContentScheduleCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ContentSchedule.
+func (c *ContentScheduleClient) Update() *ContentScheduleUpdate {
+	mutation := newContentScheduleMutation(c.config, OpUpdate)
+	return &ContentScheduleUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ContentScheduleClient) UpdateOne(_m *ContentSchedule) *ContentScheduleUpdateOne {
+	mutation := newContentScheduleMutation(c.config, OpUpdateOne, withContentSchedule(_m))
+	return &ContentScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ContentScheduleClient) UpdateOneID(id int) *ContentScheduleUpdateOne {
+	mutation := newContentScheduleMutation(c.config, OpUpdateOne, withContentScheduleID(id))
+	return &ContentScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ContentSchedule.
+func (c *ContentScheduleClient) Delete() *ContentScheduleDelete {
+	mutation := newContentScheduleMutation(c.config, OpDelete)
+	return &ContentScheduleDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ContentScheduleClient) DeleteOne(_m *ContentSchedule) *ContentScheduleDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ContentScheduleClient) DeleteOneID(id int) *ContentScheduleDeleteOne {
+	builder := c.Delete().Where(contentschedule.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ContentScheduleDeleteOne{builder}
+}
+
+// Query returns a query builder for ContentSchedule.
+func (c *ContentScheduleClient) Query() *ContentScheduleQuery {
+	return &ContentScheduleQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeContentSchedule},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ContentSchedule entity by its id.
+func (c *ContentScheduleClient) Get(ctx context.Context, id int) (*ContentSchedule, error) {
+	return c.Query().Where(contentschedule.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ContentScheduleClient) GetX(ctx context.Context, id int) *ContentSchedule {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ContentScheduleClient) Hooks() []Hook {
+	return c.hooks.ContentSchedule
+}
+
+// Interceptors returns the client interceptors.
+func (c *ContentScheduleClient) Interceptors() []Interceptor {
+	return c.inters.ContentSchedule
+}
+
+func (c *ContentScheduleClient) mutate(ctx context.Context, m *ContentScheduleMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ContentScheduleCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ContentScheduleUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ContentScheduleUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ContentScheduleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ContentSchedule mutation op: %q", m.Op())
 	}
 }
 
@@ -7494,22 +7635,22 @@ type (
 	hooks struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
-		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
-		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ContentSchedule, ContentSchema, MediaUpload, Member, MemberRefreshToken,
+		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
+		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
+		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
 		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
 		ShopUser, User, UserPermission, UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
-		ContentSchema, MediaUpload, Member, MemberRefreshToken, MemberTier, Order,
-		OrderItem, OrderNotification, Page, Payment, Permission, PointTransaction,
-		Product, ProductCategory, ProductImage, ProductSKU, PublishableKey, Role,
-		RolePermission, RoleUser, Shipment, ShipmentItem, ShippingMethod, Shop,
-		ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
+		ContentSchedule, ContentSchema, MediaUpload, Member, MemberRefreshToken,
+		MemberTier, Order, OrderItem, OrderNotification, Page, Payment, Permission,
+		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
+		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
+		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
 		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
 		ShopUser, User, UserPermission, UserRefreshToken []ent.Interceptor
 	}

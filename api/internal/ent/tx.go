@@ -32,6 +32,8 @@ type Tx struct {
 	ContentPublishHook *ContentPublishHookClient
 	// ContentRevision is the client for interacting with the ContentRevision builders.
 	ContentRevision *ContentRevisionClient
+	// ContentSchedule is the client for interacting with the ContentSchedule builders.
+	ContentSchedule *ContentScheduleClient
 	// ContentSchema is the client for interacting with the ContentSchema builders.
 	ContentSchema *ContentSchemaClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
@@ -240,6 +242,7 @@ func (tx *Tx) init() {
 	tx.ContentDocument = NewContentDocumentClient(tx.config)
 	tx.ContentPublishHook = NewContentPublishHookClient(tx.config)
 	tx.ContentRevision = NewContentRevisionClient(tx.config)
+	tx.ContentSchedule = NewContentScheduleClient(tx.config)
 	tx.ContentSchema = NewContentSchemaClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)

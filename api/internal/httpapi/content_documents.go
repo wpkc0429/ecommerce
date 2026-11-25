@@ -34,6 +34,8 @@ type ContentDocumentsHandler struct {
 	Limiter    *ratelimit.Limiter
 	PreviewTTL time.Duration
 	Log        *slog.Logger
+	// Schedules adds scheduled_publish_at to the list and detail (slice 3).
+	Schedules *content.Scheduler
 }
 
 // Rate limits of design D9, per shop and caller.
@@ -144,9 +146,19 @@ func (h *ContentDocumentsHandler) list(w http.ResponseWriter, r *http.Request) {
 		h.writeError(w, err)
 		return
 	}
+	var pending map[string]time.Time
+	if h.Schedules != nil {
+		var perr error
+		if pending, perr = h.Schedules.PendingByKey(r.Context(), shopID); perr != nil {
+			h.writeError(w, perr)
+			return
+		}
+	}
 	out := make([]map[string]any, 0, len(docs))
 	for _, d := range docs {
-		out = append(out, docSummaryJSON(d))
+		m := docSummaryJSON(d)
+		m["scheduled_publish_at"] = scheduledAt(pending, d.Key)
+		out = append(out, m)
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"documents": out})
 }
@@ -159,7 +171,23 @@ func (h *ContentDocumentsHandler) get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", etagRev(det.Doc.DraftRev))
-	httpx.WriteJSON(w, http.StatusOK, docDetailJSON(det.Doc, det))
+	out := docDetailJSON(det.Doc, det)
+	if h.Schedules != nil {
+		pending, perr := h.Schedules.PendingByKey(r.Context(), shopID)
+		if perr != nil {
+			h.writeError(w, perr)
+			return
+		}
+		out["scheduled_publish_at"] = scheduledAt(pending, det.Doc.Key)
+	}
+	httpx.WriteJSON(w, http.StatusOK, out)
+}
+
+func scheduledAt(pending map[string]time.Time, key string) any {
+	if t, ok := pending[key]; ok {
+		return t.UTC()
+	}
+	return nil
 }
 
 type saveBody struct {

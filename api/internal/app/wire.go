@@ -206,9 +206,26 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Authz:   authz, Limiter: limiter, Log: a.log,
 	}
 
+	contentService := &content.Service{Client: client, Dispatcher: dispatcher, Gate: cmsService, Log: a.log}
+	// Scheduled publishing (design D11): the scheduler publishes through the
+	// SAME contentService.Publish path as a manual publish, so revisions, audit,
+	// cache invalidation and the publish hook all behave identically. The clock
+	// is the database's now(); the in-process ticker is off unless
+	// CONTENT_SCHEDULER_ENABLED=1 (cmd/content-scheduler is the cron route).
+	contentScheduler := &content.Scheduler{
+		Client: client, DB: db, Docs: contentService, Clock: content.DBClock{DB: db},
+		Authorize: content.PublishAuthorizer(engine), Cfg: scheduleConfig(cfg), Log: a.log,
+	}
+	if cfg.ContentOps.ScheduleEnabled {
+		loopCtx, stop := context.WithCancel(context.Background())
+		go contentScheduler.Loop(loopCtx, cfg.ContentOps.ScheduleInterval)
+		a.closers = append(a.closers, func() error { stop(); return nil })
+		a.log.Info("content scheduler ticker enabled", "interval", cfg.ContentOps.ScheduleInterval)
+	}
+	deps.ContentSchedules = &httpapi.ContentSchedulesHandler{Scheduler: contentScheduler, Authz: authz, Limiter: limiter, Log: a.log}
 	deps.ContentDocuments = &httpapi.ContentDocumentsHandler{
-		Service: &content.Service{Client: client, Dispatcher: dispatcher, Gate: cmsService, Log: a.log},
-		Issuer:  issuer, Authz: authz, Limiter: limiter, PreviewTTL: cfg.ContentPreviewTTL, Log: a.log,
+		Service: contentService, Schedules: contentScheduler,
+		Issuer: issuer, Authz: authz, Limiter: limiter, PreviewTTL: cfg.ContentPreviewTTL, Log: a.log,
 	}
 	deps.ContentPublic = &httpapi.ContentPublicHandler{
 		Reader: &content.Reader{Client: client}, Cache: renderCache, Issuer: issuer, Engine: engine,
@@ -502,5 +519,12 @@ func hookConfig(cfg *config.Config) hook.Config {
 	o := cfg.ContentOps
 	c.Debounce, c.MaxWait, c.MinInterval = o.HookDebounce, o.HookMaxWait, o.HookMinInterval
 	c.DailyCap, c.QueueSize, c.FlushInterval = o.HookDailyCap, o.HookQueueSize, o.HookFlushInterval
+	return c
+}
+
+func scheduleConfig(cfg *config.Config) content.ScheduleConfig {
+	c := content.DefaultScheduleConfig()
+	o := cfg.ContentOps
+	c.MinLead, c.MaxAhead, c.Grace = o.ScheduleMinLead, o.ScheduleMaxAhead, o.ScheduleGrace
 	return c
 }

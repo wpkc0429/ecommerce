@@ -162,6 +162,11 @@ func SaveDraft(ctx context.Context, c *ent.Client, in SaveInput) (doc *ent.Conte
 		if err != nil {
 			return nil, false, err
 		}
+		// A schedule is bound to the draft_rev it was made for: this save
+		// invalidates it in the same transaction (design D11).
+		if err := SupersedeEdited(ctx, c, in.ShopID, in.Key, doc.DraftRev, in.Actor); err != nil {
+			return nil, false, err
+		}
 	}
 	if in.Key != GlobalKey {
 		if err := writeBackDraft(ctx, c, doc); err != nil {
@@ -197,6 +202,9 @@ func Publish(ctx context.Context, c *ent.Client, shopID int, key string, expecte
 		return nil, err
 	}
 	if err := writeBackPublished(ctx, c, d); err != nil {
+		return nil, err
+	}
+	if err := SupersedePublished(ctx, c, shopID, key, d.PublishedRev, actor); err != nil {
 		return nil, err
 	}
 	return d, nil
@@ -237,6 +245,9 @@ func Delete(ctx context.Context, c *ent.Client, shopID int, key string) (*ent.Co
 		return nil, err
 	}
 	if err := c.ContentDocument.DeleteOne(d).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := CancelForDeleted(ctx, c, shopID, key, 0); err != nil {
 		return nil, err
 	}
 	if key != GlobalKey {
@@ -431,6 +442,11 @@ func SyncPage(ctx context.Context, c *ent.Client, s PageSync) error {
 	if err != nil {
 		return fmt.Errorf("contentstore: sync page %q: %w", p.Slug, err)
 	}
+	if s.DraftChanged {
+		if err := SupersedeEdited(ctx, c, p.ShopID, d.Key, d.DraftRev, 0); err != nil {
+			return err
+		}
+	}
 	if s.Published {
 		return addRevision(ctx, c, d, KindPublish, p.PublishedJSON, nil, s.SchemaVersion, 0)
 	}
@@ -450,7 +466,10 @@ func SyncPageDelete(ctx context.Context, c *ent.Client, shopID int, slug string)
 		Where(entrev.ShopIDEQ(shopID), entrev.DocumentIDEQ(d.ID)).Exec(ctx); err != nil {
 		return err
 	}
-	return c.ContentDocument.DeleteOne(d).Exec(ctx)
+	if err := c.ContentDocument.DeleteOne(d).Exec(ctx); err != nil {
+		return err
+	}
+	return CancelForDeleted(ctx, c, shopID, slug, 0)
 }
 
 // SyncGlobal records a legacy write of shops.content_json: the global document
@@ -478,6 +497,9 @@ func SyncGlobal(ctx context.Context, c *ent.Client, shopID int, content json.Raw
 		SetPublishedRev(d.DraftRev + 1).SetSchemaVersion(schemaVersion).SetPublishedSchemaVersion(schemaVersion).
 		SetPublishedAt(time.Now()).SetNeedsAttention(false).Save(ctx)
 	if err != nil {
+		return err
+	}
+	if err := SupersedeEdited(ctx, c, shopID, GlobalKey, d.DraftRev, 0); err != nil {
 		return err
 	}
 	return addRevision(ctx, c, d, KindPublish, content, nil, schemaVersion, 0)

@@ -13,6 +13,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
 	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
+	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -502,6 +503,56 @@ func init() {
 	contentrevisionDescCreatedAt := contentrevisionFields[10].Descriptor()
 	// contentrevision.DefaultCreatedAt holds the default value on creation for the created_at field.
 	contentrevision.DefaultCreatedAt = contentrevisionDescCreatedAt.Default.(func() time.Time)
+	contentscheduleFields := schema.ContentSchedule{}.Fields()
+	_ = contentscheduleFields
+	// contentscheduleDescDocKey is the schema descriptor for doc_key field.
+	contentscheduleDescDocKey := contentscheduleFields[1].Descriptor()
+	// contentschedule.DocKeyValidator is a validator for the "doc_key" field. It is called by the builders before save.
+	contentschedule.DocKeyValidator = func() func(string) error {
+		validators := contentscheduleDescDocKey.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(doc_key string) error {
+			for _, fn := range fns {
+				if err := fn(doc_key); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// contentscheduleDescStatus is the schema descriptor for status field.
+	contentscheduleDescStatus := contentscheduleFields[4].Descriptor()
+	// contentschedule.DefaultStatus holds the default value on creation for the status field.
+	contentschedule.DefaultStatus = contentscheduleDescStatus.Default.(string)
+	// contentschedule.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	contentschedule.StatusValidator = contentscheduleDescStatus.Validators[0].(func(string) error)
+	// contentscheduleDescResult is the schema descriptor for result field.
+	contentscheduleDescResult := contentscheduleFields[5].Descriptor()
+	// contentschedule.DefaultResult holds the default value on creation for the result field.
+	contentschedule.DefaultResult = contentscheduleDescResult.Default.(string)
+	// contentschedule.ResultValidator is a validator for the "result" field. It is called by the builders before save.
+	contentschedule.ResultValidator = contentscheduleDescResult.Validators[0].(func(string) error)
+	// contentscheduleDescAttempts is the schema descriptor for attempts field.
+	contentscheduleDescAttempts := contentscheduleFields[7].Descriptor()
+	// contentschedule.DefaultAttempts holds the default value on creation for the attempts field.
+	contentschedule.DefaultAttempts = contentscheduleDescAttempts.Default.(int)
+	// contentscheduleDescLateSeconds is the schema descriptor for late_seconds field.
+	contentscheduleDescLateSeconds := contentscheduleFields[8].Descriptor()
+	// contentschedule.DefaultLateSeconds holds the default value on creation for the late_seconds field.
+	contentschedule.DefaultLateSeconds = contentscheduleDescLateSeconds.Default.(int)
+	// contentscheduleDescCreatedAt is the schema descriptor for created_at field.
+	contentscheduleDescCreatedAt := contentscheduleFields[10].Descriptor()
+	// contentschedule.DefaultCreatedAt holds the default value on creation for the created_at field.
+	contentschedule.DefaultCreatedAt = contentscheduleDescCreatedAt.Default.(func() time.Time)
+	// contentscheduleDescUpdatedAt is the schema descriptor for updated_at field.
+	contentscheduleDescUpdatedAt := contentscheduleFields[11].Descriptor()
+	// contentschedule.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	contentschedule.DefaultUpdatedAt = contentscheduleDescUpdatedAt.Default.(func() time.Time)
+	// contentschedule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	contentschedule.UpdateDefaultUpdatedAt = contentscheduleDescUpdatedAt.UpdateDefault.(func() time.Time)
 	contentschemaFields := schema.ContentSchema{}.Fields()
 	_ = contentschemaFields
 	// contentschemaDescSha256 is the schema descriptor for sha256 field.

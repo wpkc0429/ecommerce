@@ -199,3 +199,59 @@ func (ContentPublishHook) Indexes() []ent.Index {
 func (ContentPublishHook) Annotations() []schema.Annotation {
 	return []schema.Annotation{entsql.Annotation{Table: "content_publish_hooks"}}
 }
+
+// ContentSchedule is a scheduled publish of one document (change
+// headless-content-store slice 3, design D11).
+//
+// The schedule is bound to the draft_rev the person reviewed: it publishes at
+// publish_at only while the document's draft_rev still equals it, so an edit
+// made after scheduling can never go live unreviewed. status: pending (waiting)
+// | running (claimed by a scheduler) | done | failed | missed | cancelled |
+// superseded. At most one pending-or-running schedule exists per document
+// (partial unique index); finished rows are history, purged after
+// CONTENT_SCHEDULE_RETENTION by cmd/purge-content-audit.
+type ContentSchedule struct {
+	ent.Schema
+}
+
+func (ContentSchedule) Fields() []ent.Field {
+	return []ent.Field{
+		field.Int("shop_id"),
+		field.String("doc_key").MaxLen(63).SchemaType(map[string]string{dialect.Postgres: "varchar(63)"}).NotEmpty(),
+		field.Int64("draft_rev"),
+		field.Time("publish_at"),
+		field.String("status").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}).Default("pending"),
+		// result: published | already_published | invalid | permission_revoked |
+		// edited | published_manually | document_deleted | cancelled | missed | error.
+		field.String("result").MaxLen(30).SchemaType(map[string]string{dialect.Postgres: "varchar(30)"}).Default(""),
+		// failure: up to 5 JSON pointers of a validation failure (never content).
+		field.JSON("failure", json.RawMessage{}).Optional(),
+		field.Int("attempts").Default(0),
+		field.Int("late_seconds").Default(0),
+		field.Int("created_by_user_id").Optional().Nillable(),
+		field.Time("created_at").Immutable().Default(time.Now),
+		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
+		field.Time("claimed_at").Optional().Nillable(),
+		field.Time("finished_at").Optional().Nillable(),
+	}
+}
+
+func (ContentSchedule) Indexes() []ent.Index {
+	return []ent.Index{
+		index.Fields("shop_id", "doc_key").Unique().
+			Annotations(entsql.IndexWhere("status IN ('pending', 'running')")),
+		index.Fields("status", "publish_at"),
+		index.Fields("shop_id", "publish_at"),
+	}
+}
+
+func (ContentSchedule) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{
+			Table: "content_publish_schedules",
+			Checks: map[string]string{
+				"content_publish_schedules_status_check": "status IN ('pending', 'running', 'done', 'failed', 'missed', 'cancelled', 'superseded')",
+			},
+		},
+	}
+}

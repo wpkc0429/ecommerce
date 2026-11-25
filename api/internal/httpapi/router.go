@@ -32,6 +32,8 @@ type Deps struct {
 	ContentSchema *ContentSchemaHandler
 	// ContentHook: the publish hook admin API (slice 3).
 	ContentHook *ContentHookHandler
+	// ContentSchedules: scheduled publishing admin API (slice 3).
+	ContentSchedules *ContentSchedulesHandler
 	// ContentDocuments: the admin document API; ContentPublic: the public
 	// read API (change headless-content-store slice 2).
 	ContentDocuments       *ContentDocumentsHandler
@@ -197,6 +199,9 @@ func New(d Deps) http.Handler {
 						}
 						if d.ContentHook != nil {
 							d.ContentHook.MountShopAdmin(sh)
+						}
+						if d.ContentSchedules != nil {
+							d.ContentSchedules.MountShopAdmin(sh)
 						}
 						if d.Categories != nil {
 							d.Categories.MountShop(sh)

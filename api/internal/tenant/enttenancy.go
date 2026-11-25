@@ -20,6 +20,7 @@ var tenantOwned = map[string]bool{
 	"ContentAuditLog": true,
 	// slice 3: the publish hook and (below) schedules carry a direct shop_id.
 	"ContentPublishHook": true,
+	"ContentSchedule":    true,
 	// change retire-hosted-storefront-and-themes (group 1): per-shop content
 	// schema versions carry a direct shop_id column.
 	"ContentSchema": true,

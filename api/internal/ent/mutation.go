@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
 	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
+	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -77,6 +78,7 @@ const (
 	TypeContentDocument               = "ContentDocument"
 	TypeContentPublishHook            = "ContentPublishHook"
 	TypeContentRevision               = "ContentRevision"
+	TypeContentSchedule               = "ContentSchedule"
 	TypeContentSchema                 = "ContentSchema"
 	TypeMediaUpload                   = "MediaUpload"
 	TypeMember                        = "Member"
@@ -10132,6 +10134,1299 @@ func (m *ContentRevisionMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *ContentRevisionMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown ContentRevision edge %s", name)
+}
+
+// ContentScheduleMutation represents an operation that mutates the ContentSchedule nodes in the graph.
+type ContentScheduleMutation struct {
+	config
+	op                    Op
+	typ                   string
+	id                    *int
+	shop_id               *int
+	addshop_id            *int
+	doc_key               *string
+	draft_rev             *int64
+	adddraft_rev          *int64
+	publish_at            *time.Time
+	status                *string
+	result                *string
+	failure               *json.RawMessage
+	appendfailure         json.RawMessage
+	attempts              *int
+	addattempts           *int
+	late_seconds          *int
+	addlate_seconds       *int
+	created_by_user_id    *int
+	addcreated_by_user_id *int
+	created_at            *time.Time
+	updated_at            *time.Time
+	claimed_at            *time.Time
+	finished_at           *time.Time
+	clearedFields         map[string]struct{}
+	done                  bool
+	oldValue              func(context.Context) (*ContentSchedule, error)
+	predicates            []predicate.ContentSchedule
+}
+
+var _ ent.Mutation = (*ContentScheduleMutation)(nil)
+
+// contentscheduleOption allows management of the mutation configuration using functional options.
+type contentscheduleOption func(*ContentScheduleMutation)
+
+// newContentScheduleMutation creates new mutation for the ContentSchedule entity.
+func newContentScheduleMutation(c config, op Op, opts ...contentscheduleOption) *ContentScheduleMutation {
+	m := &ContentScheduleMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeContentSchedule,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withContentScheduleID sets the ID field of the mutation.
+func withContentScheduleID(id int) contentscheduleOption {
+	return func(m *ContentScheduleMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *ContentSchedule
+		)
+		m.oldValue = func(ctx context.Context) (*ContentSchedule, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().ContentSchedule.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withContentSchedule sets the old ContentSchedule of the mutation.
+func withContentSchedule(node *ContentSchedule) contentscheduleOption {
+	return func(m *ContentScheduleMutation) {
+		m.oldValue = func(context.Context) (*ContentSchedule, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m ContentScheduleMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m ContentScheduleMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *ContentScheduleMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *ContentScheduleMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().ContentSchedule.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *ContentScheduleMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *ContentScheduleMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *ContentScheduleMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *ContentScheduleMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *ContentScheduleMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetDocKey sets the "doc_key" field.
+func (m *ContentScheduleMutation) SetDocKey(s string) {
+	m.doc_key = &s
+}
+
+// DocKey returns the value of the "doc_key" field in the mutation.
+func (m *ContentScheduleMutation) DocKey() (r string, exists bool) {
+	v := m.doc_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDocKey returns the old "doc_key" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldDocKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDocKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDocKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDocKey: %w", err)
+	}
+	return oldValue.DocKey, nil
+}
+
+// ResetDocKey resets all changes to the "doc_key" field.
+func (m *ContentScheduleMutation) ResetDocKey() {
+	m.doc_key = nil
+}
+
+// SetDraftRev sets the "draft_rev" field.
+func (m *ContentScheduleMutation) SetDraftRev(i int64) {
+	m.draft_rev = &i
+	m.adddraft_rev = nil
+}
+
+// DraftRev returns the value of the "draft_rev" field in the mutation.
+func (m *ContentScheduleMutation) DraftRev() (r int64, exists bool) {
+	v := m.draft_rev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDraftRev returns the old "draft_rev" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldDraftRev(ctx context.Context) (v int64, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDraftRev is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDraftRev requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDraftRev: %w", err)
+	}
+	return oldValue.DraftRev, nil
+}
+
+// AddDraftRev adds i to the "draft_rev" field.
+func (m *ContentScheduleMutation) AddDraftRev(i int64) {
+	if m.adddraft_rev != nil {
+		*m.adddraft_rev += i
+	} else {
+		m.adddraft_rev = &i
+	}
+}
+
+// AddedDraftRev returns the value that was added to the "draft_rev" field in this mutation.
+func (m *ContentScheduleMutation) AddedDraftRev() (r int64, exists bool) {
+	v := m.adddraft_rev
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetDraftRev resets all changes to the "draft_rev" field.
+func (m *ContentScheduleMutation) ResetDraftRev() {
+	m.draft_rev = nil
+	m.adddraft_rev = nil
+}
+
+// SetPublishAt sets the "publish_at" field.
+func (m *ContentScheduleMutation) SetPublishAt(t time.Time) {
+	m.publish_at = &t
+}
+
+// PublishAt returns the value of the "publish_at" field in the mutation.
+func (m *ContentScheduleMutation) PublishAt() (r time.Time, exists bool) {
+	v := m.publish_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublishAt returns the old "publish_at" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldPublishAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublishAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublishAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublishAt: %w", err)
+	}
+	return oldValue.PublishAt, nil
+}
+
+// ResetPublishAt resets all changes to the "publish_at" field.
+func (m *ContentScheduleMutation) ResetPublishAt() {
+	m.publish_at = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *ContentScheduleMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *ContentScheduleMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *ContentScheduleMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetResult sets the "result" field.
+func (m *ContentScheduleMutation) SetResult(s string) {
+	m.result = &s
+}
+
+// Result returns the value of the "result" field in the mutation.
+func (m *ContentScheduleMutation) Result() (r string, exists bool) {
+	v := m.result
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResult returns the old "result" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldResult(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResult is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResult requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResult: %w", err)
+	}
+	return oldValue.Result, nil
+}
+
+// ResetResult resets all changes to the "result" field.
+func (m *ContentScheduleMutation) ResetResult() {
+	m.result = nil
+}
+
+// SetFailure sets the "failure" field.
+func (m *ContentScheduleMutation) SetFailure(jm json.RawMessage) {
+	m.failure = &jm
+	m.appendfailure = nil
+}
+
+// Failure returns the value of the "failure" field in the mutation.
+func (m *ContentScheduleMutation) Failure() (r json.RawMessage, exists bool) {
+	v := m.failure
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailure returns the old "failure" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldFailure(ctx context.Context) (v json.RawMessage, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailure is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailure requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailure: %w", err)
+	}
+	return oldValue.Failure, nil
+}
+
+// AppendFailure adds jm to the "failure" field.
+func (m *ContentScheduleMutation) AppendFailure(jm json.RawMessage) {
+	m.appendfailure = append(m.appendfailure, jm...)
+}
+
+// AppendedFailure returns the list of values that were appended to the "failure" field in this mutation.
+func (m *ContentScheduleMutation) AppendedFailure() (json.RawMessage, bool) {
+	if len(m.appendfailure) == 0 {
+		return nil, false
+	}
+	return m.appendfailure, true
+}
+
+// ClearFailure clears the value of the "failure" field.
+func (m *ContentScheduleMutation) ClearFailure() {
+	m.failure = nil
+	m.appendfailure = nil
+	m.clearedFields[contentschedule.FieldFailure] = struct{}{}
+}
+
+// FailureCleared returns if the "failure" field was cleared in this mutation.
+func (m *ContentScheduleMutation) FailureCleared() bool {
+	_, ok := m.clearedFields[contentschedule.FieldFailure]
+	return ok
+}
+
+// ResetFailure resets all changes to the "failure" field.
+func (m *ContentScheduleMutation) ResetFailure() {
+	m.failure = nil
+	m.appendfailure = nil
+	delete(m.clearedFields, contentschedule.FieldFailure)
+}
+
+// SetAttempts sets the "attempts" field.
+func (m *ContentScheduleMutation) SetAttempts(i int) {
+	m.attempts = &i
+	m.addattempts = nil
+}
+
+// Attempts returns the value of the "attempts" field in the mutation.
+func (m *ContentScheduleMutation) Attempts() (r int, exists bool) {
+	v := m.attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttempts returns the old "attempts" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttempts: %w", err)
+	}
+	return oldValue.Attempts, nil
+}
+
+// AddAttempts adds i to the "attempts" field.
+func (m *ContentScheduleMutation) AddAttempts(i int) {
+	if m.addattempts != nil {
+		*m.addattempts += i
+	} else {
+		m.addattempts = &i
+	}
+}
+
+// AddedAttempts returns the value that was added to the "attempts" field in this mutation.
+func (m *ContentScheduleMutation) AddedAttempts() (r int, exists bool) {
+	v := m.addattempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetAttempts resets all changes to the "attempts" field.
+func (m *ContentScheduleMutation) ResetAttempts() {
+	m.attempts = nil
+	m.addattempts = nil
+}
+
+// SetLateSeconds sets the "late_seconds" field.
+func (m *ContentScheduleMutation) SetLateSeconds(i int) {
+	m.late_seconds = &i
+	m.addlate_seconds = nil
+}
+
+// LateSeconds returns the value of the "late_seconds" field in the mutation.
+func (m *ContentScheduleMutation) LateSeconds() (r int, exists bool) {
+	v := m.late_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLateSeconds returns the old "late_seconds" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldLateSeconds(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLateSeconds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLateSeconds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLateSeconds: %w", err)
+	}
+	return oldValue.LateSeconds, nil
+}
+
+// AddLateSeconds adds i to the "late_seconds" field.
+func (m *ContentScheduleMutation) AddLateSeconds(i int) {
+	if m.addlate_seconds != nil {
+		*m.addlate_seconds += i
+	} else {
+		m.addlate_seconds = &i
+	}
+}
+
+// AddedLateSeconds returns the value that was added to the "late_seconds" field in this mutation.
+func (m *ContentScheduleMutation) AddedLateSeconds() (r int, exists bool) {
+	v := m.addlate_seconds
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetLateSeconds resets all changes to the "late_seconds" field.
+func (m *ContentScheduleMutation) ResetLateSeconds() {
+	m.late_seconds = nil
+	m.addlate_seconds = nil
+}
+
+// SetCreatedByUserID sets the "created_by_user_id" field.
+func (m *ContentScheduleMutation) SetCreatedByUserID(i int) {
+	m.created_by_user_id = &i
+	m.addcreated_by_user_id = nil
+}
+
+// CreatedByUserID returns the value of the "created_by_user_id" field in the mutation.
+func (m *ContentScheduleMutation) CreatedByUserID() (r int, exists bool) {
+	v := m.created_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedByUserID returns the old "created_by_user_id" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldCreatedByUserID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedByUserID: %w", err)
+	}
+	return oldValue.CreatedByUserID, nil
+}
+
+// AddCreatedByUserID adds i to the "created_by_user_id" field.
+func (m *ContentScheduleMutation) AddCreatedByUserID(i int) {
+	if m.addcreated_by_user_id != nil {
+		*m.addcreated_by_user_id += i
+	} else {
+		m.addcreated_by_user_id = &i
+	}
+}
+
+// AddedCreatedByUserID returns the value that was added to the "created_by_user_id" field in this mutation.
+func (m *ContentScheduleMutation) AddedCreatedByUserID() (r int, exists bool) {
+	v := m.addcreated_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearCreatedByUserID clears the value of the "created_by_user_id" field.
+func (m *ContentScheduleMutation) ClearCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.addcreated_by_user_id = nil
+	m.clearedFields[contentschedule.FieldCreatedByUserID] = struct{}{}
+}
+
+// CreatedByUserIDCleared returns if the "created_by_user_id" field was cleared in this mutation.
+func (m *ContentScheduleMutation) CreatedByUserIDCleared() bool {
+	_, ok := m.clearedFields[contentschedule.FieldCreatedByUserID]
+	return ok
+}
+
+// ResetCreatedByUserID resets all changes to the "created_by_user_id" field.
+func (m *ContentScheduleMutation) ResetCreatedByUserID() {
+	m.created_by_user_id = nil
+	m.addcreated_by_user_id = nil
+	delete(m.clearedFields, contentschedule.FieldCreatedByUserID)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *ContentScheduleMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *ContentScheduleMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *ContentScheduleMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *ContentScheduleMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *ContentScheduleMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *ContentScheduleMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetClaimedAt sets the "claimed_at" field.
+func (m *ContentScheduleMutation) SetClaimedAt(t time.Time) {
+	m.claimed_at = &t
+}
+
+// ClaimedAt returns the value of the "claimed_at" field in the mutation.
+func (m *ContentScheduleMutation) ClaimedAt() (r time.Time, exists bool) {
+	v := m.claimed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimedAt returns the old "claimed_at" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldClaimedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimedAt: %w", err)
+	}
+	return oldValue.ClaimedAt, nil
+}
+
+// ClearClaimedAt clears the value of the "claimed_at" field.
+func (m *ContentScheduleMutation) ClearClaimedAt() {
+	m.claimed_at = nil
+	m.clearedFields[contentschedule.FieldClaimedAt] = struct{}{}
+}
+
+// ClaimedAtCleared returns if the "claimed_at" field was cleared in this mutation.
+func (m *ContentScheduleMutation) ClaimedAtCleared() bool {
+	_, ok := m.clearedFields[contentschedule.FieldClaimedAt]
+	return ok
+}
+
+// ResetClaimedAt resets all changes to the "claimed_at" field.
+func (m *ContentScheduleMutation) ResetClaimedAt() {
+	m.claimed_at = nil
+	delete(m.clearedFields, contentschedule.FieldClaimedAt)
+}
+
+// SetFinishedAt sets the "finished_at" field.
+func (m *ContentScheduleMutation) SetFinishedAt(t time.Time) {
+	m.finished_at = &t
+}
+
+// FinishedAt returns the value of the "finished_at" field in the mutation.
+func (m *ContentScheduleMutation) FinishedAt() (r time.Time, exists bool) {
+	v := m.finished_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinishedAt returns the old "finished_at" field's value of the ContentSchedule entity.
+// If the ContentSchedule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ContentScheduleMutation) OldFinishedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinishedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinishedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinishedAt: %w", err)
+	}
+	return oldValue.FinishedAt, nil
+}
+
+// ClearFinishedAt clears the value of the "finished_at" field.
+func (m *ContentScheduleMutation) ClearFinishedAt() {
+	m.finished_at = nil
+	m.clearedFields[contentschedule.FieldFinishedAt] = struct{}{}
+}
+
+// FinishedAtCleared returns if the "finished_at" field was cleared in this mutation.
+func (m *ContentScheduleMutation) FinishedAtCleared() bool {
+	_, ok := m.clearedFields[contentschedule.FieldFinishedAt]
+	return ok
+}
+
+// ResetFinishedAt resets all changes to the "finished_at" field.
+func (m *ContentScheduleMutation) ResetFinishedAt() {
+	m.finished_at = nil
+	delete(m.clearedFields, contentschedule.FieldFinishedAt)
+}
+
+// Where appends a list predicates to the ContentScheduleMutation builder.
+func (m *ContentScheduleMutation) Where(ps ...predicate.ContentSchedule) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the ContentScheduleMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *ContentScheduleMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.ContentSchedule, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *ContentScheduleMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *ContentScheduleMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (ContentSchedule).
+func (m *ContentScheduleMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *ContentScheduleMutation) Fields() []string {
+	fields := make([]string, 0, 14)
+	if m.shop_id != nil {
+		fields = append(fields, contentschedule.FieldShopID)
+	}
+	if m.doc_key != nil {
+		fields = append(fields, contentschedule.FieldDocKey)
+	}
+	if m.draft_rev != nil {
+		fields = append(fields, contentschedule.FieldDraftRev)
+	}
+	if m.publish_at != nil {
+		fields = append(fields, contentschedule.FieldPublishAt)
+	}
+	if m.status != nil {
+		fields = append(fields, contentschedule.FieldStatus)
+	}
+	if m.result != nil {
+		fields = append(fields, contentschedule.FieldResult)
+	}
+	if m.failure != nil {
+		fields = append(fields, contentschedule.FieldFailure)
+	}
+	if m.attempts != nil {
+		fields = append(fields, contentschedule.FieldAttempts)
+	}
+	if m.late_seconds != nil {
+		fields = append(fields, contentschedule.FieldLateSeconds)
+	}
+	if m.created_by_user_id != nil {
+		fields = append(fields, contentschedule.FieldCreatedByUserID)
+	}
+	if m.created_at != nil {
+		fields = append(fields, contentschedule.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, contentschedule.FieldUpdatedAt)
+	}
+	if m.claimed_at != nil {
+		fields = append(fields, contentschedule.FieldClaimedAt)
+	}
+	if m.finished_at != nil {
+		fields = append(fields, contentschedule.FieldFinishedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *ContentScheduleMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case contentschedule.FieldShopID:
+		return m.ShopID()
+	case contentschedule.FieldDocKey:
+		return m.DocKey()
+	case contentschedule.FieldDraftRev:
+		return m.DraftRev()
+	case contentschedule.FieldPublishAt:
+		return m.PublishAt()
+	case contentschedule.FieldStatus:
+		return m.Status()
+	case contentschedule.FieldResult:
+		return m.Result()
+	case contentschedule.FieldFailure:
+		return m.Failure()
+	case contentschedule.FieldAttempts:
+		return m.Attempts()
+	case contentschedule.FieldLateSeconds:
+		return m.LateSeconds()
+	case contentschedule.FieldCreatedByUserID:
+		return m.CreatedByUserID()
+	case contentschedule.FieldCreatedAt:
+		return m.CreatedAt()
+	case contentschedule.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case contentschedule.FieldClaimedAt:
+		return m.ClaimedAt()
+	case contentschedule.FieldFinishedAt:
+		return m.FinishedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *ContentScheduleMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case contentschedule.FieldShopID:
+		return m.OldShopID(ctx)
+	case contentschedule.FieldDocKey:
+		return m.OldDocKey(ctx)
+	case contentschedule.FieldDraftRev:
+		return m.OldDraftRev(ctx)
+	case contentschedule.FieldPublishAt:
+		return m.OldPublishAt(ctx)
+	case contentschedule.FieldStatus:
+		return m.OldStatus(ctx)
+	case contentschedule.FieldResult:
+		return m.OldResult(ctx)
+	case contentschedule.FieldFailure:
+		return m.OldFailure(ctx)
+	case contentschedule.FieldAttempts:
+		return m.OldAttempts(ctx)
+	case contentschedule.FieldLateSeconds:
+		return m.OldLateSeconds(ctx)
+	case contentschedule.FieldCreatedByUserID:
+		return m.OldCreatedByUserID(ctx)
+	case contentschedule.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case contentschedule.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case contentschedule.FieldClaimedAt:
+		return m.OldClaimedAt(ctx)
+	case contentschedule.FieldFinishedAt:
+		return m.OldFinishedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown ContentSchedule field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentScheduleMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case contentschedule.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case contentschedule.FieldDocKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDocKey(v)
+		return nil
+	case contentschedule.FieldDraftRev:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDraftRev(v)
+		return nil
+	case contentschedule.FieldPublishAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublishAt(v)
+		return nil
+	case contentschedule.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case contentschedule.FieldResult:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResult(v)
+		return nil
+	case contentschedule.FieldFailure:
+		v, ok := value.(json.RawMessage)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailure(v)
+		return nil
+	case contentschedule.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttempts(v)
+		return nil
+	case contentschedule.FieldLateSeconds:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLateSeconds(v)
+		return nil
+	case contentschedule.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedByUserID(v)
+		return nil
+	case contentschedule.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case contentschedule.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case contentschedule.FieldClaimedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimedAt(v)
+		return nil
+	case contentschedule.FieldFinishedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinishedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchedule field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *ContentScheduleMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, contentschedule.FieldShopID)
+	}
+	if m.adddraft_rev != nil {
+		fields = append(fields, contentschedule.FieldDraftRev)
+	}
+	if m.addattempts != nil {
+		fields = append(fields, contentschedule.FieldAttempts)
+	}
+	if m.addlate_seconds != nil {
+		fields = append(fields, contentschedule.FieldLateSeconds)
+	}
+	if m.addcreated_by_user_id != nil {
+		fields = append(fields, contentschedule.FieldCreatedByUserID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *ContentScheduleMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case contentschedule.FieldShopID:
+		return m.AddedShopID()
+	case contentschedule.FieldDraftRev:
+		return m.AddedDraftRev()
+	case contentschedule.FieldAttempts:
+		return m.AddedAttempts()
+	case contentschedule.FieldLateSeconds:
+		return m.AddedLateSeconds()
+	case contentschedule.FieldCreatedByUserID:
+		return m.AddedCreatedByUserID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *ContentScheduleMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case contentschedule.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case contentschedule.FieldDraftRev:
+		v, ok := value.(int64)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddDraftRev(v)
+		return nil
+	case contentschedule.FieldAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddAttempts(v)
+		return nil
+	case contentschedule.FieldLateSeconds:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLateSeconds(v)
+		return nil
+	case contentschedule.FieldCreatedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddCreatedByUserID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchedule numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *ContentScheduleMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(contentschedule.FieldFailure) {
+		fields = append(fields, contentschedule.FieldFailure)
+	}
+	if m.FieldCleared(contentschedule.FieldCreatedByUserID) {
+		fields = append(fields, contentschedule.FieldCreatedByUserID)
+	}
+	if m.FieldCleared(contentschedule.FieldClaimedAt) {
+		fields = append(fields, contentschedule.FieldClaimedAt)
+	}
+	if m.FieldCleared(contentschedule.FieldFinishedAt) {
+		fields = append(fields, contentschedule.FieldFinishedAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *ContentScheduleMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *ContentScheduleMutation) ClearField(name string) error {
+	switch name {
+	case contentschedule.FieldFailure:
+		m.ClearFailure()
+		return nil
+	case contentschedule.FieldCreatedByUserID:
+		m.ClearCreatedByUserID()
+		return nil
+	case contentschedule.FieldClaimedAt:
+		m.ClearClaimedAt()
+		return nil
+	case contentschedule.FieldFinishedAt:
+		m.ClearFinishedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchedule nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *ContentScheduleMutation) ResetField(name string) error {
+	switch name {
+	case contentschedule.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case contentschedule.FieldDocKey:
+		m.ResetDocKey()
+		return nil
+	case contentschedule.FieldDraftRev:
+		m.ResetDraftRev()
+		return nil
+	case contentschedule.FieldPublishAt:
+		m.ResetPublishAt()
+		return nil
+	case contentschedule.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case contentschedule.FieldResult:
+		m.ResetResult()
+		return nil
+	case contentschedule.FieldFailure:
+		m.ResetFailure()
+		return nil
+	case contentschedule.FieldAttempts:
+		m.ResetAttempts()
+		return nil
+	case contentschedule.FieldLateSeconds:
+		m.ResetLateSeconds()
+		return nil
+	case contentschedule.FieldCreatedByUserID:
+		m.ResetCreatedByUserID()
+		return nil
+	case contentschedule.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case contentschedule.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case contentschedule.FieldClaimedAt:
+		m.ResetClaimedAt()
+		return nil
+	case contentschedule.FieldFinishedAt:
+		m.ResetFinishedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown ContentSchedule field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *ContentScheduleMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *ContentScheduleMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *ContentScheduleMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *ContentScheduleMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *ContentScheduleMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *ContentScheduleMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *ContentScheduleMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown ContentSchedule unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *ContentScheduleMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown ContentSchedule edge %s", name)
 }
 
 // ContentSchemaMutation represents an operation that mutates the ContentSchema nodes in the graph.

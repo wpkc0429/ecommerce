@@ -116,6 +116,18 @@ func (f ContentRevisionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Va
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentRevisionMutation", m)
 }
 
+// The ContentScheduleFunc type is an adapter to allow the use of ordinary
+// function as ContentSchedule mutator.
+type ContentScheduleFunc func(context.Context, *ent.ContentScheduleMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ContentScheduleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ContentScheduleMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ContentScheduleMutation", m)
+}
+
 // The ContentSchemaFunc type is an adapter to allow the use of ordinary
 // function as ContentSchema mutator.
 type ContentSchemaFunc func(context.Context, *ent.ContentSchemaMutation) (ent.Value, error)

@@ -396,6 +396,17 @@ func (s *Service) checkCreateQuota(ctx context.Context, shopID int, v *contentsc
 // Publish validates the draft against the active schema and publishes it.
 // expectedRev, when non-nil, is the draft_rev the caller reviewed.
 func (s *Service) Publish(ctx context.Context, shopID int, key string, expectedRev *int64, actor int) (*ent.ContentDocument, error) {
+	return s.publishDoc(ctx, shopID, key, expectedRev, actor, 0)
+}
+
+// PublishScheduled is the scheduler's publish: exactly Publish (same
+// validation, revision, audit row, events and therefore cache invalidation and
+// publish hook), with the schedule id recorded in the audit detail.
+func (s *Service) PublishScheduled(ctx context.Context, shopID int, key string, expectedRev int64, actor, scheduleID int) (*ent.ContentDocument, error) {
+	return s.publishDoc(ctx, shopID, key, &expectedRev, actor, scheduleID)
+}
+
+func (s *Service) publishDoc(ctx context.Context, shopID int, key string, expectedRev *int64, actor, scheduleID int) (*ent.ContentDocument, error) {
 	v, err := s.activeSchema(ctx, shopID)
 	if err != nil {
 		return nil, err
@@ -424,9 +435,13 @@ func (s *Service) Publish(ctx context.Context, shopID int, key string, expectedR
 		if perr != nil {
 			return perr
 		}
+		detail := map[string]any{"rev": out.DraftRev, "schema_version": v.Version}
+		if scheduleID > 0 {
+			detail["scheduled"] = true
+			detail["schedule_id"] = scheduleID
+		}
 		return contentstore.Audit(ctx, c, contentstore.AuditEntry{
-			ShopID: shopID, Actor: actor, Action: "doc.publish", Key: key,
-			Detail: map[string]any{"rev": out.DraftRev, "schema_version": v.Version},
+			ShopID: shopID, Actor: actor, Action: "doc.publish", Key: key, Detail: detail,
 		})
 	})
 	if err != nil {

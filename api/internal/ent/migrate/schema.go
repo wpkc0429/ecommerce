@@ -373,6 +373,50 @@ var (
 			},
 		},
 	}
+	// ContentPublishSchedulesColumns holds the columns for the "content_publish_schedules" table.
+	ContentPublishSchedulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "doc_key", Type: field.TypeString, Size: 63, SchemaType: map[string]string{"postgres": "varchar(63)"}},
+		{Name: "draft_rev", Type: field.TypeInt64},
+		{Name: "publish_at", Type: field.TypeTime},
+		{Name: "status", Type: field.TypeString, Size: 20, Default: "pending", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "result", Type: field.TypeString, Size: 30, Default: "", SchemaType: map[string]string{"postgres": "varchar(30)"}},
+		{Name: "failure", Type: field.TypeJSON, Nullable: true},
+		{Name: "attempts", Type: field.TypeInt, Default: 0},
+		{Name: "late_seconds", Type: field.TypeInt, Default: 0},
+		{Name: "created_by_user_id", Type: field.TypeInt, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "claimed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finished_at", Type: field.TypeTime, Nullable: true},
+	}
+	// ContentPublishSchedulesTable holds the schema information for the "content_publish_schedules" table.
+	ContentPublishSchedulesTable = &schema.Table{
+		Name:       "content_publish_schedules",
+		Columns:    ContentPublishSchedulesColumns,
+		PrimaryKey: []*schema.Column{ContentPublishSchedulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contentschedule_shop_id_doc_key",
+				Unique:  true,
+				Columns: []*schema.Column{ContentPublishSchedulesColumns[1], ContentPublishSchedulesColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('pending', 'running')",
+				},
+			},
+			{
+				Name:    "contentschedule_status_publish_at",
+				Unique:  false,
+				Columns: []*schema.Column{ContentPublishSchedulesColumns[5], ContentPublishSchedulesColumns[4]},
+			},
+			{
+				Name:    "contentschedule_shop_id_publish_at",
+				Unique:  false,
+				Columns: []*schema.Column{ContentPublishSchedulesColumns[1], ContentPublishSchedulesColumns[4]},
+			},
+		},
+	}
 	// ContentSchemasColumns holds the columns for the "content_schemas" table.
 	ContentSchemasColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -1627,6 +1671,7 @@ var (
 		ContentDocumentsTable,
 		ContentPublishHooksTable,
 		ContentRevisionsTable,
+		ContentPublishSchedulesTable,
 		ContentSchemasTable,
 		MediaUploadsTable,
 		MembersTable,
@@ -1720,6 +1765,12 @@ func init() {
 	ContentRevisionsTable.Annotation.Checks = map[string]string{
 		"content_revisions_kind_check":   "kind IN ('publish', 'schema_snapshot')",
 		"content_revisions_rev_no_check": "rev_no >= 1",
+	}
+	ContentPublishSchedulesTable.Annotation = &entsql.Annotation{
+		Table: "content_publish_schedules",
+	}
+	ContentPublishSchedulesTable.Annotation.Checks = map[string]string{
+		"content_publish_schedules_status_check": "status IN ('pending', 'running', 'done', 'failed', 'missed', 'cancelled', 'superseded')",
 	}
 	ContentSchemasTable.ForeignKeys[0].RefTable = ShopsTable
 	ContentSchemasTable.Annotation = &entsql.Annotation{

@@ -2381,6 +2381,9 @@ components:
           oneOf: [{ type: string, format: date-time }, { type: 'null' }]
         updated_by_user_id:
           oneOf: [{ type: integer }, { type: 'null' }]
+        scheduled_publish_at:
+          description: 等待中（或處理中）排程的發佈時間（UTC）；沒有排程為 `null`。只出現在清單與詳情，不在發佈／下架的回應。
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
 
     PublishHookStatus:
       type: object
@@ -2420,6 +2423,35 @@ components:
         result: { type: string, description: 同 `PublishHookStatus.last_status` 的類別。 }
         http_status: { type: integer }
 
+    ContentSchedule:
+      type: object
+      additionalProperties: false
+      required: [id, key, draft_rev, publish_at, status, result, failure, attempts, late_seconds, created_by_user_id, created_at, finished_at]
+      description: 文件的一筆排程發佈（design D11）。
+      properties:
+        id: { type: integer }
+        key: { type: string, description: 文件的鍵。 }
+        draft_rev: { type: integer, description: 排程綁定的草稿版本；到點時文件的 `draft_rev` 必須仍相同。 }
+        publish_at: { type: string, format: date-time, description: UTC，整分鐘。 }
+        status:
+          type: string
+          enum: [pending, running, done, failed, missed, cancelled, superseded]
+        result:
+          type: string
+          description: |
+            `''`（尚未結束）｜`published`｜`already_published`｜`invalid`（到點驗證失敗，文件標 `needs_attention`）｜`permission_revoked`（排程者已不能發佈）｜
+            `edited`（排程後草稿被改）｜`published_manually`｜`document_deleted`｜`cancelled`｜`missed`（遲到超過寬限）｜`error`（基礎設施錯誤重試用盡）。
+        failure:
+          description: 驗證失敗時最多 5 個 JSON Pointer（`{"pointers":[…]}`），不含內容。
+          oneOf: [{ type: object, additionalProperties: true }, { type: 'null' }]
+        attempts: { type: integer }
+        late_seconds: { type: integer, description: 實際處理時間比 `publish_at` 晚幾秒。 }
+        created_by_user_id:
+          oneOf: [{ type: integer }, { type: 'null' }]
+        created_at: { type: string, format: date-time }
+        finished_at:
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
+
     ContentDocumentList:
       type: object
       additionalProperties: false
@@ -2458,6 +2490,9 @@ components:
           oneOf: [{ type: object }, { type: 'null' }]
           description: 僅 `GET` 單一文件：此文件的 type 在作用中 schema 內的 JSON Schema（type 已不在 schema 內為 `null`）。
         type_title: { type: string, description: 僅 `GET` 單一文件。 }
+        scheduled_publish_at:
+          description: 僅 `GET` 單一文件：等待中（或處理中）排程的發佈時間（UTC）；沒有排程為 `null`。
+          oneOf: [{ type: string, format: date-time }, { type: 'null' }]
         restored_valid:
           type: boolean
           description: 僅還原的回應：還原的內容是否通過目前 schema。`false` 時草稿 `needs_attention`，須修正並儲存後才能發佈。
@@ -5874,6 +5909,124 @@ paths:
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
         "404": { $ref: '#/components/responses/NotFound' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/content/schedules:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [admin-cms]
+      operationId: listContentSchedules
+      summary: 本店的排程發佈清單
+      description: |
+        需要 `content.view`。`scope=upcoming`（預設）＝等待中與處理中，依時間由近到遠；`scope=recent`＝已結束（done／failed／missed／cancelled／superseded），最新在前。
+        已結束的列保留 90 天（`CONTENT_SCHEDULE_RETENTION`）。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: scope
+          in: query
+          required: false
+          schema: { type: string, enum: [upcoming, recent] }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        "200":
+          description: 清單。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [schedules]
+                properties:
+                  schedules:
+                    type: array
+                    items: { $ref: '#/components/schemas/ContentSchedule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: key
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [admin-cms]
+      operationId: getContentDocumentSchedule
+      summary: 文件目前（或最近一次）的排程
+      description: 需要 `content.view`。有等待中或處理中的排程時回它，否則回最近一筆已結束的；從未排程過回 404。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 排程。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchedule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [admin-cms]
+      operationId: scheduleContentDocument
+      summary: 排程發佈（或改期）
+      description: |
+        需要 `content.publish`（`editor` 沒有）；每商家每呼叫者每分鐘 20 次。**必須帶 `If-Match: "<draft_rev>"`**（你審閱過、要發佈的那一版草稿；缺少 428、不符 412）。
+        排程綁定這一版：**到點時只有 `draft_rev` 仍相同才會發佈**；之後任何草稿儲存（含還原）會立即讓排程變成 `superseded`（`result: edited`），
+        要發佈新版就重新排程。`publish_at` 必須是帶 UTC 偏移的 RFC 3339（無偏移 422），進位到下一個整分鐘並以 UTC 回傳；
+        至少 2 分鐘後、至多 90 天內。排程時就會對作用中 schema 驗證草稿（422），到點會再驗證一次；失敗時不發佈、文件標 `needs_attention`、排程 `failed`（`result: invalid`）。
+        已有等待中的排程時這個呼叫就是**改期**（200，同一個 `id`，並重新綁定到現在的 `draft_rev`）。遲到在 1 小時寬限內仍發佈，超過則 `missed`。
+      security: [{ adminJWT: [] }]
+      parameters:
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [publish_at]
+              properties:
+                publish_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 已改期。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchedule' }
+        "201":
+          description: 已排程。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ContentSchedule' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "412": { $ref: '#/components/responses/PreconditionFailed' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+        "428": { $ref: '#/components/responses/PreconditionRequired' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+    delete:
+      tags: [admin-cms]
+      operationId: cancelContentDocumentSchedule
+      summary: 取消排程
+      description: 需要 `content.publish`。沒有等待中的排程回 404；處理中（已被排程器認領）回 409。
+      security: [{ adminJWT: [] }]
+      responses:
+        "204": { description: 已取消。 }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
         "429": { $ref: '#/components/responses/TooManyRequests' }
 
   /api/v1/admin/shops/{shopID}/content/documents/{key}/publish:

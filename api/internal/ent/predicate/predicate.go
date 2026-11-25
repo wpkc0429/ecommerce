@@ -33,6 +33,9 @@ type ContentPublishHook func(*sql.Selector)
 // ContentRevision is the predicate function for contentrevision builders.
 type ContentRevision func(*sql.Selector)
 
+// ContentSchedule is the predicate function for contentschedule builders.
+type ContentSchedule func(*sql.Selector)
+
 // ContentSchema is the predicate function for contentschema builders.
 type ContentSchema func(*sql.Selector)
 

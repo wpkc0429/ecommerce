@@ -99,6 +99,7 @@ ContentDocument.published_at
 ContentDocument.published_rev
 ContentDocument.published_schema_version
 ContentDocument.restored_valid
+ContentDocument.scheduled_publish_at
 ContentDocument.schema_node
 ContentDocument.schema_version
 ContentDocument.status
@@ -119,6 +120,7 @@ ContentDocumentSummary.needs_attention
 ContentDocumentSummary.published_at
 ContentDocumentSummary.published_rev
 ContentDocumentSummary.published_schema_version
+ContentDocumentSummary.scheduled_publish_at
 ContentDocumentSummary.schema_version
 ContentDocumentSummary.status
 ContentDocumentSummary.title
@@ -148,6 +150,18 @@ ContentRevisionInfo.rev_no
 ContentRevisionInfo.schema_version
 ContentRevisionInfo.title
 ContentRevisionList.revisions
+ContentSchedule.attempts
+ContentSchedule.created_at
+ContentSchedule.created_by_user_id
+ContentSchedule.draft_rev
+ContentSchedule.failure
+ContentSchedule.finished_at
+ContentSchedule.id
+ContentSchedule.key
+ContentSchedule.late_seconds
+ContentSchedule.publish_at
+ContentSchedule.result
+ContentSchedule.status
 ContentSchemaDocumentReport.invalid
 ContentSchemaDocumentReport.key
 ContentSchemaDocumentReport.kind
@@ -194,6 +208,10 @@ DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path key
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
 DELETE /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path key
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path shopID
+DELETE /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule response 429 Retry-After
 DELETE /api/v1/admin/shops/{shopID}/content/publish-hook
 DELETE /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
 DELETE /api/v1/admin/shops/{shopID}/content/publish-hook response 429 Retry-After
@@ -305,8 +323,17 @@ GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev}
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path key
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path rev
 GET /api/v1/admin/shops/{shopID}/content/documents/{key}/revisions/{rev} path shopID
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path key
+GET /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path shopID
 GET /api/v1/admin/shops/{shopID}/content/publish-hook
 GET /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
+GET /api/v1/admin/shops/{shopID}/content/schedules
+GET /api/v1/admin/shops/{shopID}/content/schedules path shopID
+GET /api/v1/admin/shops/{shopID}/content/schedules query limit
+GET /api/v1/admin/shops/{shopID}/content/schedules query limit optional
+GET /api/v1/admin/shops/{shopID}/content/schedules query scope
+GET /api/v1/admin/shops/{shopID}/content/schedules query scope optional
 GET /api/v1/admin/shops/{shopID}/content/schema
 GET /api/v1/admin/shops/{shopID}/content/schema path shopID
 GET /api/v1/admin/shops/{shopID}/content/schema query include
@@ -846,6 +873,11 @@ PUT /api/v1/admin/shops/{shopID}/content/documents/{key} path shopID
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 200 ETag
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 201 ETag
 PUT /api/v1/admin/shops/{shopID}/content/documents/{key} response 429 Retry-After
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule header If-Match
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path key
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule path shopID
+PUT /api/v1/admin/shops/{shopID}/content/documents/{key}/schedule response 429 Retry-After
 PUT /api/v1/admin/shops/{shopID}/content/publish-hook
 PUT /api/v1/admin/shops/{shopID}/content/publish-hook path shopID
 PUT /api/v1/admin/shops/{shopID}/content/publish-hook query dry_run

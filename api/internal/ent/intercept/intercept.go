@@ -16,6 +16,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/contentdocument"
 	"ksdevworks/ecommerce/api/internal/ent/contentpublishhook"
 	"ksdevworks/ecommerce/api/internal/ent/contentrevision"
+	"ksdevworks/ecommerce/api/internal/ent/contentschedule"
 	"ksdevworks/ecommerce/api/internal/ent/contentschema"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
@@ -352,6 +353,33 @@ func (f TraverseContentRevision) Traverse(ctx context.Context, q ent.Query) erro
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.ContentRevisionQuery", q)
+}
+
+// The ContentScheduleFunc type is an adapter to allow the use of ordinary function as a Querier.
+type ContentScheduleFunc func(context.Context, *ent.ContentScheduleQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f ContentScheduleFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.ContentScheduleQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.ContentScheduleQuery", q)
+}
+
+// The TraverseContentSchedule type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseContentSchedule func(context.Context, *ent.ContentScheduleQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseContentSchedule) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseContentSchedule) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.ContentScheduleQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.ContentScheduleQuery", q)
 }
 
 // The ContentSchemaFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1293,6 +1321,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.ContentPublishHookQuery, predicate.ContentPublishHook, contentpublishhook.OrderOption]{typ: ent.TypeContentPublishHook, tq: q}, nil
 	case *ent.ContentRevisionQuery:
 		return &query[*ent.ContentRevisionQuery, predicate.ContentRevision, contentrevision.OrderOption]{typ: ent.TypeContentRevision, tq: q}, nil
+	case *ent.ContentScheduleQuery:
+		return &query[*ent.ContentScheduleQuery, predicate.ContentSchedule, contentschedule.OrderOption]{typ: ent.TypeContentSchedule, tq: q}, nil
 	case *ent.ContentSchemaQuery:
 		return &query[*ent.ContentSchemaQuery, predicate.ContentSchema, contentschema.OrderOption]{typ: ent.TypeContentSchema, tq: q}, nil
 	case *ent.MediaUploadQuery:
