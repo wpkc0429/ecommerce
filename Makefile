@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications admin-dev openapi openapi-mock openapi-ui
+.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications purge-content-audit content-scheduler admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -67,6 +67,10 @@ sanitize-content: ## DRY RUN: report CMS rich text that needs re-sanitizing (wri
 
 purge-applications: ## DRY RUN: report merchant applications past their retention (writes nothing; add -apply manually)
 	cd api && go run ./cmd/purge-applications
+purge-content-audit: ## DRY RUN: report content audit rows and finished schedules past their retention (add -apply manually)
+	cd api && go run ./cmd/purge-content-audit
+content-scheduler: ## Publish due scheduled content documents once (run every minute from cron / Task Scheduler)
+	cd api && go run ./cmd/content-scheduler
 
 admin-dev: ## Run the admin SPA dev server
 	cd admin && npm run dev

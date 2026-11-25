@@ -17,6 +17,7 @@ import { chromium } from "playwright";
 import { applicationBody, runApplicationPath, submitApplication, tokenFromMessage } from "./application-path.mjs";
 import { API, brief, check, deliverWebhook, dotEnvValue, fail, failureCount, isoDate, req, runID, setPlatformToken } from "./lib.mjs";
 import { runCommercePath } from "./commerce-path.mjs";
+import { runContentOpsPath } from "./content-ops-path.mjs";
 
 // Same source `make seed` used: E2E_* override → env → repo .env → old default.
 const ADMIN_EMAIL =
@@ -1357,6 +1358,13 @@ try {
   await runApplicationPath();
 } catch (err) {
   fail(`application path aborted: ${err?.stack ?? err}`);
+}
+
+// ── 內容儲存的發佈 hook／排程發佈／清除（change headless-content-store 第三切片）：需要為它設定的 API，見該檔開頭。──
+try {
+  await runContentOpsPath();
+} catch (err) {
+  fail(`content ops path aborted: ${err?.stack ?? err}`);
 }
 
 if (failureCount() > 0) {

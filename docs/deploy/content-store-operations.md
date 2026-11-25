@@ -78,3 +78,78 @@ curl -s "$BASE" -H "Authorization: Bearer $TOKEN"
 
 主 DB 需要 `make migrate`（`20261125081316_add_content_publish_hooks`：純新增一張表，down 直接 `DROP TABLE`，可逆）。
 沒有新權限節點，**不需要 re-seed**。沒有設定 hook 的商家行為與之前完全相同。
+
+## 2. 排程發佈（誰在每分鐘執行排程）
+
+商家在後台把草稿排定在未來發佈（語意見 `docs/content-store.md` §8）。**要有人每分鐘跑一次排程器**，否則排程只會躺在資料庫。兩種方式，可以並存
+（Postgres advisory lock 讓第二個整輪跳過，每筆排程另以條件式 UPDATE 認領，所以不會發佈兩次）：
+
+### 2.1 一次性指令（建議：cron／Windows 工作排程）
+
+```bash
+cd api && go run ./cmd/content-scheduler        # 跑一次就結束；make content-scheduler 等價
+go build -o content-scheduler ./cmd/content-scheduler   # 建議編譯一次，排程呼叫二進位檔
+./content-scheduler -every 1m                    # 或讓它自己常駐，每分鐘一次（用 systemd／NSSM 之類管理）
+```
+
+它需要與 API 相同的環境變數（`DATABASE_URL`、`REDIS_*`、`PAYMENT_CREDENTIALS_ENCRYPTION_KEY`、`CONTENT_HOOK_*`、`CONTENT_SCHEDULE_*`）。
+**Redis 不可達時它在認領任何排程之前就失敗退出**（沒有失效渲染快取的發佈會讓舊內容留在快取最多 24 小時；排程維持 `pending`，下一輪再試）。
+結束前它會把這一輪累積的發佈 hook 呼叫送出（受最短間隔與每日上限約束，被擋住的留在待送，由 API 的 flusher 補送）。
+輸出只有計數：`due=… published=… failed=… missed=…`；退出碼非 0 代表「這一輪本身做不了」（資料庫或 Redis），個別排程失敗記在資料裡與 API 裡，不影響退出碼。
+
+**Linux cron**（每分鐘）：
+
+```cron
+* * * * * cd /srv/ecommerce/api && /srv/ecommerce/api/content-scheduler >> /var/log/content-scheduler.log 2>&1
+```
+
+**Windows 工作排程器**（每分鐘，不論是否登入）：
+
+```powershell
+$action  = New-ScheduledTaskAction -Execute "C:\ecommerce\api\content-scheduler.exe" -WorkingDirectory "C:\ecommerce\api"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName "ecommerce-content-scheduler" -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest
+```
+
+（`.env` 由工作目錄往上找；也可在系統環境變數設定。工作排程器的重複間隔最小 1 分鐘，剛好就是粒度。）
+
+### 2.2 API 內的 ticker（選用，預設關閉）
+
+`CONTENT_SCHEDULER_ENABLED=1`（`CONTENT_SCHEDULER_INTERVAL` 預設 `1m`）。適合單一 API 實例、不想另外管 cron 的環境；多實例時每個都可以開，advisory lock 保證同一時刻只有一個在處理。
+API 行程停機的那段時間不會發佈；恢復後依寬限規則處理（見下）。
+
+### 2.3 停機與時鐘
+
+- 「到點」由資料庫 `now()` 判斷，不看各台機器的時鐘。
+- 排程器（或 API）停機之後恢復：遲到在 `CONTENT_SCHEDULE_GRACE`（預設 1 小時）內的照常發佈，超過的標 `missed`、**不發佈**（由人決定是否補排）。
+  所以排程器掛超過 1 小時要看一下 `GET …/content/schedules?scope=recent` 有沒有 `missed`。
+- `running` 超過 10 分鐘視為上一輪崩潰，下一輪重置並重試（已發佈的不會再寫一次 revision）。
+
+| 變數 | 預設 | 說明 |
+| --- | --- | --- |
+| `CONTENT_SCHEDULER_ENABLED` | 關 | API 內 ticker |
+| `CONTENT_SCHEDULER_INTERVAL` | `1m` | ticker 週期（一次性指令不看它） |
+| `CONTENT_SCHEDULE_MIN_LEAD` | `2m` | `publish_at` 至少是現在之後多久 |
+| `CONTENT_SCHEDULE_MAX_AHEAD` | `90d`（`2160h`） | `publish_at` 最遠 |
+| `CONTENT_SCHEDULE_GRACE` | `1h` | 遲到超過這個就 `missed` |
+| `CONTENT_SCHEDULE_RETENTION` | `90d`（`2160h`） | 已結束的排程列保留多久（由 purge 指令清除） |
+
+### 2.4 部署
+
+主 DB 需要 `make migrate`（`20261125083157_add_content_publish_schedules`：純新增一張表，down 直接 `DROP TABLE`，可逆）。沒有新權限節點、不需要 re-seed。
+**順序**：先 `20261125081316_add_content_publish_hooks`，再 `20261125083157_add_content_publish_schedules`（`make migrate` 依序套用兩支）；之後部署 API，再設定排程器。
+
+## 3. 稽核與排程列的清除
+
+repo 沒有排程器，請每日跑一次（先 dry run 看一次）：
+
+```bash
+cd api && go run ./cmd/purge-content-audit            # dry run：只印計數與時間範圍
+cd api && go run ./cmd/purge-content-audit -apply     # 寫入（冪等、分批）
+cd api && go run ./cmd/purge-content-audit -shop 3    # 只處理一家
+make purge-content-audit                              # 等同第一行
+```
+
+規則：`content_audit_log` 超過 `CONTENT_AUDIT_RETENTION`（預設 180 天）的列刪除；已結束（done／failed／missed／cancelled／superseded）的排程列超過
+`CONTENT_SCHEDULE_RETENTION`（預設 90 天）刪除；等待中與處理中的排程永不清除。稽核列本來就不含個資（只有 id、計數、結果類別、主機），輸出也只列計數與日期範圍。
+與 `cmd/purge-applications`（商家開店申請，見 `platform-website-api-notes.md` §5）是兩支獨立的指令，各自排程。

@@ -1,8 +1,8 @@
 # 內容儲存（headless content store）：文件、版本與公開讀取
 
 > 對應 change `headless-content-store`（design D1、D2、D5、D6、D8）。**第二個切片已實作**：內容文件、版本歷史、
-> 後台文件 API、公開讀取 API（含預覽與快取）、舊端點的相容層。**尚未實作**：發佈 hook（建置通知）、排程發佈、
-> 商家 template 的後台內容畫面（見文末「接下來」）。schema 註冊與詞彙見 [`content-schema.md`](content-schema.md)。
+> 後台文件 API、公開讀取 API（含預覽與快取）、舊端點的相容層。**第三個切片已實作**：發佈 hook（§7）、排程發佈（§8）、稽核清除（§9）。
+> **尚未實作**：後台內容畫面與商家 template 的後台核心（§10 列出畫面要用的 API）。schema 註冊與詞彙見 [`content-schema.md`](content-schema.md)。
 
 ## 1. 模型
 
@@ -24,7 +24,7 @@
 
 **稽核**（`content_audit_log`）：`schema.register`、`schema.dry_run`、`doc.save`、`doc.publish`、`doc.unpublish`、`doc.delete`、`doc.restore`。
 `detail` 只含版本號、`rev`、計數與布林；**不含內容、不含標題、不含信箱或網址**（整合測試把 log 導進 buffer、並檢查資料表，特徵值一個都找不到）。
-保留 180 天的清除指令屬於之後的切片（清單見 tasks.md）。
+保留 180 天，清除指令是 `cmd/purge-content-audit`（§9）；另有 `schema.*`、`doc.schedule_*`、`hook.*` 動作（§7、§8）。
 
 ## 2. 後台 API（`/api/v1/admin/shops/{shopID}/content/…`）
 
@@ -113,3 +113,75 @@ GET /api/v1/shop/content/{key}/preview      → 草稿（標頭 X-Preview-Token�
 3. 預覽：呼叫 `preview-token` 後開啟 `{站台}/?content_preview=<token>`；站台核心用標頭打預覽端點。
 4. 店面核心：`ShopCommerce.content.{all,get}` 用 `include=content`＋ETag，失敗退回預設；`richText()`／`link()` 以同一份 allowlist 再消毒。
 5. 設計層要出貨 `content.schema.json`；改 schema 後**必須由人**在後台觸發註冊（dry run → 確認移除 → 註冊），AI 與 CI 不得自動推送。
+
+
+## 7. 發佈 hook（第三切片；design D7）
+
+發佈或下架後通知商家站台重建（典型：Cloudflare deploy hook）。**預設關閉**，每店至多一個，只有 `content.manage`（owner、super_admin）能設定。
+操作員步驟（建立 Cloudflare hook、dry run、測試、環境變數、失敗處理）見 [`deploy/content-store-operations.md`](deploy/content-store-operations.md) §1。
+
+| 端點（`/admin/shops/{shopID}/content/publish-hook…`） | 說明 |
+| --- | --- |
+| `GET` | `PublishHookStatus`：`configured`、`enabled`、`host`、`url_masked`（`https://host/…末四碼`）、`last_status`、`last_http_status`、`last_attempt_at`、`last_success_at`、`consecutive_failures`、`disabled_reason`、`failed`、`pending`、`daily_count`／`daily_cap`。**永不回完整 URL 或 secret** |
+| `PUT`（`{url?, enabled?}`；`?dry_run=true`） | 設定或更換 URL（加密儲存，之後不可讀回）、啟停。dry run 只驗證形狀與 allowlist，不儲存也不呼叫。URL 不合規 422（訊息不回顯 URL） |
+| `DELETE` | 刪除 |
+| `POST …/test` | 對已儲存的 URL 單次測試呼叫（不影響失敗計數與每日上限）；只回 `{ok, result, http_status}` |
+| `POST …/fire` | 手動重建：略過去抖動，佔用每日上限（滿了 429 `hook_daily_cap_reached`），停用時 409 |
+| `POST …/signing-secret` | 產生新的簽章 secret，**只在這個回應顯示一次** |
+
+`test`／`fire` 每商家每分鐘共 3 次，設定類每呼叫者每分鐘 30 次。
+
+**出站規則**（唯一的出站路徑 `hook.Sender.Post`）：只允許 https、埠 443、無 userinfo／fragment、非 IP 字面值、≤ 512 字元，主機必須在 allowlist
+（預設只有 `api.cloudflare.com` 的兩種 deploy hook 路徑，`CONTENT_HOOK_ALLOWED_HOSTS` 只能新增）；每次發送自行解析 DNS，任何一個答案落在私有／loopback／link-local
+（含 `169.254.169.254`）／CGNAT／multicast／保留／IPv4-mapped／NAT64／6to4 就整個拒絕（`blocked`），並**只連線到剛檢查過的 IP**（DNS rebinding 無效）；不跟隨重導向
+（3xx＝失敗）；整體 5 秒；回應只讀 4 KiB 然後丟棄，**永不回傳給呼叫者或寫入日誌**。請求主體 `{event, shop_id, key?, rev?, at, coalesced?}` **不含內容**，
+標頭 `X-Content-Timestamp`、`X-Content-Signature: sha256=HMAC-SHA256(secret, timestamp + "." + body)`。
+
+**去抖動與上限**：同商家 30 秒內的多次發佈合併成一次呼叫（持續發佈最多拖 5 分鐘）；兩次呼叫最短間隔 60 秒（未到保留為待送）；每日（UTC）上限 30 次（用完丟棄並記 `rate_limited`）。
+狀態存在 `content_publish_hooks` 的 `pending_*` 欄位，所以重啟不丟、多實例與一次性排程指令不會重複呼叫。事件處理器只入隊（有界、滿了丟棄並 log），**不拖慢發佈請求**。
+失敗（逾時、5xx、429）重試 2 次（2 秒、4 秒）；**連續 5 次失敗自動停用**（`failed: true`），手動重新啟用才恢復。稽核 `hook.set`／`hook.test`／`hook.fire`／`hook.disable`／`hook.delete`／`hook.secret_rotate`，只記主機與結果類別。
+
+## 8. 排程發佈（第三切片；design D11）
+
+草稿可以排定在未來發佈。**排程綁定你審閱過的那一版草稿**：到點時只有 `draft_rev` 仍相同才發佈；之後任何草稿儲存（含還原）立即讓排程變成 `superseded`（`result: edited`），
+不會有「沒審閱過的修改在凌晨上線」。要發佈新版就重新排程。
+
+| 端點（`/admin/shops/{shopID}/content/…`） | 權限 | 說明 |
+| --- | --- | --- |
+| `PUT /documents/{key}/schedule`（`If-Match: "<draft_rev>"`，`{publish_at}`） | `content.publish` | 排程（201）或改期（200，同一個 `id`、重新綁定到現在的 `draft_rev`）。缺 `If-Match` 428、不符 412 |
+| `DELETE /documents/{key}/schedule` | `content.publish` | 取消（204；沒有等待中的 404；處理中 409） |
+| `GET /documents/{key}/schedule` | `content.view` | 目前（或最近一次）的排程 |
+| `GET /schedules?scope=upcoming｜recent&limit=` | `content.view` | 本店即將發佈（預設）或最近結束的排程 |
+| 文件清單與詳情 | `content.view` | 多一個 `scheduled_publish_at`（UTC 或 `null`） |
+
+- **時間**：`publish_at` 是帶偏移的 RFC 3339（無偏移 422，不猜時區）；儲存為 UTC、進位到下一個整分鐘；至少 2 分鐘後、至多 90 天（`CONTENT_SCHEDULE_MIN_LEAD`／`_MAX_AHEAD`）。
+  「到點」由**資料庫的 `now()`** 判斷，所以多台機器的時鐘偏差不影響。
+- **到點**：重新驗證草稿（schema 可能已換版）。失敗 → 不發佈、文件 `needs_attention`、排程 `failed`（`result: invalid`，`failure.pointers` 最多 5 個 JSON Pointer，不含內容）、稽核 `doc.schedule_failed`。
+  排程者已被停用／移出／失去 `content.publish` → `failed`（`permission_revoked`）。
+- **錯過視窗**：排程器（或 API）停機後恢復，遲到在 1 小時內（`CONTENT_SCHEDULE_GRACE`）照常發佈（`late_seconds` 記錄），超過 → `missed`、不發佈、稽核 `doc.schedule_missed`，由人決定是否補排。
+- **同一條路徑**：排程器呼叫 `content.Service.Publish`，所以 revision、`doc.publish` 稽核（帶 `scheduled: true`、`schedule_id`）、快取失效與發佈 hook 都與手動發佈相同。
+- **冪等與並發**：每筆以條件式 UPDATE 認領；整輪另有 Postgres advisory lock（兩個排程器同時跑，第二個整輪跳過）；崩潰遺留的 `running`（> 10 分鐘）重置為 `pending`，再處理時若已發佈就記 `already_published`，不重複寫 revision。
+- **其他使排程失效的事件**：手動發佈同一版（`superseded`／`published_manually`）、刪除文件（`cancelled`／`document_deleted`）。每份文件同時至多一筆等待中的排程。
+- **執行者**：`cmd/content-scheduler`（一次性，cron／工作排程每分鐘；`make content-scheduler`）與 API 內選用的 ticker（`CONTENT_SCHEDULER_ENABLED=1`，預設關）。見 [`deploy/content-store-operations.md`](deploy/content-store-operations.md) §2。
+
+## 9. 稽核清除（第三切片；design D12）
+
+`cmd/purge-content-audit`（`make purge-content-audit`＝dry run）：`content_audit_log` 保留 180 天（`CONTENT_AUDIT_RETENTION`），已結束的排程列保留 90 天（`CONTENT_SCHEDULE_RETENTION`）；
+預設 dry run、`-apply` 才刪、分批、冪等、`-shop N` 限一家、只印計數與時間範圍；等待中與處理中的排程永不清除。見營運手冊 §3。
+
+## 10. 給下一個 task（後台內容畫面）的 API 清單
+
+畫面要用到的全部後端能力都已存在（這個切片沒有建任何 UI）：
+
+| 畫面 | 端點 | 注意 |
+| --- | --- | --- |
+| schema 檢視／註冊 | `GET/PUT …/content/schema`、`…/schema/versions` | `dry_run`、`confirm_removals`（`content.manage`） |
+| 文件清單 | `GET …/documents`（含 `needs_attention`、`declared`、`scheduled_publish_at`） | |
+| 編輯器 | `GET/PUT …/documents/{key}`（`If-Match`／`If-None-Match: *`；412 → 重新載入；428 是程式錯誤；422 的 `details[].pointer` 對應欄位） | 以**回應**重建表單 |
+| 發佈／下架／刪除 | `POST …/publish`（`If-Match`）、`…/unpublish`、`DELETE` | 確認對話框 |
+| 排程 | `PUT/DELETE/GET …/documents/{key}/schedule`、`GET …/schedules` | `If-Match` 帶審閱過的 `draft_rev`；顯示 `status`／`result`／`failure.pointers`；時間以 UTC 傳、以商家時區顯示（`GET …/settings` 沒有，時區在報表回應的 `timezone`） |
+| 版本 | `GET …/revisions`、`…/{rev}`、`POST …/restore` | 還原只放回草稿 |
+| 預覽 | `POST …/preview-token`（`scope: document｜shop`） | |
+| 發佈 hook | `GET/PUT/DELETE …/publish-hook`（`?dry_run=true`）、`POST …/test`、`…/fire`、`…/signing-secret` | 狀態只有遮罩 URL；`failed: true` 要顯示成最終失敗並提供重新啟用；設定表單的 URL 欄位是只寫 |
+
+權限節點：`content.view`（讀）、`content.edit`（草稿、還原）、`content.publish`（發佈、下架、刪除、排程）、`content.manage`（schema、hook）；畫面可見性來自 `GET /shops/{shopID}/me`。

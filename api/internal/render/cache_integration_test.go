@@ -93,6 +93,52 @@ func TestCacheDegradesWithoutRedis(t *testing.T) {
 	}
 }
 
+// Task 6.3 (headless-content-store): the content namespace degrades the same
+// way as the page namespace - a dead or absent Redis never blocks a content
+// read, it just goes to the database every time, and the read-through still
+// works (and is invalidated) once Redis is there.
+func TestContentCacheDegradesWithoutRedis(t *testing.T) {
+	testutil.RequireIntegration(t)
+	dead := redis.NewClient(&redis.Options{Addr: "127.0.0.1:1", DialTimeout: 100 * time.Millisecond, MaxRetries: -1})
+	c := render.NewCache(dead, silentLog())
+	calls := 0
+	assemble := func(context.Context) ([]byte, error) { calls++; return []byte(`{"content":1}`), nil }
+	for i := 0; i < 2; i++ {
+		out, hit, err := c.GetContent(context.Background(), 1, "banner", assemble)
+		if err != nil || hit || string(out) != `{"content":1}` {
+			t.Fatalf("dead redis, call %d: out=%s hit=%v err=%v", i, out, hit, err)
+		}
+	}
+	if calls != 2 {
+		t.Fatalf("with Redis down every read must hit the database: %d calls", calls)
+	}
+	// A failing assembler is an error, not a cached value.
+	if _, _, err := c.GetContent(context.Background(), 1, "banner", func(context.Context) ([]byte, error) { return nil, context.DeadlineExceeded }); err == nil {
+		t.Fatal("assembler error must surface")
+	}
+	// nil Redis (cache disabled) is the same.
+	c2 := render.NewCache(nil, silentLog())
+	if out, hit, err := c2.GetContent(context.Background(), 1, "banner", assemble); err != nil || hit || string(out) != `{"content":1}` {
+		t.Fatalf("nil redis: %s %v %v", out, hit, err)
+	}
+
+	// With a live Redis: first read assembles, second is a hit, deleting the
+	// key makes the next read assemble again.
+	rdb := testutil.OpenRedis(t)
+	live := render.NewCache(rdb, silentLog())
+	calls = 0
+	if _, hit, _ := live.GetContent(context.Background(), 1, "banner", assemble); hit || calls != 1 {
+		t.Fatalf("first read: hit=%v calls=%d", hit, calls)
+	}
+	if _, hit, _ := live.GetContent(context.Background(), 1, "banner", assemble); !hit || calls != 1 {
+		t.Fatalf("second read must be a hit: hit=%v calls=%d", hit, calls)
+	}
+	live.DeleteContent(context.Background(), 1, "banner")
+	if _, hit, _ := live.GetContent(context.Background(), 1, "banner", assemble); hit || calls != 2 {
+		t.Fatalf("after DeleteContent: hit=%v calls=%d", hit, calls)
+	}
+}
+
 // Task 10.2 core behavior: concurrent misses on the same key are merged by
 // singleflight — the assembler runs far fewer times than the request count.
 func TestCacheSingleflightMergesConcurrentMisses(t *testing.T) {

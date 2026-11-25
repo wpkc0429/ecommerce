@@ -217,7 +217,7 @@ var expectedSubscribers = []string{
 	"ksdevworks/ecommerce/api/internal/notify.(*Service).Handle-fm",
 	// change headless-content-store slice 3: 發佈 hook。Handle 只入隊（不做 I/O），
 	// 由背景 writer 把「待送」記到 content_publish_hooks，flusher 去抖動後才呼叫商家
-	// 設定的 deploy hook。e2e：e2e/commerce-path.mjs 第 ⑯ 節以本機 stub 接收器斷言
+	// 設定的 deploy hook。e2e：e2e/content-ops-path.mjs（第 ⑯ 節）以本機 stub 接收器斷言
 	// 「發佈 → 收到一次簽章的呼叫」，所以這條事件鏈有端到端的覆蓋。
 	"ksdevworks/ecommerce/api/internal/content/hook.(*Notifier).Handle-fm",
 }

@@ -25,6 +25,17 @@ Source of truth: `.env.example` (comments explain each), `api/internal/config/co
 | `REPORT_DEFAULT_TIMEZONE` | fallback timezone for reports | default `Asia/Taipei`; a shop can set its own via `PUT .../settings` |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USERNAME` / `SMTP_PASSWORD` / `SMTP_FROM` / `SMTP_FROM_NAME` | customer order emails (order placed, payment succeeded) | without `SMTP_USERNAME`/`SMTP_PASSWORD` nothing is sent and nothing errors; platform-wide single sender; does NOT deliver admin account links (those are `delivery:"manual"`) |
 
+## Content store operations (runbook `docs/deploy/content-store-operations.md`)
+
+| Variable | Value | Notes |
+|---|---|---|
+| `CONTENT_HOOK_ALLOWED_HOSTS` | empty | only ADDS operator-approved hosts to the built-in `api.cloudflare.com` deploy-hook paths; never loosens the private/loopback/metadata address blocks |
+| `CONTENT_HOOK_DEBOUNCE` / `_MAX_WAIT` / `_MIN_INTERVAL` / `_DAILY_CAP` | `30s` / `5m` / `60s` / `30` | publish hook pacing per shop |
+| `CONTENT_HOOK_DEV_INSECURE` | off | local e2e only (http, loopback); the API refuses to start with it when `APP_ENV=production` |
+| `CONTENT_SCHEDULER_ENABLED` / `_INTERVAL` | off / `1m` | optional in-process scheduler ticker; otherwise run `cmd/content-scheduler` every minute from cron or a Windows task |
+| `CONTENT_SCHEDULE_MIN_LEAD` / `_MAX_AHEAD` / `_GRACE` / `_RETENTION` | `2m` / `2160h` / `1h` / `2160h` | scheduling window, lateness tolerated before `missed`, history kept |
+| `CONTENT_AUDIT_RETENTION` | `4320h` (180 days) | `cmd/purge-content-audit` (dry run by default; schedule it daily) |
+
 ## Cloudflare Access and admin exposure (runbook sections 5)
 
 | Variable | Value | Notes |

@@ -150,6 +150,9 @@ cd api && go run ./cmd/purge-applications -email someone@example.com -apply   # 
 make purge-applications                              # 等同第一行
 ```
 
+> 內容儲存（`headless-content-store`）有自己的清除指令 `cmd/purge-content-audit`（稽核列 180 天、已結束的排程列 90 天，預設 dry run），
+> 與排程發佈的排程器、發佈 hook 的設定一起寫在 [`content-store-operations.md`](content-store-operations.md)。
+
 規則：未驗證超過 7 天 → 整列刪除（連同 token 與 outbox 訊息）；已拒絕／過期／撤回 → 保存期限後清空個資欄位
 （且不早於再申請冷卻結束）；已核准 → 保存期限後清空；待審核永不自動過期。稽核事件列永遠保留且不含個資。
 **保存期限是實作預設，上線前需法務確認**（`/privacy` 的文字亦然）。
