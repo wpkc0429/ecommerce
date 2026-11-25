@@ -14,7 +14,7 @@ import { groups } from "./groups/index.js";
 
 const UI = {
   h: kit.h, svg: kit.svg, append: kit.append, clear: kit.clear, $: kit.$, $$: kit.$$,
-  confirmDialog: kit.confirmDialog, rows: kit.rows, renderPager: kit.renderPager, fillSelect: kit.fillSelect,
+  rows: kit.rows, renderPager: kit.renderPager, fillSelect: kit.fillSelect,
   repeater: kit.repeater, copyText: kit.copyText,
 };
 const FORMAT = {

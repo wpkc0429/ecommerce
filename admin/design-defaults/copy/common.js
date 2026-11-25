@@ -8,4 +8,5 @@ export default {
   "err.generic": "發生錯誤，請稍後再試。",
   "err.invalid": "資料不正確。",
   "err.403": "沒有權限執行這個操作。",
+  "err.422": "資料不正確。",
 };
