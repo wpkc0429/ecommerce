@@ -132,6 +132,9 @@ export async function runDesignPath(browser, { admin = ADMIN_BASE() } = {}) {
 
     const page = await newAdminPage(browser, admin);
     pages.push(page);
+    // This section rewrites admin/design/* between reloads. The static server sends only Last-Modified, so Chromium may serve a
+    // module it already fetched from its heuristic cache and never see the rewrite (copy.js, routes.js): keep the cache off.
+    await page.route("**/design/**", (route) => route.continue()); // an active route makes Playwright disable the HTTP cache for the page
     const warnings = [];
     const requests = [];
     page.on("console", (m) => { if (m.type() === "warning") warnings.push(m.text()); });

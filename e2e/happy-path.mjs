@@ -595,6 +595,10 @@ try {
   await page.goto(`${ADMIN}/#/orders/${opsOrder.id}`);
   await page.waitForSelector("#tab-order-detail:not([hidden])", { timeout: 8000 });
   await page.waitForSelector("#order-amounts", { timeout: 8000 });
+  // Only the hash changes, so the previous order's detail (the split-shipment order above) is still on screen and
+  // #order-amounts already exists: wait until the view shows THIS order, or #order-points-btn opens the wrong customer's ledger.
+  await page.waitForFunction((id) => new RegExp(`(^|[^0-9])${id}([^0-9]|$)`).test(document.querySelector("#order-detail-title")?.textContent ?? ""),
+    opsOrder.id, { timeout: 8000 });
 
   console.log("⑱ 後台看到該顧客的點數餘額與流水帳");
   await page.click("#order-points-btn");
@@ -1008,7 +1012,10 @@ try {
     const afterStorage = await page.evaluate(() => JSON.stringify({ ...localStorage, ...sessionStorage }));
     check("the link is written to no storage", !afterStorage.includes(appLink.split("/#/set-password/")[1]));
     await page.selectOption("#platform-applications-filter", "approved");
-    await page.waitForSelector(rowSel(uiApprove), { timeout: 8000 });
+    // The list still shows the previous filter's (now stale) row until the reload lands, so wait for the row's status
+    // text itself, not just for a row with that email to exist.
+    await page.waitForFunction((sel) => (document.querySelector(sel)?.textContent ?? "").includes("已核准"),
+      rowSel(uiApprove), { timeout: 8000 }).catch(() => {});
     check("the approved application is listed as approved",
       ((await page.textContent(rowSel(uiApprove))) ?? "").includes("已核准"));
     await page.click(`${rowSel(uiApprove)} [data-act="open"]`);
