@@ -1,0 +1,60 @@
+# SANDBOX stack (change design-history, Q5): a disposable, independent deployment whose only
+# purpose is to be photographed. Own Postgres INSTANCE (not just a database), own Redis, own
+# MinIO, own volumes, own compose project name. Driven by scripts/sandbox/sandbox.mjs, which
+# generates the credentials into the sandbox state directory and runs the safety guards first.
+# Do not run `docker compose` on this file by hand: the project name and env come from the script.
+# Every port is loopback-only. See docs/deploy/sandbox-stack.md.
+name: ecommerce-sandbox
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sandbox
+      POSTGRES_PASSWORD: ${SANDBOX_DB_PASSWORD:?run through scripts/sandbox/sandbox.mjs}
+      POSTGRES_DB: ecommerce_sandbox
+    ports:
+      - "127.0.0.1:${SANDBOX_PG_PORT:?}:5432"
+    volumes:
+      - sandbox_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sandbox -d ecommerce_sandbox"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${SANDBOX_REDIS_PASSWORD:?run through scripts/sandbox/sandbox.mjs}
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\""]
+    ports:
+      - "127.0.0.1:${SANDBOX_REDIS_PORT:?}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: bitnamilegacy/minio:2025.7.23
+    environment:
+      MINIO_ROOT_USER: ${SANDBOX_MINIO_USER:?run through scripts/sandbox/sandbox.mjs}
+      MINIO_ROOT_PASSWORD: ${SANDBOX_MINIO_PASSWORD:?run through scripts/sandbox/sandbox.mjs}
+      # Own buckets: media is public-read (like the dev one), the design-history bucket is PRIVATE.
+      MINIO_DEFAULT_BUCKETS: sandbox-media:download,sandbox-design-history:none
+      MINIO_API_CORS_ALLOW_ORIGIN: ${SANDBOX_ADMIN_ORIGINS:?}
+    ports:
+      - "127.0.0.1:${SANDBOX_MINIO_PORT:?}:9000"
+      - "127.0.0.1:${SANDBOX_MINIO_CONSOLE_PORT:?}:9001"
+    volumes:
+      - sandbox_miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  sandbox_pgdata:
+  sandbox_miniodata:

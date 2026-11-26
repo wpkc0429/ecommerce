@@ -4,7 +4,7 @@ include .env
 export
 endif
 
-.PHONY: help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications purge-content-audit purge-design-history design-sweep content-scheduler admin-dev openapi openapi-mock openapi-ui
+.PHONY: sandbox-up sandbox-down sandbox-reset sandbox-env sandbox-smoke help up down dev test test-int lint migrate migrate-down migrate-gen ecpay-sim seed seed-demo sanitize-content purge-applications purge-content-audit purge-design-history design-sweep content-scheduler admin-dev openapi openapi-mock openapi-ui
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -61,6 +61,24 @@ seed: ## Seed permissions catalog, platform roles, super admin, starter theme
 
 seed-demo: ## Seed everything plus a demo shop (publishable key pk_demoseedstorefrontkeynotsecret)
 	cd api && go run ./cmd/seed -demo
+
+# ── sandbox stack (change design-history Q5; docs/deploy/sandbox-stack.md) ──
+# A disposable, independent deployment (own Postgres/Redis/MinIO, own ports) for admin screenshots.
+# Never touches the main ecommerce database; the scripts refuse anything else.
+sandbox-up: ## Start the disposable sandbox stack (API :18080, admin :13001, own DB ecommerce_sandbox)
+	node scripts/sandbox/sandbox.mjs up
+
+sandbox-down: ## Destroy the sandbox stack (containers, volumes, credentials)
+	node scripts/sandbox/sandbox.mjs down
+
+sandbox-reset: ## Destroy and recreate the sandbox with the same synthetic dataset
+	node scripts/sandbox/sandbox.mjs reset
+
+sandbox-env: ## Print the sandbox origins and synthetic logins (JSON, no infrastructure secrets)
+	@node scripts/sandbox/sandbox.mjs env
+
+sandbox-smoke: ## Admin screenshot upload smoke test against the running sandbox
+	node scripts/sandbox/sandbox.mjs smoke
 
 sanitize-content: ## DRY RUN: report CMS rich text that needs re-sanitizing (writes nothing; add -apply manually)
 	cd api && go run ./cmd/sanitize-content

@@ -161,6 +161,13 @@ export async function runDesignHistoryPath() {
   const live = await upload(rid1, "before", "owner", 390, "orders", makePng(390, 30, 4), { "X-Capture-Manifest": manifest("public-live", "public") });
   check("an admin screenshot from live data is refused (422 live_data_capture_refused)", live.status === 422 && live.json?.error?.code === "live_data_capture_refused", `${live.status} ${live.text}`);
 
+  const noMarker = await fetch(`${API}${S(`/requests/${rid1}/screenshots/before/owner/390/orders`)}`, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "image/png" }, // no X-Capture-Manifest at all
+    body: makePng(390, 30, 4),
+  });
+  check("an admin screenshot with no capture manifest (no sandbox marker) is refused (422)", noMarker.status === 422, `${noMarker.status}`);
+
   // Not complete yet: only before exists.
   const early = await svc("POST", S(`/requests/${rid1}/submit`));
   check("submit without the after set is refused (409 screenshots_incomplete)", early.status === 409 && early.json?.error?.code === "screenshots_incomplete", brief(early));
