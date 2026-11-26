@@ -330,3 +330,24 @@ Q1–Q10 已於 2026-11-25 由使用者定案（採用 design.md 建議原文）
 - **Q8 對照 UI 放哪裡（已定案）**：由**核心擁有元件**、預設畫面在 `design-defaults`（設計層的預設備份；設計層可重新排版，但不能移除核准／還原確認與固定警告）；並同時在平台的共用 merchant admin 提供相同畫面（商家的後台可能是 template 也可能是 Bouquet 這類自訂前端，契約寫入 `docs/admin-frontend-integration.md`）。
 - **Q9 publish grant（切片 3）（已定案，附條件）**：先做切片 1–2；僅當服務將持有 `main` 寫入權才建置 grant；若服務只推分支、由人工合併，則省略。分支保護（branch protection）仍延後處理，不屬本次決議。
 - **Q10 核准通知信（已定案，附條件）**：核准、發佈、還原各寄一封通知信給店主（所有 owner）；以 email 額度／SMTP 處理完成為前提（見 CLAUDE.md 通知信一節），未完成前此項不開工。
+
+## 實作期間的預設決定（2026-11-26，使用者授權照建議）
+
+決定者：使用者將「可逆的技術細節」授權給助理，照助理建議採用；以下每項都可隨時改。
+
+- **A1 次數上限**：每個請求的上限計算「保留下來的截圖槽位」，另設獨立的「嘗試次數」上限（已於 539a137 完成；預設 240，環境變數 `DESIGN_MAX_SCREENSHOT_ATTEMPTS`）。
+- **儲存配額**：允許小幅超出（已接受）。
+- **jsonb**：`prompt_flags`、`allowed_cidrs` 用 jsonb。
+- **分支名稱**：預設 `ai/shop-{id}/{request id}`；允許服務提供 `request_id`。
+- **請求者**：必須是該店的啟用中成員且具 `design.request`；因此不是成員的 super_admin 不能當請求者。
+- **未追蹤變更確認**：以 commit sha 為鍵。
+- **核准頻率限制**：放在 handler。
+- **核准通知信**：延後到 SMTP 處理完成後（Q10 的條件）。
+- **版本預覽（D25）**：權限 `design.view`；TTL 30 分鐘；每位使用者每小時 6 次、每店每日 30 次；每個 site 同時 1 個；用量紀錄保留 90 天。
+
+### 待決（需要店主／擁有者；建議已有，等待擁有者確認）
+
+- **版本預覽唯讀模式**：是否停用 `ctx.actions`。建議：唯讀（recommended, awaiting owner）。
+- **Q9**：服務只推分支、由人工合併（建議；recommended, awaiting owner）。若確認，切片 3 的 publish grant 省略。
+
+本節未改動 `docs/` 下任何檔案。
