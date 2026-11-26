@@ -100,7 +100,7 @@ admin 截圖**只能**來自拋棄式的 sandbox 部署：另一個 API ＋ 另�
 storefront 截圖只收匿名、`sandbox-v1`（sandbox 來源）或 `public-live`（公開來源，商品與內容本來就公開）。**平台無法證明截圖真的來自 sandbox**：這是契約加縱深防禦，
 所以：
 
-- sandbox 堆疊要**另外部署**（你或服務的營運者）：一個小型 API ＋ Postgres，`seed -demo`，API origin 列入擷取腳本的允許清單，按需啟動、拍完即毀。**這個 repo 不包含它的部署。**
+- sandbox 堆疊的 repo 內建版本（2026-11-27）：`make sandbox-up`／`sandbox-down`／`sandbox-reset`（`scripts/sandbox/`、`docker/sandbox/`），獨立 Postgres／Redis／MinIO 容器與連接埠、`ecommerce_sandbox` 資料庫、`seed -demo`、拒絕主資料庫與 production 類環境；完整說明、守衛與禁忌見 `docs/deploy/sandbox-stack.md`。第一版與主堆疊跑在同一台機器，之後隨平台搬遷。
 - 商家看的預覽（連真實 API）與擷取預覽（連 sandbox）是同一份靜態檔、兩個部署。
 - 擷取腳本（template 後續任務 T6）必須拒絕在 API origin 不在 sandbox 允許清單時啟動，並對 `data-pii` 元素遮罩（T7）。
 

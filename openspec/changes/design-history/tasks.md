@@ -1,4 +1,4 @@
-> **切片 2（截圖與私有儲存）已於 2026-11-26 實作**（第 2 組、4.4、6.x、8.x 與 9.x 的對應部分已勾選；Cloudflare 的 bucket 與 token、sandbox 堆疊的部署是人工步驟，見 9.3 與操作員手冊）。
+> **切片 2（截圖與私有儲存）已於 2026-11-26 實作**（第 2 組、4.4、6.x、8.x 與 9.x 的對應部分已勾選；Cloudflare 的 bucket 與 token、sandbox 堆疊的 repo 內建版本已於 2026-11-27 完成：`make sandbox-up|down|reset`、`docs/deploy/sandbox-stack.md`，本機煙霧測試通過；它在平台上的正式部署與擷取腳本 T6 仍待做）。
 > **切片 1（資料與 API，無截圖、無簽章 permit）已於 2026-11-26 實作**，已勾選的項目即其內容；切片 2（截圖與儲存）、切片 3（選用）與 template 後續任務仍未做。
 > design.md 的 Q1–Q10 已於 2026-11-25 由使用者定案（採用建議原文）；Q9（publish grant）與 Q10（通知信）為附條件決議，見 design.md。每組可獨立部署；切片對應 design 的 Migration Plan。
 
