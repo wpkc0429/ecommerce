@@ -109,6 +109,23 @@ before 的 `commit_sha`＝`base_sha`、after＝目前 head；只在 `drafting`�
 `submit` 現在檢查 before／after 完整性，未設定儲存才回 503。清除指令刪物件，`cmd/design-sweep -orphans` 報告 bucket 與資料表的差異。
 服務側的完整契約：`docs/design-service-contract.md`。
 
+## 版本預覽（切片 4，D25）
+
+商家可以在歷史列表對任一曾發佈的設計按「預覽此版本」：部署一份**過去的設計層＋目前的 core**、用完即丟的預覽，用自己的身分登入、以目前的資料即時觀看。它**不屬於任何請求**：不佔「每站台一筆進行中請求」的名額（進行中的請求與版本預覽可同時存在）、不寫 `design_request_events`、不改任何 `design_requests` 列、**不拍也不存任何截圖**。唯一的紀錄是輕量的 `design_version_previews`（`tenantOwned`，無 trigger、無雜湊串、`requested_by_user_id` 與 `target_request_id` 無外鍵，保留 90 天，不是核准依據）。
+
+- **名詞**：「改版預覽」＝核准前、屬於某請求的預覽（D4）；「版本預覽」＝本節。UI 按鈕「預覽此版本」，預覽上的 CTA「改成這個版本」只導向既有的 `POST …/requests/{id}/revert`（`design.revert`；完整還原流程與人類核准一個步驟都不少）。
+- **權限**：`design.view`（owner、editor；`super_admin` 經 `*`；staff 不行）。他店的請求 404。
+- **API**（additive；`api/openapi/openapi.yaml`）：人 `POST /admin/shops/{id}/design/requests/{id}/version-preview`（202）、`GET …/design/version-previews/{pid}`；服務 `GET /design-service/shops/{id}/version-previews`、`POST …/{pid}/claim`（租約 5 分鐘）、`PUT …/{pid}/ready`、`POST …/{pid}/failed`。**沒有任何服務端的建立或核准路由。**
+- **相容檢查先於一切**（與還原是同一個函式 `checkRestorable`）：目標早於 core 下限 → 409 `revert_below_core_floor`（附原因）、目標已是目前設計 → 409 `already_current`、不是已發佈設計 → 409 `invalid_state`、站台狀態未知 → 409 `site_state_unknown`。這些都**不建立列、不用限流額度、不讓服務部署任何東西**。通過後服務在部署前仍以目前 core 跑守門員，失敗回報 `failed(guard_failed, rule_ids)`、不部署，發起者讀得到原因與規則 id。
+- **一份有效預覽**：同一 `(shop, site)` 至多一份 `queued｜claimed｜ready`（部分唯一索引；每店以 advisory lock 序列化建立）；新的請求使舊的轉 `superseded`，服務以 `?status=superseded` 找到該拆除的部署。
+- **TTL 與清掃**：預設 30 分鐘（`DESIGN_VERSION_PREVIEW_TTL`，1 分鐘～2 小時）。`expires_at` 一過，讀取就回 `expired`（不等清掃）並不再回 `origin`；`cmd/design-sweep -apply` 把逾時列寫成 `expired`、把逾租約的 `claimed` 寫成 `failed(service_lost)`，**只碰這張表**。
+- **限流**（資料庫 COUNT，不依賴 Redis）：每 `(shop, user)` 每小時 6（`…_HOURLY_CAP`，429 `hourly_cap_reached`）、每店每 UTC 日 30（`…_DAILY_CAP`，429 `daily_cap_reached`），都附 `Retry-After`。偏離 D25 字面之處：兩種上限用兩個錯誤碼，讓畫面能說清楚是哪一種。
+- **`origin` 只回給發起者本人**（且 `ready`、未逾期）；同店其他成員讀同一列時鍵不存在；服務路由族完全不回 origin。登記時 origin 只能是 scheme＋主機（含路徑／查詢／片段 422，列維持 `claimed`）。日誌只含 id、站台與狀態。
+- **唯讀（`read_only`）**：2026-11-26 決定預覽模式唯讀——核心在版本預覽與改版預覽下停用所有寫入型 `ctx.actions`（template 任務 T12）。平台把這個事實放進每一份預覽描述：版本預覽的 `read_only: true`（人與服務兩種回應）、請求詳情與服務的請求回應新增 `preview_read_only: true`。恆為 true；服務部署時必須以唯讀預覽模式部署。
+- **誠實的限制**：版本預覽用的是**現在**的 core 與資料，與該版當時的樣子可能不同，會過期、不被保存；它不是核准當時的紀錄。歷史畫面必須在按鈕附近以固定文字說明，並維持並排截圖才是「當時」的證據。
+- **保存**：`DESIGN_VERSION_PREVIEW_RETENTION`（90 天）由 `cmd/purge-design-history` 清除；`-export-shop` 輸出使用列（不含 origin）；`-all-for-shop` 一併刪除。
+- **Template 端還要做的事（不在本 repo）**見 `openspec/changes/design-history/tasks.md` 的 T9–T12：`ctx.actions.requestVersionPreview`／`ctx.data.getVersionPreview` 與錯誤對應、歷史畫面按鈕與固定說明、預覽主機的嚴格 CSP＋`noindex`＋核心橫幅（版本預覽、tag、到期）、預覽模式唯讀。
+
 ## 尚未做
 
 publish grant（Q9）與通知信（Q10）（附條件決議）、sandbox 堆疊的部署（操作員手冊第 7 節）、template 後續任務 T1–T8

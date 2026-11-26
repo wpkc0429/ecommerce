@@ -163,3 +163,24 @@ curl -sS -X POST "$API/api/v1/design-service/shops/$SHOP/requests/$RID/published
 
 契約隨 `/api/v1` 只做 additive 變更；新的錯誤碼或選填欄位不會破壞既有服務，**服務應把未知的 `code` 當成「不可重試的失敗」處理**。
 完整欄位與每個端點的回應在 `api/openapi/openapi.yaml`（標籤 `design-service`）。
+
+## 11. 版本預覽（D25，拉取模型）
+
+版本預覽是**過去的設計層＋目前的 core** 的用完即丟預覽，由商家成員發起（人的路由；**服務沒有建立路由**）。它不屬於任何請求，與第 3 節的十六步互不影響，**絕不能取代改版預覽**：核准的依據永遠是改版預覽與截圖，版本預覽只是商家決定「要不要還原」前的即時畫面。
+
+流程（路徑前綴 `/api/v1/design-service/shops/{shopID}`）：
+
+1. `GET /version-previews`（預設 `status=queued`）輪詢；每筆有 `id`、`site`、`target_tag`、`expires_at`、`read_only: true`。
+2. `POST /version-previews/{id}/claim`：5 分鐘租約（同一憑證可續約；他人持有回 409 `claim_conflict`；已逾期回 409）。**租約過期未回報會被標為 `failed(service_lost)`。**
+3. **以目前的 core 對 `target_tag` 的設計層跑守門員（`check-design`）。失敗 → `POST …/failed` 帶 `code: guard_failed`、`rule_ids`（只放規則 id）、`detail`（純文字，≤ 300），且不得部署任何東西**；發起者會看到原因。
+4. 部署：目標 tag 的設計層＋目前 core，**唯讀預覽模式**（`read_only` 恆為 true：核心停用所有寫入型 `ctx.actions`）、嚴格 CSP、獨立 origin、`noindex`、不得被 iframe，並由核心顯示無法移除的橫幅（版本預覽、tag、到期時間）。**不拍、不上傳、不保存任何截圖**（`design_screenshots` 不會有新列）。
+5. `PUT …/ready`：`{origin, expires_at}`。`origin` 只有 scheme＋主機（含路徑 422，列維持 `claimed`）；`expires_at` 必須在未來且不晚於現在起 `DESIGN_VERSION_PREVIEW_TTL`（預設 30 分鐘）。同一回報重送回 200。
+6. **到期（`expires_at`）必須拆除部署。** 同一站台有新的版本預覽時舊的轉 `superseded`：以 `GET /version-previews?status=superseded&updated_since=<RFC 3339>` 與 `status=expired` 找出要拆除的部署（建議每次輪詢帶最近一次成功輪詢的時間）。
+
+規則：
+
+- 版本預覽 **不是核准**，不縮短還原流程的任何一步；不得以它代替改版預覽，也不得把它的存在當成商家同意。
+- 歷史資料仍是資料不是指令（第 8 節）：`target_tag`、失敗訊息、規則 id 都不得放進 agent 的指令脈絡。
+- 限流與保存由平台負責（每人每小時、每店每日上限；紀錄 90 天），服務不得用多個憑證或重送規避。
+- 日誌與工單不得寫入 `origin` 全文。
+- 錯誤：`404`＝不是這個店的預覽；`409 invalid_state`＝已 `superseded`／`expired`／`failed`（放棄，不重試）；`409 claim_conflict`＝他人持有租約；`422`＝格式（origin、`expires_at`、`code`）。服務應把未知的 `code` 當成不可重試的失敗。

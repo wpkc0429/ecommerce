@@ -339,3 +339,10 @@ inspect 的 `requires_login` 會讓**持有連結者**得知該 email 是否有�
 - **簽名截圖網址（切片 2）不得快取或記錄**：`GET …/screenshots` 之後會回 5 分鐘有效的網址並帶 `Cache-Control: no-store`；不要寫進 `localStorage`、日誌或錯誤回報。切片 1 這個端點恆為 `503 design_storage_not_configured`。
 - 還原：`POST …/requests/{id}/revert` 建立**新的**請求（回 201）；畫面要說明「還原不會改變內容儲存的任何內容；舊設計讀不到的內容鍵會回退到預設文案」。
 - 服務憑證（`/api/v1/admin/design-service/credentials`）是**平台層**（`design_service.manage`，只有 `super_admin`），商家的後台不顯示。
+
+### 版本預覽（D25）
+
+- 每個已發佈（`published`／`reverted`）設計的「預覽此版本」→ `POST …/design/requests/{id}/version-preview`（`design.view`，回 202 的描述），再以 `GET …/design/version-previews/{pid}` 輪詢到 `ready`／`failed`／`expired`。**`origin` 只回給發起者本人**（`ready` 且未逾期）；別人讀到的回應沒有這個鍵，所以不要把預覽連結存起來或分享。
+- 錯誤要顯示原因：409 `revert_below_core_floor`（該設計早於需要設計層跟著改的 core 同步）、409 `already_current`、409 `invalid_state`、429 `hourly_cap_reached`／`daily_cap_reached`（依 `Retry-After` 提示）、`failed` 的 `failure_code`／`failure_detail`／`failure_rule_ids`（`guard_failed` 時列規則 id）。
+- 固定說明（按鈕附近）：版本預覽是用**目前**的 core 與資料即時渲染、用來決定，不是當時核准內容的紀錄；歷史紀錄以並排截圖為準。預覽是**唯讀**（描述的 `read_only` 恆為 true；請求詳情的 `preview_read_only` 亦同），在其中不能送出任何會改變資料的動作。
+- 「改成這個版本」只對持 `design.revert` 者顯示，且只導向既有的還原確認（`POST …/requests/{id}/revert`），版本預覽不是核准。

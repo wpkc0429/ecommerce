@@ -120,3 +120,13 @@ storefront 截圖只收匿名、`sandbox-v1`（sandbox 來源）或 `public-live
 
 見第 2 節；入職檢查清單多一步：商家要用 AI 重新設計時，由平台管理員簽發該店的 `dsk_` 憑證（每店一把）、交給服務的祕密管理、記下到期日。
 未簽發憑證的商家不受影響（沒有請求就沒有任何寫入）。
+
+## 11. 版本預覽（切片 4，D25）
+
+- **Migration**：`20261126103356_add_design_version_previews`（純新增一張表與四個索引，可逆；沒有新權限節點、不需 re-seed）。主 DB 由操作者自己 `make migrate`。
+- **新設定**（`internal/config/design.go`，超出範圍拒絕啟動）：`DESIGN_VERSION_PREVIEW_TTL`（30m，1m–2h）、`DESIGN_VERSION_PREVIEW_HOURLY_CAP`（6，每店每人每小時）、`DESIGN_VERSION_PREVIEW_DAILY_CAP`（30，每店每 UTC 日）、`DESIGN_VERSION_PREVIEW_RETENTION`（90 天，1 天–10 年）。
+- **排程**：沿用第 3 節的 `design-sweep -apply`（每 5 分鐘）——它現在也把逾時的版本預覽寫成 `expired`、把逾租約的 `claimed` 寫成 `failed(service_lost)`（輸出多兩行；只碰 `design_version_previews`）。沒有排程時，讀取仍會即時顯示 `expired`，但有效預覽數不會被釋放，也不會被「新請求」以外的方式清掉。
+- **清除**：`purge-design-history`（每日）多一行 `version preview usage rows`；只刪早於保存期限的使用列，**不碰請求、事件、截圖**；冪等；`-shop N` 可限定；`-export-shop` 輸出使用列（不含 origin）；`-all-for-shop` 一併刪。
+- **常見狀況**：商家說「按了預覽一直在等」→ 服務沒有輪詢或沒有該店憑證（`GET …/version-previews?status=queued` 看佇列）；`failed(service_lost)` → 服務認領後沒有在 5 分鐘內回報；429 → 達每小時或每日上限，等 `Retry-After`；409 `revert_below_core_floor` → 該設計早於一次需要設計層跟著改的 core 同步，這是預期的拒絕。
+- **用量查詢**（誰在何時預覽過哪一版）：`SELECT created_at, requested_by_user_id, target_tag, status FROM design_version_previews WHERE shop_id = N ORDER BY created_at DESC;`——admin 的版本預覽會讓發起者看到他本來就有權看的真實資料，這張表是「誰開過」的紀錄。
+- 日誌只含預覽 id、shop、站台與狀態，**不含 origin**。
