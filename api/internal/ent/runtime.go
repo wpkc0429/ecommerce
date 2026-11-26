@@ -21,6 +21,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -925,6 +926,64 @@ func init() {
 	designuntrackedchangeDescDetectedAt := designuntrackedchangeFields[8].Descriptor()
 	// designuntrackedchange.DefaultDetectedAt holds the default value on creation for the detected_at field.
 	designuntrackedchange.DefaultDetectedAt = designuntrackedchangeDescDetectedAt.Default.(func() time.Time)
+	designversionpreviewFields := schema.DesignVersionPreview{}.Fields()
+	_ = designversionpreviewFields
+	// designversionpreviewDescSite is the schema descriptor for site field.
+	designversionpreviewDescSite := designversionpreviewFields[2].Descriptor()
+	// designversionpreview.SiteValidator is a validator for the "site" field. It is called by the builders before save.
+	designversionpreview.SiteValidator = designversionpreviewDescSite.Validators[0].(func(string) error)
+	// designversionpreviewDescTargetTag is the schema descriptor for target_tag field.
+	designversionpreviewDescTargetTag := designversionpreviewFields[4].Descriptor()
+	// designversionpreview.TargetTagValidator is a validator for the "target_tag" field. It is called by the builders before save.
+	designversionpreview.TargetTagValidator = designversionpreviewDescTargetTag.Validators[0].(func(string) error)
+	// designversionpreviewDescStatus is the schema descriptor for status field.
+	designversionpreviewDescStatus := designversionpreviewFields[6].Descriptor()
+	// designversionpreview.DefaultStatus holds the default value on creation for the status field.
+	designversionpreview.DefaultStatus = designversionpreviewDescStatus.Default.(string)
+	// designversionpreview.StatusValidator is a validator for the "status" field. It is called by the builders before save.
+	designversionpreview.StatusValidator = designversionpreviewDescStatus.Validators[0].(func(string) error)
+	// designversionpreviewDescFailureCode is the schema descriptor for failure_code field.
+	designversionpreviewDescFailureCode := designversionpreviewFields[7].Descriptor()
+	// designversionpreview.FailureCodeValidator is a validator for the "failure_code" field. It is called by the builders before save.
+	designversionpreview.FailureCodeValidator = designversionpreviewDescFailureCode.Validators[0].(func(string) error)
+	// designversionpreviewDescFailureDetail is the schema descriptor for failure_detail field.
+	designversionpreviewDescFailureDetail := designversionpreviewFields[8].Descriptor()
+	// designversionpreview.FailureDetailValidator is a validator for the "failure_detail" field. It is called by the builders before save.
+	designversionpreview.FailureDetailValidator = designversionpreviewDescFailureDetail.Validators[0].(func(string) error)
+	// designversionpreviewDescFailureRuleIds is the schema descriptor for failure_rule_ids field.
+	designversionpreviewDescFailureRuleIds := designversionpreviewFields[9].Descriptor()
+	// designversionpreview.DefaultFailureRuleIds holds the default value on creation for the failure_rule_ids field.
+	designversionpreview.DefaultFailureRuleIds = designversionpreviewDescFailureRuleIds.Default.([]string)
+	// designversionpreviewDescCoreVersion is the schema descriptor for core_version field.
+	designversionpreviewDescCoreVersion := designversionpreviewFields[10].Descriptor()
+	// designversionpreview.DefaultCoreVersion holds the default value on creation for the core_version field.
+	designversionpreview.DefaultCoreVersion = designversionpreviewDescCoreVersion.Default.(string)
+	// designversionpreview.CoreVersionValidator is a validator for the "core_version" field. It is called by the builders before save.
+	designversionpreview.CoreVersionValidator = designversionpreviewDescCoreVersion.Validators[0].(func(string) error)
+	// designversionpreviewDescDesignFloorVersion is the schema descriptor for design_floor_version field.
+	designversionpreviewDescDesignFloorVersion := designversionpreviewFields[11].Descriptor()
+	// designversionpreview.DefaultDesignFloorVersion holds the default value on creation for the design_floor_version field.
+	designversionpreview.DefaultDesignFloorVersion = designversionpreviewDescDesignFloorVersion.Default.(string)
+	// designversionpreview.DesignFloorVersionValidator is a validator for the "design_floor_version" field. It is called by the builders before save.
+	designversionpreview.DesignFloorVersionValidator = designversionpreviewDescDesignFloorVersion.Validators[0].(func(string) error)
+	// designversionpreviewDescPreviewOrigin is the schema descriptor for preview_origin field.
+	designversionpreviewDescPreviewOrigin := designversionpreviewFields[12].Descriptor()
+	// designversionpreview.PreviewOriginValidator is a validator for the "preview_origin" field. It is called by the builders before save.
+	designversionpreview.PreviewOriginValidator = designversionpreviewDescPreviewOrigin.Validators[0].(func(string) error)
+	// designversionpreviewDescCreatedAt is the schema descriptor for created_at field.
+	designversionpreviewDescCreatedAt := designversionpreviewFields[15].Descriptor()
+	// designversionpreview.DefaultCreatedAt holds the default value on creation for the created_at field.
+	designversionpreview.DefaultCreatedAt = designversionpreviewDescCreatedAt.Default.(func() time.Time)
+	// designversionpreviewDescUpdatedAt is the schema descriptor for updated_at field.
+	designversionpreviewDescUpdatedAt := designversionpreviewFields[16].Descriptor()
+	// designversionpreview.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	designversionpreview.DefaultUpdatedAt = designversionpreviewDescUpdatedAt.Default.(func() time.Time)
+	// designversionpreview.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	designversionpreview.UpdateDefaultUpdatedAt = designversionpreviewDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// designversionpreviewDescID is the schema descriptor for id field.
+	designversionpreviewDescID := designversionpreviewFields[0].Descriptor()
+	// designversionpreview.DefaultID holds the default value on creation for the id field.
+	designversionpreview.DefaultID = designversionpreviewDescID.Default.(func() uuid.UUID)
 	mediauploadFields := schema.MediaUpload{}.Fields()
 	_ = mediauploadFields
 	// mediauploadDescObjectKey is the schema descriptor for object_key field.

@@ -28,6 +28,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -110,6 +111,8 @@ type Client struct {
 	DesignSiteState *DesignSiteStateClient
 	// DesignUntrackedChange is the client for interacting with the DesignUntrackedChange builders.
 	DesignUntrackedChange *DesignUntrackedChangeClient
+	// DesignVersionPreview is the client for interacting with the DesignVersionPreview builders.
+	DesignVersionPreview *DesignVersionPreviewClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
 	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
@@ -204,6 +207,7 @@ func (c *Client) init() {
 	c.DesignServiceCredential = NewDesignServiceCredentialClient(c.config)
 	c.DesignSiteState = NewDesignSiteStateClient(c.config)
 	c.DesignUntrackedChange = NewDesignUntrackedChangeClient(c.config)
+	c.DesignVersionPreview = NewDesignVersionPreviewClient(c.config)
 	c.MediaUpload = NewMediaUploadClient(c.config)
 	c.Member = NewMemberClient(c.config)
 	c.MemberRefreshToken = NewMemberRefreshTokenClient(c.config)
@@ -346,6 +350,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		DesignServiceCredential:       NewDesignServiceCredentialClient(cfg),
 		DesignSiteState:               NewDesignSiteStateClient(cfg),
 		DesignUntrackedChange:         NewDesignUntrackedChangeClient(cfg),
+		DesignVersionPreview:          NewDesignVersionPreviewClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
@@ -415,6 +420,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		DesignServiceCredential:       NewDesignServiceCredentialClient(cfg),
 		DesignSiteState:               NewDesignSiteStateClient(cfg),
 		DesignUntrackedChange:         NewDesignUntrackedChangeClient(cfg),
+		DesignVersionPreview:          NewDesignVersionPreviewClient(cfg),
 		MediaUpload:                   NewMediaUploadClient(cfg),
 		Member:                        NewMemberClient(cfg),
 		MemberRefreshToken:            NewMemberRefreshTokenClient(cfg),
@@ -482,11 +488,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
 		c.DesignRequest, c.DesignRequestEvent, c.DesignScreenshot,
 		c.DesignServiceCredential, c.DesignSiteState, c.DesignUntrackedChange,
-		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
-		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
-		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
-		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.DesignVersionPreview, c.MediaUpload, c.Member, c.MemberRefreshToken,
+		c.MemberTier, c.Order, c.OrderItem, c.OrderNotification, c.Page, c.Payment,
+		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage,
+		c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission, c.RoleUser,
+		c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
 		c.ShopApplication, c.ShopApplicationEvent, c.ShopApplicationMessage,
 		c.ShopApplicationToken, c.ShopPaymentProviderCredential, c.ShopUser, c.User,
 		c.UserPermission, c.UserRefreshToken,
@@ -504,11 +510,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ContentPublishHook, c.ContentRevision, c.ContentSchedule, c.ContentSchema,
 		c.DesignRequest, c.DesignRequestEvent, c.DesignScreenshot,
 		c.DesignServiceCredential, c.DesignSiteState, c.DesignUntrackedChange,
-		c.MediaUpload, c.Member, c.MemberRefreshToken, c.MemberTier, c.Order,
-		c.OrderItem, c.OrderNotification, c.Page, c.Payment, c.Permission,
-		c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage, c.ProductSKU,
-		c.PublishableKey, c.Role, c.RolePermission, c.RoleUser, c.Shipment,
-		c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
+		c.DesignVersionPreview, c.MediaUpload, c.Member, c.MemberRefreshToken,
+		c.MemberTier, c.Order, c.OrderItem, c.OrderNotification, c.Page, c.Payment,
+		c.Permission, c.PointTransaction, c.Product, c.ProductCategory, c.ProductImage,
+		c.ProductSKU, c.PublishableKey, c.Role, c.RolePermission, c.RoleUser,
+		c.Shipment, c.ShipmentItem, c.ShippingMethod, c.Shop, c.ShopAllowedOrigin,
 		c.ShopApplication, c.ShopApplicationEvent, c.ShopApplicationMessage,
 		c.ShopApplicationToken, c.ShopPaymentProviderCredential, c.ShopUser, c.User,
 		c.UserPermission, c.UserRefreshToken,
@@ -554,6 +560,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.DesignSiteState.mutate(ctx, m)
 	case *DesignUntrackedChangeMutation:
 		return c.DesignUntrackedChange.mutate(ctx, m)
+	case *DesignVersionPreviewMutation:
+		return c.DesignVersionPreview.mutate(ctx, m)
 	case *MediaUploadMutation:
 		return c.MediaUpload.mutate(ctx, m)
 	case *MemberMutation:
@@ -3123,6 +3131,139 @@ func (c *DesignUntrackedChangeClient) mutate(ctx context.Context, m *DesignUntra
 		return (&DesignUntrackedChangeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown DesignUntrackedChange mutation op: %q", m.Op())
+	}
+}
+
+// DesignVersionPreviewClient is a client for the DesignVersionPreview schema.
+type DesignVersionPreviewClient struct {
+	config
+}
+
+// NewDesignVersionPreviewClient returns a client for the DesignVersionPreview from the given config.
+func NewDesignVersionPreviewClient(c config) *DesignVersionPreviewClient {
+	return &DesignVersionPreviewClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `designversionpreview.Hooks(f(g(h())))`.
+func (c *DesignVersionPreviewClient) Use(hooks ...Hook) {
+	c.hooks.DesignVersionPreview = append(c.hooks.DesignVersionPreview, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `designversionpreview.Intercept(f(g(h())))`.
+func (c *DesignVersionPreviewClient) Intercept(interceptors ...Interceptor) {
+	c.inters.DesignVersionPreview = append(c.inters.DesignVersionPreview, interceptors...)
+}
+
+// Create returns a builder for creating a DesignVersionPreview entity.
+func (c *DesignVersionPreviewClient) Create() *DesignVersionPreviewCreate {
+	mutation := newDesignVersionPreviewMutation(c.config, OpCreate)
+	return &DesignVersionPreviewCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of DesignVersionPreview entities.
+func (c *DesignVersionPreviewClient) CreateBulk(builders ...*DesignVersionPreviewCreate) *DesignVersionPreviewCreateBulk {
+	return &DesignVersionPreviewCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *DesignVersionPreviewClient) MapCreateBulk(slice any, setFunc func(*DesignVersionPreviewCreate, int)) *DesignVersionPreviewCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &DesignVersionPreviewCreateBulk{err: fmt.Errorf("calling to DesignVersionPreviewClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*DesignVersionPreviewCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &DesignVersionPreviewCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for DesignVersionPreview.
+func (c *DesignVersionPreviewClient) Update() *DesignVersionPreviewUpdate {
+	mutation := newDesignVersionPreviewMutation(c.config, OpUpdate)
+	return &DesignVersionPreviewUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *DesignVersionPreviewClient) UpdateOne(_m *DesignVersionPreview) *DesignVersionPreviewUpdateOne {
+	mutation := newDesignVersionPreviewMutation(c.config, OpUpdateOne, withDesignVersionPreview(_m))
+	return &DesignVersionPreviewUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *DesignVersionPreviewClient) UpdateOneID(id uuid.UUID) *DesignVersionPreviewUpdateOne {
+	mutation := newDesignVersionPreviewMutation(c.config, OpUpdateOne, withDesignVersionPreviewID(id))
+	return &DesignVersionPreviewUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for DesignVersionPreview.
+func (c *DesignVersionPreviewClient) Delete() *DesignVersionPreviewDelete {
+	mutation := newDesignVersionPreviewMutation(c.config, OpDelete)
+	return &DesignVersionPreviewDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *DesignVersionPreviewClient) DeleteOne(_m *DesignVersionPreview) *DesignVersionPreviewDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *DesignVersionPreviewClient) DeleteOneID(id uuid.UUID) *DesignVersionPreviewDeleteOne {
+	builder := c.Delete().Where(designversionpreview.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &DesignVersionPreviewDeleteOne{builder}
+}
+
+// Query returns a query builder for DesignVersionPreview.
+func (c *DesignVersionPreviewClient) Query() *DesignVersionPreviewQuery {
+	return &DesignVersionPreviewQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeDesignVersionPreview},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a DesignVersionPreview entity by its id.
+func (c *DesignVersionPreviewClient) Get(ctx context.Context, id uuid.UUID) (*DesignVersionPreview, error) {
+	return c.Query().Where(designversionpreview.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *DesignVersionPreviewClient) GetX(ctx context.Context, id uuid.UUID) *DesignVersionPreview {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *DesignVersionPreviewClient) Hooks() []Hook {
+	return c.hooks.DesignVersionPreview
+}
+
+// Interceptors returns the client interceptors.
+func (c *DesignVersionPreviewClient) Interceptors() []Interceptor {
+	return c.inters.DesignVersionPreview
+}
+
+func (c *DesignVersionPreviewClient) mutate(ctx context.Context, m *DesignVersionPreviewMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&DesignVersionPreviewCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&DesignVersionPreviewUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&DesignVersionPreviewUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&DesignVersionPreviewDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown DesignVersionPreview mutation op: %q", m.Op())
 	}
 }
 
@@ -8487,26 +8628,28 @@ type (
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
 		ContentSchedule, ContentSchema, DesignRequest, DesignRequestEvent,
 		DesignScreenshot, DesignServiceCredential, DesignSiteState,
-		DesignUntrackedChange, MediaUpload, Member, MemberRefreshToken, MemberTier,
-		Order, OrderItem, OrderNotification, Page, Payment, Permission,
-		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
-		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
-		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
-		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
-		ShopUser, User, UserPermission, UserRefreshToken []ent.Hook
+		DesignUntrackedChange, DesignVersionPreview, MediaUpload, Member,
+		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
+		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
+		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
+		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication,
+		ShopApplicationEvent, ShopApplicationMessage, ShopApplicationToken,
+		ShopPaymentProviderCredential, ShopUser, User, UserPermission,
+		UserRefreshToken []ent.Hook
 	}
 	inters struct {
 		AdminCredentialToken, Cart, CartItem, Category, CheckoutIdempotencyKey,
 		ContentAuditLog, ContentDocument, ContentPublishHook, ContentRevision,
 		ContentSchedule, ContentSchema, DesignRequest, DesignRequestEvent,
 		DesignScreenshot, DesignServiceCredential, DesignSiteState,
-		DesignUntrackedChange, MediaUpload, Member, MemberRefreshToken, MemberTier,
-		Order, OrderItem, OrderNotification, Page, Payment, Permission,
-		PointTransaction, Product, ProductCategory, ProductImage, ProductSKU,
-		PublishableKey, Role, RolePermission, RoleUser, Shipment, ShipmentItem,
-		ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication, ShopApplicationEvent,
-		ShopApplicationMessage, ShopApplicationToken, ShopPaymentProviderCredential,
-		ShopUser, User, UserPermission, UserRefreshToken []ent.Interceptor
+		DesignUntrackedChange, DesignVersionPreview, MediaUpload, Member,
+		MemberRefreshToken, MemberTier, Order, OrderItem, OrderNotification, Page,
+		Payment, Permission, PointTransaction, Product, ProductCategory, ProductImage,
+		ProductSKU, PublishableKey, Role, RolePermission, RoleUser, Shipment,
+		ShipmentItem, ShippingMethod, Shop, ShopAllowedOrigin, ShopApplication,
+		ShopApplicationEvent, ShopApplicationMessage, ShopApplicationToken,
+		ShopPaymentProviderCredential, ShopUser, User, UserPermission,
+		UserRefreshToken []ent.Interceptor
 	}
 )
 

@@ -295,3 +295,68 @@ func (DesignUntrackedChange) Annotations() []schema.Annotation {
 		},
 	}
 }
+
+// DesignVersionPreview is the light usage row of one "version preview" (design
+// D25): a throwaway deployment of a past release's design layer on the CURRENT
+// core, owned by no request. It is NOT part of the history: no append-only
+// trigger, no hash chain, no foreign keys (requested_by_user_id and
+// target_request_id follow the audit convention that these rows outlive their
+// referents), and it writes nothing to design_request_events. The rows exist
+// to answer rate limits and "who opened which version"; the purge removes them
+// after DESIGN_VERSION_PREVIEW_RETENTION (90 days).
+type DesignVersionPreview struct {
+	ent.Schema
+}
+
+func (DesignVersionPreview) Fields() []ent.Field {
+	return []ent.Field{
+		field.UUID("id", uuid.UUID{}).Default(uuid.New),
+		field.Int("shop_id").Immutable(),
+		field.String("site").MaxLen(10).SchemaType(map[string]string{dialect.Postgres: "varchar(10)"}).Immutable(),
+		field.UUID("target_request_id", uuid.UUID{}).Immutable(),
+		field.String("target_tag").MaxLen(60).SchemaType(map[string]string{dialect.Postgres: "varchar(60)"}).Immutable(),
+		field.Int("requested_by_user_id").Immutable(),
+		field.String("status").MaxLen(12).SchemaType(map[string]string{dialect.Postgres: "varchar(12)"}).Default("queued"),
+		field.String("failure_code").MaxLen(40).SchemaType(map[string]string{dialect.Postgres: "varchar(40)"}).Optional().Nillable(),
+		field.String("failure_detail").MaxLen(300).SchemaType(map[string]string{dialect.Postgres: "varchar(300)"}).Optional().Nillable(),
+		// failure_rule_ids: the gatekeeper rules that refused (guard_failed).
+		field.JSON("failure_rule_ids", []string{}).Default([]string{}),
+		// core_version / design_floor_version: the platform's view of the site
+		// when the preview was requested (the compatibility check's inputs).
+		field.String("core_version").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}).Default(""),
+		field.String("design_floor_version").MaxLen(20).SchemaType(map[string]string{dialect.Postgres: "varchar(20)"}).Default(""),
+		// preview_origin: an origin only (scheme + host), never a path or query.
+		field.String("preview_origin").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).Optional().Nillable(),
+		field.Int("claimed_by_credential_id").Optional().Nillable(),
+		field.Time("claim_expires_at").Optional().Nillable(),
+		field.Time("created_at").Immutable().Default(time.Now),
+		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),
+		field.Time("ready_at").Optional().Nillable(),
+		field.Time("expires_at"),
+	}
+}
+
+func (DesignVersionPreview) Indexes() []ent.Index {
+	return []ent.Index{
+		// At most one live preview per (shop, site): a new request supersedes the
+		// old one in the same transaction, and this index is the backstop.
+		index.Fields("shop_id", "site").Unique().StorageKey("design_version_previews_one_active").
+			Annotations(entsql.IndexWhere("status IN ('queued', 'claimed', 'ready')")),
+		index.Fields("shop_id", "site", "status").StorageKey("design_version_previews_shop_site_status"),
+		// The rate-limit counts and the retention purge.
+		index.Fields("shop_id", "requested_by_user_id", "created_at").StorageKey("design_version_previews_user_created"),
+		index.Fields("created_at").StorageKey("design_version_previews_created"),
+	}
+}
+
+func (DesignVersionPreview) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{
+			Table: "design_version_previews",
+			Checks: map[string]string{
+				"design_version_previews_site_check":   "site IN ('storefront', 'admin')",
+				"design_version_previews_status_check": "status IN ('queued', 'claimed', 'ready', 'failed', 'expired', 'superseded')",
+			},
+		},
+	}
+}

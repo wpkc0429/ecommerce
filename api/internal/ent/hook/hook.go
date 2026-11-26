@@ -212,6 +212,18 @@ func (f DesignUntrackedChangeFunc) Mutate(ctx context.Context, m ent.Mutation) (
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignUntrackedChangeMutation", m)
 }
 
+// The DesignVersionPreviewFunc type is an adapter to allow the use of ordinary
+// function as DesignVersionPreview mutator.
+type DesignVersionPreviewFunc func(context.Context, *ent.DesignVersionPreviewMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f DesignVersionPreviewFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.DesignVersionPreviewMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.DesignVersionPreviewMutation", m)
+}
+
 // The MediaUploadFunc type is an adapter to allow the use of ordinary
 // function as MediaUpload mutator.
 type MediaUploadFunc func(context.Context, *ent.MediaUploadMutation) (ent.Value, error)

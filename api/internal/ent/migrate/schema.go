@@ -708,6 +708,59 @@ var (
 			},
 		},
 	}
+	// DesignVersionPreviewsColumns holds the columns for the "design_version_previews" table.
+	DesignVersionPreviewsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "shop_id", Type: field.TypeInt},
+		{Name: "site", Type: field.TypeString, Size: 10, SchemaType: map[string]string{"postgres": "varchar(10)"}},
+		{Name: "target_request_id", Type: field.TypeUUID},
+		{Name: "target_tag", Type: field.TypeString, Size: 60, SchemaType: map[string]string{"postgres": "varchar(60)"}},
+		{Name: "requested_by_user_id", Type: field.TypeInt},
+		{Name: "status", Type: field.TypeString, Size: 12, Default: "queued", SchemaType: map[string]string{"postgres": "varchar(12)"}},
+		{Name: "failure_code", Type: field.TypeString, Nullable: true, Size: 40, SchemaType: map[string]string{"postgres": "varchar(40)"}},
+		{Name: "failure_detail", Type: field.TypeString, Nullable: true, Size: 300, SchemaType: map[string]string{"postgres": "varchar(300)"}},
+		{Name: "failure_rule_ids", Type: field.TypeJSON},
+		{Name: "core_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "design_floor_version", Type: field.TypeString, Size: 20, Default: "", SchemaType: map[string]string{"postgres": "varchar(20)"}},
+		{Name: "preview_origin", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
+		{Name: "claimed_by_credential_id", Type: field.TypeInt, Nullable: true},
+		{Name: "claim_expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "ready_at", Type: field.TypeTime, Nullable: true},
+		{Name: "expires_at", Type: field.TypeTime},
+	}
+	// DesignVersionPreviewsTable holds the schema information for the "design_version_previews" table.
+	DesignVersionPreviewsTable = &schema.Table{
+		Name:       "design_version_previews",
+		Columns:    DesignVersionPreviewsColumns,
+		PrimaryKey: []*schema.Column{DesignVersionPreviewsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "design_version_previews_one_active",
+				Unique:  true,
+				Columns: []*schema.Column{DesignVersionPreviewsColumns[1], DesignVersionPreviewsColumns[2]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "status IN ('queued', 'claimed', 'ready')",
+				},
+			},
+			{
+				Name:    "design_version_previews_shop_site_status",
+				Unique:  false,
+				Columns: []*schema.Column{DesignVersionPreviewsColumns[1], DesignVersionPreviewsColumns[2], DesignVersionPreviewsColumns[6]},
+			},
+			{
+				Name:    "design_version_previews_user_created",
+				Unique:  false,
+				Columns: []*schema.Column{DesignVersionPreviewsColumns[1], DesignVersionPreviewsColumns[5], DesignVersionPreviewsColumns[15]},
+			},
+			{
+				Name:    "design_version_previews_created",
+				Unique:  false,
+				Columns: []*schema.Column{DesignVersionPreviewsColumns[15]},
+			},
+		},
+	}
 	// MediaUploadsColumns holds the columns for the "media_uploads" table.
 	MediaUploadsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1937,6 +1990,7 @@ var (
 		DesignServiceCredentialsTable,
 		DesignSiteStateTable,
 		DesignUntrackedChangesTable,
+		DesignVersionPreviewsTable,
 		MediaUploadsTable,
 		MembersTable,
 		MemberRefreshTokensTable,
@@ -2089,6 +2143,13 @@ func init() {
 	}
 	DesignUntrackedChangesTable.Annotation.Checks = map[string]string{
 		"design_untracked_changes_site_check": "site IN ('storefront', 'admin')",
+	}
+	DesignVersionPreviewsTable.Annotation = &entsql.Annotation{
+		Table: "design_version_previews",
+	}
+	DesignVersionPreviewsTable.Annotation.Checks = map[string]string{
+		"design_version_previews_site_check":   "site IN ('storefront', 'admin')",
+		"design_version_previews_status_check": "status IN ('queued', 'claimed', 'ready', 'failed', 'expired', 'superseded')",
 	}
 	MediaUploadsTable.ForeignKeys[0].RefTable = ShopsTable
 	MediaUploadsTable.Annotation = &entsql.Annotation{}

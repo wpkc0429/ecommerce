@@ -77,3 +77,52 @@ func TestDesignHistoryMigrationsAreReversible(t *testing.T) {
 	}
 	present()
 }
+
+const designVersionPreviewMig = 20261126103356
+
+// The version-preview migration is a pure addition and reversible: up, down, up
+// again on a throwaway database (change design-history task 10.1).
+func TestDesignVersionPreviewMigrationIsReversible(t *testing.T) {
+	db, m := scratchMigration(t, "ecommerce_migtest_design_vp", designVersionPreviewMig)
+	exists := func() int {
+		return scalarInt(t, db, `SELECT count(*) FROM pg_tables WHERE schemaname='public' AND tablename='design_version_previews'`)
+	}
+	if exists() != 1 {
+		t.Fatal("table missing after up")
+	}
+	if n := scalarInt(t, db, `SELECT count(*) FROM pg_trigger WHERE NOT tgisinternal AND tgrelid = 'design_version_previews'::regclass`); n != 0 {
+		t.Fatalf("%d triggers on a table that must have none", n)
+	}
+	if n := scalarInt(t, db, `SELECT count(*) FROM pg_constraint WHERE contype='f' AND conrelid = 'design_version_previews'::regclass`); n != 0 {
+		t.Fatalf("%d foreign keys on a table that must have none", n)
+	}
+	const cols = `(id, shop_id, site, target_request_id, target_tag, requested_by_user_id, status, failure_rule_ids, created_at, updated_at, expires_at)`
+	ins := func(status string) error {
+		_, err := db.Exec(`INSERT INTO design_version_previews `+cols+` VALUES (gen_random_uuid(), 1, 'admin', gen_random_uuid(), 't', 1, $1, '[]', now(), now(), now())`, status)
+		return err
+	}
+	if err := ins("queued"); err != nil {
+		t.Fatal(err)
+	}
+	if ins("ready") == nil {
+		t.Fatal("two live previews for one (shop, site) were accepted")
+	}
+	if err := ins("expired"); err != nil {
+		t.Fatalf("a finished row must not collide: %v", err)
+	}
+	if ins("bogus") == nil {
+		t.Fatal("an unknown status was accepted")
+	}
+	if err := m.Steps(-1); err != nil {
+		t.Fatalf("down: %v", err)
+	}
+	if exists() != 0 {
+		t.Fatal("table survived the down migration")
+	}
+	if err := m.Steps(1); err != nil {
+		t.Fatalf("up again: %v", err)
+	}
+	if exists() != 1 {
+		t.Fatal("table missing after the second up")
+	}
+}

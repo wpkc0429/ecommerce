@@ -23,6 +23,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -139,6 +140,7 @@ func checkColumn(t, c string) error {
 			designservicecredential.Table:       designservicecredential.ValidColumn,
 			designsitestate.Table:               designsitestate.ValidColumn,
 			designuntrackedchange.Table:         designuntrackedchange.ValidColumn,
+			designversionpreview.Table:          designversionpreview.ValidColumn,
 			mediaupload.Table:                   mediaupload.ValidColumn,
 			member.Table:                        member.ValidColumn,
 			memberrefreshtoken.Table:            memberrefreshtoken.ValidColumn,

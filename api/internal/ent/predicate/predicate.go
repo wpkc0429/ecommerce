@@ -57,6 +57,9 @@ type DesignSiteState func(*sql.Selector)
 // DesignUntrackedChange is the predicate function for designuntrackedchange builders.
 type DesignUntrackedChange func(*sql.Selector)
 
+// DesignVersionPreview is the predicate function for designversionpreview builders.
+type DesignVersionPreview func(*sql.Selector)
+
 // MediaUpload is the predicate function for mediaupload builders.
 type MediaUpload func(*sql.Selector)
 

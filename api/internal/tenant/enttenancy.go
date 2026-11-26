@@ -101,7 +101,7 @@ var tenantOwned = map[string]bool{
 	// passes shop_id explicitly — same defense-in-depth reasoning as
 	// PublishableKey/ShopAllowedOrigin above.
 	"ShopPaymentProviderCredential": true,
-	// change design-history: five tables carry a direct shop_id. Every access in
+	// change design-history: six tables carry a direct shop_id. Every access in
 	// internal/design runs outside tenant context and passes shop_id
 	// explicitly (the service credential, not a tenant host, scopes it); the
 	// entries are the default guard for whatever reads these tables next.
@@ -110,6 +110,7 @@ var tenantOwned = map[string]bool{
 	"DesignScreenshot":      true,
 	"DesignSiteState":       true,
 	"DesignUntrackedChange": true,
+	"DesignVersionPreview":  true,
 }
 
 // Interceptor forces `shop_id = <ctx shop>` on every query of tenant-owned

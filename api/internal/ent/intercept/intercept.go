@@ -24,6 +24,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -575,6 +576,33 @@ func (f TraverseDesignUntrackedChange) Traverse(ctx context.Context, q ent.Query
 		return f(ctx, q)
 	}
 	return fmt.Errorf("unexpected query type %T. expect *ent.DesignUntrackedChangeQuery", q)
+}
+
+// The DesignVersionPreviewFunc type is an adapter to allow the use of ordinary function as a Querier.
+type DesignVersionPreviewFunc func(context.Context, *ent.DesignVersionPreviewQuery) (ent.Value, error)
+
+// Query calls f(ctx, q).
+func (f DesignVersionPreviewFunc) Query(ctx context.Context, q ent.Query) (ent.Value, error) {
+	if q, ok := q.(*ent.DesignVersionPreviewQuery); ok {
+		return f(ctx, q)
+	}
+	return nil, fmt.Errorf("unexpected query type %T. expect *ent.DesignVersionPreviewQuery", q)
+}
+
+// The TraverseDesignVersionPreview type is an adapter to allow the use of ordinary function as Traverser.
+type TraverseDesignVersionPreview func(context.Context, *ent.DesignVersionPreviewQuery) error
+
+// Intercept is a dummy implementation of Intercept that returns the next Querier in the pipeline.
+func (f TraverseDesignVersionPreview) Intercept(next ent.Querier) ent.Querier {
+	return next
+}
+
+// Traverse calls f(ctx, q).
+func (f TraverseDesignVersionPreview) Traverse(ctx context.Context, q ent.Query) error {
+	if q, ok := q.(*ent.DesignVersionPreviewQuery); ok {
+		return f(ctx, q)
+	}
+	return fmt.Errorf("unexpected query type %T. expect *ent.DesignVersionPreviewQuery", q)
 }
 
 // The MediaUploadFunc type is an adapter to allow the use of ordinary function as a Querier.
@@ -1505,6 +1533,8 @@ func NewQuery(q ent.Query) (Query, error) {
 		return &query[*ent.DesignSiteStateQuery, predicate.DesignSiteState, designsitestate.OrderOption]{typ: ent.TypeDesignSiteState, tq: q}, nil
 	case *ent.DesignUntrackedChangeQuery:
 		return &query[*ent.DesignUntrackedChangeQuery, predicate.DesignUntrackedChange, designuntrackedchange.OrderOption]{typ: ent.TypeDesignUntrackedChange, tq: q}, nil
+	case *ent.DesignVersionPreviewQuery:
+		return &query[*ent.DesignVersionPreviewQuery, predicate.DesignVersionPreview, designversionpreview.OrderOption]{typ: ent.TypeDesignVersionPreview, tq: q}, nil
 	case *ent.MediaUploadQuery:
 		return &query[*ent.MediaUploadQuery, predicate.MediaUpload, mediaupload.OrderOption]{typ: ent.TypeMediaUpload, tq: q}, nil
 	case *ent.MemberQuery:

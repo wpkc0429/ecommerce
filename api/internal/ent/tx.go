@@ -48,6 +48,8 @@ type Tx struct {
 	DesignSiteState *DesignSiteStateClient
 	// DesignUntrackedChange is the client for interacting with the DesignUntrackedChange builders.
 	DesignUntrackedChange *DesignUntrackedChangeClient
+	// DesignVersionPreview is the client for interacting with the DesignVersionPreview builders.
+	DesignVersionPreview *DesignVersionPreviewClient
 	// MediaUpload is the client for interacting with the MediaUpload builders.
 	MediaUpload *MediaUploadClient
 	// Member is the client for interacting with the Member builders.
@@ -262,6 +264,7 @@ func (tx *Tx) init() {
 	tx.DesignServiceCredential = NewDesignServiceCredentialClient(tx.config)
 	tx.DesignSiteState = NewDesignSiteStateClient(tx.config)
 	tx.DesignUntrackedChange = NewDesignUntrackedChangeClient(tx.config)
+	tx.DesignVersionPreview = NewDesignVersionPreviewClient(tx.config)
 	tx.MediaUpload = NewMediaUploadClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
 	tx.MemberRefreshToken = NewMemberRefreshTokenClient(tx.config)

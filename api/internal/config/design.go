@@ -24,6 +24,14 @@ type DesignConfig struct {
 	UntrackedRetention             time.Duration // DESIGN_UNTRACKED_RETENTION
 	CredentialRetention            time.Duration // DESIGN_CREDENTIAL_RETENTION
 
+	// Version preview (design D25). TTL bounds how long a preview may live
+	// (default 30m, at most 2h); the caps are database COUNTs per (shop, user)
+	// per hour and per shop per UTC day; retention removes the usage rows.
+	VersionPreviewTTL       time.Duration // DESIGN_VERSION_PREVIEW_TTL
+	VersionPreviewHourlyCap int           // DESIGN_VERSION_PREVIEW_HOURLY_CAP
+	VersionPreviewDailyCap  int           // DESIGN_VERSION_PREVIEW_DAILY_CAP
+	VersionPreviewRetention time.Duration // DESIGN_VERSION_PREVIEW_RETENTION
+
 	// Screenshot storage (slice 2, design D5): a SECOND, private bucket. It has
 	// its own credentials (the token is scoped to that bucket and must not be the
 	// public-image token); the account id / endpoint are shared with media.
@@ -61,6 +69,8 @@ func loadDesign(cfg *Config) error {
 		{&c.AuditRetention, "DESIGN_AUDIT_RETENTION", 730 * day, day, 10 * 366 * day},
 		{&c.UntrackedRetention, "DESIGN_UNTRACKED_RETENTION", 730 * day, day, 10 * 366 * day},
 		{&c.CredentialRetention, "DESIGN_CREDENTIAL_RETENTION", 90 * day, day, 10 * 366 * day},
+		{&c.VersionPreviewTTL, "DESIGN_VERSION_PREVIEW_TTL", 30 * time.Minute, time.Minute, 2 * time.Hour},
+		{&c.VersionPreviewRetention, "DESIGN_VERSION_PREVIEW_RETENTION", 90 * day, day, 10 * 366 * day},
 	}
 	for _, d := range durs {
 		v, err := parseDuration(d.key, d.def)
@@ -80,6 +90,18 @@ func loadDesign(cfg *Config) error {
 		return fmt.Errorf("config: DESIGN_DAILY_REQUEST_CAP must be between 1 and 1000")
 	}
 	c.DailyRequestCap = n
+	if c.VersionPreviewHourlyCap, err = parseInt("DESIGN_VERSION_PREVIEW_HOURLY_CAP", 6); err != nil {
+		return err
+	}
+	if c.VersionPreviewHourlyCap < 1 || c.VersionPreviewHourlyCap > 1000 {
+		return fmt.Errorf("config: DESIGN_VERSION_PREVIEW_HOURLY_CAP must be between 1 and 1000")
+	}
+	if c.VersionPreviewDailyCap, err = parseInt("DESIGN_VERSION_PREVIEW_DAILY_CAP", 30); err != nil {
+		return err
+	}
+	if c.VersionPreviewDailyCap < 1 || c.VersionPreviewDailyCap > 10000 {
+		return fmt.Errorf("config: DESIGN_VERSION_PREVIEW_DAILY_CAP must be between 1 and 10000")
+	}
 	if c.MaxScreenshotAttempts, err = parseInt("DESIGN_MAX_SCREENSHOT_ATTEMPTS", 240); err != nil {
 		return err
 	}

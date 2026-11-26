@@ -1,0 +1,11 @@
+-- Design D25: version-preview usage rows. Pure addition: one light table, no trigger, no hash chain, no foreign keys.
+-- create "design_version_previews" table
+CREATE TABLE "design_version_previews" ("id" uuid NOT NULL, "shop_id" bigint NOT NULL, "site" character varying(10) NOT NULL, "target_request_id" uuid NOT NULL, "target_tag" character varying(60) NOT NULL, "requested_by_user_id" bigint NOT NULL, "status" character varying(12) NOT NULL DEFAULT 'queued', "failure_code" character varying(40) NULL, "failure_detail" character varying(300) NULL, "failure_rule_ids" jsonb NOT NULL, "core_version" character varying(20) NOT NULL DEFAULT '', "design_floor_version" character varying(20) NOT NULL DEFAULT '', "preview_origin" character varying(255) NULL, "claimed_by_credential_id" bigint NULL, "claim_expires_at" timestamptz NULL, "created_at" timestamptz NOT NULL, "updated_at" timestamptz NOT NULL, "ready_at" timestamptz NULL, "expires_at" timestamptz NOT NULL, PRIMARY KEY ("id"), CONSTRAINT "design_version_previews_site_check" CHECK ((site)::text = ANY ((ARRAY['storefront'::character varying, 'admin'::character varying])::text[])), CONSTRAINT "design_version_previews_status_check" CHECK ((status)::text = ANY ((ARRAY['queued'::character varying, 'claimed'::character varying, 'ready'::character varying, 'failed'::character varying, 'expired'::character varying, 'superseded'::character varying])::text[])));
+-- create index "design_version_previews_created" to table: "design_version_previews"
+CREATE INDEX "design_version_previews_created" ON "design_version_previews" ("created_at");
+-- create index "design_version_previews_one_active" to table: "design_version_previews"
+CREATE UNIQUE INDEX "design_version_previews_one_active" ON "design_version_previews" ("shop_id", "site") WHERE ((status)::text = ANY ((ARRAY['queued'::character varying, 'claimed'::character varying, 'ready'::character varying])::text[]));
+-- create index "design_version_previews_shop_site_status" to table: "design_version_previews"
+CREATE INDEX "design_version_previews_shop_site_status" ON "design_version_previews" ("shop_id", "site", "status");
+-- create index "design_version_previews_user_created" to table: "design_version_previews"
+CREATE INDEX "design_version_previews_user_created" ON "design_version_previews" ("shop_id", "requested_by_user_id", "created_at");

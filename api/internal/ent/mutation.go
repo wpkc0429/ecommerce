@@ -24,6 +24,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 	"ksdevworks/ecommerce/api/internal/ent/mediaupload"
 	"ksdevworks/ecommerce/api/internal/ent/member"
 	"ksdevworks/ecommerce/api/internal/ent/memberrefreshtoken"
@@ -92,6 +93,7 @@ const (
 	TypeDesignServiceCredential       = "DesignServiceCredential"
 	TypeDesignSiteState               = "DesignSiteState"
 	TypeDesignUntrackedChange         = "DesignUntrackedChange"
+	TypeDesignVersionPreview          = "DesignVersionPreview"
 	TypeMediaUpload                   = "MediaUpload"
 	TypeMember                        = "Member"
 	TypeMemberRefreshToken            = "MemberRefreshToken"
@@ -21451,6 +21453,1492 @@ func (m *DesignUntrackedChangeMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *DesignUntrackedChangeMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown DesignUntrackedChange edge %s", name)
+}
+
+// DesignVersionPreviewMutation represents an operation that mutates the DesignVersionPreview nodes in the graph.
+type DesignVersionPreviewMutation struct {
+	config
+	op                          Op
+	typ                         string
+	id                          *uuid.UUID
+	shop_id                     *int
+	addshop_id                  *int
+	site                        *string
+	target_request_id           *uuid.UUID
+	target_tag                  *string
+	requested_by_user_id        *int
+	addrequested_by_user_id     *int
+	status                      *string
+	failure_code                *string
+	failure_detail              *string
+	failure_rule_ids            *[]string
+	appendfailure_rule_ids      []string
+	core_version                *string
+	design_floor_version        *string
+	preview_origin              *string
+	claimed_by_credential_id    *int
+	addclaimed_by_credential_id *int
+	claim_expires_at            *time.Time
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	ready_at                    *time.Time
+	expires_at                  *time.Time
+	clearedFields               map[string]struct{}
+	done                        bool
+	oldValue                    func(context.Context) (*DesignVersionPreview, error)
+	predicates                  []predicate.DesignVersionPreview
+}
+
+var _ ent.Mutation = (*DesignVersionPreviewMutation)(nil)
+
+// designversionpreviewOption allows management of the mutation configuration using functional options.
+type designversionpreviewOption func(*DesignVersionPreviewMutation)
+
+// newDesignVersionPreviewMutation creates new mutation for the DesignVersionPreview entity.
+func newDesignVersionPreviewMutation(c config, op Op, opts ...designversionpreviewOption) *DesignVersionPreviewMutation {
+	m := &DesignVersionPreviewMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeDesignVersionPreview,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withDesignVersionPreviewID sets the ID field of the mutation.
+func withDesignVersionPreviewID(id uuid.UUID) designversionpreviewOption {
+	return func(m *DesignVersionPreviewMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *DesignVersionPreview
+		)
+		m.oldValue = func(ctx context.Context) (*DesignVersionPreview, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().DesignVersionPreview.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withDesignVersionPreview sets the old DesignVersionPreview of the mutation.
+func withDesignVersionPreview(node *DesignVersionPreview) designversionpreviewOption {
+	return func(m *DesignVersionPreviewMutation) {
+		m.oldValue = func(context.Context) (*DesignVersionPreview, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m DesignVersionPreviewMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m DesignVersionPreviewMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of DesignVersionPreview entities.
+func (m *DesignVersionPreviewMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *DesignVersionPreviewMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *DesignVersionPreviewMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().DesignVersionPreview.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetShopID sets the "shop_id" field.
+func (m *DesignVersionPreviewMutation) SetShopID(i int) {
+	m.shop_id = &i
+	m.addshop_id = nil
+}
+
+// ShopID returns the value of the "shop_id" field in the mutation.
+func (m *DesignVersionPreviewMutation) ShopID() (r int, exists bool) {
+	v := m.shop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldShopID returns the old "shop_id" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldShopID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldShopID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldShopID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldShopID: %w", err)
+	}
+	return oldValue.ShopID, nil
+}
+
+// AddShopID adds i to the "shop_id" field.
+func (m *DesignVersionPreviewMutation) AddShopID(i int) {
+	if m.addshop_id != nil {
+		*m.addshop_id += i
+	} else {
+		m.addshop_id = &i
+	}
+}
+
+// AddedShopID returns the value that was added to the "shop_id" field in this mutation.
+func (m *DesignVersionPreviewMutation) AddedShopID() (r int, exists bool) {
+	v := m.addshop_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetShopID resets all changes to the "shop_id" field.
+func (m *DesignVersionPreviewMutation) ResetShopID() {
+	m.shop_id = nil
+	m.addshop_id = nil
+}
+
+// SetSite sets the "site" field.
+func (m *DesignVersionPreviewMutation) SetSite(s string) {
+	m.site = &s
+}
+
+// Site returns the value of the "site" field in the mutation.
+func (m *DesignVersionPreviewMutation) Site() (r string, exists bool) {
+	v := m.site
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSite returns the old "site" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldSite(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSite is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSite requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSite: %w", err)
+	}
+	return oldValue.Site, nil
+}
+
+// ResetSite resets all changes to the "site" field.
+func (m *DesignVersionPreviewMutation) ResetSite() {
+	m.site = nil
+}
+
+// SetTargetRequestID sets the "target_request_id" field.
+func (m *DesignVersionPreviewMutation) SetTargetRequestID(u uuid.UUID) {
+	m.target_request_id = &u
+}
+
+// TargetRequestID returns the value of the "target_request_id" field in the mutation.
+func (m *DesignVersionPreviewMutation) TargetRequestID() (r uuid.UUID, exists bool) {
+	v := m.target_request_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTargetRequestID returns the old "target_request_id" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldTargetRequestID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTargetRequestID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTargetRequestID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTargetRequestID: %w", err)
+	}
+	return oldValue.TargetRequestID, nil
+}
+
+// ResetTargetRequestID resets all changes to the "target_request_id" field.
+func (m *DesignVersionPreviewMutation) ResetTargetRequestID() {
+	m.target_request_id = nil
+}
+
+// SetTargetTag sets the "target_tag" field.
+func (m *DesignVersionPreviewMutation) SetTargetTag(s string) {
+	m.target_tag = &s
+}
+
+// TargetTag returns the value of the "target_tag" field in the mutation.
+func (m *DesignVersionPreviewMutation) TargetTag() (r string, exists bool) {
+	v := m.target_tag
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTargetTag returns the old "target_tag" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldTargetTag(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTargetTag is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTargetTag requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTargetTag: %w", err)
+	}
+	return oldValue.TargetTag, nil
+}
+
+// ResetTargetTag resets all changes to the "target_tag" field.
+func (m *DesignVersionPreviewMutation) ResetTargetTag() {
+	m.target_tag = nil
+}
+
+// SetRequestedByUserID sets the "requested_by_user_id" field.
+func (m *DesignVersionPreviewMutation) SetRequestedByUserID(i int) {
+	m.requested_by_user_id = &i
+	m.addrequested_by_user_id = nil
+}
+
+// RequestedByUserID returns the value of the "requested_by_user_id" field in the mutation.
+func (m *DesignVersionPreviewMutation) RequestedByUserID() (r int, exists bool) {
+	v := m.requested_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedByUserID returns the old "requested_by_user_id" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldRequestedByUserID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedByUserID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedByUserID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedByUserID: %w", err)
+	}
+	return oldValue.RequestedByUserID, nil
+}
+
+// AddRequestedByUserID adds i to the "requested_by_user_id" field.
+func (m *DesignVersionPreviewMutation) AddRequestedByUserID(i int) {
+	if m.addrequested_by_user_id != nil {
+		*m.addrequested_by_user_id += i
+	} else {
+		m.addrequested_by_user_id = &i
+	}
+}
+
+// AddedRequestedByUserID returns the value that was added to the "requested_by_user_id" field in this mutation.
+func (m *DesignVersionPreviewMutation) AddedRequestedByUserID() (r int, exists bool) {
+	v := m.addrequested_by_user_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetRequestedByUserID resets all changes to the "requested_by_user_id" field.
+func (m *DesignVersionPreviewMutation) ResetRequestedByUserID() {
+	m.requested_by_user_id = nil
+	m.addrequested_by_user_id = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *DesignVersionPreviewMutation) SetStatus(s string) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *DesignVersionPreviewMutation) Status() (r string, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *DesignVersionPreviewMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetFailureCode sets the "failure_code" field.
+func (m *DesignVersionPreviewMutation) SetFailureCode(s string) {
+	m.failure_code = &s
+}
+
+// FailureCode returns the value of the "failure_code" field in the mutation.
+func (m *DesignVersionPreviewMutation) FailureCode() (r string, exists bool) {
+	v := m.failure_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureCode returns the old "failure_code" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldFailureCode(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureCode: %w", err)
+	}
+	return oldValue.FailureCode, nil
+}
+
+// ClearFailureCode clears the value of the "failure_code" field.
+func (m *DesignVersionPreviewMutation) ClearFailureCode() {
+	m.failure_code = nil
+	m.clearedFields[designversionpreview.FieldFailureCode] = struct{}{}
+}
+
+// FailureCodeCleared returns if the "failure_code" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) FailureCodeCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldFailureCode]
+	return ok
+}
+
+// ResetFailureCode resets all changes to the "failure_code" field.
+func (m *DesignVersionPreviewMutation) ResetFailureCode() {
+	m.failure_code = nil
+	delete(m.clearedFields, designversionpreview.FieldFailureCode)
+}
+
+// SetFailureDetail sets the "failure_detail" field.
+func (m *DesignVersionPreviewMutation) SetFailureDetail(s string) {
+	m.failure_detail = &s
+}
+
+// FailureDetail returns the value of the "failure_detail" field in the mutation.
+func (m *DesignVersionPreviewMutation) FailureDetail() (r string, exists bool) {
+	v := m.failure_detail
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureDetail returns the old "failure_detail" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldFailureDetail(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureDetail is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureDetail requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureDetail: %w", err)
+	}
+	return oldValue.FailureDetail, nil
+}
+
+// ClearFailureDetail clears the value of the "failure_detail" field.
+func (m *DesignVersionPreviewMutation) ClearFailureDetail() {
+	m.failure_detail = nil
+	m.clearedFields[designversionpreview.FieldFailureDetail] = struct{}{}
+}
+
+// FailureDetailCleared returns if the "failure_detail" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) FailureDetailCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldFailureDetail]
+	return ok
+}
+
+// ResetFailureDetail resets all changes to the "failure_detail" field.
+func (m *DesignVersionPreviewMutation) ResetFailureDetail() {
+	m.failure_detail = nil
+	delete(m.clearedFields, designversionpreview.FieldFailureDetail)
+}
+
+// SetFailureRuleIds sets the "failure_rule_ids" field.
+func (m *DesignVersionPreviewMutation) SetFailureRuleIds(s []string) {
+	m.failure_rule_ids = &s
+	m.appendfailure_rule_ids = nil
+}
+
+// FailureRuleIds returns the value of the "failure_rule_ids" field in the mutation.
+func (m *DesignVersionPreviewMutation) FailureRuleIds() (r []string, exists bool) {
+	v := m.failure_rule_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFailureRuleIds returns the old "failure_rule_ids" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldFailureRuleIds(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFailureRuleIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFailureRuleIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFailureRuleIds: %w", err)
+	}
+	return oldValue.FailureRuleIds, nil
+}
+
+// AppendFailureRuleIds adds s to the "failure_rule_ids" field.
+func (m *DesignVersionPreviewMutation) AppendFailureRuleIds(s []string) {
+	m.appendfailure_rule_ids = append(m.appendfailure_rule_ids, s...)
+}
+
+// AppendedFailureRuleIds returns the list of values that were appended to the "failure_rule_ids" field in this mutation.
+func (m *DesignVersionPreviewMutation) AppendedFailureRuleIds() ([]string, bool) {
+	if len(m.appendfailure_rule_ids) == 0 {
+		return nil, false
+	}
+	return m.appendfailure_rule_ids, true
+}
+
+// ResetFailureRuleIds resets all changes to the "failure_rule_ids" field.
+func (m *DesignVersionPreviewMutation) ResetFailureRuleIds() {
+	m.failure_rule_ids = nil
+	m.appendfailure_rule_ids = nil
+}
+
+// SetCoreVersion sets the "core_version" field.
+func (m *DesignVersionPreviewMutation) SetCoreVersion(s string) {
+	m.core_version = &s
+}
+
+// CoreVersion returns the value of the "core_version" field in the mutation.
+func (m *DesignVersionPreviewMutation) CoreVersion() (r string, exists bool) {
+	v := m.core_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoreVersion returns the old "core_version" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldCoreVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoreVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoreVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoreVersion: %w", err)
+	}
+	return oldValue.CoreVersion, nil
+}
+
+// ResetCoreVersion resets all changes to the "core_version" field.
+func (m *DesignVersionPreviewMutation) ResetCoreVersion() {
+	m.core_version = nil
+}
+
+// SetDesignFloorVersion sets the "design_floor_version" field.
+func (m *DesignVersionPreviewMutation) SetDesignFloorVersion(s string) {
+	m.design_floor_version = &s
+}
+
+// DesignFloorVersion returns the value of the "design_floor_version" field in the mutation.
+func (m *DesignVersionPreviewMutation) DesignFloorVersion() (r string, exists bool) {
+	v := m.design_floor_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDesignFloorVersion returns the old "design_floor_version" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldDesignFloorVersion(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDesignFloorVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDesignFloorVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDesignFloorVersion: %w", err)
+	}
+	return oldValue.DesignFloorVersion, nil
+}
+
+// ResetDesignFloorVersion resets all changes to the "design_floor_version" field.
+func (m *DesignVersionPreviewMutation) ResetDesignFloorVersion() {
+	m.design_floor_version = nil
+}
+
+// SetPreviewOrigin sets the "preview_origin" field.
+func (m *DesignVersionPreviewMutation) SetPreviewOrigin(s string) {
+	m.preview_origin = &s
+}
+
+// PreviewOrigin returns the value of the "preview_origin" field in the mutation.
+func (m *DesignVersionPreviewMutation) PreviewOrigin() (r string, exists bool) {
+	v := m.preview_origin
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPreviewOrigin returns the old "preview_origin" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldPreviewOrigin(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPreviewOrigin is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPreviewOrigin requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPreviewOrigin: %w", err)
+	}
+	return oldValue.PreviewOrigin, nil
+}
+
+// ClearPreviewOrigin clears the value of the "preview_origin" field.
+func (m *DesignVersionPreviewMutation) ClearPreviewOrigin() {
+	m.preview_origin = nil
+	m.clearedFields[designversionpreview.FieldPreviewOrigin] = struct{}{}
+}
+
+// PreviewOriginCleared returns if the "preview_origin" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) PreviewOriginCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldPreviewOrigin]
+	return ok
+}
+
+// ResetPreviewOrigin resets all changes to the "preview_origin" field.
+func (m *DesignVersionPreviewMutation) ResetPreviewOrigin() {
+	m.preview_origin = nil
+	delete(m.clearedFields, designversionpreview.FieldPreviewOrigin)
+}
+
+// SetClaimedByCredentialID sets the "claimed_by_credential_id" field.
+func (m *DesignVersionPreviewMutation) SetClaimedByCredentialID(i int) {
+	m.claimed_by_credential_id = &i
+	m.addclaimed_by_credential_id = nil
+}
+
+// ClaimedByCredentialID returns the value of the "claimed_by_credential_id" field in the mutation.
+func (m *DesignVersionPreviewMutation) ClaimedByCredentialID() (r int, exists bool) {
+	v := m.claimed_by_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimedByCredentialID returns the old "claimed_by_credential_id" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldClaimedByCredentialID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimedByCredentialID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimedByCredentialID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimedByCredentialID: %w", err)
+	}
+	return oldValue.ClaimedByCredentialID, nil
+}
+
+// AddClaimedByCredentialID adds i to the "claimed_by_credential_id" field.
+func (m *DesignVersionPreviewMutation) AddClaimedByCredentialID(i int) {
+	if m.addclaimed_by_credential_id != nil {
+		*m.addclaimed_by_credential_id += i
+	} else {
+		m.addclaimed_by_credential_id = &i
+	}
+}
+
+// AddedClaimedByCredentialID returns the value that was added to the "claimed_by_credential_id" field in this mutation.
+func (m *DesignVersionPreviewMutation) AddedClaimedByCredentialID() (r int, exists bool) {
+	v := m.addclaimed_by_credential_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearClaimedByCredentialID clears the value of the "claimed_by_credential_id" field.
+func (m *DesignVersionPreviewMutation) ClearClaimedByCredentialID() {
+	m.claimed_by_credential_id = nil
+	m.addclaimed_by_credential_id = nil
+	m.clearedFields[designversionpreview.FieldClaimedByCredentialID] = struct{}{}
+}
+
+// ClaimedByCredentialIDCleared returns if the "claimed_by_credential_id" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) ClaimedByCredentialIDCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldClaimedByCredentialID]
+	return ok
+}
+
+// ResetClaimedByCredentialID resets all changes to the "claimed_by_credential_id" field.
+func (m *DesignVersionPreviewMutation) ResetClaimedByCredentialID() {
+	m.claimed_by_credential_id = nil
+	m.addclaimed_by_credential_id = nil
+	delete(m.clearedFields, designversionpreview.FieldClaimedByCredentialID)
+}
+
+// SetClaimExpiresAt sets the "claim_expires_at" field.
+func (m *DesignVersionPreviewMutation) SetClaimExpiresAt(t time.Time) {
+	m.claim_expires_at = &t
+}
+
+// ClaimExpiresAt returns the value of the "claim_expires_at" field in the mutation.
+func (m *DesignVersionPreviewMutation) ClaimExpiresAt() (r time.Time, exists bool) {
+	v := m.claim_expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldClaimExpiresAt returns the old "claim_expires_at" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldClaimExpiresAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldClaimExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldClaimExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldClaimExpiresAt: %w", err)
+	}
+	return oldValue.ClaimExpiresAt, nil
+}
+
+// ClearClaimExpiresAt clears the value of the "claim_expires_at" field.
+func (m *DesignVersionPreviewMutation) ClearClaimExpiresAt() {
+	m.claim_expires_at = nil
+	m.clearedFields[designversionpreview.FieldClaimExpiresAt] = struct{}{}
+}
+
+// ClaimExpiresAtCleared returns if the "claim_expires_at" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) ClaimExpiresAtCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldClaimExpiresAt]
+	return ok
+}
+
+// ResetClaimExpiresAt resets all changes to the "claim_expires_at" field.
+func (m *DesignVersionPreviewMutation) ResetClaimExpiresAt() {
+	m.claim_expires_at = nil
+	delete(m.clearedFields, designversionpreview.FieldClaimExpiresAt)
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *DesignVersionPreviewMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *DesignVersionPreviewMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *DesignVersionPreviewMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *DesignVersionPreviewMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *DesignVersionPreviewMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *DesignVersionPreviewMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetReadyAt sets the "ready_at" field.
+func (m *DesignVersionPreviewMutation) SetReadyAt(t time.Time) {
+	m.ready_at = &t
+}
+
+// ReadyAt returns the value of the "ready_at" field in the mutation.
+func (m *DesignVersionPreviewMutation) ReadyAt() (r time.Time, exists bool) {
+	v := m.ready_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReadyAt returns the old "ready_at" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldReadyAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReadyAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReadyAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReadyAt: %w", err)
+	}
+	return oldValue.ReadyAt, nil
+}
+
+// ClearReadyAt clears the value of the "ready_at" field.
+func (m *DesignVersionPreviewMutation) ClearReadyAt() {
+	m.ready_at = nil
+	m.clearedFields[designversionpreview.FieldReadyAt] = struct{}{}
+}
+
+// ReadyAtCleared returns if the "ready_at" field was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) ReadyAtCleared() bool {
+	_, ok := m.clearedFields[designversionpreview.FieldReadyAt]
+	return ok
+}
+
+// ResetReadyAt resets all changes to the "ready_at" field.
+func (m *DesignVersionPreviewMutation) ResetReadyAt() {
+	m.ready_at = nil
+	delete(m.clearedFields, designversionpreview.FieldReadyAt)
+}
+
+// SetExpiresAt sets the "expires_at" field.
+func (m *DesignVersionPreviewMutation) SetExpiresAt(t time.Time) {
+	m.expires_at = &t
+}
+
+// ExpiresAt returns the value of the "expires_at" field in the mutation.
+func (m *DesignVersionPreviewMutation) ExpiresAt() (r time.Time, exists bool) {
+	v := m.expires_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpiresAt returns the old "expires_at" field's value of the DesignVersionPreview entity.
+// If the DesignVersionPreview object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DesignVersionPreviewMutation) OldExpiresAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpiresAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpiresAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpiresAt: %w", err)
+	}
+	return oldValue.ExpiresAt, nil
+}
+
+// ResetExpiresAt resets all changes to the "expires_at" field.
+func (m *DesignVersionPreviewMutation) ResetExpiresAt() {
+	m.expires_at = nil
+}
+
+// Where appends a list predicates to the DesignVersionPreviewMutation builder.
+func (m *DesignVersionPreviewMutation) Where(ps ...predicate.DesignVersionPreview) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the DesignVersionPreviewMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *DesignVersionPreviewMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.DesignVersionPreview, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *DesignVersionPreviewMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *DesignVersionPreviewMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (DesignVersionPreview).
+func (m *DesignVersionPreviewMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *DesignVersionPreviewMutation) Fields() []string {
+	fields := make([]string, 0, 18)
+	if m.shop_id != nil {
+		fields = append(fields, designversionpreview.FieldShopID)
+	}
+	if m.site != nil {
+		fields = append(fields, designversionpreview.FieldSite)
+	}
+	if m.target_request_id != nil {
+		fields = append(fields, designversionpreview.FieldTargetRequestID)
+	}
+	if m.target_tag != nil {
+		fields = append(fields, designversionpreview.FieldTargetTag)
+	}
+	if m.requested_by_user_id != nil {
+		fields = append(fields, designversionpreview.FieldRequestedByUserID)
+	}
+	if m.status != nil {
+		fields = append(fields, designversionpreview.FieldStatus)
+	}
+	if m.failure_code != nil {
+		fields = append(fields, designversionpreview.FieldFailureCode)
+	}
+	if m.failure_detail != nil {
+		fields = append(fields, designversionpreview.FieldFailureDetail)
+	}
+	if m.failure_rule_ids != nil {
+		fields = append(fields, designversionpreview.FieldFailureRuleIds)
+	}
+	if m.core_version != nil {
+		fields = append(fields, designversionpreview.FieldCoreVersion)
+	}
+	if m.design_floor_version != nil {
+		fields = append(fields, designversionpreview.FieldDesignFloorVersion)
+	}
+	if m.preview_origin != nil {
+		fields = append(fields, designversionpreview.FieldPreviewOrigin)
+	}
+	if m.claimed_by_credential_id != nil {
+		fields = append(fields, designversionpreview.FieldClaimedByCredentialID)
+	}
+	if m.claim_expires_at != nil {
+		fields = append(fields, designversionpreview.FieldClaimExpiresAt)
+	}
+	if m.created_at != nil {
+		fields = append(fields, designversionpreview.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, designversionpreview.FieldUpdatedAt)
+	}
+	if m.ready_at != nil {
+		fields = append(fields, designversionpreview.FieldReadyAt)
+	}
+	if m.expires_at != nil {
+		fields = append(fields, designversionpreview.FieldExpiresAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *DesignVersionPreviewMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case designversionpreview.FieldShopID:
+		return m.ShopID()
+	case designversionpreview.FieldSite:
+		return m.Site()
+	case designversionpreview.FieldTargetRequestID:
+		return m.TargetRequestID()
+	case designversionpreview.FieldTargetTag:
+		return m.TargetTag()
+	case designversionpreview.FieldRequestedByUserID:
+		return m.RequestedByUserID()
+	case designversionpreview.FieldStatus:
+		return m.Status()
+	case designversionpreview.FieldFailureCode:
+		return m.FailureCode()
+	case designversionpreview.FieldFailureDetail:
+		return m.FailureDetail()
+	case designversionpreview.FieldFailureRuleIds:
+		return m.FailureRuleIds()
+	case designversionpreview.FieldCoreVersion:
+		return m.CoreVersion()
+	case designversionpreview.FieldDesignFloorVersion:
+		return m.DesignFloorVersion()
+	case designversionpreview.FieldPreviewOrigin:
+		return m.PreviewOrigin()
+	case designversionpreview.FieldClaimedByCredentialID:
+		return m.ClaimedByCredentialID()
+	case designversionpreview.FieldClaimExpiresAt:
+		return m.ClaimExpiresAt()
+	case designversionpreview.FieldCreatedAt:
+		return m.CreatedAt()
+	case designversionpreview.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case designversionpreview.FieldReadyAt:
+		return m.ReadyAt()
+	case designversionpreview.FieldExpiresAt:
+		return m.ExpiresAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *DesignVersionPreviewMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case designversionpreview.FieldShopID:
+		return m.OldShopID(ctx)
+	case designversionpreview.FieldSite:
+		return m.OldSite(ctx)
+	case designversionpreview.FieldTargetRequestID:
+		return m.OldTargetRequestID(ctx)
+	case designversionpreview.FieldTargetTag:
+		return m.OldTargetTag(ctx)
+	case designversionpreview.FieldRequestedByUserID:
+		return m.OldRequestedByUserID(ctx)
+	case designversionpreview.FieldStatus:
+		return m.OldStatus(ctx)
+	case designversionpreview.FieldFailureCode:
+		return m.OldFailureCode(ctx)
+	case designversionpreview.FieldFailureDetail:
+		return m.OldFailureDetail(ctx)
+	case designversionpreview.FieldFailureRuleIds:
+		return m.OldFailureRuleIds(ctx)
+	case designversionpreview.FieldCoreVersion:
+		return m.OldCoreVersion(ctx)
+	case designversionpreview.FieldDesignFloorVersion:
+		return m.OldDesignFloorVersion(ctx)
+	case designversionpreview.FieldPreviewOrigin:
+		return m.OldPreviewOrigin(ctx)
+	case designversionpreview.FieldClaimedByCredentialID:
+		return m.OldClaimedByCredentialID(ctx)
+	case designversionpreview.FieldClaimExpiresAt:
+		return m.OldClaimExpiresAt(ctx)
+	case designversionpreview.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case designversionpreview.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case designversionpreview.FieldReadyAt:
+		return m.OldReadyAt(ctx)
+	case designversionpreview.FieldExpiresAt:
+		return m.OldExpiresAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown DesignVersionPreview field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignVersionPreviewMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case designversionpreview.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetShopID(v)
+		return nil
+	case designversionpreview.FieldSite:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSite(v)
+		return nil
+	case designversionpreview.FieldTargetRequestID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTargetRequestID(v)
+		return nil
+	case designversionpreview.FieldTargetTag:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTargetTag(v)
+		return nil
+	case designversionpreview.FieldRequestedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedByUserID(v)
+		return nil
+	case designversionpreview.FieldStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case designversionpreview.FieldFailureCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureCode(v)
+		return nil
+	case designversionpreview.FieldFailureDetail:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureDetail(v)
+		return nil
+	case designversionpreview.FieldFailureRuleIds:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFailureRuleIds(v)
+		return nil
+	case designversionpreview.FieldCoreVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoreVersion(v)
+		return nil
+	case designversionpreview.FieldDesignFloorVersion:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDesignFloorVersion(v)
+		return nil
+	case designversionpreview.FieldPreviewOrigin:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPreviewOrigin(v)
+		return nil
+	case designversionpreview.FieldClaimedByCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimedByCredentialID(v)
+		return nil
+	case designversionpreview.FieldClaimExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetClaimExpiresAt(v)
+		return nil
+	case designversionpreview.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case designversionpreview.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case designversionpreview.FieldReadyAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReadyAt(v)
+		return nil
+	case designversionpreview.FieldExpiresAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpiresAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignVersionPreview field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *DesignVersionPreviewMutation) AddedFields() []string {
+	var fields []string
+	if m.addshop_id != nil {
+		fields = append(fields, designversionpreview.FieldShopID)
+	}
+	if m.addrequested_by_user_id != nil {
+		fields = append(fields, designversionpreview.FieldRequestedByUserID)
+	}
+	if m.addclaimed_by_credential_id != nil {
+		fields = append(fields, designversionpreview.FieldClaimedByCredentialID)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *DesignVersionPreviewMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case designversionpreview.FieldShopID:
+		return m.AddedShopID()
+	case designversionpreview.FieldRequestedByUserID:
+		return m.AddedRequestedByUserID()
+	case designversionpreview.FieldClaimedByCredentialID:
+		return m.AddedClaimedByCredentialID()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *DesignVersionPreviewMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case designversionpreview.FieldShopID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddShopID(v)
+		return nil
+	case designversionpreview.FieldRequestedByUserID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddRequestedByUserID(v)
+		return nil
+	case designversionpreview.FieldClaimedByCredentialID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddClaimedByCredentialID(v)
+		return nil
+	}
+	return fmt.Errorf("unknown DesignVersionPreview numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *DesignVersionPreviewMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(designversionpreview.FieldFailureCode) {
+		fields = append(fields, designversionpreview.FieldFailureCode)
+	}
+	if m.FieldCleared(designversionpreview.FieldFailureDetail) {
+		fields = append(fields, designversionpreview.FieldFailureDetail)
+	}
+	if m.FieldCleared(designversionpreview.FieldPreviewOrigin) {
+		fields = append(fields, designversionpreview.FieldPreviewOrigin)
+	}
+	if m.FieldCleared(designversionpreview.FieldClaimedByCredentialID) {
+		fields = append(fields, designversionpreview.FieldClaimedByCredentialID)
+	}
+	if m.FieldCleared(designversionpreview.FieldClaimExpiresAt) {
+		fields = append(fields, designversionpreview.FieldClaimExpiresAt)
+	}
+	if m.FieldCleared(designversionpreview.FieldReadyAt) {
+		fields = append(fields, designversionpreview.FieldReadyAt)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *DesignVersionPreviewMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *DesignVersionPreviewMutation) ClearField(name string) error {
+	switch name {
+	case designversionpreview.FieldFailureCode:
+		m.ClearFailureCode()
+		return nil
+	case designversionpreview.FieldFailureDetail:
+		m.ClearFailureDetail()
+		return nil
+	case designversionpreview.FieldPreviewOrigin:
+		m.ClearPreviewOrigin()
+		return nil
+	case designversionpreview.FieldClaimedByCredentialID:
+		m.ClearClaimedByCredentialID()
+		return nil
+	case designversionpreview.FieldClaimExpiresAt:
+		m.ClearClaimExpiresAt()
+		return nil
+	case designversionpreview.FieldReadyAt:
+		m.ClearReadyAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignVersionPreview nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *DesignVersionPreviewMutation) ResetField(name string) error {
+	switch name {
+	case designversionpreview.FieldShopID:
+		m.ResetShopID()
+		return nil
+	case designversionpreview.FieldSite:
+		m.ResetSite()
+		return nil
+	case designversionpreview.FieldTargetRequestID:
+		m.ResetTargetRequestID()
+		return nil
+	case designversionpreview.FieldTargetTag:
+		m.ResetTargetTag()
+		return nil
+	case designversionpreview.FieldRequestedByUserID:
+		m.ResetRequestedByUserID()
+		return nil
+	case designversionpreview.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case designversionpreview.FieldFailureCode:
+		m.ResetFailureCode()
+		return nil
+	case designversionpreview.FieldFailureDetail:
+		m.ResetFailureDetail()
+		return nil
+	case designversionpreview.FieldFailureRuleIds:
+		m.ResetFailureRuleIds()
+		return nil
+	case designversionpreview.FieldCoreVersion:
+		m.ResetCoreVersion()
+		return nil
+	case designversionpreview.FieldDesignFloorVersion:
+		m.ResetDesignFloorVersion()
+		return nil
+	case designversionpreview.FieldPreviewOrigin:
+		m.ResetPreviewOrigin()
+		return nil
+	case designversionpreview.FieldClaimedByCredentialID:
+		m.ResetClaimedByCredentialID()
+		return nil
+	case designversionpreview.FieldClaimExpiresAt:
+		m.ResetClaimExpiresAt()
+		return nil
+	case designversionpreview.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case designversionpreview.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case designversionpreview.FieldReadyAt:
+		m.ResetReadyAt()
+		return nil
+	case designversionpreview.FieldExpiresAt:
+		m.ResetExpiresAt()
+		return nil
+	}
+	return fmt.Errorf("unknown DesignVersionPreview field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *DesignVersionPreviewMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *DesignVersionPreviewMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *DesignVersionPreviewMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *DesignVersionPreviewMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *DesignVersionPreviewMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *DesignVersionPreviewMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *DesignVersionPreviewMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown DesignVersionPreview unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *DesignVersionPreviewMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown DesignVersionPreview edge %s", name)
 }
 
 // MediaUploadMutation represents an operation that mutates the MediaUpload nodes in the graph.

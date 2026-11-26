@@ -17,12 +17,16 @@ func TestLoadDesignDefaultsAndBounds(t *testing.T) {
 		d.ClaimLease != 15*time.Minute || d.ApprovalPendingTimeout != 7*day ||
 		d.PromptRetention != 365*day || d.ScreenshotRetention != 365*day ||
 		d.ScreenshotRetentionUnpublished != 30*day || d.AuditRetention != 730*day ||
-		d.UntrackedRetention != 730*day || d.CredentialRetention != 90*day {
+		d.UntrackedRetention != 730*day || d.CredentialRetention != 90*day ||
+		d.VersionPreviewTTL != 30*time.Minute || d.VersionPreviewHourlyCap != 6 ||
+		d.VersionPreviewDailyCap != 30 || d.VersionPreviewRetention != 90*day {
 		t.Fatalf("defaults: %+v", d)
 	}
 	for key, bad := range map[string]string{
 		"DESIGN_APPROVAL_TTL": "1s", "DESIGN_CLAIM_LEASE": "48h", "DESIGN_DAILY_REQUEST_CAP": "0",
-		"DESIGN_PROMPT_RETENTION": "1h", "DESIGN_AUDIT_RETENTION": "999999h", "DESIGN_APPROVAL_PENDING_TIMEOUT": "nope",
+		"DESIGN_VERSION_PREVIEW_TTL": "3h", "DESIGN_VERSION_PREVIEW_HOURLY_CAP": "0", "DESIGN_VERSION_PREVIEW_DAILY_CAP": "0",
+		"DESIGN_VERSION_PREVIEW_RETENTION": "1h",
+		"DESIGN_PROMPT_RETENTION":          "1h", "DESIGN_AUDIT_RETENTION": "999999h", "DESIGN_APPROVAL_PENDING_TIMEOUT": "nope",
 	} {
 		t.Setenv(key, bad)
 		if err := loadDesign(&Config{}); err == nil {
