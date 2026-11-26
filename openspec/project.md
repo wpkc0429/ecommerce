@@ -7,7 +7,7 @@
 
 ## Tech Stack
 
-- **API**（`/api`，Go 1.26）：chi v5、ent v0.14（+ Atlas diff 引擎產 golang-migrate 格式 versioned migrations）、golang-jwt/jwt v5、santhosh-tekuri/jsonschema v6、go-redis v9 + x/sync/singleflight、alexedwards/argon2id、log/slog
+- **API**（`/api`，Go 1.26.11）：chi v5、ent v0.14（+ Atlas diff 引擎產 golang-migrate 格式 versioned migrations）、golang-jwt/jwt v5、santhosh-tekuri/jsonschema v6、go-redis v9 + x/sync/singleflight、alexedwards/argon2id、log/slog
 - **DB/快取**：PostgreSQL 16（jsonb、UNIQUE NULLS NOT DISTINCT、partial unique indexes）、Redis 7（cache-only，可降級）
 - **商家店面**：不由本 repo 託管；商家的店面與後台來自 merchant template（零建置靜態站），以 `X-Publishable-Key` 呼叫 API
 - **Admin**（`/admin`）：無建置步驟靜態 ES modules SPA

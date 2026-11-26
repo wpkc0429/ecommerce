@@ -19,7 +19,7 @@ docs/    交付文件
 
 ## 跑起來
 
-需要 Docker、Go 1.26、Node 20。
+需要 Docker、Go 1.26.11、Node 20。
 
 ```bash
 cp .env.example .env     # 首次；把 <generate: …> 佔位值換成自己產生的隨機值（見檔內說明）
