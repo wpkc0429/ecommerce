@@ -1,0 +1,31 @@
+# gitleaks configuration (run: gitleaks git --redact=100 --no-banner .)
+# Allowlists only known-public / non-secret values. Nothing here may be a real
+# credential: if a finding is real, rotate it, do not allowlist it.
+title = "ecommerce gitleaks config"
+
+[extend]
+useDefault = true
+
+# 1. Integrity hashes (content hashes, not secrets) flagged as generic-api-key.
+[[allowlists]]
+description = "hash manifests and atlas migration checksum"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)[^/]*manifest\.json$''',
+  '''(^|/)atlas\.sum$''',
+]
+
+# 2. Public ECPay sandbox credentials and dev/test fixtures, matched by exact value.
+[[allowlists]]
+description = "public ECPay sandbox values and dev/test fixtures (exact values)"
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = [
+  '''^075d367f7e5f40a3856e621a743c81e156e10ac4f07259b4d9c8d0f942acbee0$''',
+  '''^6c76bd2c42674027079b01abf197bd1b01ee454e2bcbdd96ebf3a4e5c87296a9$''',
+  '''^87cdc594ad8dada3e6447ee26c8e6ac18842eadaf7170f4820d53057acb78ae4$''',
+  '''^AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=$''',
+  '''^pwFHCqoQZGmho4w6$''',
+  '''^test\-fixture\-r2\-secret\-3e7a91c5$''',
+  '''^unique\-prompt\-marker\-7f3a9c$''',
+]
