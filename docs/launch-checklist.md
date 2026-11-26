@@ -221,4 +221,48 @@
 ### 六、下一步建議
 1. 先修 H2（影響真實付款），再做 H3（D 的第 2 步，需同意）與 H1（部署設定）。
 2. 補通用跨租戶測試，並把 M1-M3 的小修併成一個 PR。
-3. 其餘照 D 的順序；工具安裝取得同意後再跑 govulncheck、gosec、gitleaks、trivy 作為第二道。
+3. 其餘照 D 的順序；govulncheck、gosec、gitleaks 已跑（見「掃描工具結果」），trivy 等仍待同意。
+
+## 掃描工具結果 (2026-11-26)
+
+工具以 `go install` 安裝到 `C:\Users\ks\go\bin`（未改 PATH、未改 repo）：govulncheck v1.10.0（DB 2026-11-24）、gosec v2.30.0、gitleaks v8.30.1。執行環境 GOTOOLCHAIN=go1.26.4（需把該 toolchain 的 bin 放在該次指令 PATH 前，否則 go1.27 的 `go list` 會與 govulncheck 衝突）。
+
+### 指令與數量
+| 工具 | 指令（於 ecommerce/api） | 結果 |
+|---|---|---|
+| govulncheck | `govulncheck ./...` | 修前：28 個可達（x/net 與 stdlib 合計，部分同時涉及兩者）；另有 4 個在匯入套件、18 個在依賴模組但未呼叫。修後（x/net 升 v0.62.0）：21 個可達，全為 stdlib |
+| gosec | `gosec -exclude-dir=ent -exclude-generated -no-fail ./...`（預設不含 `_test.go`；排除 ent 產生碼） | 139 檔 / 33,884 行，14 筆：HIGH 11（G115×5、G404×2、G704×2、G101×2）、MEDIUM 3（G705×2、G304×1）；全部判定為誤報或低風險 |
+| gitleaks | `gitleaks git --redact=100 --no-banner -f json .`（全歷史，輸出已遮蔽） | ecommerce 34、bouquet 8、platform-website 1、merchant-template-clean 16；**全為 generic-api-key，無真實機密**，無 AWS/Stripe/Cloudflare/私鑰類命中 |
+
+### 發現
+**高**
+- V1（owner 需要）Go 標準庫 go1.26.4 有 21 個可達漏洞（net/http、crypto/tls、crypto/x509、html/template、encoding/xml、net/url…），最高修復版 go1.26.11（GO-2026-6859 HTTP/1 伺服器崩潰、GO-2026-6809 x509 中繼憑證）。可達路徑例：`internal/content/hook/sender.go:154`（http.Client.Do）、`internal/media/s3store.go:46`。修法：`api/go.mod` 的 `go` 改 1.26.11、Dockerfile 用 `golang:1.26.11-alpine`（目前 `golang:1.26-alpine` 會浮動）、CI 重建映像。**未由 subagent 處理**：golangci-lint v2.15.0 以 go1.26.4 建置，go 指令改版會使 lint 失敗，需連同 lint 升級一起核准。
+
+**中**
+- V2（已修）golang.org/x/net v0.47.0 的 13 個漏洞（GO-2026-5025~5030、6610~6617、6860、6866 等），其中 `internal/cms/richtext/imageprefix.go:22` 的 `html.ParseFragment`（CMS 富文本淨化）可達 GO-2026-5030（重複屬性 XSS）、5025-5029、6860、6866。已升 v0.62.0（crypto 連帶 v0.58.0）。
+
+**低**
+- G115 `internal/points/service.go:313`（int64→int32 點數）：`AwardBasisAmount/pointsPerMinorUnit` 理論可溢位；建議加上限檢查。subagent 可做。
+- G115 `internal/media/service.go:421` 影像寬高 int→int32：已受影像尺寸上限約束，誤報。
+- G115 `internal/design/screenshots.go:310,377` viewport int→int16：請求端已驗證範圍，建議在轉型前加 clamp 以消警。subagent 可做。
+- G404 `internal/ratelimit/limiter.go:91,162`：math/rand 僅用於 Redis sorted-set 成員唯一後綴，非安全用途，誤報。
+- G704 `cmd/ecpay-sim/main.go:223,229`：本機 ECPay 模擬器，URL 來自表單且僅開發用，誤報；確保此 binary 不進 production 映像。
+- G101 `internal/config/secrets.go:21,26`：公開的 dev 金鑰/mock webhook 預設值，檔內註明且非 dev 環境會拒絕啟動，誤報。
+- G705 `internal/httpapi/content_public.go:110,221`：輸出已序列化 JSON 且 Content-Type 為 application/json，誤報。
+- G304 `internal/config/config.go:723`：`.env` 讀取固定相對路徑，非使用者輸入，誤報。
+
+### gitleaks 分類（值皆未印出）
+- 真實機密：**0**。不需輪替。
+- 公開沙盒值：ECPay 官方公開測試商店（MerchantID 3002607 與其公開 HashKey/HashIV），出現於 `.env.example`、`config.go`、`ecpay-sim/main.go`、`e2e/lib.mjs`、多個 `_test.go`、openspec 封存文件（ecommerce 歷史 commit 1345cb5、0217aa5）。
+- 測試/開發固定值：`secrets.go` dev 加密金鑰、`cryptbox_test.go` 測試 base64 金鑰、`media_test.go`、`design_integration_test.go` 的 prompt 字串、`resolver_integration_test.go`/`cms_integration_test.go` 的 64 位 hex 測試金鑰（皆為 dev/CI 專用，正式環境被拒）。
+- 完整性雜湊誤報：`admin/scripts/core.manifest.json`、`scripts/*.manifest.json`（bouquet、platform-website、merchant-template-clean 全部命中）、`api/migrations/atlas.sum`。建議新增 `.gitleaks.toml` allowlist（path 比對上述檔案）以便日後接 CI：owner 同意後 subagent 可做。
+- 待人工確認（低）：`openspec/changes/archive/2026-07-31-guest-checkout/tasks.md:186` 一個 `eyJ` 開頭字串，看似範例 token 佔位，建議 owner 目視確認一次。
+
+### 分工
+| 項目 | 狀態 | 分工 |
+|---|---|---|
+| V1 go 1.26.11 + Dockerfile + lint 升級 | 未做 | owner 核准後 subagent 可做 |
+| V2 x/net v0.62.0 | 已修 | 完成 |
+| G115 points/screenshots 加檢查 | 未做 | subagent 可做 |
+| `.gitleaks.toml` allowlist 與 CI 接入 | 未做 | subagent 可做（需同意） |
+| tasks.md:186 目視確認 | 未做 | owner |
