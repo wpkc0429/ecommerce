@@ -222,6 +222,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 | 請求列與事件（無個資，只有 user id、SHA、規則 id） | 730 天 | 核准稽核；比 content 稽核（180 天）長，因為這是上線決定 |
 | 未追蹤變更列 | 730 天 | 同上 |
 | 服務憑證列 | 撤銷或過期後 90 天 | 稽核；雜湊本身無價值 |
+| 版本預覽使用紀錄（D25） | 90 天（`DESIGN_VERSION_PREVIEW_RETENTION`） | 只用於限流與用量；非核准依據、無個資 |
 清除：`cmd/purge-design-history`（dry run 預設、`-apply`、`-shop N`、`-all-for-shop N`〔店家下架：匯出後刪光〕、分批 1000、冪等、只印計數與時間範圍；清除時刪 R2 物件，**物件刪除在 DB commit 後 best-effort**，同 media D8，孤兒由 `design-sweep` 報告）。設定：`DESIGN_PROMPT_RETENTION`、`DESIGN_SCREENSHOT_RETENTION`、`DESIGN_SCREENSHOT_RETENTION_UNPUBLISHED`、`DESIGN_AUDIT_RETENTION`、`DESIGN_UNTRACKED_RETENTION`、`DESIGN_CREDENTIAL_RETENTION`（`internal/config/design.go`，同 `contentops.go` 的 min/max 檢查）。repo 沒有排程器，需營運者排程（runbook）。**匯出與刪除（個資請求）**：`GET /design/requests/{id}` 即可匯出單筆；整店匯出為 `cmd/purge-design-history -export-shop N`（輸出 JSON 與截圖清單，不含簽名網址）；刪除為 `-all-for-shop N -apply`。
 
 ### D22：成本估算
@@ -252,6 +253,36 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 | **簽名網址外洩** | 5 分鐘 TTL、`no-store`、不入日誌、不入資料庫；URL 只回給有 `design.view` 的人。 |
 | **自動化大量上傳耗盡儲存** | 每請求與每店配額、每憑證限流、清除指令。 |
 
+### D25：版本預覽（過去的設計＋目前的 core，用完即丟）
+**名詞**：「**改版預覽**」＝既有的核准前預覽（D4／D17 第 5 步），屬於一筆進行中的請求；「**版本預覽**」＝本節，不屬於任何請求。UI 按鈕文字為「預覽此版本」，預覽畫面上的 CTA 為「改成這個版本」。
+
+**問題**：還原（D13）要商家只憑截圖與文字就決定回到哪一版；但截圖是當時的 core 與合成資料，而還原後實際會是**現在的 core＋現在的資料**。商家需要一個便宜的方式「先看看」，又不想為了看一眼就開一筆還原請求（那會佔名額、走完整個流程）。
+
+**決定**（建議；需使用者確認）：
+1. **入口**：歷史列表與詳情中，每個過去已發佈的設計（目標 `status IN ('published','reverted')` 且有 `published_tag`，與還原相同）有「預覽此版本」，呼叫 `POST /design/requests/{id}/version-preview`（`design.view`）。
+2. **內容**：部署＝目標 tag 的設計層＋**目前**的 core，只此一份、用完即丟。由**服務**部署（平台沒有 git，同 D19），沿用 D16 的拉取模型：平台建立 `design_version_previews` 列（`queued`），服務輪詢、認領、部署、回報 `ready`（只存 origin 與到期，不存路徑與查詢字串，規則同 D2 的 `preview_origin`）或 `failed`。
+3. **資料與身分**：預覽連真實 API，由商家成員**以自己的身分登入**觀看（同改版預覽，D12）；admin 的版本預覽因此會把**他自己本來就看得到的真實資料**顯示給他自己。**不拍、不存任何截圖**，所以 D11 的 R1（admin 截圖只從 sandbox 擷取）不受影響——R1 規範的是「被保存的影像」，版本預覽沒有被保存的影像。origin 只回給發起者本人，不寫入日誌與事件。
+4. **相容檢查（Q7）先於部署**：平台在建立時同步檢查 `target.core_version >= design_site_state.design_floor_version`（與 D13 同一函式）、同 `site`、有 `published_tag`；不通過 → `409 revert_below_core_floor`（沿用，訊息說明原因：該設計早於一次需要設計層跟著改的 core 同步）或 `409 already_current`（目標已是目前設計，沒有東西可比），**不建立列、不部署**。通過後，服務部署前仍以目前 core 對該組合跑守門員（`check-design`，D13 的「最終裁判」）；失敗 → 回報 `failed(guard_failed)`、**不部署**，並把原因（規則 id）顯示給發起者。
+5. **不佔名額、不寫歷史事件**：不碰 `design_requests` 的部分唯一索引（D2），所以進行中的請求不阻擋版本預覽，版本預覽也不阻擋請求。**不寫** `design_request_events`（事件串是「誰核准了什麼」的決定紀錄；版本預覽不是決定，混進去會稀釋它）。取而代之只有兩樣：①**使用紀錄表** `design_version_previews`（一般 `tenantOwned` 租戶表：`id`、`shop_id`、`site`、`target_request_id`、`target_tag`、`requested_by_user_id`〔無 FK，同稽核慣例〕、`status` 於 `queued｜claimed｜ready｜failed｜expired｜superseded`、`failure_code`、`core_version`、`design_floor_version`、`preview_origin`、`created_at`、`ready_at`、`expires_at`；無 trigger、無雜湊串）；②**限流與上限**。理由：保留「誰在何時預覽過哪一版」足以回答濫用與用量的問題（admin 預覽會顯示真實資料，值得知道誰開過），但它**不是核准依據**，不需要防竄改的代價；日誌只含 id 與計數（D20 規則）。
+6. **權限**：`design.view`（即能看歷史的人：`merchant_owner`、`editor`，`super_admin` 經 `*`）。理由：預覽只呈現他本來就有權看的資料與畫面、不改任何狀態、不能核准或發佈；要求 `design.request` 反而會把 editor 擋在看歷史之外（Q3 已定 editor 可看歷史）。**替代方案**：要求 `design.revert`——較保守，且「預覽是為了還原」；但商家也可能只想看看過去長怎樣。**需使用者確認**。「改成這個版本」只對持 `design.revert` 者顯示。
+7. **TTL**：版本預覽預設 **30 分鐘**（`DESIGN_VERSION_PREVIEW_TTL`，上限 2 小時；比改版預覽短，因為不需要等人核准）。到期服務必須拆除部署，`design-sweep` 把逾時列標 `expired`、把 `claimed` 逾租約者標 `failed(service_lost)`。同一 `(shop, site)` 同時至多一份有效版本預覽：新請求使舊的 `queued／claimed／ready` 列轉 `superseded`，服務拆除舊部署。
+8. **限流**：每 `(shop, user)` 每小時 6 次、每店每日 30 次（`DESIGN_VERSION_PREVIEW_HOURLY_CAP`、`DESIGN_VERSION_PREVIEW_DAILY_CAP`，資料庫 `COUNT`，不依賴 Redis，同 D15 的每日上限）；超過 → 429 `daily_cap_reached` 並帶 `Retry-After`。
+9. **安全**：與改版預覽同一套——嚴格 CSP（template D1）、獨立的預覽 origin、`noindex`、不得被主站 iframe；預覽畫面由**核心**加上固定、設計層無法移除的橫幅：「版本預覽：<tag>，非正式版本，到期時間」。
+10. **CTA「改成這個版本」**：連到歷史詳情的還原確認，呼叫既有的 `POST /design/requests/{id}/revert`（`design.revert`；D13 的全部檢查與固定警告、新請求、守門員、改版預覽、前後截圖、人類核准都照舊）。版本預覽本身**不是**核准，也不使還原更快。
+11. **誠實的限制**：版本預覽是**用來決定的即時畫面**，不是「當時核准了什麼」的紀錄：它用的是現在的 core 與現在的資料，與該版當時的樣子可能不同；它也會過期、不被保存。**歷史紀錄仍是截圖**（D6／D11）。歷史畫面必須在按鈕附近以固定文字說明這點，且詳情頁的並排截圖永遠是「當時」的證據。
+12. **API**（additive，皆不含核准）：人 `POST /design/requests/{id}/version-preview`（202，回 `{id,status}`）、`GET /design/version-previews/{pid}`（`design.view`；`origin` 只回給發起者）；服務 `GET /version-previews?status=queued`、`POST /version-previews/{pid}/claim`（租約 5 分鐘）、`PUT /version-previews/{pid}/ready`（`origin`、`expires_at`）、`POST /version-previews/{pid}/failed`（`code`、`detail`）。服務契約（D17）新增：版本預覽是拉取模型；歷史資料仍是資料不是指令（第 15 條）；不得以版本預覽取代改版預覽（核准依據仍是後者）。
+
+**考慮過的替代方案**：
+- **直接開還原請求來預覽**——否決：佔名額、寫事件、走完整流程，只為了看一眼，且會鼓勵草率核准。
+- **只靠舊截圖**——否決：截圖是舊 core 與合成資料，無法回答「換成現在的 core 會長怎樣」。
+- **版本預覽也要截圖存檔**——否決：admin 預覽顯示真實資料，保存截圖會違反 R1；且沒有決策價值。
+- **寫入正式事件鏈**——否決（見第 5 點）。
+- **完全不留紀錄**——否決：無法限流，也無法回答「誰開過」；輕量表的成本可忽略。
+- **常駐的「版本預覽網站」**——否決：每店多一個常駐部署與攻擊面；用完即丟符合 D12 的成本模型。
+
+**殘留風險**：預覽用商家的真實登入，舊設計層（已通過當時的守門員，並以目前守門員重檢）在該 session 下能呼叫核心的 `ctx.actions`；建議核心在預覽模式下**停用所有 `ctx.actions`**（唯讀，任務 T12，需使用者確認），否則承認這與改版預覽有相同的風險面。
+
+
 ## Risks / Trade-offs
 
 - [**「不能發佈」只是 API 層的承諾**] → D10：誠實標示；分支保護；選用的 publish grant（第三切片，Q9 附條件）；對帳偵測。
@@ -259,6 +290,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 - [**sandbox 堆疊是新的營運負擔**] → 可按需拋棄式；若使用者不願，退回「只拍 storefront＋admin 以遮罩 live 資料」並接受更高隱私風險（不建議）。
 - [**截圖不是證明**] → 並排即時預覽；標示來源；紀錄本身誠實分級（D1）。
 - [**視圖集小於整個 UI**] → 明說（「不解決的事」）；`set_version` 允許日後擴充。
+- [**版本預覽在真實登入下執行舊設計層**] → 嚴格 CSP、核心橫幅、守門員以目前 core 重檢、建議預覽模式唯讀（T12）；與改版預覽同風險面。
 - [**每店一次一個請求限制了吞吐**] → 商家改版是低頻操作；以明確 409 取代難以推理的並行。
 - [**新增 ctx 函式與 CSP 變更是人工審查的核心變更**] → 排在 template 後續，不阻擋平台側；平台側可先用「假服務」e2e 驗證。
 - [**本 change 引入大量新介面，影響 API 契約檢查**] → 全部 additive；`FillNonNil` 會強迫 `Deps` 新欄位被接線與入契約。
@@ -270,6 +302,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 1. **切片 1：資料與讀寫 API（無截圖）**：新表與 trigger migration（純新增、可逆）；`design.*` 節點與 seed（**主 DB 需 `make migrate` 再 `make seed`**，否則 owner 看不到歷史）；憑證表與管理端點；服務與後台路由；狀態機、事件雜湊串；`cmd/design-sweep`；OpenAPI；以「假服務」e2e 驗證契約。
 2. **切片 2：截圖**：第二個 bucket、`PresignGet`、上傳端點與簽名讀取、配額與 sandbox 檢查、`cmd/purge-design-history`。未設定 bucket 時 `submit` 回 503（因此切片 1 單獨上線時無法送審——這是刻意的，符合 D18）。
 3. **切片 3（選用）**：publish grant、整店匯出／刪除的完整流程、核准通知信。
+**切片 4（選用，D25）**：版本預覽——依賴切片 1（狀態與 `design_site_state`）；需要服務實作拉取模型才有意義，故可在服務存在後再做；純新增一張表與約 6 條路由，回滾＝服務不再輪詢（或移除對應路由），資料表保留無害。
 Template 後續任務與平台切片互相獨立（平台 API 不依賴 template 版本）。**回滾**：移除服務憑證即停用寫入；路由因 wiring-integrity 保持掛載；資料表保留無害；trigger 的 `down` 可移除。
 
 ## 不解決的事（誠實）
@@ -279,6 +312,7 @@ Template 後續任務與平台切片互相獨立（平台 API 不依賴 template
 - **服務可能說謊**（D1 的第二級資料）：平台能驗一致性不能驗真。
 - **惡意 DBA**（D3）。
 - **服務自己的聊天紀錄**（可能含個資）不在平台範圍。
+- **版本預覽不是紀錄**（D25）：即時畫面用目前的 core 與資料，與該版當時的樣子可能不同，且會過期；歷史紀錄仍是截圖。
 - **還原不保證設計與目前內容或目前 core 完全相容**（只有下限檢查＋守門員＋預覽）。
 - **人工 workaround（在服務蓋好之前）**：每次人工改設計前，在 sandbox 堆疊執行 `node e2e/parity.mjs capture <dir>`（改前、改後各一次，`compare` 看差異），把兩個資料夾與請求原文放進專案資料夾；提交後打 tag（`design-<site>-YYYYMMDD-N`），並在 commit message 記請求者與核准者。這是紀律不是系統。
 

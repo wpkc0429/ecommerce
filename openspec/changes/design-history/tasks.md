@@ -78,3 +78,20 @@
 - [x] 9.2 `cd e2e && node design-history-path.mjs` 全綠；`commerce-path.mjs` 仍綠（未動事件鏈，仍須確認） （`design-history-path.mjs` 55 項全綠；`commerce-path.mjs` 為 happy-path 的一部分，該次整體跑完只剩 `design-path.mjs` 兩項與設計歷史節的 email 撞名〔已修〕——`design-path.mjs` 的兩項〔固定警告前導文字、loader 回報被拒的鍵〕是 admin 設計層的瀏覽器測試，本 change 未動 `admin/`，但**未在基線上比對過**）
 - [x] 9.3 手動：第二個 bucket 以匿名請求讀取任何物件鍵必須 403／404（把結果寫進 runbook） （本機 MinIO 版已由 e2e 驗證：去掉簽名、竄改簽名、匿名列出 bucket 皆被拒。**真正的 R2 第二個 bucket 的匿名讀取驗證仍須由你在建立 bucket 後手動做**，步驟在操作員手冊第 6 節）
 - [x] 9.4 量測並記入 CLAUDE.md：每請求 DB 與儲存實際大小，對照 design D22 的估算 （量測，e2e 合成資料：每請求事件約 8.5 列〔平均 368 B/列〕、請求列約 1 KB、截圖列 4 張／請求；三張表的總關聯大小約 48 KB／請求，與 D22 的 50 KB 估計相符。**儲存大小無法在此量測**：e2e 的 PNG 是幾百位元組的合成漸層，真實的截圖大小要等 template 的擷取腳本 T6 與 sandbox 堆疊存在後才有意義；D22 的 6–20 MB／請求估計維持未驗證）
+
+## 10. 版本預覽（D25；**未開始 NOT STARTED**；切片 4，選用，依賴切片 1；需服務實作拉取模型才有意義）
+
+> 名詞：「改版預覽」＝既有核准前預覽；「版本預覽」＝本組，不屬於任何請求。UI 按鈕「預覽此版本」、CTA「改成這個版本」。design.md D25 中標「需使用者確認」的項目（權限 `design.view` 或 `design.revert`、預設 TTL 30 分鐘、限流數字、預覽模式是否唯讀）在開工前先確認。
+
+- [ ] 10.1 `api/internal/ent/schema/designversionpreview.go`：`DesignVersionPreview`（欄位見 D25 第 5 點；無 trigger、無雜湊串、`requested_by_user_id` 無 FK；`(shop_id, site, status)` 索引）；`make migrate-gen name=add_design_version_previews`；`tenantOwned` 登記；up→down→up
+- [ ] 10.2 `api/internal/design/versionpreview.go`：建立（目標檢查、**呼叫 D13 同一個相容檢查函式**、`already_current`、取代舊的有效列、限流計數取自資料庫）、認領（5 分鐘租約）、`ready`（origin 驗證：只有 scheme＋主機）、`failed`、清掃（`expired`、逾租約 `failed(service_lost)`）；**不碰** `design_requests` 與 `design_request_events`
+- [ ] 10.3 `api/internal/httpapi/design_admin.go`：`POST /design/requests/{id}/version-preview`（202）、`GET /design/version-previews/{pid}`（`origin` 只回發起者）皆 `design.view`；`design_service.go`：`GET /version-previews?status=queued`、`POST …/claim`、`PUT …/ready`、`POST …/failed`；`router.go`／`wire.go` 沿用既有 `Deps`（`wiring_integration_test.go` 綠）
+- [ ] 10.4 `api/internal/config/design.go`：`DESIGN_VERSION_PREVIEW_TTL`（預設 30m，上限 2h）、`DESIGN_VERSION_PREVIEW_HOURLY_CAP`（6）、`DESIGN_VERSION_PREVIEW_DAILY_CAP`（30）、`DESIGN_VERSION_PREVIEW_RETENTION`（90d）；含 min/max 檢查；`.env.example`
+- [ ] 10.5 `cmd/design-sweep` 加入版本預覽逾時處理；`cmd/purge-design-history` 加入 `design_version_previews` 的保存期限清除與 `-export-shop` 輸出；測試仿既有（邊界、冪等、不碰他店與其他表）
+- [ ] 10.6 OpenAPI：約 6 條新路由與 `DesignVersionPreview` schema，`v1-surface.txt` **只新增行**；`make openapi` 四道檢查全綠
+- [ ] 10.7 整合與 e2e：不佔名額（有 `awaiting_approval` 時仍可預覽）、不寫事件（事件數不變）、`revert_below_core_floor` 與 `already_current` 不建立列、`staff` 403、跨店 404、他人看不到 origin、服務不能建立、取代舊預覽、限流 429、origin 含路徑 422、slog buffer 證明日誌無 origin；假服務腳本加入拉取—認領—`ready`—到期流程；擴充 `design-history-path.mjs`
+- [ ] 10.8 文件：`docs/design-service-contract.md`（D17 新增版本預覽步驟與錯誤處理，並寫明不得以版本預覽取代改版預覽）、`docs/design-history.md`、`docs/admin-frontend-integration.md`（按鈕、固定限制文字、`origin` 僅發起者、CTA 走既有還原）、`docs/deploy/design-history-operations.md`（新設定與清除）、`CLAUDE.md`
+- [ ] T9 `admin/core/data.js`／`actions.js`：`ctx.actions.requestVersionPreview(requestId)`（先檢查 `design.view`；非不可逆動作，不需 `WARNED_CONFIRM_IDS`）與 `ctx.data.getVersionPreview(pid)`；`409 revert_below_core_floor`／`already_current`／`429` 對應到 `ActionError` 並以 `copy.js` 顯示原因；新增 `ctx` 函式是人工審查的核心變更（`.claude/skills/core-change`）
+- [ ] T10 `admin/design-defaults/views/design-history.js`、`design-request.js`：每個已發佈設計的「預覽此版本」按鈕、等待／失敗／到期狀態、固定限制說明（非核准當時紀錄、截圖為準）、「改成這個版本」（僅 `design.revert`，導向既有還原確認）；copy 鍵同步 `design/copy.js` 與 `design-defaults/copy.js`
+- [ ] T11 預覽主機與 CSP：版本預覽的部署使用與改版預覽相同的預覽 host 設定（獨立 origin、`noindex`、嚴格 CSP、禁止被 iframe）；**核心橫幅**（版本預覽、tag、到期時間；設計層不可移除，守門員加規則保護）；`checkCsp`、`deployChecks` 與測試同改；`docs/DECISIONS.md` 記錄
+- [ ] T12 （**需使用者確認**）預覽模式唯讀：核心在版本預覽下停用所有 `ctx.actions`（只允許導覽），降低在真實登入下執行舊設計層的風險；`admin/lib/public-api.json`、`admin/docs/DESIGN-LAYER.md`、`admin/scripts/core.manifest.json`（人工 `--update`）、守門員 fixtures、`admin/e2e/`、`docs/CORE-CHANGELOG.md`（`Design-layer action:` 行：copy 鍵、按鈕）、`template.json` 版本
