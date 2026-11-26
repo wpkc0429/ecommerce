@@ -1892,6 +1892,7 @@ var (
 		{Name: "password_hash", Type: field.TypeString, Nullable: true, Size: 255, SchemaType: map[string]string{"postgres": "varchar(255)"}},
 		{Name: "status", Type: field.TypeInt16, Default: 1},
 		{Name: "meta", Type: field.TypeJSON},
+		{Name: "display_name", Type: field.TypeString, Nullable: true, Size: 80, SchemaType: map[string]string{"postgres": "varchar(80)"}},
 	}
 	// UsersTable holds the schema information for the "users" table.
 	UsersTable = &schema.Table{

@@ -27,6 +27,8 @@ const (
 	FieldStatus = "status"
 	// FieldMeta holds the string denoting the meta field in the database.
 	FieldMeta = "meta"
+	// FieldDisplayName holds the string denoting the display_name field in the database.
+	FieldDisplayName = "display_name"
 	// EdgeShopUsers holds the string denoting the shop_users edge name in mutations.
 	EdgeShopUsers = "shop_users"
 	// EdgeRoleUsers holds the string denoting the role_users edge name in mutations.
@@ -85,6 +87,7 @@ var Columns = []string{
 	FieldPasswordHash,
 	FieldStatus,
 	FieldMeta,
+	FieldDisplayName,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -112,6 +115,8 @@ var (
 	DefaultStatus int16
 	// DefaultMeta holds the default value on creation for the "meta" field.
 	DefaultMeta json.RawMessage
+	// DisplayNameValidator is a validator for the "display_name" field. It is called by the builders before save.
+	DisplayNameValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the User queries.
@@ -145,6 +150,11 @@ func ByPasswordHash(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByDisplayName orders the results by the display_name field.
+func ByDisplayName(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDisplayName, opts...).ToFunc()
 }
 
 // ByShopUsersCount orders the results by shop_users count.

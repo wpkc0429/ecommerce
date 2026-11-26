@@ -19,3 +19,13 @@
 - **個資請求／商家下架**：`purge-design-history -export-shop N` 匯出（只有中繼資料與物件鍵，不含簽名網址），`-all-for-shop N -apply` 刪除資料列與物件。
 - **服務看不到歷史**：機器路由的唯讀詳情不回 prompt 全文，也沒有截圖讀取路由；歷史是資料不是指令，永不餵入 agent 的指令脈絡（`docs/design-service-contract.md`）。
 - **殘留風險**：服務可能上傳假的 `dataset` 宣告（無法驗真）；影像內容未經個資偵測。緩解：sandbox 是唯一接受 admin 截圖的環境、核准畫面並排即時預覽、R3 的遮罩。
+
+## 顯示名稱（2026-11-27 後續）：隱私審查說明
+
+設計歷史的畫面需要「誰提出、誰核准」，但編輯者（`editor`）不能呼叫成員清單。新增 `proposed_by_name`、`approved_by_name`、`rejected_by_name`（請求）與 `actor_name`（事件）。審查結論：
+
+- **儲存**：`users.display_name`（可空 varchar(80)），由使用者自己用 `PATCH /api/v1/admin/me` 設定或清除；從不由 email、電話或帳號資料推導。寫入時剔除控制與雙向覆寫字元，並拒絕含 email、台灣手機或疑似卡號者（沿用 `RedactPII`），須單行。
+- **誰看得到**：只有人用路由（`/admin/shops/{id}/design/…`）、該店 `design.view` 的成員與平台管理員；他店 404／403。服務憑證的路由（`/design-service/…`）**不回任何名稱**（整合測試斷言鍵不存在、回應不含名稱）。
+- **回退值**：沒設定名稱時，店內成員顯示 `Team member`，非成員（平台管理員）顯示 `Platform admin`，服務事件 `Design service`，系統事件 `System`。因此不會洩漏 email、電話，也不會因名稱缺失而透露帳號資訊。
+- **殘留風險**：顯示名稱是使用者自填的自由文字，可能是真名；同店有 `design.view` 的人看得到。名稱可隨時改或清空，但**已經讀過的人會記得**，且歷史上的名稱是「讀取當下的名稱」不是快照（事件鏈與 `detail` 不含名稱，所以改名不影響雜湊鏈）。個資刪除請求時清空 `users.display_name` 即可，不需動歷史表。
+- **sandbox 來源清單**：R1 的伺服器端強化見 `docs/deploy/sandbox-stack.md`（`DESIGN_SANDBOX_ORIGINS`）。

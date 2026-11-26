@@ -5,12 +5,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"time"
 
 	"ksdevworks/ecommerce/api/internal/auth"
+	"ksdevworks/ecommerce/api/internal/design"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/permission"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
@@ -312,9 +314,60 @@ func (h *AdminAuthHandler) Me(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{
 		"id":                   u.ID,
 		"email":                u.Email,
+		"display_name":         u.DisplayName,
 		"sids":                 id.SIDs,
 		"platform_permissions": perms,
 	})
+}
+
+// UpdateMe sets or clears the caller's own display name, the name teammates
+// see in the design history (never their email). Only the caller's own record.
+func (h *AdminAuthHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	id, ok := auth.AdminFrom(r.Context())
+	if !ok {
+		httpx.Unauthorized(w)
+		return
+	}
+	var body struct {
+		DisplayName *string `json:"display_name"`
+	}
+	if !decodeJSON(w, r, &body) {
+		return
+	}
+	if body.DisplayName == nil {
+		httpx.Unprocessable(w, "display_name is required (empty clears it)", nil)
+		return
+	}
+	name, err := design.CleanDisplayName(*body.DisplayName)
+	if err != nil {
+		msg := "display_name is not acceptable"
+		var de *design.Error
+		if errors.As(err, &de) {
+			msg = de.Message
+		}
+		httpx.Unprocessable(w, msg, nil)
+		return
+	}
+	upd := h.Client.User.UpdateOneID(id.UserID).Where(user.StatusEQ(1))
+	if name == "" {
+		upd.ClearDisplayName()
+	} else {
+		upd.SetDisplayName(name)
+	}
+	if err := upd.Exec(r.Context()); err != nil {
+		if ent.IsNotFound(err) {
+			httpx.Unauthorized(w)
+			return
+		}
+		h.Log.Error("me: update display name", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	var out any
+	if name != "" {
+		out = name
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"id": id.UserID, "display_name": out})
 }
 
 // platformPermissions is the decided permission set at platform ctx, sorted by

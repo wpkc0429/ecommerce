@@ -49514,6 +49514,7 @@ type UserMutation struct {
 	addstatus                *int16
 	meta                     *json.RawMessage
 	appendmeta               json.RawMessage
+	display_name             *string
 	clearedFields            map[string]struct{}
 	shop_users               map[int]struct{}
 	removedshop_users        map[int]struct{}
@@ -49897,6 +49898,55 @@ func (m *UserMutation) ResetMeta() {
 	m.appendmeta = nil
 }
 
+// SetDisplayName sets the "display_name" field.
+func (m *UserMutation) SetDisplayName(s string) {
+	m.display_name = &s
+}
+
+// DisplayName returns the value of the "display_name" field in the mutation.
+func (m *UserMutation) DisplayName() (r string, exists bool) {
+	v := m.display_name
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldDisplayName returns the old "display_name" field's value of the User entity.
+// If the User object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *UserMutation) OldDisplayName(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldDisplayName is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldDisplayName requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldDisplayName: %w", err)
+	}
+	return oldValue.DisplayName, nil
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (m *UserMutation) ClearDisplayName() {
+	m.display_name = nil
+	m.clearedFields[user.FieldDisplayName] = struct{}{}
+}
+
+// DisplayNameCleared returns if the "display_name" field was cleared in this mutation.
+func (m *UserMutation) DisplayNameCleared() bool {
+	_, ok := m.clearedFields[user.FieldDisplayName]
+	return ok
+}
+
+// ResetDisplayName resets all changes to the "display_name" field.
+func (m *UserMutation) ResetDisplayName() {
+	m.display_name = nil
+	delete(m.clearedFields, user.FieldDisplayName)
+}
+
 // AddShopUserIDs adds the "shop_users" edge to the ShopUser entity by ids.
 func (m *UserMutation) AddShopUserIDs(ids ...int) {
 	if m.shop_users == nil {
@@ -50201,7 +50251,7 @@ func (m *UserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *UserMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.created_at != nil {
 		fields = append(fields, user.FieldCreatedAt)
 	}
@@ -50219,6 +50269,9 @@ func (m *UserMutation) Fields() []string {
 	}
 	if m.meta != nil {
 		fields = append(fields, user.FieldMeta)
+	}
+	if m.display_name != nil {
+		fields = append(fields, user.FieldDisplayName)
 	}
 	return fields
 }
@@ -50240,6 +50293,8 @@ func (m *UserMutation) Field(name string) (ent.Value, bool) {
 		return m.Status()
 	case user.FieldMeta:
 		return m.Meta()
+	case user.FieldDisplayName:
+		return m.DisplayName()
 	}
 	return nil, false
 }
@@ -50261,6 +50316,8 @@ func (m *UserMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldStatus(ctx)
 	case user.FieldMeta:
 		return m.OldMeta(ctx)
+	case user.FieldDisplayName:
+		return m.OldDisplayName(ctx)
 	}
 	return nil, fmt.Errorf("unknown User field %s", name)
 }
@@ -50312,6 +50369,13 @@ func (m *UserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetMeta(v)
 		return nil
+	case user.FieldDisplayName:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetDisplayName(v)
+		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)
 }
@@ -50360,6 +50424,9 @@ func (m *UserMutation) ClearedFields() []string {
 	if m.FieldCleared(user.FieldPasswordHash) {
 		fields = append(fields, user.FieldPasswordHash)
 	}
+	if m.FieldCleared(user.FieldDisplayName) {
+		fields = append(fields, user.FieldDisplayName)
+	}
 	return fields
 }
 
@@ -50376,6 +50443,9 @@ func (m *UserMutation) ClearField(name string) error {
 	switch name {
 	case user.FieldPasswordHash:
 		m.ClearPasswordHash()
+		return nil
+	case user.FieldDisplayName:
+		m.ClearDisplayName()
 		return nil
 	}
 	return fmt.Errorf("unknown User nullable field %s", name)
@@ -50402,6 +50472,9 @@ func (m *UserMutation) ResetField(name string) error {
 		return nil
 	case user.FieldMeta:
 		m.ResetMeta()
+		return nil
+	case user.FieldDisplayName:
+		m.ResetDisplayName()
 		return nil
 	}
 	return fmt.Errorf("unknown User field %s", name)

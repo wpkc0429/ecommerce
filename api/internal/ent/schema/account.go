@@ -33,6 +33,10 @@ func (User) Fields() []ent.Field {
 		field.String("password_hash").MaxLen(255).SchemaType(map[string]string{dialect.Postgres: "varchar(255)"}).Optional().Nillable().Sensitive(),
 		field.Int16("status").Default(1),
 		field.JSON("meta", json.RawMessage{}).Default(json.RawMessage("{}")),
+		// display_name is what teammates see in the design history (design
+		// history follow-up). Optional free text the user chose for themself;
+		// never derived from email. See docs/design-history-privacy.md.
+		field.String("display_name").MaxLen(80).SchemaType(map[string]string{dialect.Postgres: "varchar(80)"}).Optional().Nillable(),
 	}
 }
 

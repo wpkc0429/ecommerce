@@ -126,6 +126,25 @@ before 的 `commit_sha`＝`base_sha`、after＝目前 head；只在 `drafting`�
 - **保存**：`DESIGN_VERSION_PREVIEW_RETENTION`（90 天）由 `cmd/purge-design-history` 清除；`-export-shop` 輸出使用列（不含 origin）；`-all-for-shop` 一併刪除。
 - **Template 端還要做的事（不在本 repo）**見 `openspec/changes/design-history/tasks.md` 的 T9–T12：`ctx.actions.requestVersionPreview`／`ctx.data.getVersionPreview` 與錯誤對應、歷史畫面按鈕與固定說明、預覽主機的嚴格 CSP＋`noindex`＋核心橫幅（版本預覽、tag、到期）、預覽模式唯讀。
 
+## 歷史畫面用的欄位（2026-11-27 後續）
+
+只在**人用**的 `/admin/shops/{id}/design/…`（`design.view`）回應中，服務族（`/design-service/…`）一律沒有：
+
+- `proposed_by_name`／`approved_by_name`／`rejected_by_name`（請求列表、詳情與各動作回應）與事件的 `actor_name`：同店顯示名稱。使用者以 `PATCH /api/v1/admin/me {"display_name": …}` 自己設定（`users.display_name`，可空、≤ 80 字）；沒設定時店內成員是 `Team member`，不是本店成員的人（平台管理員）是 `Platform admin`；事件的服務與系統行為分別是 `Design service`、`System`。**永遠不是 email 或電話**。隱私說明見 `docs/design-history-privacy.md`。
+- `is_current`：此請求發佈的 tag 是否為該站台目前的設計。來源只有一個：`design_site_state.current_request_id`（與 `GET …/state` 的 `current_request_id`、還原的 `already_current` 檢查相同）。已發佈的請求詳情因此不會回 304（`ETag` 仍只看 `rev`）。
+- `revert_target_tag`：`kind=revert` 的請求要還原到的已發佈 tag，其餘為 `null`。
+- `GET …/state` 新增每站台的 `pending_approval_count` 與頂層 `pending_approval_count`（`awaiting_approval` 的請求數，兩次 COUNT，可用於導覽徽章）。
+
+## 核准與預覽 TTL 的確切行為（2026-11-27 讀程式碼確認）
+
+「核准」只檢查 `ops_human.go` 的 `Service.Approve`：請求必須是 `awaiting_approval`、`head_sha` 等於 `candidate_sha` 且等於目前 `head_sha`、`If-Match` 的 `rev` 吻合。**它不讀 `preview_expires_at`**。預覽 TTL 只在服務 `submit` 時檢查一次（剩餘須 ≥ `DESIGN_MIN_PREVIEW_REMAINING`，預設 30 分鐘），之後預覽過期不會改變請求狀態。因此：**只要 `head_sha` 未變且請求仍在 `awaiting_approval`，預覽過期之後仍可核准**（整合測試 `TestApprovalAfterPreviewExpiryIsAllowedWhileHeadUnchanged`）。
+
+時間上的實際界線有兩個，且都不是預覽 TTL：
+1. `awaiting_approval` 的等待上限是 `DESIGN_APPROVAL_PENDING_TIMEOUT`（預設 **7 天**，以 `updated_at` 計）；`design-sweep -apply` 之後才會把它標成 `failed(approval_timeout)`（沒人排程 sweep 就不會發生）。
+2. 「核准窗口」`DESIGN_APPROVAL_TTL`（預設 1 小時）是**核准之後**到服務回報 `published` 的期限（`approval_expires_at`），不是核准前的期限；逾期由 sweep 標成 `failed(approval_expired)`，`published` 也會被拒。
+
+所以和「只要 head_sha 未變且核准窗口開著就能核准」的說法相比：核准前沒有 1 小時窗口，限制是 7 天；預覽過期只代表人看到的即時預覽連結失效（畫面應以並排截圖為準）。若要在預覽過期後禁止核准，需要新增檢查（目前**未**實作）。
+
 ## 尚未做
 
 publish grant（Q9）與通知信（Q10）（附條件決議）、sandbox 堆疊的部署（操作員手冊第 7 節）、template 後續任務 T1–T8

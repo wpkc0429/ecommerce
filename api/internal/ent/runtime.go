@@ -2208,6 +2208,10 @@ func init() {
 	userDescMeta := userFields[3].Descriptor()
 	// user.DefaultMeta holds the default value on creation for the meta field.
 	user.DefaultMeta = userDescMeta.Default.(json.RawMessage)
+	// userDescDisplayName is the schema descriptor for display_name field.
+	userDescDisplayName := userFields[4].Descriptor()
+	// user.DisplayNameValidator is a validator for the "display_name" field. It is called by the builders before save.
+	user.DisplayNameValidator = userDescDisplayName.Validators[0].(func(string) error)
 	userrefreshtokenFields := schema.UserRefreshToken{}.Fields()
 	_ = userrefreshtokenFields
 	// userrefreshtokenDescTokenHash is the schema descriptor for token_hash field.

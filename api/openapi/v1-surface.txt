@@ -252,6 +252,7 @@ DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 DELETE /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional
 DELETE /api/v1/shop/cart/items/{itemID} path itemID
 DesignEvent.actor_credential_id
+DesignEvent.actor_name
 DesignEvent.actor_type
 DesignEvent.actor_user_id
 DesignEvent.created_at
@@ -268,6 +269,7 @@ DesignEventPage.page_size
 DesignEventPage.total
 DesignRequest.approval_expires_at
 DesignRequest.approved_at
+DesignRequest.approved_by_name
 DesignRequest.approved_by_user_id
 DesignRequest.approved_head_sha
 DesignRequest.base_sha
@@ -284,6 +286,7 @@ DesignRequest.failure_detail
 DesignRequest.guard
 DesignRequest.head_sha
 DesignRequest.id
+DesignRequest.is_current
 DesignRequest.kind
 DesignRequest.preview_expires_at
 DesignRequest.preview_origin
@@ -292,16 +295,19 @@ DesignRequest.preview_registered_at
 DesignRequest.prompt_flags
 DesignRequest.prompt_sha256
 DesignRequest.prompt_text
+DesignRequest.proposed_by_name
 DesignRequest.publish_tag
 DesignRequest.published_at
 DesignRequest.published_sha
 DesignRequest.published_tag
 DesignRequest.reject_reason
 DesignRequest.rejected_at
+DesignRequest.rejected_by_name
 DesignRequest.rejected_by_user_id
 DesignRequest.requested_by_user_id
 DesignRequest.restores_request_id
 DesignRequest.rev
+DesignRequest.revert_target_tag
 DesignRequest.reverted_by_request_id
 DesignRequest.site
 DesignRequest.status
@@ -312,6 +318,7 @@ DesignRequestPage.requests
 DesignRequestPage.total
 DesignRequestSummary.approval_expires_at
 DesignRequestSummary.approved_at
+DesignRequestSummary.approved_by_name
 DesignRequestSummary.approved_by_user_id
 DesignRequestSummary.approved_head_sha
 DesignRequestSummary.base_sha
@@ -324,19 +331,23 @@ DesignRequestSummary.design_floor_version
 DesignRequestSummary.failure_code
 DesignRequestSummary.head_sha
 DesignRequestSummary.id
+DesignRequestSummary.is_current
 DesignRequestSummary.kind
 DesignRequestSummary.preview_expires_at
 DesignRequestSummary.preview_registered_at
 DesignRequestSummary.prompt_excerpt
 DesignRequestSummary.prompt_flags
 DesignRequestSummary.prompt_sha256
+DesignRequestSummary.proposed_by_name
 DesignRequestSummary.publish_tag
 DesignRequestSummary.published_at
 DesignRequestSummary.published_sha
 DesignRequestSummary.published_tag
+DesignRequestSummary.rejected_by_name
 DesignRequestSummary.requested_by_user_id
 DesignRequestSummary.restores_request_id
 DesignRequestSummary.rev
+DesignRequestSummary.revert_target_tag
 DesignRequestSummary.reverted_by_request_id
 DesignRequestSummary.site
 DesignRequestSummary.status
@@ -453,6 +464,7 @@ DesignState.current_sha
 DesignState.current_tag
 DesignState.design_floor_version
 DesignState.last_seen_main_sha
+DesignState.pending_approval_count
 DesignState.site
 DesignState.untracked_changes
 DesignState.updated_at
@@ -978,6 +990,7 @@ OrderPage.orders
 OrderPage.page
 OrderPage.page_size
 OrderPage.total
+PATCH /api/v1/admin/me
 POST /api/v1/admin/accounts
 POST /api/v1/admin/accounts/{userID}/disable
 POST /api/v1/admin/accounts/{userID}/disable path userID

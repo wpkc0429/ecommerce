@@ -96,6 +96,20 @@ func (_c *UserCreate) SetMeta(v json.RawMessage) *UserCreate {
 	return _c
 }
 
+// SetDisplayName sets the "display_name" field.
+func (_c *UserCreate) SetDisplayName(v string) *UserCreate {
+	_c.mutation.SetDisplayName(v)
+	return _c
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_c *UserCreate) SetNillableDisplayName(v *string) *UserCreate {
+	if v != nil {
+		_c.SetDisplayName(*v)
+	}
+	return _c
+}
+
 // AddShopUserIDs adds the "shop_users" edge to the ShopUser entity by IDs.
 func (_c *UserCreate) AddShopUserIDs(ids ...int) *UserCreate {
 	_c.mutation.AddShopUserIDs(ids...)
@@ -251,6 +265,11 @@ func (_c *UserCreate) check() error {
 	if _, ok := _c.mutation.Meta(); !ok {
 		return &ValidationError{Name: "meta", err: errors.New(`ent: missing required field "User.meta"`)}
 	}
+	if v, ok := _c.mutation.DisplayName(); ok {
+		if err := user.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "User.display_name": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -301,6 +320,10 @@ func (_c *UserCreate) createSpec() (*User, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Meta(); ok {
 		_spec.SetField(user.FieldMeta, field.TypeJSON, value)
 		_node.Meta = value
+	}
+	if value, ok := _c.mutation.DisplayName(); ok {
+		_spec.SetField(user.FieldDisplayName, field.TypeString, value)
+		_node.DisplayName = &value
 	}
 	if nodes := _c.mutation.ShopUsersIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -506,6 +529,24 @@ func (u *UserUpsert) UpdateMeta() *UserUpsert {
 	return u
 }
 
+// SetDisplayName sets the "display_name" field.
+func (u *UserUpsert) SetDisplayName(v string) *UserUpsert {
+	u.Set(user.FieldDisplayName, v)
+	return u
+}
+
+// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
+func (u *UserUpsert) UpdateDisplayName() *UserUpsert {
+	u.SetExcluded(user.FieldDisplayName)
+	return u
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (u *UserUpsert) ClearDisplayName() *UserUpsert {
+	u.SetNull(user.FieldDisplayName)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -632,6 +673,27 @@ func (u *UserUpsertOne) SetMeta(v json.RawMessage) *UserUpsertOne {
 func (u *UserUpsertOne) UpdateMeta() *UserUpsertOne {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetDisplayName sets the "display_name" field.
+func (u *UserUpsertOne) SetDisplayName(v string) *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.SetDisplayName(v)
+	})
+}
+
+// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
+func (u *UserUpsertOne) UpdateDisplayName() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateDisplayName()
+	})
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (u *UserUpsertOne) ClearDisplayName() *UserUpsertOne {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearDisplayName()
 	})
 }
 
@@ -927,6 +989,27 @@ func (u *UserUpsertBulk) SetMeta(v json.RawMessage) *UserUpsertBulk {
 func (u *UserUpsertBulk) UpdateMeta() *UserUpsertBulk {
 	return u.Update(func(s *UserUpsert) {
 		s.UpdateMeta()
+	})
+}
+
+// SetDisplayName sets the "display_name" field.
+func (u *UserUpsertBulk) SetDisplayName(v string) *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.SetDisplayName(v)
+	})
+}
+
+// UpdateDisplayName sets the "display_name" field to the value that was provided on create.
+func (u *UserUpsertBulk) UpdateDisplayName() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.UpdateDisplayName()
+	})
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (u *UserUpsertBulk) ClearDisplayName() *UserUpsertBulk {
+	return u.Update(func(s *UserUpsert) {
+		s.ClearDisplayName()
 	})
 }
 

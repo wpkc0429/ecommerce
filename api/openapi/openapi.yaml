@@ -486,7 +486,7 @@ components:
         | 409 | `quota_exceeded` | 截圖已達每請求 40 MiB 或每店（`DESIGN_SHOP_QUOTA_BYTES`）上限 |
         | 409 | `head_not_set` | 還沒回報 head 就上傳 after 截圖 |
         | 422 | `invalid_screenshot` | 截圖不是合法 PNG、寬度不等於視口、太高、雜湊或 manifest 無效（過大為 413） |
-        | 422 | `live_data_capture_refused` | admin 截圖不是來自 sandbox 資料集，或 storefront 截圖不是匿名／資料集宣告不一致 |
+        | 422 | `live_data_capture_refused` | admin 截圖不是來自 sandbox 資料集或其 `origin` 不在 `DESIGN_SANDBOX_ORIGINS`，或 storefront 截圖不是匿名／資料集宣告不一致 |
         | 502 | `storage_unavailable` | 截圖物件儲存暫時不可用，可重試 |
         | 500 | `internal` | 伺服器內部錯誤 |
         | 503 | `shop_disabled` | 商家已停用，前台應呈現維護頁 |
@@ -2794,7 +2794,7 @@ components:
     DesignRequestSummary:
       type: object
       additionalProperties: false
-      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_excerpt]
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_excerpt, proposed_by_name, approved_by_name, rejected_by_name, is_current, revert_target_tag]
       description: |
         列表中的一筆設計請求：與詳情相同但只有 `prompt_excerpt`（前 120 字，純文字），沒有 prompt 全文。
         所有文字（含 `prompt_excerpt`）都是**資料**：請以純文字顯示，不得當作 HTML 或指令。
@@ -2830,10 +2830,15 @@ components:
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
         prompt_excerpt: { type: string }
+        proposed_by_name: { type: string, description: "提出者在這家店的顯示名稱（`design.view` 的成員才看得到）。使用者自己設定的 `display_name`；沒設定時為中性字樣（店內成員 `Team member`、平台管理員 `Platform admin`）。**永遠不是 email 或電話**，服務憑證的回應沒有這個欄位。" }
+        approved_by_name: { type: [string, "null"], description: "核准者的顯示名稱，規則同 `proposed_by_name`；尚未核准為 null。" }
+        rejected_by_name: { type: [string, "null"], description: "拒絕者的顯示名稱，規則同 `proposed_by_name`；未被拒絕為 null。" }
+        is_current: { type: boolean, description: "此請求發佈的 tag 是否為該站台**目前**的設計（`design_site_state.current_request_id` 等於此請求；與狀態端點的 `current_request_id` 同一個來源）。未發佈者恆為 false。" }
+        revert_target_tag: { type: [string, "null"], description: "還原請求（`kind=revert`）要還原到的已發佈 tag；其他請求為 null。" }
     DesignRequest:
       type: object
       additionalProperties: false
-      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_text, diff_summary, guard, preview_origin, rejected_by_user_id, rejected_at, reject_reason, change_note, failure_detail, preview_read_only]
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_text, diff_summary, guard, preview_origin, rejected_by_user_id, rejected_at, reject_reason, change_note, failure_detail, preview_read_only, proposed_by_name, approved_by_name, rejected_by_name, is_current, revert_target_tag]
       description: |
         一筆設計請求（change design-history）。**欄位的真實性分三級**：平台自己產生的（`id`、時間、核准者與核准的 SHA、`status`、`publish_tag`）是權威；
         服務回報的（`prompt_text`、`head_sha`、`diff_summary`、`guard`、`preview_origin`、守門員結果）是「服務如此聲稱」，平台只驗格式與一致性；
@@ -2883,6 +2888,11 @@ components:
         change_note: { type: [string, "null"] }
         failure_detail: { type: [string, "null"] }
         preview_read_only: { type: boolean, description: "恆為 true：核心在改版預覽（與版本預覽）下停用所有寫入型 ctx.actions，預覽以真實登入開啟也不會改變任何狀態。" }
+        proposed_by_name: { type: string, description: "提出者在這家店的顯示名稱（`design.view` 的成員才看得到）。使用者自己設定的 `display_name`；沒設定時為中性字樣（店內成員 `Team member`、平台管理員 `Platform admin`）。**永遠不是 email 或電話**，服務憑證的回應沒有這個欄位。" }
+        approved_by_name: { type: [string, "null"], description: "核准者的顯示名稱，規則同 `proposed_by_name`；尚未核准為 null。" }
+        rejected_by_name: { type: [string, "null"], description: "拒絕者的顯示名稱，規則同 `proposed_by_name`；未被拒絕為 null。" }
+        is_current: { type: boolean, description: "此請求發佈的 tag 是否為該站台**目前**的設計（`design_site_state.current_request_id` 等於此請求；與狀態端點的 `current_request_id` 同一個來源）。未發佈者恆為 false。" }
+        revert_target_tag: { type: [string, "null"], description: "還原請求（`kind=revert`）要還原到的已發佈 tag；其他請求為 null。" }
     DesignServiceRequest:
       type: object
       additionalProperties: false
@@ -3031,7 +3041,7 @@ components:
     DesignEvent:
       type: object
       additionalProperties: false
-      required: [seq, kind, from_status, to_status, actor_type, actor_user_id, actor_credential_id, head_sha, detail, hash, created_at]
+      required: [seq, kind, from_status, to_status, actor_type, actor_user_id, actor_credential_id, head_sha, detail, hash, created_at, actor_name]
       description: |
         只能追加的事件。`hash` 串接前一筆（`design-sweep -verify` 重算）。`detail` 只有 id、計數、規則 id 與原因碼。
       properties:
@@ -3041,6 +3051,7 @@ components:
         to_status: { type: string }
         actor_type: { type: string, enum: [service, user, system] }
         actor_user_id: { type: [integer, "null"] }
+        actor_name: { type: [string, "null"], description: "事件執行者的顯示名稱：使用者事件為該使用者在這家店的顯示名稱（規則同請求的 `proposed_by_name`，永遠不是 email）；服務事件為 `Design service`；系統事件為 `System`。" }
         actor_credential_id: { type: [integer, "null"] }
         head_sha: { type: string }
         detail: { type: [object, "null"], additionalProperties: true }
@@ -3062,6 +3073,7 @@ components:
         design_floor_version: { type: string }
         last_seen_main_sha: { type: string }
         updated_at: { type: [string, "null"], format: date-time }
+        pending_approval_count: { type: integer, description: "此站台等待人核准（`awaiting_approval`）的請求數；只在人用的 `GET …/design/state` 回應中出現（`design.view`）。" }
     DesignUntrackedChange:
       type: object
       additionalProperties: false
@@ -4461,10 +4473,11 @@ paths:
               schema:
                 type: object
                 additionalProperties: false
-                required: [id, email, sids, platform_permissions]
+                required: [id, email, display_name, sids, platform_permissions]
                 properties:
                   id: { type: integer }
                   email: { type: string }
+                  display_name: { type: [string, "null"], description: "使用者自己設定的顯示名稱（隊友在設計歷史中看到的名字）；未設定為 null。見 `PATCH /admin/me`。" }
                   platform_permissions:
                     type: array
                     items: { type: string }
@@ -4478,6 +4491,38 @@ paths:
                       - type: 'null'
                     description: 該使用者具有成員資格的商家 id 集合。
         "401": { $ref: '#/components/responses/Unauthorized' }
+    patch:
+      tags: [admin-auth]
+      operationId: adminUpdateMe
+      summary: 設定自己的顯示名稱
+      description: |
+        設定或清除（空字串）呼叫者**自己**的 `display_name`，也就是同店隊友在設計歷史中看到的名字。
+        最多 80 字、單行；含 email、電話或疑似卡號者 422。這是平台唯一儲存的「顯示名稱」，不會由 email 推導。
+      security: [{ adminJWT: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [display_name]
+              properties:
+                display_name: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: 已更新。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [id, display_name]
+                properties:
+                  id: { type: integer }
+                  display_name: { type: [string, "null"] }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
 
   # ═══════════════════════ 平台層：帳號與開店 (change platform-account-provisioning) ═══════════════════════
   /api/v1/admin/auth/password-setup/inspect:
@@ -8899,6 +8944,7 @@ paths:
                 required: [sites]
                 properties:
                   sites: { type: array, items: { $ref: '#/components/schemas/DesignState' } }
+                  pending_approval_count: { type: integer, description: "所有站台等待核准的請求總數（便宜的 COUNT，可用於導覽列的徽章）。" }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "403": { $ref: '#/components/responses/Forbidden' }
 
@@ -9347,8 +9393,10 @@ paths:
       description: |
         **服務憑證。** 槽位由路徑決定，不接受自由檔名。本文是 PNG 位元組（`Content-Type: image/png`，≤ 2 MiB）。平台驗證寬度等於視口、高度 ≤ 10,000、PNG 可完整解碼，
         然後**重新編碼**（去除所有中繼資料）再存進私有 bucket；`sha256` 是**存入位元組**的雜湊，`X-Content-SHA256`（選填）必須等於**上傳位元組**的雜湊（否則 422 `invalid_screenshot`）。
-        `X-Capture-Manifest` 是 base64 的 JSON（≤ 2 KiB：`tool`、`tool_version`、`dataset`、`api_origin_class`、`captured_at`、`set_version`，其餘欄位丟棄）。
+        `X-Capture-Manifest` 是 base64 的 JSON（≤ 2 KiB：`tool`、`tool_version`、`dataset`、`api_origin_class`、`origin`（選填）、`captured_at`、`set_version`，其餘欄位丟棄）。
         **隱私規則（Q5）**：admin 站台必須 `dataset=sandbox-v1` 且 `api_origin_class=sandbox`；storefront 只收匿名（`role=anon`），資料集為 `sandbox-v1`（sandbox 來源）或 `public-live`（公開來源）；
+        **sandbox 來源清單（平台端）**：admin 站台的 manifest 還必須帶 `origin`（`scheme://host[:port]`，小寫、不含路徑），且必須逐字等於平台設定 `DESIGN_SANDBOX_ORIGINS` 的其中一項；
+        設定為空時，production 類的 `APP_ENV` 一律拒絕 admin 截圖，development／test 只照上述 manifest 規則收。storefront 不受此清單影響。
         違反回 422 `live_data_capture_refused`。平台無法驗真，這是契約與縱深防禦。
         同位元組、同 commit 重放回 200（`Idempotency-Replayed: true`）；不同位元組新增 `attempt`（舊的保留）。before 的 `commit_sha` 是 `base_sha`，after 是目前 `head_sha`。
         只在 `drafting`／`previewing` 可上傳（409 `invalid_state`）。每請求最多 80 個槽位（重拍同一槽位不佔額度，超過 409 `slot_cap_exceeded`）、嘗試總數最多 240（`DESIGN_MAX_SCREENSHOT_ATTEMPTS`，超過 409 `attempt_cap_exceeded`）、40 MiB，每店 `DESIGN_SHOP_QUOTA_BYTES`（預設 2 GiB），超過 409 `quota_exceeded`；每憑證每分鐘 60 次上傳。

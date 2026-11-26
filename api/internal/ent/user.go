@@ -30,6 +30,8 @@ type User struct {
 	Status int16 `json:"status,omitempty"`
 	// Meta holds the value of the "meta" field.
 	Meta json.RawMessage `json:"meta,omitempty"`
+	// DisplayName holds the value of the "display_name" field.
+	DisplayName *string `json:"display_name,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the UserQuery when eager-loading is set.
 	Edges        UserEdges `json:"edges"`
@@ -107,7 +109,7 @@ func (*User) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case user.FieldID, user.FieldStatus:
 			values[i] = new(sql.NullInt64)
-		case user.FieldEmail, user.FieldPasswordHash:
+		case user.FieldEmail, user.FieldPasswordHash, user.FieldDisplayName:
 			values[i] = new(sql.NullString)
 		case user.FieldCreatedAt, user.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -170,6 +172,13 @@ func (_m *User) assignValues(columns []string, values []any) error {
 				if err := json.Unmarshal(*value, &_m.Meta); err != nil {
 					return fmt.Errorf("unmarshal field meta: %w", err)
 				}
+			}
+		case user.FieldDisplayName:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field display_name", values[i])
+			} else if value.Valid {
+				_m.DisplayName = new(string)
+				*_m.DisplayName = value.String
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -248,6 +257,11 @@ func (_m *User) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("meta=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Meta))
+	builder.WriteString(", ")
+	if v := _m.DisplayName; v != nil {
+		builder.WriteString("display_name=")
+		builder.WriteString(*v)
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

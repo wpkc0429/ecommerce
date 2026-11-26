@@ -109,6 +109,26 @@ func (_u *UserUpdate) AppendMeta(v json.RawMessage) *UserUpdate {
 	return _u
 }
 
+// SetDisplayName sets the "display_name" field.
+func (_u *UserUpdate) SetDisplayName(v string) *UserUpdate {
+	_u.mutation.SetDisplayName(v)
+	return _u
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_u *UserUpdate) SetNillableDisplayName(v *string) *UserUpdate {
+	if v != nil {
+		_u.SetDisplayName(*v)
+	}
+	return _u
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (_u *UserUpdate) ClearDisplayName() *UserUpdate {
+	_u.mutation.ClearDisplayName()
+	return _u
+}
+
 // AddShopUserIDs adds the "shop_users" edge to the ShopUser entity by IDs.
 func (_u *UserUpdate) AddShopUserIDs(ids ...int) *UserUpdate {
 	_u.mutation.AddShopUserIDs(ids...)
@@ -342,6 +362,11 @@ func (_u *UserUpdate) check() error {
 			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "User.password_hash": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayName(); ok {
+		if err := user.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "User.display_name": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -388,6 +413,12 @@ func (_u *UserUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, user.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.DisplayName(); ok {
+		_spec.SetField(user.FieldDisplayName, field.TypeString, value)
+	}
+	if _u.mutation.DisplayNameCleared() {
+		_spec.ClearField(user.FieldDisplayName, field.TypeString)
 	}
 	if _u.mutation.ShopUsersCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -709,6 +740,26 @@ func (_u *UserUpdateOne) AppendMeta(v json.RawMessage) *UserUpdateOne {
 	return _u
 }
 
+// SetDisplayName sets the "display_name" field.
+func (_u *UserUpdateOne) SetDisplayName(v string) *UserUpdateOne {
+	_u.mutation.SetDisplayName(v)
+	return _u
+}
+
+// SetNillableDisplayName sets the "display_name" field if the given value is not nil.
+func (_u *UserUpdateOne) SetNillableDisplayName(v *string) *UserUpdateOne {
+	if v != nil {
+		_u.SetDisplayName(*v)
+	}
+	return _u
+}
+
+// ClearDisplayName clears the value of the "display_name" field.
+func (_u *UserUpdateOne) ClearDisplayName() *UserUpdateOne {
+	_u.mutation.ClearDisplayName()
+	return _u
+}
+
 // AddShopUserIDs adds the "shop_users" edge to the ShopUser entity by IDs.
 func (_u *UserUpdateOne) AddShopUserIDs(ids ...int) *UserUpdateOne {
 	_u.mutation.AddShopUserIDs(ids...)
@@ -955,6 +1006,11 @@ func (_u *UserUpdateOne) check() error {
 			return &ValidationError{Name: "password_hash", err: fmt.Errorf(`ent: validator failed for field "User.password_hash": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DisplayName(); ok {
+		if err := user.DisplayNameValidator(v); err != nil {
+			return &ValidationError{Name: "display_name", err: fmt.Errorf(`ent: validator failed for field "User.display_name": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -1018,6 +1074,12 @@ func (_u *UserUpdateOne) sqlSave(ctx context.Context) (_node *User, err error) {
 		_spec.AddModifier(func(u *sql.UpdateBuilder) {
 			sqljson.Append(u, user.FieldMeta, value)
 		})
+	}
+	if value, ok := _u.mutation.DisplayName(); ok {
+		_spec.SetField(user.FieldDisplayName, field.TypeString, value)
+	}
+	if _u.mutation.DisplayNameCleared() {
+		_spec.ClearField(user.FieldDisplayName, field.TypeString)
 	}
 	if _u.mutation.ShopUsersCleared() {
 		edge := &sqlgraph.EdgeSpec{

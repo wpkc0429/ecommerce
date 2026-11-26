@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -149,6 +150,10 @@ func (h *DesignAdminHandler) list(w http.ResponseWriter, r *http.Request) {
 	for _, row := range rows {
 		out = append(out, designSummaryJSON(row))
 	}
+	if err := h.decorate(r.Context(), shopID, rows, out); err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"requests": out, "page": f.Page, "page_size": f.PageSize, "total": total})
 }
 
@@ -168,11 +173,14 @@ func (h *DesignAdminHandler) get(w http.ResponseWriter, r *http.Request) {
 	}
 	etag := etagOf(row.Rev)
 	w.Header().Set("ETag", etag)
-	if inm := strings.TrimSpace(r.Header.Get("If-None-Match")); inm != "" && (inm == etag || inm == "W/"+etag) {
+	if inm := strings.TrimSpace(r.Header.Get("If-None-Match")); inm != "" && (inm == etag || inm == "W/"+etag) &&
+		row.Status != design.StatusPublished && row.Status != design.StatusReverted {
+		// A published request's is_current changes without its rev changing
+		// (another release becomes current), so only unreleased rows may 304.
 		w.WriteHeader(http.StatusNotModified)
 		return
 	}
-	httpx.WriteJSON(w, http.StatusOK, designDetailJSON(row))
+	h.writeDetail(w, r, shopID, http.StatusOK, row)
 }
 
 func (h *DesignAdminHandler) events(w http.ResponseWriter, r *http.Request) {
@@ -188,9 +196,22 @@ func (h *DesignAdminHandler) events(w http.ResponseWriter, r *http.Request) {
 		writeDesignError(w, h.Log, err)
 		return
 	}
+	var actorIDs []int
+	for _, e := range rows {
+		if e.ActorUserID != nil {
+			actorIDs = append(actorIDs, *e.ActorUserID)
+		}
+	}
+	names, err := h.Service.DisplayNames(r.Context(), shopID, actorIDs)
+	if err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
 	out := make([]map[string]any, 0, len(rows))
 	for _, e := range rows {
-		out = append(out, designEventJSON(e))
+		m := designEventJSON(e)
+		m["actor_name"] = actorName(e, names)
+		out = append(out, m)
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"events": out, "page": page, "page_size": size, "total": total})
 }
@@ -265,7 +286,7 @@ func (h *DesignAdminHandler) approve(w http.ResponseWriter, r *http.Request) {
 	if res.Replay {
 		w.Header().Set("Idempotency-Replayed", "true")
 	}
-	httpx.WriteJSON(w, http.StatusOK, designDetailJSON(res.Request))
+	h.writeDetail(w, r, shopID, http.StatusOK, res.Request)
 }
 
 func (h *DesignAdminHandler) reject(w http.ResponseWriter, r *http.Request) {
@@ -288,7 +309,7 @@ func (h *DesignAdminHandler) reject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", etagOf(row.Rev))
-	httpx.WriteJSON(w, http.StatusOK, designDetailJSON(row))
+	h.writeDetail(w, r, shopID, http.StatusOK, row)
 }
 
 func (h *DesignAdminHandler) requestChanges(w http.ResponseWriter, r *http.Request) {
@@ -311,7 +332,7 @@ func (h *DesignAdminHandler) requestChanges(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.Header().Set("ETag", etagOf(row.Rev))
-	httpx.WriteJSON(w, http.StatusOK, designDetailJSON(row))
+	h.writeDetail(w, r, shopID, http.StatusOK, row)
 }
 
 func (h *DesignAdminHandler) cancel(w http.ResponseWriter, r *http.Request) {
@@ -328,7 +349,7 @@ func (h *DesignAdminHandler) cancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", etagOf(row.Rev))
-	httpx.WriteJSON(w, http.StatusOK, designDetailJSON(row))
+	h.writeDetail(w, r, shopID, http.StatusOK, row)
 }
 
 func (h *DesignAdminHandler) revert(w http.ResponseWriter, r *http.Request) {
@@ -351,7 +372,7 @@ func (h *DesignAdminHandler) revert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("ETag", etagOf(row.Rev))
-	httpx.WriteJSON(w, http.StatusCreated, designDetailJSON(row))
+	h.writeDetail(w, r, shopID, http.StatusCreated, row)
 }
 
 func siteStateJSON(v design.SiteView) map[string]any {
@@ -373,11 +394,18 @@ func (h *DesignAdminHandler) state(w http.ResponseWriter, r *http.Request) {
 		writeDesignError(w, h.Log, err)
 		return
 	}
+	perSite, total, err := h.Service.PendingApprovalCounts(r.Context(), shopID)
+	if err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
 	out := make([]map[string]any, 0, len(views))
 	for _, v := range views {
-		out = append(out, siteStateJSON(v))
+		m := siteStateJSON(v)
+		m["pending_approval_count"] = perSite[v.Site]
+		out = append(out, m)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sites": out})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sites": out, "pending_approval_count": total})
 }
 
 func untrackedJSON(u *ent.DesignUntrackedChange) map[string]any {
@@ -421,4 +449,74 @@ func (h *DesignAdminHandler) acknowledge(w http.ResponseWriter, r *http.Request)
 		out = append(out, untrackedJSON(u))
 	}
 	httpx.WriteJSON(w, http.StatusOK, map[string]any{"changes": out})
+}
+
+// decorate adds what only people in this shop may read to request rows: the
+// shop-scoped display names of the proposer, approver and rejecter, and the
+// derived is_current and revert_target_tag. The routes using it are guarded by
+// design.view; the machine routes never call it.
+func (h *DesignAdminHandler) decorate(ctx context.Context, shopID int, rows []*ent.DesignRequest, maps []map[string]any) error {
+	var ids []int
+	for _, r := range rows {
+		ids = append(ids, r.RequestedByUserID)
+		if r.ApprovedByUserID != nil {
+			ids = append(ids, *r.ApprovedByUserID)
+		}
+		if r.RejectedByUserID != nil {
+			ids = append(ids, *r.RejectedByUserID)
+		}
+	}
+	names, err := h.Service.DisplayNames(ctx, shopID, ids)
+	if err != nil {
+		return err
+	}
+	extras, err := h.Service.Extras(ctx, shopID, rows)
+	if err != nil {
+		return err
+	}
+	for i, r := range rows {
+		m := maps[i]
+		m["proposed_by_name"] = nameOf(names, &r.RequestedByUserID)
+		m["approved_by_name"] = nameOf(names, r.ApprovedByUserID)
+		m["rejected_by_name"] = nameOf(names, r.RejectedByUserID)
+		ex := extras[r.ID]
+		m["is_current"] = ex.IsCurrent
+		if ex.RevertTargetTag != "" {
+			m["revert_target_tag"] = ex.RevertTargetTag
+		} else {
+			m["revert_target_tag"] = nil
+		}
+	}
+	return nil
+}
+
+func nameOf(names map[int]string, id *int) any {
+	if id == nil {
+		return nil
+	}
+	if n, ok := names[*id]; ok {
+		return n
+	}
+	return nil
+}
+
+func actorName(e *ent.DesignRequestEvent, names map[int]string) any {
+	switch e.ActorType {
+	case design.ActorUser:
+		return nameOf(names, e.ActorUserID)
+	case design.ActorService:
+		return design.NameDesignService
+	default:
+		return design.NameSystem
+	}
+}
+
+// writeDetail answers with the decorated detail of one request.
+func (h *DesignAdminHandler) writeDetail(w http.ResponseWriter, r *http.Request, shopID, status int, row *ent.DesignRequest) {
+	m := designDetailJSON(row)
+	if err := h.decorate(r.Context(), shopID, []*ent.DesignRequest{row}, []map[string]any{m}); err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
+	httpx.WriteJSON(w, status, m)
 }

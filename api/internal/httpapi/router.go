@@ -201,6 +201,7 @@ func New(d Deps) http.Handler {
 					pr.Use(orPassthrough(d.AdminBindEmailMW))
 					if d.AdminAuth != nil {
 						pr.Get("/me", d.AdminAuth.Me)
+						pr.Patch("/me", d.AdminAuth.UpdateMe)
 					}
 					// Merchant-scoped resources share the /shops/{shopID}
 					// group; the target shop always comes from the URL and is
