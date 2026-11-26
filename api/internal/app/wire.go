@@ -232,6 +232,8 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Reader: &content.Reader{Client: client}, Cache: renderCache, Issuer: issuer, Engine: engine,
 		MaxAge: cfg.ContentPublicMaxAge, Log: a.log,
 	}
+	deps.BaselineRateLimit = httpapi.NewBaselineRateLimit(limiter, cfg.BaselineRateLimit, cfg.BaselineRateWindow, cfg.WebhookRateLimit, cfg.WebhookRateWindow)
+	deps.ProductionMode = cfg.Env == config.EnvProduction
 	deps.ContentPublicRateLimit = httpapi.NewContentPublicRateLimit(limiter, cfg.ContentPublicRateLimit, cfg.ContentPublicRateWindow)
 
 	// Design history (change design-history, slice 1). The record is the
@@ -438,6 +440,10 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		ClientBackURL: cfg.ECPay.ClientBackURL,
 		ReturnURLBase: cfg.ECPay.ReturnURL,
 	}
+	// M3: the mock provider (forgeable-by-design webhook, no real money) exists
+	// only outside production. The registry is the allowlist for the
+	// customer-supplied `provider` field: anything not in it is a 422.
+	providers := paymentProviders(cfg.Env, mockProvider, ecpayResolver)
 	paymentService := &payment.Service{
 		Client:     client,
 		Orders:     orderService,
@@ -445,10 +451,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		// The only consumer is the "paid, but the order was already cancelled"
 		// warning (design D9) — a state only a human can resolve.
 		Log: a.log,
-		Providers: map[string]any{
-			mockProvider.Name():  mockProvider,
-			ecpayResolver.Name(): ecpayResolver,
-		},
+		Providers:       providers,
 		DefaultProvider: cfg.PaymentDefaultProvider,
 	}
 	deps.Payments = &httpapi.PaymentHandler{Client: client, Service: paymentService, Authz: authz, Log: a.log}
@@ -566,4 +569,16 @@ func scheduleConfig(cfg *config.Config) content.ScheduleConfig {
 	o := cfg.ContentOps
 	c.MinLead, c.MaxAhead, c.Grace = o.ScheduleMinLead, o.ScheduleMaxAhead, o.ScheduleGrace
 	return c
+}
+
+// paymentProviders builds the payment provider registry (also the allowlist of
+// the customer-supplied `provider` field). The mock provider is registered only
+// outside production, so in production neither the initiate endpoint nor its
+// webhook route can reach it (audit M3).
+func paymentProviders(env string, mock *payment.MockProvider, ecpay payment.ShopScopedProvider) map[string]any {
+	providers := map[string]any{ecpay.Name(): ecpay}
+	if env != config.EnvProduction {
+		providers[mock.Name()] = mock
+	}
+	return providers
 }

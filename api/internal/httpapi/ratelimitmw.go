@@ -226,3 +226,29 @@ func NewAdminPasswordSetupRateLimit(l *ratelimit.Limiter, cfg config.RateLimitCo
 		ipRule("admin_password_setup", cfg.LoginBroadLimit, cfg.LoginBroadWindow),
 	})
 }
+
+// webhookPathPrefix is the route family served to payment providers' servers.
+const webhookPathPrefix = "/api/v1/webhooks/"
+
+// NewBaselineRateLimit is the catch-all per-client-IP limit for /api/v1 (audit
+// M4). Payment webhooks are counted in their own bucket, never in the general
+// one, so a visitor burst cannot starve a gateway callback and a callback
+// flood cannot lock out visitors. The webhook default (600/min per IP) is far
+// above what a gateway sends for a small shop (a handful of retries per
+// order), and the limiter fails open when Redis is down. Routes with their
+// own, tighter rule (login, checkout, ...) still apply it on top. A limit <= 0
+// disables the corresponding bucket.
+func NewBaselineRateLimit(l *ratelimit.Limiter, limit int, window time.Duration, webhookLimit int, webhookWindow time.Duration) func(http.Handler) http.Handler {
+	general := newAuthRateLimitMW(l, []rateLimitRule{ipRule("baseline", limit, window)})
+	webhook := newAuthRateLimitMW(l, []rateLimitRule{ipRule("baseline_webhook", webhookLimit, webhookWindow)})
+	return func(next http.Handler) http.Handler {
+		g, w := general(next), webhook(next)
+		return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+			if strings.HasPrefix(r.URL.Path, webhookPathPrefix) {
+				w.ServeHTTP(rw, r)
+				return
+			}
+			g.ServeHTTP(rw, r)
+		})
+	}
+}

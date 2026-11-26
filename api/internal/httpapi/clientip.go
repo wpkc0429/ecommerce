@@ -2,10 +2,12 @@ package httpapi
 
 import (
 	"context"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"strings"
+	"sync"
 )
 
 // cfConnectingIPHeader is set by Cloudflare's edge (and forwarded verbatim by
@@ -23,13 +25,43 @@ type clientIPKey struct{}
 // rate-limit key. X-Forwarded-For / X-Real-IP are never consulted (unlike
 // chi's middleware.RealIP, which trusts them from anyone). With an empty
 // trusted list this is exactly the previous RemoteAddr-only behaviour.
-func NewClientIPMiddleware(trusted []netip.Prefix) func(http.Handler) http.Handler {
+func NewClientIPMiddleware(trusted []netip.Prefix, opts ...ClientIPOption) func(http.Handler) http.Handler {
+	o := &clientIPOptions{}
+	for _, opt := range opts {
+		opt(o)
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if o.warn && (len(r.Header.Values(cfConnectingIPHeader)) > 0 || len(r.Header.Values("X-Forwarded-For")) > 0) {
+				o.warnOnce.Do(func() {
+					if o.log != nil {
+						o.log.Warn("requests carry CF-Connecting-IP / X-Forwarded-For but TRUSTED_PROXIES is empty: every client is keyed by the TCP peer address, so per-IP rate limits act as one global bucket behind a reverse proxy or Cloudflare Tunnel; set TRUSTED_PROXIES to the proxy address (127.0.0.1/32,::1/128 for cloudflared on this host)",
+							"peer", remoteHost(r))
+					}
+				})
+			}
 			ip := resolveClientIP(r, trusted)
 			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), clientIPKey{}, ip)))
 		})
 	}
+}
+
+type clientIPOptions struct {
+	warn     bool
+	log      *slog.Logger
+	warnOnce sync.Once
+}
+
+// ClientIPOption configures NewClientIPMiddleware.
+type ClientIPOption func(*clientIPOptions)
+
+// WithUntrustedForwardingWarning logs one WARN (per process) the first time a
+// request carries CF-Connecting-IP or X-Forwarded-For while enabled. It is
+// meant for production with an empty TRUSTED_PROXIES, where the headers prove
+// a proxy sits in front but the app cannot see real client IPs. It never
+// changes which IP is used.
+func WithUntrustedForwardingWarning(enabled bool, log *slog.Logger) ClientIPOption {
+	return func(o *clientIPOptions) { o.warn, o.log = enabled, log }
 }
 
 // resolveClientIP implements the trust rule described on NewClientIPMiddleware.

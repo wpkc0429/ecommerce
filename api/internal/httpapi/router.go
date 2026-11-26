@@ -123,6 +123,11 @@ type Deps struct {
 	// public submit and verify routes (design D3).
 	ApplicationRateLimit       func(http.Handler) http.Handler
 	ApplicationVerifyRateLimit func(http.Handler) http.Handler
+	// BaselineRateLimit is the catch-all per-IP limit on /api/v1 (audit M4).
+	BaselineRateLimit func(http.Handler) http.Handler
+	// ProductionMode makes New log a warning when forwarding headers arrive
+	// while TRUSTED_PROXIES is empty (audit H1).
+	ProductionMode bool
 }
 
 // New assembles the full router.
@@ -135,7 +140,7 @@ func New(d Deps) http.Handler {
 	if d.Cfg != nil {
 		trustedProxies = d.Cfg.TrustedProxies
 	}
-	r.Use(NewClientIPMiddleware(trustedProxies))
+	r.Use(NewClientIPMiddleware(trustedProxies, WithUntrustedForwardingWarning(d.ProductionMode && len(trustedProxies) == 0, d.Log)))
 	r.Use(requestLogger(d.Log))
 	r.Use(recoverer(d.Log))
 	// CORS is mounted whenever either source of allowed origins is wired: a
@@ -156,7 +161,12 @@ func New(d Deps) http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		if d.Health != nil {
 			if err := d.Health(); err != nil {
-				httpx.WriteError(w, http.StatusServiceUnavailable, "unhealthy", err.Error(), nil)
+				// Anonymous endpoint: never echo the error (DB host/port/user
+				// can be inside it); the detail goes to the server log.
+				if d.Log != nil {
+					d.Log.Error("healthz: health check failed", "error", err)
+				}
+				httpx.WriteError(w, http.StatusServiceUnavailable, "unhealthy", "service unavailable", nil)
 				return
 			}
 		}
@@ -164,6 +174,7 @@ func New(d Deps) http.Handler {
 	})
 
 	r.Route("/api/v1", func(v1 chi.Router) {
+		v1.Use(orPassthrough(d.BaselineRateLimit))
 		// ── Admin (back office) ────────────────────────────────
 		v1.Route("/admin", func(ar chi.Router) {
 			// Access verification first (an unverified request learns nothing,

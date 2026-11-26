@@ -102,7 +102,10 @@ admin 靜態站要由某個程序提供在 `127.0.0.1:3001`（`make admin-dev` �
 | `CF_ACCESS_BIND_EMAIL` | 預設關閉 | `true` 時 Access JWT 的 email 必須等於後台帳號 email。商家網域是「任何人都能過 Access」，所以預設不開 |
 | `PLATFORM_ADMIN_HOSTS` | `platform-admin.example.com` | 逗號分隔 `host[:port]`；平台層後台 API 只能從這些主機呼叫 |
 | `ADMIN_PUBLIC_URL` | `https://merchant.example.com` | 共用 merchant admin 網域（沒有登記 admin origin 的商家用它當連結基底） |
-| `TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | 既有；cloudflared 在本機時用於取得客戶端 IP（鎖定與限流依賴它） |
+| `TRUSTED_PROXIES` | `127.0.0.1/32,::1/128` | **cloudflared 與 API 同機時必填**。留空則所有訪客共用 127.0.0.1，所有 per-IP 限流與鎖定變成全域共用桶（一人打滿，全員 429）；production 留空且收到 `CF-Connecting-IP`／`X-Forwarded-For` 時 API 會記一次 WARN。只採信 `CF-Connecting-IP`，且僅當 TCP 對端在此清單內；`X-Forwarded-For` 永不採信。API 跑在 Docker、cloudflared 在主機時，對端是 Docker 橋接閘道，改填該網段 |
+| `RATE_LIMIT_BASELINE_LIMIT` / `_WINDOW` | production 預設 `300` / `1m` | `/api/v1` 全部路由每 IP 的基線限流；`0`＝關閉（dev/test 預設關） |
+| `RATE_LIMIT_WEBHOOK_LIMIT` / `_WINDOW` | production 預設 `600` / `1m` | 金流回呼（`/api/v1/webhooks/*`）每 IP 獨立桶，遠高於綠界重送次數，不會擋掉正常重試 |
+| `PAYMENT_DEFAULT_PROVIDER` | production 預設 `ecpay` | production 不註冊 mock，顧客 body 的 `provider` 只能是 `ecpay`；明確設 `mock` 會拒絕啟動 |
 | `RATE_LIMIT_LOGIN_ACCOUNT_FAILURES` / `_WINDOW` | 預設 `10` / `15m` | 帳號層級登入鎖定（選用調整） |
 
 設定後重啟 API。`APP_ENV=production` 且沒設 `CF_ACCESS_*` 或 `PLATFORM_ADMIN_HOSTS` 時，啟動日誌會各有一行 WARN。

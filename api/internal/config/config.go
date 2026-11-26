@@ -51,6 +51,13 @@ type Config struct {
 	ContentPreviewTTL       time.Duration
 	ContentPublicMaxAge     int
 	ContentPublicRateLimit  int
+	// Baseline per-IP limits (audit M4): every /api/v1 route except payment
+	// webhooks shares one bucket per client IP; webhooks get their own, larger
+	// bucket. A limit <= 0 disables that bucket.
+	BaselineRateLimit  int
+	BaselineRateWindow time.Duration
+	WebhookRateLimit   int
+	WebhookRateWindow  time.Duration
 	ContentPublicRateWindow time.Duration
 
 	// OrderAccessTokenTTL bounds how long a guest's order access token stays
@@ -358,7 +365,7 @@ func Load() (*Config, error) {
 		JWTIssuer:       getenv("JWT_ISSUER", "ecommerce-api"),
 
 		PaymentMockWebhookSecret: getenv("PAYMENT_MOCK_WEBHOOK_SECRET", "dev-only-mock-payment-webhook-secret"),
-		PaymentDefaultProvider:   getenv("PAYMENT_DEFAULT_PROVIDER", "mock"),
+		PaymentDefaultProvider:   getenv("PAYMENT_DEFAULT_PROVIDER", ""),
 
 		ReportDefaultTimezone: getenv("REPORT_DEFAULT_TIMEZONE", "Asia/Taipei"),
 
@@ -397,6 +404,19 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: APP_ENV must be %q, %q or %q", EnvDevelopment, EnvTest, EnvProduction)
 	}
 
+	// M3: the mock provider is never registered in production, so the default
+	// there is the real provider; an explicit "mock" is refused.
+	if cfg.PaymentDefaultProvider == "" {
+		if cfg.Env == EnvProduction {
+			cfg.PaymentDefaultProvider = "ecpay"
+		} else {
+			cfg.PaymentDefaultProvider = "mock"
+		}
+	}
+	if cfg.Env == EnvProduction && cfg.PaymentDefaultProvider == "mock" {
+		return nil, errors.New("config: PAYMENT_DEFAULT_PROVIDER=mock is not allowed with APP_ENV=production (the mock provider is not registered there)")
+	}
+
 	var err error
 	if cfg.TrustedProxies, err = parsePrefixes("TRUSTED_PROXIES"); err != nil {
 		return nil, err
@@ -426,6 +446,25 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if cfg.ContentPublicRateWindow, err = parseDuration("RATE_LIMIT_CONTENT_PUBLIC_WINDOW", time.Minute); err != nil {
+		return nil, err
+	}
+	// Development/test default to "off" (local e2e and dev servers share one
+	// loopback IP and legitimately exceed a per-IP baseline); production and
+	// an unset APP_ENV default to 300 requests/min (600 for webhooks).
+	baselineDefault, webhookDefault := 300, 600
+	if cfg.IsDevOrTest() {
+		baselineDefault, webhookDefault = 0, 0
+	}
+	if cfg.BaselineRateLimit, err = parseInt("RATE_LIMIT_BASELINE_LIMIT", baselineDefault); err != nil {
+		return nil, err
+	}
+	if cfg.BaselineRateWindow, err = parseDuration("RATE_LIMIT_BASELINE_WINDOW", time.Minute); err != nil {
+		return nil, err
+	}
+	if cfg.WebhookRateLimit, err = parseInt("RATE_LIMIT_WEBHOOK_LIMIT", webhookDefault); err != nil {
+		return nil, err
+	}
+	if cfg.WebhookRateWindow, err = parseDuration("RATE_LIMIT_WEBHOOK_WINDOW", time.Minute); err != nil {
 		return nil, err
 	}
 	if cfg.AdminSetupTokenTTL, err = parseDuration("ADMIN_SETUP_TOKEN_TTL", 72*time.Hour); err != nil {
