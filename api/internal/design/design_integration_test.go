@@ -470,3 +470,96 @@ func TestPurgeLeavesRequestsThatAreStillReferenced(t *testing.T) {
 		t.Fatalf("referenced request is gone: %v", err)
 	}
 }
+
+// The version preview's usage rows (design D25) follow their own retention and
+// the purge touches nothing else for them.
+func TestPurgeVersionPreviewUsageRows(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	req := f.request(1, "admin")
+	add := func(shop int, age time.Duration, status string) {
+		f.t.Helper()
+		at := f.now.Add(-age)
+		f.client.DesignVersionPreview.Create().SetShopID(shop).SetSite("admin").SetTargetRequestID(uuid.New()).
+			SetTargetTag("design-admin-20260101-1").SetRequestedByUserID(1).SetStatus(status).
+			SetCreatedAt(at).SetUpdatedAt(at).SetExpiresAt(at.Add(30 * time.Minute)).SetPreviewOrigin("https://x.example").SaveX(ctx)
+	}
+	day := 24 * time.Hour
+	add(1, 91*day, design.VPExpired) // old: goes
+	add(1, 120*day, design.VPFailed) // old: goes
+	add(2, 100*day, design.VPReady)  // old, other shop
+	add(1, 89*day, design.VPExpired) // inside the retention: stays
+	add(1, time.Hour, design.VPQueued)
+	cfg := design.DefaultPurgeConfig()
+	cfg.Shop = 1
+	dry, err := f.purger(nil).Purge(ctx, cfg, false)
+	if err != nil || dry.VersionPreviews != 2 {
+		t.Fatalf("dry run: %+v %v", dry, err)
+	}
+	if n := f.client.DesignVersionPreview.Query().CountX(ctx); n != 5 {
+		t.Fatalf("the dry run deleted rows: %d", n)
+	}
+	eventsBefore := f.client.DesignRequestEvent.Query().CountX(ctx)
+	rep, err := f.purger(nil).Purge(ctx, cfg, true)
+	if err != nil || rep.VersionPreviews != 2 {
+		t.Fatalf("apply: %+v %v", rep, err)
+	}
+	if n := f.client.DesignVersionPreview.Query().CountX(ctx); n != 3 {
+		t.Fatalf("rows left: %d (shop 2 and the recent ones stay)", n)
+	}
+	if f.client.DesignRequest.Query().CountX(ctx) != 1 || f.client.DesignRequestEvent.Query().CountX(ctx) != eventsBefore || req == nil {
+		t.Fatal("the purge touched the history")
+	}
+	again, err := f.purger(nil).Purge(ctx, cfg, true)
+	if err != nil || again.VersionPreviews != 0 {
+		t.Fatalf("not idempotent: %+v %v", again, err)
+	}
+	// Every shop, and a zero retention means "skip".
+	cfg.Shop = 0
+	rep, _ = f.purger(nil).Purge(ctx, cfg, true)
+	if rep.VersionPreviews != 1 {
+		t.Fatalf("all shops: %+v", rep)
+	}
+	cfg.VersionPreviewRetention = 0
+	if err := f.exec(`UPDATE design_version_previews SET created_at = $1`, f.now.Add(-400*day)); err != nil {
+		t.Fatal(err)
+	}
+	rep, _ = f.purger(nil).Purge(ctx, cfg, true)
+	if rep.VersionPreviews != 0 {
+		t.Fatal("a zero retention must skip the table")
+	}
+	// Export carries the usage rows without their origin; the shop wipe removes them.
+	ex, err := f.purger(nil).ExportShop(ctx, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := json.Marshal(ex)
+	if len(ex.VersionPreviews) == 0 || strings.Contains(string(raw), "x.example") {
+		t.Fatalf("export: %d rows, origin leaked=%v", len(ex.VersionPreviews), strings.Contains(string(raw), "x.example"))
+	}
+	if _, err := f.purger(nil).AllForShop(ctx, 1, true); err != nil {
+		t.Fatal(err)
+	}
+	if n := f.client.DesignVersionPreview.Query().CountX(ctx); n != 0 {
+		t.Fatalf("rows after the shop wipe: %d", n)
+	}
+}
+
+func TestEffectiveVersionPreviewStatus(t *testing.T) {
+	now := time.Now()
+	for _, c := range []struct {
+		status string
+		exp    time.Time
+		want   string
+	}{
+		{design.VPQueued, now.Add(time.Minute), design.VPQueued},
+		{design.VPReady, now.Add(-time.Second), design.VPExpired},
+		{design.VPClaimed, now, design.VPExpired},
+		{design.VPFailed, now.Add(-time.Hour), design.VPFailed},
+		{design.VPSuperseded, now.Add(-time.Hour), design.VPSuperseded},
+	} {
+		if got := design.EffectiveVPStatus(&ent.DesignVersionPreview{Status: c.status, ExpiresAt: c.exp}, now); got != c.want {
+			t.Errorf("%s: got %s want %s", c.status, got, c.want)
+		}
+	}
+}
