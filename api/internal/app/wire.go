@@ -264,6 +264,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 			ScreenshotsEnabled:     cfg.Design.Enabled(),
 			ShopQuotaBytes:         cfg.Design.ShopQuotaBytes, ScreenshotURLTTL: cfg.Design.ScreenshotTTL,
 			ProcessConcurrency: cfg.Media.ProcessConcurrency, MaxScreenshotAttempts: cfg.Design.MaxScreenshotAttempts,
+			SandboxOrigins: cfg.Design.SandboxOrigins, SandboxOriginsRequired: cfg.Design.SandboxOriginsRequired,
 		},
 	}
 	designCreds := &design.Credentials{Client: client, Now: time.Now}

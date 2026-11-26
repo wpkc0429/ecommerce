@@ -99,3 +99,25 @@ func TestLoadDesignStorageAllOrNothing(t *testing.T) {
 		t.Setenv(key, "")
 	}
 }
+
+func TestDesignSandboxOrigins(t *testing.T) {
+	t.Setenv("DESIGN_SANDBOX_ORIGINS", " HTTP://127.0.0.1:13001, https://Sandbox.Example.com ,http://127.0.0.1:13001,")
+	cfg := &Config{}
+	if err := loadDesign(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(cfg.Design.SandboxOrigins, "|"); got != "http://127.0.0.1:13001|https://sandbox.example.com" {
+		t.Fatalf("origins: %q", got)
+	}
+	for _, bad := range []string{"127.0.0.1:13001", "http://x/path", "ftp://x", "http://u@x", "*"} {
+		t.Setenv("DESIGN_SANDBOX_ORIGINS", bad)
+		if err := loadDesign(&Config{}); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	t.Setenv("DESIGN_SANDBOX_ORIGINS", "")
+	cfg = &Config{}
+	if err := loadDesign(cfg); err != nil || len(cfg.Design.SandboxOrigins) != 0 {
+		t.Fatalf("empty list: %v %v", err, cfg.Design.SandboxOrigins)
+	}
+}

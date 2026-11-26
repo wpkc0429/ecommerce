@@ -8,17 +8,19 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"image"
 	"image/png"
+	"math"
 	"net/http"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 
+	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/designrequest"
 	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
@@ -33,15 +35,15 @@ import (
 
 // Limits (design D5).
 const (
-	MaxScreenshotBytes    = 2 << 20  // per image, uploaded and stored
-	MaxScreenshotsPerReq  = 80       // retained slots per request (a re-shoot of a slot counts once)
+	MaxScreenshotBytes   = 2 << 20 // per image, uploaded and stored
+	MaxScreenshotsPerReq = 80      // retained slots per request (a re-shoot of a slot counts once)
 	// DefaultMaxScreenshotAttempts bounds every upload attempt per request
 	// (3x the slot cap); DESIGN_MAX_SCREENSHOT_ATTEMPTS overrides it.
 	DefaultMaxScreenshotAttempts = 3 * MaxScreenshotsPerReq
-	MaxScreenshotBytesReq = 40 << 20 // bytes per request
-	MaxScreenshotHeight   = 10_000
-	MaxManifestBytes      = 2 << 10
-	maxScreenshotPixels   = 1280 * MaxScreenshotHeight
+	MaxScreenshotBytesReq        = 40 << 20 // bytes per request
+	MaxScreenshotHeight          = 10_000
+	MaxManifestBytes             = 2 << 10
+	maxScreenshotPixels          = 1280 * MaxScreenshotHeight
 
 	DatasetSandbox     = "sandbox-v1"
 	DatasetPublicLive  = "public-live"
@@ -83,9 +85,12 @@ type Manifest struct {
 	ToolVersion string `json:"tool_version"`
 	Dataset     string `json:"dataset"`
 	APIOrigin   string `json:"api_origin_class"`
-	CapturedAt  string `json:"captured_at"`
-	SetVersion  int    `json:"set_version"`
-	Truncated   bool   `json:"truncated,omitempty"`
+	// Origin is the exact origin (scheme://host[:port]) the capture ran against.
+	// For admin captures it must be one of DESIGN_SANDBOX_ORIGINS.
+	Origin     string `json:"origin,omitempty"`
+	CapturedAt string `json:"captured_at"`
+	SetVersion int    `json:"set_version"`
+	Truncated  bool   `json:"truncated,omitempty"`
 }
 
 // ParseManifest decodes the base64 JSON of X-Capture-Manifest and checks its
@@ -113,6 +118,13 @@ func ParseManifest(b64 string) (Manifest, error) {
 	case m.APIOrigin != OriginClassSandbox && m.APIOrigin != OriginClassPublic:
 		return m, invalidShot("api_origin_class must be sandbox or public")
 	}
+	if m.Origin != "" {
+		o, ok := config.NormalizeOrigin(m.Origin)
+		if !ok || len(m.Origin) > 255 {
+			return m, invalidShot("origin must be a bare http(s) origin such as http://127.0.0.1:13001")
+		}
+		m.Origin = o
+	}
 	if _, err := time.Parse(time.RFC3339, m.CapturedAt); err != nil {
 		return m, invalidShot("captured_at must be an RFC 3339 time")
 	}
@@ -122,7 +134,7 @@ func ParseManifest(b64 string) (Manifest, error) {
 // checkCaptureRules is the privacy rule R1/R2 at the door (design D11, Q5).
 // The platform cannot prove where a screenshot came from; it can refuse one
 // that declares it came from live data where that is not allowed.
-func checkCaptureRules(site, role string, m Manifest) error {
+func checkCaptureRules(site, role string, m Manifest, p sandboxPolicy) error {
 	refuse := func(msg string) error {
 		return newErr(http.StatusUnprocessableEntity, "live_data_capture_refused", msg)
 	}
@@ -132,6 +144,16 @@ func checkCaptureRules(site, role string, m Manifest) error {
 		// fixed synthetic dataset may be captured, never a merchant's live admin.
 		if m.Dataset != DatasetSandbox || m.APIOrigin != OriginClassSandbox {
 			return refuse("admin screenshots must be captured from the sandbox stack (dataset sandbox-v1)")
+		}
+		// The platform's own list of sandbox origins (DESIGN_SANDBOX_ORIGINS):
+		// the declared class alone is only the service's claim.
+		switch {
+		case len(p.origins) > 0:
+			if m.Origin == "" || !slices.Contains(p.origins, m.Origin) {
+				return refuse("admin screenshots must declare a capture origin that is a configured sandbox origin")
+			}
+		case p.required:
+			return refuse("admin screenshots are refused: no sandbox origins are configured (DESIGN_SANDBOX_ORIGINS)")
 		}
 	case SiteStorefront:
 		// Storefront shots are public data only: no login, so only the anonymous role.
@@ -146,6 +168,12 @@ func checkCaptureRules(site, role string, m Manifest) error {
 		}
 	}
 	return nil
+}
+
+// sandboxPolicy is the platform-side list of sandbox origins (Config).
+type sandboxPolicy struct {
+	origins  []string
+	required bool
 }
 
 // UploadInput is one screenshot PUT.
@@ -268,7 +296,7 @@ func (s *Service) UploadScreenshot(ctx context.Context, in UploadInput) (*ent.De
 	if err != nil {
 		return nil, false, err
 	}
-	if err := checkCaptureRules(req.Site, in.Role, man); err != nil {
+	if err := checkCaptureRules(req.Site, in.Role, man, sandboxPolicy{origins: s.Cfg.SandboxOrigins, required: s.Cfg.SandboxOriginsRequired}); err != nil {
 		return nil, false, err
 	}
 	// before = the base commit, after = the current head. A head that has not

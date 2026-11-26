@@ -30,6 +30,7 @@ import {
   assertResetTargets,
   buildSandboxEnv,
   captureManifestHeader,
+  sandboxOrigins,
   readMainStackFacts,
   resolvePorts,
 } from "./guard.mjs";
@@ -203,6 +204,10 @@ function describe(ports) {
     api_origin: `http://127.0.0.1:${ports.api}`,
     admin_origin: `http://127.0.0.1:${ports.admin}`,
     allowed_api_origins: [`http://127.0.0.1:${ports.api}`, `http://localhost:${ports.api}`],
+    // The platform's DESIGN_SANDBOX_ORIGINS must list these (the sandbox API already does), and an admin
+    // capture's X-Capture-Manifest must carry one of them as "origin" (capture_origin is the usual one).
+    design_sandbox_origins: sandboxOrigins(ports),
+    capture_origin: `http://127.0.0.1:${ports.admin}`,
     media_origin: `http://127.0.0.1:${ports.minio}`,
     database: SANDBOX_DB,
     redis_db: REDIS_DB_INDEX,
@@ -249,6 +254,7 @@ async function smoke() {
       E2E_ADMIN_EMAIL: SANDBOX_PERSONAS.platform.email,
       E2E_ADMIN_PASSWORD: SANDBOX_PERSONAS.platform.password,
       E2E_REQUIRE_DESIGN_STORAGE: "1",
+      E2E_SANDBOX_ORIGIN: `http://127.0.0.1:${ports.admin}`,
     },
   });
   const lines = (r.stdout + r.stderr).split(/\r?\n/).filter((l) => /sandbox|manifest|live data|✗|PASSED|FAILED|screenshot is stored|stored/i.test(l));
@@ -274,7 +280,7 @@ try {
     const pids = readPids();
     console.log(JSON.stringify({ api: Boolean(pids.api && alive(pids.api)), admin: Boolean(pids.admin && alive(pids.admin)), ports }, null, 2));
   } else if (cmd === "env") console.log(JSON.stringify(describe(guardedContext().ports), null, 2));
-  else if (cmd === "manifest") console.log(captureManifestHeader());
+  else if (cmd === "manifest") console.log(captureManifestHeader(new Date(), `http://127.0.0.1:${guardedContext().ports.admin}`));
   else if (cmd === "smoke") await smoke();
   else if (cmd === "selftest") await selftest();
   else {

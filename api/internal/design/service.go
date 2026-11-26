@@ -47,6 +47,14 @@ type Config struct {
 	VersionPreviewClaimLease time.Duration // default 5m
 	VersionPreviewHourlyCap  int           // per (shop, user) per hour; default 6
 	VersionPreviewDailyCap   int           // per shop per UTC day; default 30
+
+	// SandboxOrigins are the exact origins of the sandbox stack (normalized, see
+	// config.NormalizeOrigin). When non-empty an admin screenshot's
+	// capture_manifest.origin must be one of them. When empty, admin captures are
+	// refused if SandboxOriginsRequired (production-like APP_ENV) and otherwise
+	// governed by the manifest rules alone (dev/test).
+	SandboxOrigins         []string
+	SandboxOriginsRequired bool
 }
 
 // DefaultConfig returns the documented defaults.

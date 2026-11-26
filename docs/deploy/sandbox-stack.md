@@ -49,8 +49,13 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 
 ## 平台如何判斷「這是 sandbox」（誠實說明）
 
-平台**沒有**「sandbox 部署」的伺服器端旗標，也**沒有**可登記的 sandbox origin 清單。`design.checkCaptureRules`（`api/internal/design/screenshots.go`）只信任上傳時的 `X-Capture-Manifest`：admin 截圖必須 `dataset=sandbox-v1` 且 `api_origin_class=sandbox`（否則 422 `live_data_capture_refused`），沒有標頭同樣 422；storefront 只收 `anon`，資料集 `sandbox-v1`＋sandbox 或 `public-live`＋public。這是宣告，**平台無法驗真**。因此防線是：擷取工具只對 sandbox 的 origin 運作（allowlist 由 `make sandbox-env` 的 `allowed_api_origins`／`admin_origin` 提供）、sandbox 本身沒有真實資料可拍（上面的守衛）、核准畫面並排即時預覽。
-產生標頭值：`node scripts/sandbox/sandbox.mjs manifest`（base64 的 `{"tool":"design-capture",…,"dataset":"sandbox-v1","api_origin_class":"sandbox",…}`）。
+平台**沒有**「sandbox 部署」的旗標，但從 2026-11-27 起有一份**伺服器端的 sandbox origin 清單**：設定 `DESIGN_SANDBOX_ORIGINS`（逗號分隔的 `http(s)://host[:port]`，不含路徑；大小寫會被正規化，比對是逐字相等）。
+`design.checkCaptureRules`（`api/internal/design/screenshots.go`）對 admin 截圖要求：`dataset=sandbox-v1`、`api_origin_class=sandbox`，**且** `capture_manifest.origin`（新的選填欄位，admin 必填）等於清單中的某一項，否則 422 `live_data_capture_refused`。
+- 清單為空：`APP_ENV` 為 production 類（含未設定，fail closed）時 **所有 admin 截圖一律被拒**；development／test 時只照 manifest 規則收（origin 可省略）。清單非空時任何環境都強制比對。
+- storefront 截圖不受清單影響（它拍的是公開資料）。上傳時 manifest 只保存已知欄位，`origin` 現在是其中之一。
+- 這仍然不是證明：manifest 是服務自己宣告的，清單擋住的是「宣告了不在清單內的 origin」與「production 忘了設定清單」。真正的邊界仍是 sandbox 的守衛與擷取腳本的 allowlist（template T6，**尚未實作**，且 T6 要在 manifest 帶上 `origin`＝實際截圖的 admin origin）。
+- 平台部署要設的值：`make sandbox-env` 的 `design_sandbox_origins`（預設 `http://127.0.0.1:13001`、`http://localhost:13001`、`http://127.0.0.1:18080`、`http://localhost:18080`）；若 sandbox 搬到別的主機，填它的真實 https origin。sandbox 自己的 API 啟動時已由 `buildSandboxEnv` 設好同一份清單，所以 `make sandbox-smoke` 會實際走過這個檢查。
+產生標頭值：`node scripts/sandbox/sandbox.mjs manifest`（base64 的 `{"tool":"design-capture",…,"dataset":"sandbox-v1","api_origin_class":"sandbox","origin":"http://127.0.0.1:13001",…}`）。
 
 ## AI 編輯服務怎麼取得 origin 與測試帳號
 
@@ -59,7 +64,7 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 - `api_origin`（`http://127.0.0.1:18080`）、`admin_origin`（`http://127.0.0.1:13001`）、`allowed_api_origins`：擷取腳本（template T6，**尚未實作**）只可對這些 origin 啟動；admin SPA 的 API 位址由腳本寫進 localStorage `apiBase`。
 - `logins.owner`／`logins.staff`：admin 的 owner／staff 截圖；`publishable_key`：storefront 的匿名截圖。
 - 服務上傳到**真正的平台**用的是平台簽發給它的 `dsk_` 憑證，與 sandbox 無關；sandbox 自己的設計歷史 bucket 只用來在本機做上傳煙霧測試。
-- 「為某個商家登記 sandbox origin」：平台沒有這個概念（見上）。預覽 origin 是每個請求用 `PUT …/preview` 登記的；sandbox origin 只存在於擷取腳本的 allowlist。未來若要伺服器端強制，需新增設定（例如 `DESIGN_SANDBOX_ORIGINS`）與上傳端比對——那是平台程式變更，這個 change 沒有做。
+- sandbox origin 是**平台層設定**（`DESIGN_SANDBOX_ORIGINS`），不是每個商家登記的東西；預覽 origin 仍是每個請求用 `PUT …/preview` 登記的。擷取腳本的 allowlist 與平台清單應是同一份（取自 `make sandbox-env`）。
 
 ## 上傳煙霧測試（`make sandbox-smoke`）
 

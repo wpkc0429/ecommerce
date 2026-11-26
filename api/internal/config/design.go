@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -45,6 +46,14 @@ type DesignConfig struct {
 	ShopQuotaBytes int64 // DESIGN_SHOP_QUOTA_BYTES: stored screenshot bytes per shop
 	// MaxScreenshotAttempts is DESIGN_MAX_SCREENSHOT_ATTEMPTS: every upload attempt per request (default 240 = 3 x 80 slots).
 	MaxScreenshotAttempts int
+
+	// SandboxOrigins is DESIGN_SANDBOX_ORIGINS: the exact origins (scheme://host[:port])
+	// of the sandbox stack. Admin screenshots must declare one of them as
+	// capture_manifest.origin. Empty means admin captures are refused when
+	// APP_ENV is production-like (SandboxOriginsRequired) and accepted per the
+	// manifest rules alone in development and test.
+	SandboxOrigins         []string
+	SandboxOriginsRequired bool
 }
 
 // Enabled reports whether the private screenshot bucket is configured.
@@ -108,7 +117,45 @@ func loadDesign(cfg *Config) error {
 	if c.MaxScreenshotAttempts < 80 || c.MaxScreenshotAttempts > 2000 {
 		return fmt.Errorf("config: DESIGN_MAX_SCREENSHOT_ATTEMPTS must be between 80 and 2000")
 	}
+	if c.SandboxOrigins, err = ParseSandboxOrigins(os.Getenv("DESIGN_SANDBOX_ORIGINS")); err != nil {
+		return err
+	}
+	c.SandboxOriginsRequired = !cfg.IsDevOrTest()
 	return loadDesignStorage(cfg)
+}
+
+// ParseSandboxOrigins parses the DESIGN_SANDBOX_ORIGINS comma list. Each entry
+// must be a bare http(s) origin (no userinfo, path, query or fragment); entries
+// are lower-cased and de-duplicated, so a later comparison is exact.
+func ParseSandboxOrigins(raw string) ([]string, error) {
+	var out []string
+	seen := map[string]bool{}
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		o, ok := NormalizeOrigin(part)
+		if !ok {
+			return nil, fmt.Errorf("config: DESIGN_SANDBOX_ORIGINS entries must be bare http(s) origins such as http://127.0.0.1:13001")
+		}
+		if !seen[o] {
+			seen[o] = true
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+// NormalizeOrigin returns scheme://host[:port] in lower case, or false when s
+// is not exactly an http(s) origin.
+func NormalizeOrigin(s string) (string, bool) {
+	u, err := url.Parse(s)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.Hostname() == "" ||
+		u.User != nil || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.Fragment != "" || strings.Contains(s, "#") || strings.Contains(s, "?") {
+		return "", false
+	}
+	return strings.ToLower(u.Scheme) + "://" + strings.ToLower(u.Host), true
 }
 
 // Bounds of the per-shop screenshot quota.

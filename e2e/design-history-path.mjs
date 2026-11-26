@@ -70,7 +70,7 @@ export function makePng(width, height, seed = 0, extraChunks = []) {
 }
 
 const manifest = (dataset = "sandbox-v1", origin = "sandbox") =>
-  Buffer.from(JSON.stringify({ tool: "e2e-fake-service", tool_version: "1", dataset, api_origin_class: origin, captured_at: new Date().toISOString(), set_version: 1 })).toString("base64");
+  Buffer.from(JSON.stringify({ tool: "e2e-fake-service", tool_version: "1", dataset, api_origin_class: origin, ...(process.env.E2E_SANDBOX_ORIGIN ? { origin: process.env.E2E_SANDBOX_ORIGIN } : {}), captured_at: new Date().toISOString(), set_version: 1 })).toString("base64");
 
 const hex = (n) => n.toString(16).padStart(2, "0").repeat(20); // a 40-hex commit id
 const idem = () => `e2e-design-${runID}-${Math.random().toString(36).slice(2, 12)}`;

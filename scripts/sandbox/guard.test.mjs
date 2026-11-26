@@ -15,6 +15,7 @@ import {
   assertSandboxEnv,
   buildSandboxEnv,
   captureManifestHeader,
+  sandboxOrigins,
   resolvePorts,
 } from "./guard.mjs";
 
@@ -88,4 +89,15 @@ test("the capture manifest declares sandbox-v1 / sandbox", () => {
   const m = JSON.parse(Buffer.from(captureManifestHeader(), "base64").toString());
   assert.equal(m.dataset, "sandbox-v1");
   assert.equal(m.api_origin_class, "sandbox");
+  assert.equal(m.origin, undefined);
+  const withOrigin = JSON.parse(Buffer.from(captureManifestHeader(new Date(), "http://127.0.0.1:13001"), "base64").toString());
+  assert.equal(withOrigin.origin, "http://127.0.0.1:13001");
+});
+
+test("the sandbox env lists the sandbox origins for DESIGN_SANDBOX_ORIGINS", () => {
+  const env = buildSandboxEnv({ secrets, ports });
+  const list = env.DESIGN_SANDBOX_ORIGINS.split(",");
+  assert.ok(list.includes("http://127.0.0.1:13001"));
+  assert.ok(list.every((o) => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)));
+  assert.deepEqual(list, sandboxOrigins(ports));
 });

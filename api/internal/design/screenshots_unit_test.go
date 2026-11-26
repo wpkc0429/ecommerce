@@ -145,9 +145,59 @@ func TestCaptureRulesAdminSandboxOnly(t *testing.T) {
 		{SiteStorefront, "staff", live, true},
 	}
 	for _, c := range cases {
-		err := checkCaptureRules(c.site, c.role, c.m)
+		err := checkCaptureRules(c.site, c.role, c.m, sandboxPolicy{})
 		if c.refused != (errCode(err) == "live_data_capture_refused") || (err != nil && !c.refused) {
 			t.Errorf("%s/%s %+v: refused=%v err=%v", c.site, c.role, c.m, c.refused, err)
+		}
+	}
+}
+
+func TestCaptureRulesSandboxOrigins(t *testing.T) {
+	m := func(origin string) Manifest {
+		return Manifest{Dataset: DatasetSandbox, APIOrigin: OriginClassSandbox, Origin: origin}
+	}
+	list := sandboxPolicy{origins: []string{"http://127.0.0.1:13001", "https://sandbox.example.com"}}
+	required := sandboxPolicy{required: true}
+	cases := []struct {
+		name    string
+		site    string
+		m       Manifest
+		p       sandboxPolicy
+		refused bool
+	}{
+		{"listed", SiteAdmin, m("http://127.0.0.1:13001"), list, false},
+		{"listed https", SiteAdmin, m("https://sandbox.example.com"), list, false},
+		{"unlisted", SiteAdmin, m("https://merchant.example.com"), list, true},
+		{"port differs", SiteAdmin, m("http://127.0.0.1:13002"), list, true},
+		{"scheme differs", SiteAdmin, m("https://127.0.0.1:13001"), list, true},
+		{"no origin with list", SiteAdmin, m(""), list, true},
+		{"empty list in production", SiteAdmin, m("http://127.0.0.1:13001"), required, true},
+		{"empty list in dev", SiteAdmin, m(""), sandboxPolicy{}, false},
+		{"storefront ignores list", SiteStorefront, m("https://merchant.example.com"), list, false},
+		{"storefront ignores production", SiteStorefront, m(""), required, false},
+	}
+	for _, c := range cases {
+		err := checkCaptureRules(c.site, "anon", c.m, c.p)
+		if c.site == SiteAdmin {
+			err = checkCaptureRules(c.site, "owner", c.m, c.p)
+		}
+		if c.refused != (errCode(err) == "live_data_capture_refused") || (err != nil && !c.refused) {
+			t.Errorf("%s: refused=%v err=%v", c.name, c.refused, err)
+		}
+	}
+}
+
+func TestParseManifestOrigin(t *testing.T) {
+	with := func(o string) string {
+		return manifest(t, strings.Replace(okManifest, `"set_version":1`, `"set_version":1,"origin":"`+o+`"`, 1))
+	}
+	got, err := ParseManifest(with("HTTP://127.0.0.1:13001"))
+	if err != nil || got.Origin != "http://127.0.0.1:13001" {
+		t.Fatalf("normalized origin: %v %q", err, got.Origin)
+	}
+	for _, bad := range []string{"127.0.0.1:13001", "http://127.0.0.1:13001/path", "ftp://x", "http://u:p@x"} {
+		if _, err := ParseManifest(with(bad)); errCode(err) != "invalid_screenshot" {
+			t.Errorf("%q accepted: %v", bad, err)
 		}
 	}
 }

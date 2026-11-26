@@ -135,6 +135,20 @@ export function assertOutsideRepo(dir, repoRoot) {
  * WHITELIST: nothing is inherited from the invoking shell, so exported SMTP_*, ECPAY_*, R2_*,
  * CF_*, DATABASE_URL etc. cannot leak in.
  */
+/**
+ * The exact origins of the sandbox stack, the value the platform's
+ * DESIGN_SANDBOX_ORIGINS must hold for admin screenshots to be accepted from it
+ * (an admin capture declares the admin SPA's origin; the API's is listed too).
+ */
+export function sandboxOrigins(ports) {
+  return [
+    `http://127.0.0.1:${ports.admin}`,
+    `http://localhost:${ports.admin}`,
+    `http://127.0.0.1:${ports.api}`,
+    `http://localhost:${ports.api}`,
+  ];
+}
+
 export function buildSandboxEnv({ secrets, ports, systemEnv = {} }) {
   const adminOrigins = `http://127.0.0.1:${ports.admin},http://localhost:${ports.admin}`;
   const env = {
@@ -168,6 +182,7 @@ export function buildSandboxEnv({ secrets, ports, systemEnv = {} }) {
     DESIGN_R2_BUCKET: BUCKET_DESIGN,
     DESIGN_R2_ACCESS_KEY_ID: secrets.minioUser,
     DESIGN_R2_SECRET_ACCESS_KEY: secrets.minioPassword,
+    DESIGN_SANDBOX_ORIGINS: sandboxOrigins(ports).join(","),
     // SMTP_* is deliberately absent: no credentials = the API sends no mail at all (the e-mail sink).
     // ECPAY_* is deliberately absent: the mock provider is the default and ECPay stays unconfigured.
   };
@@ -216,8 +231,8 @@ export const SANDBOX_PERSONAS = Object.freeze({
   publishableKey: "pk_demoseedstorefrontkeynotsecret",
 });
 
-export function captureManifestHeader(now = new Date()) {
+export function captureManifestHeader(now = new Date(), origin = undefined) {
   return Buffer.from(
-    JSON.stringify({ tool: "design-capture", tool_version: "1", dataset: "sandbox-v1", api_origin_class: "sandbox", captured_at: now.toISOString(), set_version: 1 }),
+    JSON.stringify({ tool: "design-capture", tool_version: "1", dataset: "sandbox-v1", api_origin_class: "sandbox", ...(origin ? { origin } : {}), captured_at: now.toISOString(), set_version: 1 }),
   ).toString("base64");
 }
