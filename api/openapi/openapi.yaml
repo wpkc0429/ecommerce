@@ -481,7 +481,9 @@ components:
         | 409 | `already_revoked` / `already_acknowledged` | 憑證已撤銷／未追蹤變更已確認 |
         | 429 | `daily_cap_reached` | 該店今日的設計請求已達上限 |
         | 503 | `design_storage_not_configured` | 截圖儲存尚未設定 |
-        | 409 | `quota_exceeded` | 截圖已達每請求（80 張／40 MiB）或每店（`DESIGN_SHOP_QUOTA_BYTES`）上限 |
+        | 409 | `slot_cap_exceeded` | 每請求已有 80 個截圖槽位（重拍既有槽位不計） |
+        | 409 | `attempt_cap_exceeded` | 每請求上傳嘗試總數已達上限（預設 240） |
+        | 409 | `quota_exceeded` | 截圖已達每請求 40 MiB 或每店（`DESIGN_SHOP_QUOTA_BYTES`）上限 |
         | 409 | `head_not_set` | 還沒回報 head 就上傳 after 截圖 |
         | 422 | `invalid_screenshot` | 截圖不是合法 PNG、寬度不等於視口、太高、雜湊或 manifest 無效（過大為 413） |
         | 422 | `live_data_capture_refused` | admin 截圖不是來自 sandbox 資料集，或 storefront 截圖不是匿名／資料集宣告不一致 |
@@ -9247,7 +9249,7 @@ paths:
         **隱私規則（Q5）**：admin 站台必須 `dataset=sandbox-v1` 且 `api_origin_class=sandbox`；storefront 只收匿名（`role=anon`），資料集為 `sandbox-v1`（sandbox 來源）或 `public-live`（公開來源）；
         違反回 422 `live_data_capture_refused`。平台無法驗真，這是契約與縱深防禦。
         同位元組、同 commit 重放回 200（`Idempotency-Replayed: true`）；不同位元組新增 `attempt`（舊的保留）。before 的 `commit_sha` 是 `base_sha`，after 是目前 `head_sha`。
-        只在 `drafting`／`previewing` 可上傳（409 `invalid_state`）。每請求最多 80 張、40 MiB，每店 `DESIGN_SHOP_QUOTA_BYTES`（預設 2 GiB），超過 409 `quota_exceeded`；每憑證每分鐘 60 次上傳。
+        只在 `drafting`／`previewing` 可上傳（409 `invalid_state`）。每請求最多 80 個槽位（重拍同一槽位不佔額度，超過 409 `slot_cap_exceeded`）、嘗試總數最多 240（`DESIGN_MAX_SCREENSHOT_ATTEMPTS`，超過 409 `attempt_cap_exceeded`）、40 MiB，每店 `DESIGN_SHOP_QUOTA_BYTES`（預設 2 GiB），超過 409 `quota_exceeded`；每憑證每分鐘 60 次上傳。
         **未設定截圖儲存時回 503 `design_storage_not_configured`**（認證與請求存在性之後）。
       security: [{ designServiceKey: [] }]
       parameters:

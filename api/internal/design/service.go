@@ -39,6 +39,8 @@ type Config struct {
 	ShopQuotaBytes     int64         // stored screenshot bytes per shop (default none = unlimited in unit tests; config defaults 2 GiB)
 	ScreenshotURLTTL   time.Duration // signed read URL lifetime (default 5m)
 	ProcessConcurrency int           // concurrent PNG decode/encode (default 2)
+	// MaxScreenshotAttempts caps every upload attempt per request (default 3x the slot cap).
+	MaxScreenshotAttempts int
 }
 
 // DefaultConfig returns the documented defaults.

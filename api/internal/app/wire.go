@@ -259,7 +259,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 			ApprovalPendingTimeout: cfg.Design.ApprovalPendingTimeout,
 			ScreenshotsEnabled:     cfg.Design.Enabled(),
 			ShopQuotaBytes:         cfg.Design.ShopQuotaBytes, ScreenshotURLTTL: cfg.Design.ScreenshotTTL,
-			ProcessConcurrency: cfg.Media.ProcessConcurrency,
+			ProcessConcurrency: cfg.Media.ProcessConcurrency, MaxScreenshotAttempts: cfg.Design.MaxScreenshotAttempts,
 		},
 	}
 	designCreds := &design.Credentials{Client: client, Now: time.Now}

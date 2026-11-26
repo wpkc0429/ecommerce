@@ -33,7 +33,10 @@ import (
 // Limits (design D5).
 const (
 	MaxScreenshotBytes    = 2 << 20  // per image, uploaded and stored
-	MaxScreenshotsPerReq  = 80       // rows per request, every attempt counted
+	MaxScreenshotsPerReq  = 80       // retained slots per request (a re-shoot of a slot counts once)
+	// DefaultMaxScreenshotAttempts bounds every upload attempt per request
+	// (3x the slot cap); DESIGN_MAX_SCREENSHOT_ATTEMPTS overrides it.
+	DefaultMaxScreenshotAttempts = 3 * MaxScreenshotsPerReq
 	MaxScreenshotBytesReq = 40 << 20 // bytes per request
 	MaxScreenshotHeight   = 10_000
 	MaxManifestBytes      = 2 << 10
@@ -317,18 +320,39 @@ func (s *Service) UploadScreenshot(ctx context.Context, in UploadInput) (*ent.De
 		if last != nil {
 			attempt = last.Attempt + 1
 		}
-		// Per-request caps count every attempt that still holds an object.
-		sizes, err := tx.DesignScreenshot.Query().Where(designscreenshot.RequestIDEQ(in.RequestID), designscreenshot.PurgedAtIsNil()).
-			Select(designscreenshot.FieldByteSize).Ints(ctx)
+		// Per-request caps. Slot cap: distinct slots (a re-shoot supersedes the
+		// previous attempt and counts once). Attempt cap: every attempt ever
+		// stored for the request (a wider abuse bound). Byte cap: attempts that
+		// still hold an object; superseded attempts stay counted until purged,
+		// exactly as the per-shop quota below counts them.
+		prior, err := tx.DesignScreenshot.Query().Where(designscreenshot.RequestIDEQ(in.RequestID)).All(ctx)
 		if err != nil {
 			return err
 		}
-		reqBytes := len(stored)
-		for _, b := range sizes {
-			reqBytes += b
+		type slotKey struct {
+			phase, role, view string
+			viewport          int16
 		}
-		if len(sizes)+1 > MaxScreenshotsPerReq || reqBytes > MaxScreenshotBytesReq {
-			return conflict("quota_exceeded", "this request has reached its screenshot limit (80 images or 40 MiB)")
+		slots := map[slotKey]bool{}
+		reqBytes := len(stored)
+		for _, r := range prior {
+			slots[slotKey{r.Phase, r.Role, r.ViewKey, r.Viewport}] = true
+			if r.PurgedAt == nil {
+				reqBytes += r.ByteSize
+			}
+		}
+		attemptCap := s.Cfg.MaxScreenshotAttempts
+		if attemptCap <= 0 {
+			attemptCap = DefaultMaxScreenshotAttempts
+		}
+		if len(prior)+1 > attemptCap {
+			return conflict("attempt_cap_exceeded", fmt.Sprintf("this request has reached its upload attempt limit (%d attempts)", attemptCap))
+		}
+		if last == nil && len(slots)+1 > MaxScreenshotsPerReq {
+			return conflict("slot_cap_exceeded", fmt.Sprintf("this request has reached its screenshot slot limit (%d slots); re-shooting an existing slot is still allowed", MaxScreenshotsPerReq))
+		}
+		if reqBytes > MaxScreenshotBytesReq {
+			return conflict("quota_exceeded", "this request has reached its screenshot size limit (40 MiB)")
 		}
 		shopSizes, err := tx.DesignScreenshot.Query().Where(designscreenshot.ShopIDEQ(in.ShopID), designscreenshot.PurgedAtIsNil()).
 			Select(designscreenshot.FieldByteSize).Ints(ctx)

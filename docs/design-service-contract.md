@@ -67,7 +67,9 @@ failed ◄── 服務回報 failed、認領租約過期、核准逾期、等�
 | 415 | `Content-Type` 不是 `image/png` | 修程式 |
 | 422 `invalid_screenshot` | 不是 PNG／寬度不等於視口／高度 > 10,000／無法解碼／雜湊不符／manifest 無效 | 雜湊不符可重傳一次；其餘是擷取程式的錯誤，**不要重試**，`failed(screenshot_upload_failed)` |
 | 422 `live_data_capture_refused` | admin 截圖不是 sandbox 資料集，或 storefront 不是匿名／資料集宣告不一致 | **停止**：擷取環境設定錯誤，這是隱私規則（§6），`failed(live_data_capture_refused)` 並通知營運者 |
-| 409 `quota_exceeded` | 每請求 80 張／40 MiB 或每店配額已滿 | **放棄**這個請求（`failed`）；不要靠重試解決，請營運者檢視配額 |
+| 409 `slot_cap_exceeded` | 每請求已有 80 個槽位（槽位＝phase×role×viewport×view_key；**重拍既有槽位不佔額度**，只有新槽位會觸發） | **放棄**這個請求；不要靠重試解決 |
+| 409 `attempt_cap_exceeded` | 每請求上傳嘗試總數已達上限（預設 240，`DESIGN_MAX_SCREENSHOT_ATTEMPTS`；含所有重拍） | **放棄**這個請求；表示擷取流程在迴圈重拍 |
+| 409 `quota_exceeded` | 每請求 40 MiB（仍存有物件的 attempt 計入）或每店配額已滿 | **放棄**這個請求（`failed`）；不要靠重試解決，請營運者檢視配額 |
 | 409 `invalid_state` | 請求不在 drafting／previewing | 重新讀取請求狀態 |
 | 409 `head_moved` | 上傳期間 head 變了 | 以新的 head 重拍 |
 | 409 `head_not_set` | 還沒回報 head 就上傳 after | 先 `PUT head` |

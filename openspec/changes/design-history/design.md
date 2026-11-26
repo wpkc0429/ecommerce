@@ -82,7 +82,7 @@ published ──(之後某筆還原發佈)──► reverted（見 D15）
 - **鍵**：`shops/{shop_id}/design/{request_id}/{screenshot_id}.png`。bucket 本身私有，鍵可猜也無妨，但仍含 uuid。
 - **讀取**：只經 API：`GET …/screenshots` 為每張回 `url`（`PresignGet`，**5 分鐘**，`DESIGN_SCREENSHOT_URL_TTL`）與 `url_expires_at`；回應 `Cache-Control: no-store`。簽名網址不寫進日誌、不寫進任何資料表。
 - **上傳**：服務把 PNG 位元組直接 `PUT` 給 API（不經 presigned PUT）：API 驗證後存入。理由：圖小（≤ 2 MiB）、服務是伺服器端、API 必須**自己解碼驗證**（防偽、防炸彈）、省掉 `incoming/` 與意圖表。實作要點：`http.MaxBytesReader`（2 MiB）、`image.DecodeConfig` 先驗尺寸（寬必須等於視口、高 ≤ 10,000、像素 ≤ 1280×10,000）、完整解碼並**重新編碼 PNG**（Go 的編碼器不寫入任何輔助區塊，自然去除 tEXt／eXIf 等中繼資料）、對**存入位元組**算 SHA-256；若服務附 `X-Content-SHA256`，必須等於**上傳位元組**的雜湊（傳輸完整性），不符 422。沿用 media 的處理併發信號量。
-- **上限**：每請求 ≤ 80 張（兩個站台×角色×視圖×視口的上界）、≤ 40 MiB；每店 ≤ 2 GiB（`DESIGN_SHOP_QUOTA_BYTES`），超過 409 `quota_exceeded`。
+- **上限**：每請求 ≤ 80 個槽位（phase×角色×視圖×視口；重拍同一槽位不佔額度，超過 409 `slot_cap_exceeded`）、嘗試總數 ≤ 240（`DESIGN_MAX_SCREENSHOT_ATTEMPTS`，超過 409 `attempt_cap_exceeded`）、≤ 40 MiB（被取代但仍存放的 attempt 照算）；每店 ≤ 2 GiB（`DESIGN_SHOP_QUOTA_BYTES`），超過 409 `quota_exceeded`。
 - 格式 PNG（無損，供像素比較與文字清晰度）；不轉 WebP。
 
 ### D6：標準化截圖
@@ -175,7 +175,7 @@ published ──(之後某筆還原發佈)──► reverted（見 D15）
 | `POST /requests/{id}/failed` | `{code, detail}` |
 | `PUT /sites/{site}/state` | 回報 main sha、core 版本、下限 |
 | `POST /untracked-changes` | 批次（≤ 100）；對帳工作的輸出（D19） |
-**共通**：分頁 `page`／`page_size`；錯誤碼（snake_case，掛在既有 envelope）：`design_storage_not_configured`(503)、`invalid_state`(409)、`head_moved`(409)、`request_in_progress`(409)、`already_current`(409)、`revert_below_core_floor`(409)、`quota_exceeded`(409)、`screenshots_incomplete`(409)、`guard_not_passed`(409)、`approval_expired`(409)、`approval_required`(409)、`preview_expired`(409)、`live_data_capture_refused`(422)、`invalid_screenshot`(422)、`requester_not_permitted`(403)、`precondition_failed`(412)、`precondition_required`(428)、`daily_cap_reached`(429)。
+**共通**：分頁 `page`／`page_size`；錯誤碼（snake_case，掛在既有 envelope）：`design_storage_not_configured`(503)、`invalid_state`(409)、`head_moved`(409)、`request_in_progress`(409)、`already_current`(409)、`revert_below_core_floor`(409)、`quota_exceeded`(409)、`slot_cap_exceeded`(409)、`attempt_cap_exceeded`(409)、`screenshots_incomplete`(409)、`guard_not_passed`(409)、`approval_expired`(409)、`approval_required`(409)、`preview_expired`(409)、`live_data_capture_refused`(422)、`invalid_screenshot`(422)、`requester_not_permitted`(403)、`precondition_failed`(412)、`precondition_required`(428)、`daily_cap_reached`(429)。
 **OpenAPI**：約 24 條新路由與 schema（`DesignRequest`、`DesignRequestSummary`、`DesignEvent`、`DesignScreenshot`、`DesignState`、`DesignUntrackedChange`、`DesignServiceCredential` 等）；`v1-surface.txt` 以 `-openapi.update-surface` 重新產生，**只新增行**；`Idempotency-Key`、`If-Match` 與 `ETag` 回應標頭依既有形式宣告（它們會成為新行，不是改既有行）。
 
 ### D16：認領租約與工作發現

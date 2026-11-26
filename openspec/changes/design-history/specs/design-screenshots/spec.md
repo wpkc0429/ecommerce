@@ -40,6 +40,12 @@
 - **WHEN** 該店累計大小已達上限
 - **THEN** 回 409 `quota_exceeded`
 
+#### Scenario: 槽位與嘗試上限
+- **WHEN** 請求已有 80 個槽位仍上傳新槽位
+- **THEN** 回 409 `slot_cap_exceeded`；重拍既有槽位不受影響
+- **WHEN** 該請求的上傳嘗試總數已達上限（預設 240）
+- **THEN** 回 409 `attempt_cap_exceeded`
+
 #### Scenario: 重送與重拍
 - **WHEN** 同一槽先後以相同位元組、再以不同位元組上傳
 - **THEN** 第一次重送回 200 不新增列，第二次新增 `attempt = 2`，列表預設只回每槽最新 attempt

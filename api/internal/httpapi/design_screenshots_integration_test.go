@@ -226,17 +226,27 @@ func TestScreenshotQuotas(t *testing.T) {
 		t.Fatal("an over-quota upload wrote an object")
 	}
 
-	// Per request: 80 images.
+	// Per request: 80 retained slots. A re-shoot of an existing slot does not
+	// consume slot budget; a new slot trips slot_cap_exceeded.
 	r := uuid.MustParse(rid)
 	for i := 0; i < 80; i++ {
 		e.client.DesignScreenshot.Create().SetShopID(e.shopA).SetRequestID(r).SetPhase("before").SetSite("admin").
 			SetViewKey(fmt.Sprintf("v%d", i)).SetViewport(390).SetRole("owner").SetCommitSha(shaBase).
 			SetObjectKey(fmt.Sprintf("k%d", i)).SetByteSize(10).SetWidth(390).SetHeight(10).SetSha256(strings.Repeat("d", 64)).SaveX(ctx)
 	}
-	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "home", img), 409, "quota_exceeded", "80 images")
-	// A purged row no longer counts.
+	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "home", img), 409, "slot_cap_exceeded", "81st slot")
+	e.mustCode(e.upload(e.keyA, rid, "before", "owner", 390, "v3", img), 201, "re-shoot of a full slot set")
+	e.mustCode(e.upload(e.keyA, rid, "before", "owner", 390, "v3", shotPNG(t, 390, 20, 9)), 201, "second re-shoot")
+	// A purged slot is still a slot (its history stays on the request).
 	e.retentionExec(`UPDATE design_screenshots SET purged_at = now() WHERE request_id = $1 AND view_key = 'v0'`, r)
-	e.mustCode(e.upload(e.keyA, rid, "before", "owner", 390, "home", img), 201, "room again")
+	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "home", img), 409, "slot_cap_exceeded", "purged slot still counts")
+
+	// Per request: every attempt counts toward the wider attempt cap.
+	e.svc.Cfg.MaxScreenshotAttempts = 83 // 80 seeded + 2 re-shoots + 1 more
+	e.mustCode(e.upload(e.keyA, rid, "before", "owner", 390, "v3", shotPNG(t, 390, 20, 10)), 201, "last attempt")
+	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "v3", shotPNG(t, 390, 20, 11)), 409, "attempt_cap_exceeded", "attempt cap")
+	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "v4", img), 409, "attempt_cap_exceeded", "attempt cap, other slot")
+	e.svc.Cfg.MaxScreenshotAttempts = 0
 
 	// Per request: 40 MiB (the stored size of existing rows is what counts).
 	e.retentionExec(`UPDATE design_screenshots SET purged_at = now() WHERE request_id = $1`, r)
@@ -245,7 +255,7 @@ func TestScreenshotQuotas(t *testing.T) {
 			SetViewKey(fmt.Sprintf("huge%d", i)).SetViewport(390).SetRole("owner").SetCommitSha(shaBase).SetObjectKey(fmt.Sprintf("huge%d", i)).
 			SetByteSize(2 << 20).SetWidth(390).SetHeight(10).SetSha256(strings.Repeat("e", 64)).SaveX(ctx)
 	}
-	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "again", img), 409, "quota_exceeded", "40 MiB")
+	e.wantErr(e.upload(e.keyA, rid, "before", "owner", 390, "v3", shotPNG(t, 390, 20, 12)), 409, "quota_exceeded", "40 MiB")
 }
 
 func TestScreenshotSignedReads(t *testing.T) {

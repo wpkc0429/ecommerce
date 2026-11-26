@@ -41,7 +41,7 @@ func TestLoadDesignStorageAllOrNothing(t *testing.T) {
 	if err := loadDesign(cfg); err != nil || cfg.Design.Enabled() {
 		t.Fatalf("unset must be disabled: %v %+v", err, cfg.Design.Enabled())
 	}
-	if cfg.Design.ScreenshotTTL != 5*time.Minute || cfg.Design.ShopQuotaBytes != 2<<30 {
+	if cfg.Design.ScreenshotTTL != 5*time.Minute || cfg.Design.ShopQuotaBytes != 2<<30 || cfg.Design.MaxScreenshotAttempts != 240 {
 		t.Fatalf("defaults: %v %d", cfg.Design.ScreenshotTTL, cfg.Design.ShopQuotaBytes)
 	}
 
@@ -87,7 +87,7 @@ func TestLoadDesignStorageAllOrNothing(t *testing.T) {
 		t.Fatalf("weak design secret: %v", err)
 	}
 
-	for key, bad := range map[string]string{"DESIGN_SCREENSHOT_URL_TTL": "1s", "DESIGN_SHOP_QUOTA_BYTES": "10"} {
+	for key, bad := range map[string]string{"DESIGN_SCREENSHOT_URL_TTL": "1s", "DESIGN_SHOP_QUOTA_BYTES": "10", "DESIGN_MAX_SCREENSHOT_ATTEMPTS": "10"} {
 		t.Setenv(key, bad)
 		if err := loadDesign(&Config{Env: EnvTest}); err == nil {
 			t.Errorf("%s=%s was accepted", key, bad)

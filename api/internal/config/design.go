@@ -35,6 +35,8 @@ type DesignConfig struct {
 	R2Endpoint     string // derived: R2_ENDPOINT, else https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com
 	ScreenshotTTL  time.Duration
 	ShopQuotaBytes int64 // DESIGN_SHOP_QUOTA_BYTES: stored screenshot bytes per shop
+	// MaxScreenshotAttempts is DESIGN_MAX_SCREENSHOT_ATTEMPTS: every upload attempt per request (default 240 = 3 x 80 slots).
+	MaxScreenshotAttempts int
 }
 
 // Enabled reports whether the private screenshot bucket is configured.
@@ -78,6 +80,12 @@ func loadDesign(cfg *Config) error {
 		return fmt.Errorf("config: DESIGN_DAILY_REQUEST_CAP must be between 1 and 1000")
 	}
 	c.DailyRequestCap = n
+	if c.MaxScreenshotAttempts, err = parseInt("DESIGN_MAX_SCREENSHOT_ATTEMPTS", 240); err != nil {
+		return err
+	}
+	if c.MaxScreenshotAttempts < 80 || c.MaxScreenshotAttempts > 2000 {
+		return fmt.Errorf("config: DESIGN_MAX_SCREENSHOT_ATTEMPTS must be between 80 and 2000")
+	}
 	return loadDesignStorage(cfg)
 }
 
