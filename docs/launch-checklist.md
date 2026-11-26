@@ -6,6 +6,7 @@
 - `go vet ./...`（ecommerce/api）：無輸出，通過。
 - `golangci-lint run -E gosec,errcheck,staticcheck`：**無法使用**，程式 panic（golangci-lint 以舊版 Go 編譯，載入 Go 1.26.4 toolchain 的型別時崩潰）。需要用 Go 1.26 重編 golangci-lint 或改用 gosec 單機版。
 - `npm audit --package-lock-only`（ecommerce/e2e，唯一有 lockfile 的相關專案）：0 個漏洞。店面與平台官網、admin 皆無 package.json/lockfile（無建置、無 npm 依賴，供應鏈風險低；但 vendor/ 內的第三方檔案如 HEIC 解碼器需人工查版本）。
+- gitleaks 完整歷史掃描（2026-11-26）：已安裝並跑完 115 個 commit，唯一剩餘的 1 筆（guest-checkout 歸檔 tasks.md 第 186 行 generic-api-key）是被截斷的範例 JWT 標頭（eyJhb...），非真實機密、與 .env 皆不相符，已用 .gitleaksignore 指紋略過；結果 0 筆。CI 新增 gitleaks job（固定 v8.28.0，不用 secrets）。
 - 機密掃描（快速 grep，非完整歷史）：命中的檔案是 .env.example、文件、ecpay-sim、e2e 測試用的 ECPay 變數名稱，屬預期；`ecommerce/.env` 存在於本機，需確認被 .gitignore 且從未進過 git 歷史（完整確認要靠 gitleaks，見 A）。
 - 安全標頭檢視：
   - merchant-template-clean/public/_headers：CSP 嚴格（script-src 'self'、object-src 'none'、frame-ancestors 'none'、base-uri 'none'），有 nosniff/Referrer-Policy/X-Frame-Options。缺 HSTS 與 Permissions-Policy；connect-src 為 `https:`（未釘死 API origin）。
