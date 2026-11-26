@@ -42,6 +42,12 @@ func (h *DesignServiceHandler) MountService(r chi.Router) {
 	r.Post("/requests/{requestID}/submit", h.submit)
 	r.Post("/requests/{requestID}/published", h.published)
 	r.Post("/requests/{requestID}/failed", h.failed)
+	// Version previews (design D25): pull model; the service can list, claim and
+	// report ready or failed, never create one.
+	r.Get("/version-previews", h.vpList)
+	r.Post("/version-previews/{previewID}/claim", h.vpClaim)
+	r.Put("/version-previews/{previewID}/ready", h.vpReady)
+	r.Post("/version-previews/{previewID}/failed", h.vpFailed)
 	r.Put("/sites/{site}/state", h.putState)
 	r.Post("/untracked-changes", h.untracked)
 }
@@ -53,6 +59,7 @@ func serviceRequestJSON(r *ent.DesignRequest) map[string]any {
 	m["preview_origin"] = r.PreviewOrigin
 	m["claim_expires_at"] = ts(r.ClaimExpiresAt)
 	m["change_note"] = r.ChangeNote
+	m["preview_read_only"] = true
 	return m
 }
 

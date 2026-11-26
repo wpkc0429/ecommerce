@@ -18,9 +18,10 @@ type predicateReq = predicate.DesignRequest
 
 // SweepReport counts what a sweep did (or would do).
 type SweepReport struct {
-	LeasesLost       int // claim lease ran out -> failed(service_lost)
-	ApprovalTimeouts int // awaiting_approval too long -> failed(approval_timeout)
-	ApprovalExpired  int // approved but not published in time -> failed(approval_expired)
+	LeasesLost       int                 // claim lease ran out -> failed(service_lost)
+	ApprovalTimeouts int                 // awaiting_approval too long -> failed(approval_timeout)
+	ApprovalExpired  int                 // approved but not published in time -> failed(approval_expired)
+	VersionPreviews  VersionPreviewSweep // design D25; touches only design_version_previews
 	Broken           []BrokenChain
 	Verified         int
 }
@@ -90,6 +91,13 @@ func (s *Service) Sweep(ctx context.Context, shopID int, apply bool) (*SweepRepo
 			}
 			*j.dst++
 		}
+	}
+	vp, err := s.SweepVersionPreviews(ctx, shopID, apply)
+	if vp != nil {
+		rep.VersionPreviews = *vp
+	}
+	if err != nil {
+		return rep, err
 	}
 	return rep, nil
 }

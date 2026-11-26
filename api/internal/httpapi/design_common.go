@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -36,6 +37,9 @@ func designNoSniff(next http.Handler) http.Handler {
 func writeDesignError(w http.ResponseWriter, log *slog.Logger, err error) {
 	var de *design.Error
 	if errors.As(err, &de) {
+		if de.RetryAfter > 0 {
+			w.Header().Set("Retry-After", strconv.Itoa(int((de.RetryAfter+time.Second-time.Nanosecond)/time.Second)))
+		}
 		httpx.WriteError(w, de.Status, de.Code, de.Message, de.Details)
 		return
 	}
@@ -111,6 +115,9 @@ func designDetailJSON(r *ent.DesignRequest) map[string]any {
 	m["diff_summary"] = rawJSON(r.DiffSummary)
 	m["guard"] = rawJSON(r.Guard)
 	m["preview_origin"] = r.PreviewOrigin
+	// The preview of a request is read-only too: the core disables every
+	// writing ctx.action in preview mode (design D25, owner decision 2026-11-26).
+	m["preview_read_only"] = true
 	m["rejected_by_user_id"] = r.RejectedByUserID
 	m["rejected_at"] = ts(r.RejectedAt)
 	m["reject_reason"] = r.RejectReason

@@ -10,6 +10,7 @@ package design
 import (
 	"net/http"
 	"regexp"
+	"time"
 )
 
 // Statuses of a request (design D4).
@@ -76,6 +77,8 @@ type Error struct {
 	Code    string
 	Message string
 	Details any
+	// RetryAfter, when positive, is sent as Retry-After (a 429 from a cap).
+	RetryAfter time.Duration
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }

@@ -78,7 +78,7 @@ func main() {
 	case *allForShop > 0:
 		rep, err := p.AllForShop(ctx, *allForShop, *apply)
 		if rep != nil {
-			fmt.Printf("shop %d: %d requests, %d untracked changes %s\n", *allForShop, rep.Requests, rep.Untracked, verb(*apply))
+			fmt.Printf("shop %d: %d requests, %d untracked changes %s (version preview usage rows are removed too)\n", *allForShop, rep.Requests, rep.Untracked, verb(*apply))
 			printObjects(rep, *apply)
 		}
 		if err != nil {
@@ -90,6 +90,7 @@ func main() {
 			PromptRetention: cfg.Design.PromptRetention, ScreenshotRetention: cfg.Design.ScreenshotRetention,
 			ScreenshotRetentionUnpublished: cfg.Design.ScreenshotRetentionUnpublished, AuditRetention: cfg.Design.AuditRetention,
 			UntrackedRetention: cfg.Design.UntrackedRetention, CredentialRetention: cfg.Design.CredentialRetention, Shop: *shop,
+			VersionPreviewRetention: cfg.Design.VersionPreviewRetention,
 		}
 		rep, err := p.Purge(ctx, pc, *apply)
 		if rep != nil {
@@ -132,5 +133,6 @@ func printReport(_ *sql.DB, rep *design.PurgeReport, apply bool) {
 	fmt.Println()
 	fmt.Printf("untracked changes %s: %d\n", v, rep.Untracked)
 	fmt.Printf("service credentials %s: %d\n", v, rep.Credentials)
+	fmt.Printf("version preview usage rows %s: %d\n", v, rep.VersionPreviews)
 	printObjects(rep, apply)
 }

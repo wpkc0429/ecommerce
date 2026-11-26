@@ -57,6 +57,9 @@ func (h *DesignAdminHandler) MountShopAdmin(r chi.Router) {
 		dr.With(approve).Post("/requests/{requestID}/request-changes", h.requestChanges)
 		dr.With(request).Post("/requests/{requestID}/cancel", h.cancel)
 		dr.With(revert).Post("/requests/{requestID}/revert", h.revert)
+		// Version preview (design D25): not a request, no slot, no events.
+		dr.With(view).Post("/requests/{requestID}/version-preview", h.versionPreview)
+		dr.With(view).Get("/version-previews/{previewID}", h.getVersionPreview)
 		dr.With(view).Get("/state", h.state)
 		dr.With(view).Get("/untracked-changes", h.untracked)
 		dr.With(approve).Post("/untracked-changes/{sha}/acknowledge", h.acknowledge)

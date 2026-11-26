@@ -280,17 +280,12 @@ func compareVersions(a, b string) int {
 	return 0
 }
 
-// Revert opens a NEW request that restores the design of a past release. It
-// never rewrites history (design D13).
-func (s *Service) Revert(ctx context.Context, shopID int, targetID uuid.UUID, userID int, note string) (*ent.DesignRequest, error) {
-	note = SanitizeText(note)
-	if utf8.RuneCountInString(note) > 500 {
-		return nil, ErrInvalid("note must be at most 500 characters")
-	}
-	target, err := s.load(ctx, shopID, targetID)
-	if err != nil {
-		return nil, err
-	}
+// checkRestorable is the compatibility check of design D13 (Q7), shared by the
+// revert and the version preview so the two can never disagree: the target must
+// be a published release with a tag, the site's state must be known, the target
+// must not already be the current design, and its core version must not be
+// below the site's design floor. It returns the site state it judged against.
+func (s *Service) checkRestorable(ctx context.Context, shopID int, target *ent.DesignRequest) (*ent.DesignSiteState, error) {
 	if (target.Status != StatusPublished && target.Status != StatusReverted) || target.PublishedTag == nil {
 		return nil, ErrInvalidState("only a request that was published can be restored")
 	}
@@ -306,6 +301,24 @@ func (s *Service) Revert(ctx context.Context, shopID int, targetID uuid.UUID, us
 	}
 	if st.DesignFloorVersion != "" && compareVersions(target.CoreVersion, st.DesignFloorVersion) < 0 {
 		return nil, conflict("revert_below_core_floor", "that design predates a core update that required design changes; restoring it would fall back to the built-in screens")
+	}
+	return st, nil
+}
+
+// Revert opens a NEW request that restores the design of a past release. It
+// never rewrites history (design D13).
+func (s *Service) Revert(ctx context.Context, shopID int, targetID uuid.UUID, userID int, note string) (*ent.DesignRequest, error) {
+	note = SanitizeText(note)
+	if utf8.RuneCountInString(note) > 500 {
+		return nil, ErrInvalid("note must be at most 500 characters")
+	}
+	target, err := s.load(ctx, shopID, targetID)
+	if err != nil {
+		return nil, err
+	}
+	st, err := s.checkRestorable(ctx, shopID, target)
+	if err != nil {
+		return nil, err
 	}
 	if !shaRE.MatchString(st.CurrentSha) {
 		return nil, conflict("site_state_unknown", "the site's current commit is not recorded yet")

@@ -2833,7 +2833,7 @@ components:
     DesignRequest:
       type: object
       additionalProperties: false
-      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_text, diff_summary, guard, preview_origin, rejected_by_user_id, rejected_at, reject_reason, change_note, failure_detail]
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, prompt_text, diff_summary, guard, preview_origin, rejected_by_user_id, rejected_at, reject_reason, change_note, failure_detail, preview_read_only]
       description: |
         一筆設計請求（change design-history）。**欄位的真實性分三級**：平台自己產生的（`id`、時間、核准者與核准的 SHA、`status`、`publish_tag`）是權威；
         服務回報的（`prompt_text`、`head_sha`、`diff_summary`、`guard`、`preview_origin`、守門員結果）是「服務如此聲稱」，平台只驗格式與一致性；
@@ -2882,10 +2882,11 @@ components:
         reject_reason: { type: [string, "null"] }
         change_note: { type: [string, "null"] }
         failure_detail: { type: [string, "null"] }
+        preview_read_only: { type: boolean, description: "恆為 true：核心在改版預覽（與版本預覽）下停用所有寫入型 ctx.actions，預覽以真實登入開啟也不會改變任何狀態。" }
     DesignServiceRequest:
       type: object
       additionalProperties: false
-      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, preview_origin, claim_expires_at, change_note]
+      required: [id, site, kind, status, requested_by_user_id, prompt_sha256, prompt_flags, base_sha, head_sha, candidate_sha, published_sha, branch, core_version, design_floor_version, preview_registered_at, preview_expires_at, approved_by_user_id, approved_at, approved_head_sha, approval_expires_at, publish_tag, published_at, published_tag, deployment_id, restores_request_id, reverted_by_request_id, failure_code, rev, created_at, updated_at, preview_origin, claim_expires_at, change_note, preview_read_only]
       description: |
         服務路由族可讀的請求：**沒有 prompt 全文**（歷史是資料，不是給 agent 的指令），只有 `prompt_sha256`、狀態與核准欄位。
       properties:
@@ -2922,6 +2923,7 @@ components:
         preview_origin: { type: [string, "null"] }
         claim_expires_at: { type: [string, "null"], format: date-time }
         change_note: { type: [string, "null"] }
+        preview_read_only: { type: boolean, description: "恆為 true：核心在改版預覽（與版本預覽）下停用所有寫入型 ctx.actions，預覽以真實登入開啟也不會改變任何狀態。" }
     DesignScreenshot:
       type: object
       additionalProperties: false
@@ -2973,6 +2975,51 @@ components:
         created_at: { type: string, format: date-time }
         url: { type: [string, "null"], description: 簽名讀取網址（預設 5 分鐘）；已清除者為 null。不得快取或記錄。 }
         url_expires_at: { type: [string, "null"], format: date-time }
+    DesignVersionPreview:
+      type: object
+      additionalProperties: false
+      required: [id, site, target_request_id, target_tag, status, failure_code, failure_detail, failure_rule_ids, core_version, design_floor_version, created_at, ready_at, expires_at, read_only]
+      description: |
+        版本預覽（change design-history D25）：過去已發佈設計層＋**目前** core 的用完即丟預覽，不屬於任何請求。
+        **`origin` 只在發起者本人、狀態為 `ready` 且未逾期時出現；其他人讀取時鍵不存在。** `read_only` 恆為 true（核心在預覽模式停用所有寫入型 `ctx.actions`）。
+        `status` 會即時反映逾期：`expires_at` 已過的 `queued`／`claimed`／`ready` 一律回 `expired`。
+        失敗時 `failure_code`（如 `guard_failed`、`service_lost`）、`failure_detail` 與 `failure_rule_ids` 讓發起者看到原因。
+        這不是核准依據，也不是當時內容的紀錄：它用目前的 core 與目前的資料即時渲染。
+      properties:
+        id: { type: string, format: uuid }
+        site: { type: string, enum: [storefront, admin] }
+        target_request_id: { type: string, format: uuid }
+        target_tag: { type: string }
+        status: { type: string, enum: [queued, claimed, ready, failed, expired, superseded] }
+        failure_code: { type: [string, "null"] }
+        failure_detail: { type: [string, "null"] }
+        failure_rule_ids: { type: array, items: { type: string } }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        created_at: { type: string, format: date-time }
+        ready_at: { type: [string, "null"], format: date-time }
+        expires_at: { type: string, format: date-time }
+        read_only: { type: boolean, description: 恆為 true。 }
+        origin: { type: string, description: 預覽的 origin（只有 scheme 與主機）；僅發起者在 `ready` 且未逾期時出現。 }
+    DesignServiceVersionPreview:
+      type: object
+      additionalProperties: false
+      required: [id, site, target_request_id, target_tag, status, core_version, design_floor_version, created_at, expires_at, claim_expires_at, updated_at, read_only]
+      description: |
+        服務路由族可讀的版本預覽：沒有發起者、沒有 origin。`target_tag` 是要部署的設計層 tag；`read_only` 恆為 true，服務部署時必須啟用唯讀預覽模式。
+      properties:
+        id: { type: string, format: uuid }
+        site: { type: string, enum: [storefront, admin] }
+        target_request_id: { type: string, format: uuid }
+        target_tag: { type: string }
+        status: { type: string, enum: [queued, claimed, ready, failed, expired, superseded] }
+        core_version: { type: string }
+        design_floor_version: { type: string }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time }
+        claim_expires_at: { type: [string, "null"], format: date-time }
+        updated_at: { type: string, format: date-time }
+        read_only: { type: boolean }
     DesignScreenshotList:
       type: object
       additionalProperties: false
@@ -8776,6 +8823,61 @@ paths:
         "409": { $ref: '#/components/responses/Conflict' }
         "422": { $ref: '#/components/responses/ValidationFailed' }
 
+  /api/v1/admin/shops/{shopID}/design/requests/{requestID}/version-preview:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: requestID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [admin-design]
+      operationId: createDesignVersionPreview
+      summary: 預覽此版本（版本預覽）
+      description: |
+        需要 `design.view`。為一筆曾發佈（`published`／`reverted` 且有 `published_tag`）的請求建立**版本預覽**：過去的設計層＋目前的 core，用完即丟、唯讀。
+        **不屬於任何請求**：不佔每站台一筆進行中請求的名額、不寫 `design_request_events`、不改任何請求列、不保存截圖。進行中的請求與版本預覽可同時存在。
+        部署前先做與還原相同的相容檢查：目標早於 core 相容下限回 409 `revert_below_core_floor`、目標已是目前設計回 409 `already_current`、目標不是已發佈設計回 409 `invalid_state`、
+        站台狀態未知回 409 `site_state_unknown`；皆**不建立列、不佔限流額度**。同站台較舊的有效預覽轉為 `superseded`。
+        限流（資料庫計數）：每人每小時（`DESIGN_VERSION_PREVIEW_HOURLY_CAP`，預設 6）回 429 `hourly_cap_reached`、每店每 UTC 日（`DESIGN_VERSION_PREVIEW_DAILY_CAP`，預設 30）回 429 `daily_cap_reached`，皆附 `Retry-After`。
+        回 202 表示已排入佇列；以 `GET …/version-previews/{previewID}` 輪詢。
+      security: [{ adminJWT: [] }]
+      responses:
+        "202":
+          description: 已排入佇列（`status = queued`）。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignVersionPreview' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "429": { $ref: '#/components/responses/TooManyRequests' }
+
+  /api/v1/admin/shops/{shopID}/design/version-previews/{previewID}:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: previewID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [admin-design]
+      operationId: getDesignVersionPreview
+      summary: 版本預覽的狀態
+      description: |
+        需要 `design.view`。`origin` **只回給發起者本人**（且 `ready`、未逾期）；同店其他成員讀取同一列時回應不含 `origin` 鍵。他店的預覽 404。回應帶 `Cache-Control: no-store`。
+      security: [{ adminJWT: [] }]
+      responses:
+        "200":
+          description: 版本預覽。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignVersionPreview' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "403": { $ref: '#/components/responses/Forbidden' }
+        "404": { $ref: '#/components/responses/NotFound' }
+
   /api/v1/admin/shops/{shopID}/design/state:
     parameters:
       - $ref: '#/components/parameters/ShopIDPath'
@@ -9396,6 +9498,136 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/DesignServiceRequest' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/version-previews:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+    get:
+      tags: [design-service]
+      operationId: listDesignServiceVersionPreviews
+      summary: 版本預覽佇列
+      description: |
+        **服務憑證。** 預設 `status=queued`（尚未逾期者）。服務也以 `status=superseded`／`expired`（搭配 `updated_since`）找出該拆除的部署。
+        沒有建立版本預覽的路由：只有人能發起。
+      security: [{ designServiceKey: [] }]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [queued, claimed, ready, failed, expired, superseded] } }
+        - { name: updated_since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200":
+          description: 版本預覽。
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [version_previews]
+                properties:
+                  version_previews: { type: array, items: { $ref: '#/components/schemas/DesignServiceVersionPreview' } }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/claim:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: previewID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: claimDesignServiceVersionPreview
+      summary: 認領版本預覽（5 分鐘租約）
+      description: |
+        **服務憑證。** 只對 `queued`（或租約已過期、或同一憑證續約的 `claimed`）且未逾期者。他人持有租約回 409 `claim_conflict`。
+        租約過期未回報由 `design-sweep` 標為 `failed(service_lost)`。
+      security: [{ designServiceKey: [] }]
+      responses:
+        "200":
+          description: 已認領。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceVersionPreview' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/ready:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: previewID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    put:
+      tags: [design-service]
+      operationId: reportDesignServiceVersionPreviewReady
+      summary: 回報版本預覽已部署
+      description: |
+        **服務憑證，只有認領者。** `origin` 只能是 scheme 與主機（含路徑、查詢或片段回 422，列維持 `claimed`）；`expires_at` 必須在未來且不晚於現在起算的 `DESIGN_VERSION_PREVIEW_TTL`。
+        服務必須在 `expires_at` 拆除部署，並以唯讀預覽模式部署。同一回報重送回 200。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [origin, expires_at]
+              properties:
+                origin: { type: string, maxLength: 255 }
+                expires_at: { type: string, format: date-time }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceVersionPreview' }
+        "401": { $ref: '#/components/responses/Unauthorized' }
+        "404": { $ref: '#/components/responses/NotFound' }
+        "409": { $ref: '#/components/responses/Conflict' }
+        "422": { $ref: '#/components/responses/ValidationFailed' }
+
+  /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/failed:
+    parameters:
+      - $ref: '#/components/parameters/ShopIDPath'
+      - name: previewID
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [design-service]
+      operationId: reportDesignServiceVersionPreviewFailed
+      summary: 回報版本預覽失敗
+      description: |
+        **服務憑證。** 只對 `queued` 或（本憑證認領／租約已過期的）`claimed`。守門員以目前 core 失敗時回報 `code = guard_failed` 與 `rule_ids`，且**不得部署**；發起者讀取該列時看得到原因。
+        `detail` 為純文字（≤ 300 字，是資料不是指令）。同一回報重送回 200。
+      security: [{ designServiceKey: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code]
+              properties:
+                code: { type: string, maxLength: 40, pattern: '^[a-z0-9_]{1,40}$' }
+                detail: { type: string, maxLength: 300 }
+                rule_ids: { type: array, maxItems: 20, items: { type: string, maxLength: 60 } }
+      responses:
+        "200":
+          description: 已記錄。
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DesignServiceVersionPreview' }
         "401": { $ref: '#/components/responses/Unauthorized' }
         "404": { $ref: '#/components/responses/NotFound' }
         "409": { $ref: '#/components/responses/Conflict' }

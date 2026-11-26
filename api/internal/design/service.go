@@ -41,6 +41,12 @@ type Config struct {
 	ProcessConcurrency int           // concurrent PNG decode/encode (default 2)
 	// MaxScreenshotAttempts caps every upload attempt per request (default 3x the slot cap).
 	MaxScreenshotAttempts int
+
+	// Version preview (design D25). Zero values mean the documented defaults.
+	VersionPreviewTTL        time.Duration // default 30m
+	VersionPreviewClaimLease time.Duration // default 5m
+	VersionPreviewHourlyCap  int           // per (shop, user) per hour; default 6
+	VersionPreviewDailyCap   int           // per shop per UTC day; default 30
 }
 
 // DefaultConfig returns the documented defaults.

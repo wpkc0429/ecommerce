@@ -259,6 +259,8 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 			ApprovalTTL: cfg.Design.ApprovalTTL, MinPreviewRemaining: cfg.Design.MinPreviewRemaining,
 			DailyRequestCap: cfg.Design.DailyRequestCap, ClaimLease: cfg.Design.ClaimLease,
 			ApprovalPendingTimeout: cfg.Design.ApprovalPendingTimeout,
+			VersionPreviewTTL:      cfg.Design.VersionPreviewTTL, VersionPreviewHourlyCap: cfg.Design.VersionPreviewHourlyCap,
+			VersionPreviewDailyCap: cfg.Design.VersionPreviewDailyCap,
 			ScreenshotsEnabled:     cfg.Design.Enabled(),
 			ShopQuotaBytes:         cfg.Design.ShopQuotaBytes, ScreenshotURLTTL: cfg.Design.ScreenshotTTL,
 			ProcessConcurrency: cfg.Media.ProcessConcurrency, MaxScreenshotAttempts: cfg.Design.MaxScreenshotAttempts,
@@ -450,7 +452,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 		Dispatcher: dispatcher,
 		// The only consumer is the "paid, but the order was already cancelled"
 		// warning (design D9) — a state only a human can resolve.
-		Log: a.log,
+		Log:             a.log,
 		Providers:       providers,
 		DefaultProvider: cfg.PaymentDefaultProvider,
 	}

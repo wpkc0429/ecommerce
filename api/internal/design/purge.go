@@ -15,6 +15,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/designscreenshot"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/designuntrackedchange"
+	"ksdevworks/ecommerce/api/internal/ent/designversionpreview"
 )
 
 // ObjectDeleter removes stored screenshot objects (slice 2). It is optional:
@@ -32,6 +33,7 @@ type PurgeConfig struct {
 	AuditRetention                 time.Duration // requests and events
 	UntrackedRetention             time.Duration
 	CredentialRetention            time.Duration // after revocation or expiry
+	VersionPreviewRetention        time.Duration // usage rows of version previews (D25); 0 = skip
 	Shop                           int           // 0 = every shop
 	Batch                          int           // 0 = 1000
 }
@@ -41,16 +43,16 @@ func DefaultPurgeConfig() PurgeConfig {
 	d := 24 * time.Hour
 	return PurgeConfig{
 		PromptRetention: 365 * d, ScreenshotRetention: 365 * d, ScreenshotRetentionUnpublished: 30 * d,
-		AuditRetention: 730 * d, UntrackedRetention: 730 * d, CredentialRetention: 90 * d,
+		AuditRetention: 730 * d, UntrackedRetention: 730 * d, CredentialRetention: 90 * d, VersionPreviewRetention: 90 * d,
 	}
 }
 
 // PurgeReport counts what a purge did (or would do). It carries counts and time
 // ranges only.
 type PurgeReport struct {
-	Prompts, Screenshots, Requests, Untracked, Credentials int
-	OldestRequest, NewestRequest                           *time.Time
-	ObjectsDeleted, ObjectsFailed                          int
+	Prompts, Screenshots, Requests, Untracked, Credentials, VersionPreviews int
+	OldestRequest, NewestRequest                                            *time.Time
+	ObjectsDeleted, ObjectsFailed                                           int
 }
 
 // Purger applies the retention policy.
@@ -252,6 +254,20 @@ AND NOT EXISTS (SELECT 1 FROM design_requests o WHERE o.restores_request_id = r.
 			`DELETE FROM design_service_credentials WHERE id IN (SELECT id FROM design_service_credentials WHERE (revoked_at < $1 OR expires_at < $1) AND ($2 = 0 OR shop_id = $2) LIMIT $3)`,
 			[]any{now.Add(-cfg.CredentialRetention), cfg.Shop}},
 	}
+	if cfg.VersionPreviewRetention > 0 {
+		// Usage rows only (design D25): nothing here touches requests, events or
+		// screenshots. A live row is never older than the 2 h TTL cap, so
+		// "older than the retention" means finished.
+		simple = append(simple, struct {
+			dst   *int
+			count string
+			del   string
+			args  []any
+		}{&rep.VersionPreviews,
+			`SELECT count(*) FROM design_version_previews WHERE created_at < $1 AND ($2 = 0 OR shop_id = $2)`,
+			`DELETE FROM design_version_previews WHERE id IN (SELECT id FROM design_version_previews WHERE created_at < $1 AND ($2 = 0 OR shop_id = $2) LIMIT $3)`,
+			[]any{now.Add(-cfg.VersionPreviewRetention), cfg.Shop}})
+	}
 	for _, q := range simple {
 		if !apply {
 			if err := p.DB.QueryRowContext(ctx, q.count, q.args...).Scan(q.dst); err != nil {
@@ -340,6 +356,7 @@ func (p *Purger) AllForShop(ctx context.Context, shopID int, apply bool) (*Purge
 		for _, q := range []string{
 			`DELETE FROM design_requests WHERE shop_id = $1`,
 			`DELETE FROM design_untracked_changes WHERE shop_id = $1`,
+			`DELETE FROM design_version_previews WHERE shop_id = $1`,
 			`DELETE FROM design_site_state WHERE shop_id = $1`,
 		} {
 			if _, err := tx.ExecContext(ctx, q, shopID); err != nil {
@@ -365,6 +382,22 @@ type ShopExport struct {
 	Screenshots []ScreenshotRef              `json:"screenshots"`
 	Untracked   []*ent.DesignUntrackedChange `json:"untracked_changes"`
 	SiteStates  []*ent.DesignSiteState       `json:"site_states"`
+	// VersionPreviews are the usage rows (D25); the preview origin is left out.
+	VersionPreviews []VersionPreviewRef `json:"version_previews"`
+}
+
+// VersionPreviewRef is a version preview's usage row without its origin.
+type VersionPreviewRef struct {
+	ID              string     `json:"id"`
+	Site            string     `json:"site"`
+	TargetRequestID string     `json:"target_request_id"`
+	TargetTag       string     `json:"target_tag"`
+	RequestedBy     int        `json:"requested_by_user_id"`
+	Status          string     `json:"status"`
+	FailureCode     *string    `json:"failure_code"`
+	CreatedAt       time.Time  `json:"created_at"`
+	ReadyAt         *time.Time `json:"ready_at"`
+	ExpiresAt       time.Time  `json:"expires_at"`
 }
 
 // ScreenshotRef is a screenshot's metadata (object key, never a URL).
@@ -405,6 +438,21 @@ func (p *Purger) ExportShop(ctx context.Context, shopID int) (*ShopExport, error
 	if out.Untracked, err = p.Client.DesignUntrackedChange.Query().Where(designuntrackedchange.ShopIDEQ(shopID)).All(ctx); err != nil {
 		return nil, err
 	}
-	out.SiteStates, err = p.Client.DesignSiteState.Query().Where(designsitestate.ShopIDEQ(shopID)).All(ctx)
-	return out, err
+	if out.SiteStates, err = p.Client.DesignSiteState.Query().Where(designsitestate.ShopIDEQ(shopID)).All(ctx); err != nil {
+		return nil, err
+	}
+	vps, err := p.Client.DesignVersionPreview.Query().Where(designversionpreview.ShopIDEQ(shopID)).
+		Order(ent.Asc(designversionpreview.FieldCreatedAt)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out.VersionPreviews = []VersionPreviewRef{}
+	for _, v := range vps {
+		out.VersionPreviews = append(out.VersionPreviews, VersionPreviewRef{
+			ID: v.ID.String(), Site: v.Site, TargetRequestID: v.TargetRequestID.String(), TargetTag: v.TargetTag,
+			RequestedBy: v.RequestedByUserID, Status: v.Status, FailureCode: v.FailureCode, CreatedAt: v.CreatedAt,
+			ReadyAt: v.ReadyAt, ExpiresAt: v.ExpiresAt,
+		})
+	}
+	return out, nil
 }

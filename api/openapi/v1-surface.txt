@@ -287,6 +287,7 @@ DesignRequest.id
 DesignRequest.kind
 DesignRequest.preview_expires_at
 DesignRequest.preview_origin
+DesignRequest.preview_read_only
 DesignRequest.preview_registered_at
 DesignRequest.prompt_flags
 DesignRequest.prompt_sha256
@@ -419,6 +420,7 @@ DesignServiceRequest.id
 DesignServiceRequest.kind
 DesignServiceRequest.preview_expires_at
 DesignServiceRequest.preview_origin
+DesignServiceRequest.preview_read_only
 DesignServiceRequest.preview_registered_at
 DesignServiceRequest.prompt_flags
 DesignServiceRequest.prompt_sha256
@@ -433,6 +435,18 @@ DesignServiceRequest.reverted_by_request_id
 DesignServiceRequest.site
 DesignServiceRequest.status
 DesignServiceRequest.updated_at
+DesignServiceVersionPreview.claim_expires_at
+DesignServiceVersionPreview.core_version
+DesignServiceVersionPreview.created_at
+DesignServiceVersionPreview.design_floor_version
+DesignServiceVersionPreview.expires_at
+DesignServiceVersionPreview.id
+DesignServiceVersionPreview.read_only
+DesignServiceVersionPreview.site
+DesignServiceVersionPreview.status
+DesignServiceVersionPreview.target_request_id
+DesignServiceVersionPreview.target_tag
+DesignServiceVersionPreview.updated_at
 DesignState.core_version
 DesignState.current_request_id
 DesignState.current_sha
@@ -456,6 +470,21 @@ DesignUntrackedChangePage.changes
 DesignUntrackedChangePage.page
 DesignUntrackedChangePage.page_size
 DesignUntrackedChangePage.total
+DesignVersionPreview.core_version
+DesignVersionPreview.created_at
+DesignVersionPreview.design_floor_version
+DesignVersionPreview.expires_at
+DesignVersionPreview.failure_code
+DesignVersionPreview.failure_detail
+DesignVersionPreview.failure_rule_ids
+DesignVersionPreview.id
+DesignVersionPreview.origin
+DesignVersionPreview.read_only
+DesignVersionPreview.ready_at
+DesignVersionPreview.site
+DesignVersionPreview.status
+DesignVersionPreview.target_request_id
+DesignVersionPreview.target_tag
 ECPayCredentials.choose_payment
 ECPayCredentials.configured
 ECPayCredentials.hash_iv_configured
@@ -593,6 +622,9 @@ GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page_size
 GET /api/v1/admin/shops/{shopID}/design/untracked-changes query page_size optional
 GET /api/v1/admin/shops/{shopID}/design/untracked-changes query site
 GET /api/v1/admin/shops/{shopID}/design/untracked-changes query site optional
+GET /api/v1/admin/shops/{shopID}/design/version-previews/{previewID}
+GET /api/v1/admin/shops/{shopID}/design/version-previews/{previewID} path previewID
+GET /api/v1/admin/shops/{shopID}/design/version-previews/{previewID} path shopID
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials
 GET /api/v1/admin/shops/{shopID}/ecpay-credentials path shopID
 GET /api/v1/admin/shops/{shopID}/invitations
@@ -726,6 +758,14 @@ GET /api/v1/design-service/shops/{shopID}/requests query status optional
 GET /api/v1/design-service/shops/{shopID}/requests/{requestID}
 GET /api/v1/design-service/shops/{shopID}/requests/{requestID} path requestID
 GET /api/v1/design-service/shops/{shopID}/requests/{requestID} path shopID
+GET /api/v1/design-service/shops/{shopID}/version-previews
+GET /api/v1/design-service/shops/{shopID}/version-previews path shopID
+GET /api/v1/design-service/shops/{shopID}/version-previews query limit
+GET /api/v1/design-service/shops/{shopID}/version-previews query limit optional
+GET /api/v1/design-service/shops/{shopID}/version-previews query status
+GET /api/v1/design-service/shops/{shopID}/version-previews query status optional
+GET /api/v1/design-service/shops/{shopID}/version-previews query updated_since
+GET /api/v1/design-service/shops/{shopID}/version-previews query updated_since optional
 GET /api/v1/render/page
 GET /api/v1/render/page header X-Publishable-Key
 GET /api/v1/render/page header X-Publishable-Key optional
@@ -1038,6 +1078,10 @@ POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/request-changes pa
 POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert
 POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert path requestID
 POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/revert path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/version-preview
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/version-preview path requestID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/version-preview path shopID
+POST /api/v1/admin/shops/{shopID}/design/requests/{requestID}/version-preview response 429 Retry-After
 POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge
 POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge path sha
 POST /api/v1/admin/shops/{shopID}/design/untracked-changes/{sha}/acknowledge path shopID
@@ -1108,6 +1152,12 @@ POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit path requ
 POST /api/v1/design-service/shops/{shopID}/requests/{requestID}/submit path shopID
 POST /api/v1/design-service/shops/{shopID}/untracked-changes
 POST /api/v1/design-service/shops/{shopID}/untracked-changes path shopID
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/claim
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/claim path previewID
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/claim path shopID
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/failed
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/failed path previewID
+POST /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/failed path shopID
 POST /api/v1/public/shop-applications
 POST /api/v1/public/shop-applications response 429 Retry-After
 POST /api/v1/public/shop-applications/verify
@@ -1249,6 +1299,9 @@ PUT /api/v1/design-service/shops/{shopID}/requests/{requestID}/screenshots/{phas
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path shopID
 PUT /api/v1/design-service/shops/{shopID}/sites/{site}/state path site
+PUT /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/ready
+PUT /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/ready path previewID
+PUT /api/v1/design-service/shops/{shopID}/version-previews/{previewID}/ready path shopID
 PUT /api/v1/shop/cart/items/{itemID}
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key
 PUT /api/v1/shop/cart/items/{itemID} header X-Publishable-Key optional

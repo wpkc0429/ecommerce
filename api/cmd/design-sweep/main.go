@@ -106,6 +106,8 @@ func main() {
 	fmt.Printf("%s %d request(s): service_lost (claim lease expired)\n", word, rep.LeasesLost)
 	fmt.Printf("%s %d request(s): approval_timeout (nobody approved in time)\n", word, rep.ApprovalTimeouts)
 	fmt.Printf("%s %d request(s): approval_expired (approved but not published in time)\n", word, rep.ApprovalExpired)
+	fmt.Printf("%s %d version preview(s): service_lost (claim lease expired)\n", word, rep.VersionPreviews.LeasesLost)
+	fmt.Printf("%s %d version preview(s): expired (past expires_at)\n", map[bool]string{true: "marked", false: "would mark"}[*apply], rep.VersionPreviews.Expired)
 	if !*apply {
 		fmt.Println("dry run; pass -apply to write")
 	}
