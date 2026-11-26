@@ -128,7 +128,7 @@ func loadDesign(cfg *Config) error {
 // must be a bare http(s) origin (no userinfo, path, query or fragment); entries
 // are lower-cased and de-duplicated, so a later comparison is exact.
 func ParseSandboxOrigins(raw string) ([]string, error) {
-	var out []string
+	out := []string{} // never nil: the wiring audit treats nil as "not wired"
 	seen := map[string]bool{}
 	for _, part := range strings.Split(raw, ",") {
 		part = strings.TrimSpace(part)

@@ -27,6 +27,8 @@ import (
 // either guard it, or accept (and say why) that a disabled account may call it.
 //
 //	GET /api/v1/admin/me            reads users.status itself and answers 401
+//	PATCH /api/v1/admin/me          sets only the caller's own display_name, and
+//	                                the update is filtered on users.status = 1
 //	GET /api/v1/admin/media/config  upload limits only, nothing tenant-specific
 //	POST /api/v1/admin/invitations/accept  the caller is not yet a member of what
 //	                                the invitation grants; the token plus the
@@ -41,6 +43,7 @@ var expectedUnguardedAdminRoutes = []string{
 	"GET /api/v1/admin/branding",
 	"GET /api/v1/admin/me",
 	"GET /api/v1/admin/media/config",
+	"PATCH /api/v1/admin/me",
 	"POST /api/v1/admin/invitations/accept",
 }
 
