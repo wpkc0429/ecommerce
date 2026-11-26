@@ -87,10 +87,11 @@
 ### 一、發現（依嚴重度）
 
 #### 高（上線阻擋）
-**H1. TRUSTED_PROXIES 預設為空，Cloudflare Tunnel 後面所有訪客共用同一個 IP，rate limit 變成全域共用桶**
+**[已修 c73bd12] H1. TRUSTED_PROXIES 預設為空，Cloudflare Tunnel 後面所有訪客共用同一個 IP，rate limit 變成全域共用桶**
 - 證據：`.env.example:51-54`（`TRUSTED_PROXIES=` 空值）、`api/internal/httpapi/clientip.go:36-43`（信任清單為空時一律用 TCP peer）。cloudflared 與 API 同機時 peer 恆為 127.0.0.1（或 docker 閘道）。
 - 影響：任何一個匿名者打滿 admin 登入（20 次/5 分）、會員登入、申請表、訪客結帳的 IP 桶，所有真實使用者都會收到 429（拒絕服務）；per-IP 防暴力也失去意義；log 的 client_ip 也全是同一個。
 - 修法：正式環境設 `TRUSTED_PROXIES=127.0.0.1/32,::1/128`（cloudflared 在 docker 網路時填該網段）；`config.Load` 對 production 空值給警告或拒絕啟動；加整合測試。 [O 確認拓撲並設定 .env] + [S 寫啟動檢查與測試]
+- 處置（c73bd12）：不預設信任標頭（避免偽造 IP）；production 空值且收到 CF-Connecting-IP／X-Forwarded-For 時記一次 WARN；已加偽造／可信對端測試。**店主仍須在本機 .env 設 `TRUSTED_PROXIES=127.0.0.1/32,::1/128`**（API 在 Docker、cloudflared 在主機時改填 Docker 橋接網段）。
 
 **H2. merchant-template 的 `_headers` 以 `form-action 'self'` 擋掉 ECPay 付款跳轉，結帳會無法付款**
 - 證據：`merchant-template-clean/public/_headers:26`（`form-action 'self'`）；`public/commerce/checkout.js:29-40`（建立 form、`form.action = f.action`、`form.submit()` 送往綠界）。bouquet 的 `public/commerce/checkout.js:29-40` 相同，且之後要套同一份 CSP。
@@ -103,13 +104,13 @@
 - 修法：見「四、bouquet 標頭提案」。 [O 同意修改 bouquet] + [S 實作與驗證]
 
 #### 中
-**M1. `/healthz` 對匿名者回傳內部錯誤字串**：`api/internal/httpapi/router.go:156-160`（`err.Error()` 直接寫進回應，DB 連線錯誤可能含主機、埠、使用者名稱）。修法：對外只回固定的 unhealthy，細節寫 log；或不經 tunnel 公開 /healthz。 [S]
+**[已修 c73bd12] M1. `/healthz` 對匿名者回傳內部錯誤字串**：`api/internal/httpapi/router.go:156-160`（`err.Error()` 直接寫進回應，DB 連線錯誤可能含主機、埠、使用者名稱）。修法：對外只回固定的 unhealthy，細節寫 log；或不經 tunnel 公開 /healthz。 [S]
 
 **M2. HTTP server 只設了 ReadHeaderTimeout**：`api/cmd/server/main.go:36-40`，沒有 ReadTimeout / IdleTimeout / WriteTimeout / MaxHeaderBytes，慢速 body 可長時間占用連線。修法：加 `ReadTimeout`（約 30s）、`IdleTimeout`（約 120s）、`MaxHeaderBytes`；WriteTimeout 需考慮截圖上傳與 hook 測試耗時再定。 [S]
 
-**M3. mock 付款供應商在 production 仍註冊，顧客可用 body 的 `provider` 指定它**：`api/internal/app/wire.go:433-451`（mock 與 ecpay 同時註冊）、`httpapi/payment.go:137-145` 與 `payment/service.go:124-126`（`provider` 由請求決定）、`config/config.go:361`（`PAYMENT_DEFAULT_PROVIDER` 預設 "mock"）。mock webhook 靠 `PAYMENT_MOCK_WEBHOOK_SECRET` 的 HMAC 保護，production 啟動會拒絕預設值（`config/secrets.go:118`；`APP_ENV` 預設為 production，`config.go:350`），目前不可偽造。但若 `APP_ENV` 設成 development，或 default provider 沒改，風險立刻變成「可偽造付款完成」或「真實訂單走 mock」。修法：production 不註冊 mock，或強制 `PAYMENT_DEFAULT_PROVIDER=ecpay` 並拒絕請求指定 mock。 [S]
+**[已修 c73bd12] M3. mock 付款供應商在 production 仍註冊，顧客可用 body 的 `provider` 指定它**：`api/internal/app/wire.go:433-451`（mock 與 ecpay 同時註冊）、`httpapi/payment.go:137-145` 與 `payment/service.go:124-126`（`provider` 由請求決定）、`config/config.go:361`（`PAYMENT_DEFAULT_PROVIDER` 預設 "mock"）。mock webhook 靠 `PAYMENT_MOCK_WEBHOOK_SECRET` 的 HMAC 保護，production 啟動會拒絕預設值（`config/secrets.go:118`；`APP_ENV` 預設為 production，`config.go:350`），目前不可偽造。但若 `APP_ENV` 設成 development，或 default provider 沒改，風險立刻變成「可偽造付款完成」或「真實訂單走 mock」。修法：production 不註冊 mock，或強制 `PAYMENT_DEFAULT_PROVIDER=ecpay` 並拒絕請求指定 mock。 [S]
 
-**M4. 除登入/註冊/申請/結帳/內容公開讀取外，沒有基線 rate limit**（對照表見二）：店面商品/分類/運送公開讀取（`router.go:379-394`）、會員購物車與訂單（`router.go:339-361`）、訪客訂單 token 路由（`router.go:372-376`）、`/render/*`（`router.go:414-418`）、`GET /admin/branding`（`branding.go:129`，匿名且會查 DB）、付款 webhook（`router.go:404-412`，簽章驗證前先解析 provider 並可能查 DB）、已登入後台的所有寫入路由（僅邀請有限制，`team.go:31`）。修法：Cloudflare WAF/Rate Limiting 先擋；API 端加一個以 IP 與 shop+IP 為鍵的寬鬆全域中介層（例如 300 次/分），webhook 以 IP 單獨設限。 [O 設 Cloudflare 規則] + [S 寫中介層]
+**[已修 c73bd12] M4. 除登入/註冊/申請/結帳/內容公開讀取外，沒有基線 rate limit**（對照表見二）：店面商品/分類/運送公開讀取（`router.go:379-394`）、會員購物車與訂單（`router.go:339-361`）、訪客訂單 token 路由（`router.go:372-376`）、`/render/*`（`router.go:414-418`）、`GET /admin/branding`（`branding.go:129`，匿名且會查 DB）、付款 webhook（`router.go:404-412`，簽章驗證前先解析 provider 並可能查 DB）、已登入後台的所有寫入路由（僅邀請有限制，`team.go:31`）。修法：Cloudflare WAF/Rate Limiting 先擋；API 端加一個以 IP 與 shop+IP 為鍵的寬鬆全域中介層（例如 300 次/分），webhook 以 IP 單獨設限。 [O 設 Cloudflare 規則] + [S 寫中介層]
 
 **M5. rate limiter 與帳號鎖定在 Redis 故障時 fail-open**：`api/internal/ratelimit/limiter.go:61-101`（`Allow` 出錯回 Allowed，Peek/Record/Reset 同）；`httpapi/adminexposure_integration_test.go:570`（`TestAdminAccountLockoutFailsOpen`）證明是刻意設計。可接受，但上線前要有 Redis 監控與告警，並知道 Redis 掛掉等於登入防暴力失效。 [O 決策/監控] + [S 寫告警文件]
 
