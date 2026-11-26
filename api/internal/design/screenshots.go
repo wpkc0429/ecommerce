@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 	"image"
 	"image/png"
 	"net/http"
@@ -307,7 +308,7 @@ func (s *Service) UploadScreenshot(ctx context.Context, in UploadInput) (*ent.De
 		}
 		last, err := tx.DesignScreenshot.Query().
 			Where(designscreenshot.RequestIDEQ(in.RequestID), designscreenshot.PhaseEQ(in.Phase), designscreenshot.RoleEQ(in.Role),
-				designscreenshot.ViewportEQ(int16(in.Viewport)), designscreenshot.ViewKeyEQ(in.ViewKey)).
+				designscreenshot.ViewportEQ(viewportInt16(in.Viewport)), designscreenshot.ViewKeyEQ(in.ViewKey)).
 			Order(ent.Desc(designscreenshot.FieldAttempt)).First(ctx)
 		if err != nil && !ent.IsNotFound(err) {
 			return err
@@ -374,7 +375,7 @@ func (s *Service) UploadScreenshot(ctx context.Context, in UploadInput) (*ent.De
 		}
 		create := tx.DesignScreenshot.Create().
 			SetID(id).SetShopID(in.ShopID).SetRequestID(in.RequestID).SetPhase(in.Phase).SetSite(req.Site).
-			SetViewKey(in.ViewKey).SetViewport(int16(in.Viewport)).SetRole(in.Role).SetAttempt(attempt).
+			SetViewKey(in.ViewKey).SetViewport(viewportInt16(in.Viewport)).SetRole(in.Role).SetAttempt(attempt).
 			SetCommitSha(commit).SetObjectKey(key).SetContentType("image/png").SetByteSize(len(stored)).
 			SetWidth(w).SetHeight(h).SetSha256(storedHash).SetCaptureManifest(manifest)
 		if in.DiffPPM != nil {
@@ -526,4 +527,14 @@ func setVersion(manifest json.RawMessage) int {
 	}
 	_ = json.Unmarshal(manifest, &m)
 	return m.SetVersion
+}
+
+// viewportInt16 narrows a viewport width for the int16 column. Upload already
+// restricts it to 390 or 1280; the range check makes the conversion safe on
+// its own and returns 0 (matches no stored row) for anything out of range.
+func viewportInt16(v int) int16 {
+	if v < math.MinInt16 || v > math.MaxInt16 {
+		return 0
+	}
+	return int16(v)
 }

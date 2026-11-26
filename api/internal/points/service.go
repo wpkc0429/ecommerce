@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"log/slog"
 	"strings"
 
@@ -310,7 +311,7 @@ func (s *Service) HandleOrderPaid(ctx context.Context, ev events.OrderPaymentSuc
 		return fmt.Errorf("points: query member for award: %w", err)
 	}
 
-	awarded := int32(ev.AwardBasisAmount / pointsPerMinorUnit)
+	awarded := awardFor(ev.AwardBasisAmount)
 
 	tx, err := s.Client.Tx(ctx)
 	if err != nil {
@@ -583,4 +584,18 @@ func (s *Service) listTransactions(ctx context.Context, shopID, memberID int, pa
 		return nil, fmt.Errorf("points: list transactions: %w", err)
 	}
 	return &TransactionPage{Transactions: rows, Total: total, Page: page, PageSize: pageSize}, nil
+}
+
+// awardFor converts a paid goods amount to points (floor). The result is
+// clamped to the int32 range of the points columns so an absurd amount can
+// never wrap into a negative award; every realistic amount is unaffected.
+func awardFor(basis int64) int32 {
+	p := basis / pointsPerMinorUnit
+	if p > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if p < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(p)
 }
