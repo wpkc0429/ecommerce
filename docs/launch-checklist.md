@@ -266,3 +266,8 @@
 | G115 points/screenshots 加檢查 | 未做 | subagent 可做 |
 | `.gitleaks.toml` allowlist 與 CI 接入 | 未做 | subagent 可做（需同意） |
 | tasks.md:186 目視確認 | 未做 | owner |
+
+### 修復進度（2026-11-26，本機提交，未推送）
+- V1 已修（8385df9）：`api/go.mod` go 1.26.11、Dockerfile `golang:1.26.11-alpine`、CI 的 golangci-lint 釘 v2.15.0（goinstall，以 job 的 Go 建置）、文件版本號。govulncheck 可達：修前 21 → 修後 0。本機 golangci-lint v2.15.0 已用 go1.26.11 重建（舊檔留在 `C:\Users\ks\go\bin\golangci-lint.go1.26.4.exe.bak`），不再需要 GOTOOLCHAIN=go1.26.4；`go generate ./internal/ent` 仍需 1.26.x（用 `GOTOOLCHAIN=go1.26.11`）。api 映像 `docker build` 本機成功（未推送）。驗證：go vet、golangci-lint 0 issues、`INTEGRATION=1 go test -p 1 -timeout 40m ./...` 全綠（29 個套件 ok，httpapi 1258s）。
+- G115 已修（baad182）：`points.awardFor`、`design.viewportInt16` 加範圍檢查與單元測試，合法輸入行為不變。
+- gitleaks 已設定（73d2098）：`.gitleaks.toml` 以「完全相同的值」allowlist 公開 ECPay 沙盒與 dev/測試固定值，並以路徑 allowlist 雜湊清單（`*manifest.json`、`atlas.sum`）。全歷史 `gitleaks git --redact=100 --no-banner .` 現只剩 1 筆：`openspec/changes/archive/2026-07-31-guest-checkout/tasks.md:186`（待 owner 目視，未 allowlist）。因該筆會使 CI 失敗，暫不接入 CI；手動執行：`gitleaks git --redact=100 --no-banner .`。
