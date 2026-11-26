@@ -81,7 +81,7 @@
 
 ## 10. 版本預覽（D25；**未開始 NOT STARTED**；切片 4，選用，依賴切片 1；需服務實作拉取模型才有意義）
 
-> 名詞：「改版預覽」＝既有核准前預覽；「版本預覽」＝本組，不屬於任何請求。UI 按鈕「預覽此版本」、CTA「改成這個版本」。design.md D25 中標「需使用者確認」的項目（權限 `design.view` 或 `design.revert`、預設 TTL 30 分鐘、限流數字、預覽模式是否唯讀）在開工前先確認。
+> 名詞：「改版預覽」＝既有核准前預覽；「版本預覽」＝本組，不屬於任何請求。UI 按鈕「預覽此版本」、CTA「改成這個版本」。design.md D25 中標「需使用者確認」的項目（權限 `design.view` 或 `design.revert`、預設 TTL 30 分鐘、限流數字、預覽模式唯讀已於 2026-11-26 定案）在開工前先確認其餘項目。
 
 - [ ] 10.1 `api/internal/ent/schema/designversionpreview.go`：`DesignVersionPreview`（欄位見 D25 第 5 點；無 trigger、無雜湊串、`requested_by_user_id` 無 FK；`(shop_id, site, status)` 索引）；`make migrate-gen name=add_design_version_previews`；`tenantOwned` 登記；up→down→up
 - [ ] 10.2 `api/internal/design/versionpreview.go`：建立（目標檢查、**呼叫 D13 同一個相容檢查函式**、`already_current`、取代舊的有效列、限流計數取自資料庫）、認領（5 分鐘租約）、`ready`（origin 驗證：只有 scheme＋主機）、`failed`、清掃（`expired`、逾租約 `failed(service_lost)`）；**不碰** `design_requests` 與 `design_request_events`
@@ -94,4 +94,4 @@
 - [ ] T9 `admin/core/data.js`／`actions.js`：`ctx.actions.requestVersionPreview(requestId)`（先檢查 `design.view`；非不可逆動作，不需 `WARNED_CONFIRM_IDS`）與 `ctx.data.getVersionPreview(pid)`；`409 revert_below_core_floor`／`already_current`／`429` 對應到 `ActionError` 並以 `copy.js` 顯示原因；新增 `ctx` 函式是人工審查的核心變更（`.claude/skills/core-change`）
 - [ ] T10 `admin/design-defaults/views/design-history.js`、`design-request.js`：每個已發佈設計的「預覽此版本」按鈕、等待／失敗／到期狀態、固定限制說明（非核准當時紀錄、截圖為準）、「改成這個版本」（僅 `design.revert`，導向既有還原確認）；copy 鍵同步 `design/copy.js` 與 `design-defaults/copy.js`
 - [ ] T11 預覽主機與 CSP：版本預覽的部署使用與改版預覽相同的預覽 host 設定（獨立 origin、`noindex`、嚴格 CSP、禁止被 iframe）；**核心橫幅**（版本預覽、tag、到期時間；設計層不可移除，守門員加規則保護）；`checkCsp`、`deployChecks` 與測試同改；`docs/DECISIONS.md` 記錄
-- [ ] T12 （**需使用者確認**）預覽模式唯讀：核心在版本預覽下停用所有 `ctx.actions`（只允許導覽），降低在真實登入下執行舊設計層的風險；`admin/lib/public-api.json`、`admin/docs/DESIGN-LAYER.md`、`admin/scripts/core.manifest.json`（人工 `--update`）、守門員 fixtures、`admin/e2e/`、`docs/CORE-CHANGELOG.md`（`Design-layer action:` 行：copy 鍵、按鈕）、`template.json` 版本
+- [ ] T12 （**使用者已確認 2026-11-26**）預覽模式唯讀：核心在版本預覽與改版預覽下皆停用所有寫入型 `ctx.actions`（只允許導覽與唯讀），降低在真實登入下執行舊設計層的風險；`admin/lib/public-api.json`、`admin/docs/DESIGN-LAYER.md`、`admin/scripts/core.manifest.json`（人工 `--update`）、守門員 fixtures、`admin/e2e/`、`docs/CORE-CHANGELOG.md`（`Design-layer action:` 行：copy 鍵、按鈕）、`template.json` 版本

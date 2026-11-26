@@ -119,7 +119,7 @@ published ──(之後某筆還原發佈)──► reverted（見 D15）
 - 核准端點本文必帶 `head_sha`、必帶 `If-Match`（ETag＝`rev`）。伺服器條件：狀態＝`awaiting_approval`、`body.head_sha == candidate_sha == head_sha`、`If-Match` 吻合；條件式 UPDATE `WHERE status='awaiting_approval' AND candidate_sha=$sha AND rev=$rev`＋影響列數；失敗回 409 `head_moved`／412。成功時寫 `approved_head_sha`、`approval_expires_at`、配發 `publish_tag`。
 - **重放**：核准是單次消耗——只有 `awaiting_approval → approved` 一條路；重送同一請求（同使用者、同 SHA）在已核准時回 200（同一結果，便於網路重試），其他情況 409；`published` 的條件式轉移（`WHERE status='approved' AND approval_expires_at > now()`）使一次核准只能換一次發佈。
 - **發佈前重檢**：`published` 事件被接受的條件是：已核准未逾期、存在 `guard_rechecked` 事件滿足 `head_sha == approved_head_sha` 且 `passed` 且發生於核准**之後**、本文的 `published_sha == approved_head_sha`、`tag == publish_tag`。服務有義務在發佈前 `check-design --base` 於**該確切 SHA**重跑（AI-EDIT-SERVICE-NOTES 第 5 步已有此要求）。
-- **誠實的邊界**：平台**無法**阻止一個握有 git 寫入權的服務直接推 `main`——API 的「不能發佈」只意味著它**無法讓平台承認一次未經核准的發佈**，而不是 git 層的物理阻擋。縱深：①服務的 git token 限該商家 repo、`main` 設分支保護（template notes 第 1 步已要求）；②**第三切片（選用；Q9 決議：僅在服務持有 `main` 寫入權時建置）**：核准時平台簽發 **publish grant**（Ed25519 簽章，內含 shop、request、`approved_head_sha`、tag、到期），商家 repo 的部署 CI 在 `main` 推送時驗證 grant（公鑰由平台公開端點提供、固定在 repo 的鎖定檔）。這才讓「無核准就無法上線」成為物理事實。③`reconciliation`（D19）會把繞過者列為「未追蹤的變更」。
+- **誠實的邊界**：平台**無法**阻止一個握有 git 寫入權的服務直接推 `main`——API 的「不能發佈」只意味著它**無法讓平台承認一次未經核准的發佈**，而不是 git 層的物理阻擋。縱深：①服務的 git token 限該商家 repo、`main` 設分支保護（template notes 第 1 步已要求）；②**第三切片（選用；Q9 已定案：服務只推分支、由人合併，故**依決定省略、不建置**；若服務日後取得 `main` 寫入權須重新檢討）**：核准時平台簽發 **publish grant**（Ed25519 簽章，內含 shop、request、`approved_head_sha`、tag、到期），商家 repo 的部署 CI 在 `main` 推送時驗證 grant（公鑰由平台公開端點提供、固定在 repo 的鎖定檔）。這才讓「無核准就無法上線」成為物理事實。③`reconciliation`（D19）會把繞過者列為「未追蹤的變更」。
 
 ### D11：隱私——擷取什麼、從哪裡擷取
 **規則（建議，需使用者確認）**：
@@ -280,7 +280,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 - **完全不留紀錄**——否決：無法限流，也無法回答「誰開過」；輕量表的成本可忽略。
 - **常駐的「版本預覽網站」**——否決：每店多一個常駐部署與攻擊面；用完即丟符合 D12 的成本模型。
 
-**殘留風險**：預覽用商家的真實登入，舊設計層（已通過當時的守門員，並以目前守門員重檢）在該 session 下能呼叫核心的 `ctx.actions`；建議核心在預覽模式下**停用所有 `ctx.actions`**（唯讀，任務 T12，需使用者確認），否則承認這與改版預覽有相同的風險面。
+**殘留風險**：預覽用商家的真實登入，舊設計層（已通過當時的守門員，並以目前守門員重檢）在該 session 下能呼叫核心的 `ctx.actions`；**已定案（使用者 2026-11-26）**：預覽模式**唯讀**——核心在「版本預覽」下，並為一致性在「改版預覽」下，**停用所有可寫入的 `ctx.actions`**（只允許導覽與唯讀讀取；任務 T12）。因此舊設計層即使在商家真實登入下執行，也不能透過核心動作改變任何狀態。
 
 
 ## Risks / Trade-offs
@@ -290,7 +290,7 @@ revert 請求由人建立，服務需要知道。選擇**拉取**而非平台呼
 - [**sandbox 堆疊是新的營運負擔**] → 可按需拋棄式；若使用者不願，退回「只拍 storefront＋admin 以遮罩 live 資料」並接受更高隱私風險（不建議）。
 - [**截圖不是證明**] → 並排即時預覽；標示來源；紀錄本身誠實分級（D1）。
 - [**視圖集小於整個 UI**] → 明說（「不解決的事」）；`set_version` 允許日後擴充。
-- [**版本預覽在真實登入下執行舊設計層**] → 嚴格 CSP、核心橫幅、守門員以目前 core 重檢、建議預覽模式唯讀（T12）；與改版預覽同風險面。
+- [**版本預覽在真實登入下執行舊設計層**] → 嚴格 CSP、核心橫幅、守門員以目前 core 重檢、預覽模式唯讀（T12，已定案：版本預覽與改版預覽皆停用寫入型 `ctx.actions`）。
 - [**每店一次一個請求限制了吞吐**] → 商家改版是低頻操作；以明確 409 取代難以推理的並行。
 - [**新增 ctx 函式與 CSP 變更是人工審查的核心變更**] → 排在 template 後續，不阻擋平台側；平台側可先用「假服務」e2e 驗證。
 - [**本 change 引入大量新介面，影響 API 契約檢查**] → 全部 additive；`FillNonNil` 會強迫 `Deps` 新欄位被接線與入契約。
@@ -328,7 +328,7 @@ Q1–Q10 已於 2026-11-25 由使用者定案（採用 design.md 建議原文）
 - **Q6 tag 命名（已定案）**：`design-{site}-{YYYYMMDD}-{N}`（如 `design-admin-20261125-1`；日期為 UTC、N 由平台於核准時配發並以 `UNIQUE(shop_id, publish_tag)` 保證不重複），因為 admin 與 storefront 在同一個 repo。原提議 `design-YYYYMMDD-N` 在兩站同日發佈時需另外區分，故加上 site。還原發佈同樣配發新 tag。
 - **Q7 core 相容檢查的解讀（已定案）**：「不低於設計下限」（D13）；替代「target.core_version ≥ 目前 core」過於嚴格。
 - **Q8 對照 UI 放哪裡（已定案）**：由**核心擁有元件**、預設畫面在 `design-defaults`（設計層的預設備份；設計層可重新排版，但不能移除核准／還原確認與固定警告）；並同時在平台的共用 merchant admin 提供相同畫面（商家的後台可能是 template 也可能是 Bouquet 這類自訂前端，契約寫入 `docs/admin-frontend-integration.md`）。
-- **Q9 publish grant（切片 3）（已定案，附條件）**：先做切片 1–2；僅當服務將持有 `main` 寫入權才建置 grant；若服務只推分支、由人工合併，則省略。分支保護（branch protection）仍延後處理，不屬本次決議。
+- **Q9 publish grant（切片 3）（已定案，附條件；條件已於 2026-11-26 判定）**：先做切片 1–2；僅當服務將持有 `main` 寫入權才建置 grant。**使用者 2026-11-26 決定：AI 改版服務只推分支，由人（或經擁有者核准的流程）合併；簽章的 publish grant 不建置（依決定省略）。** 註記：若服務日後取得 `main` 寫入權，必須重新檢討此決定。商家 repo 的分支保護在免費方案不可用，因此服務的 git token 權限必須最小化（只限該商家 repo、只允許推分支）。
 - **Q10 核准通知信（已定案，附條件）**：核准、發佈、還原各寄一封通知信給店主（所有 owner）；以 email 額度／SMTP 處理完成為前提（見 CLAUDE.md 通知信一節），未完成前此項不開工。
 
 ## 實作期間的預設決定（2026-11-26，使用者授權照建議）
@@ -345,9 +345,9 @@ Q1–Q10 已於 2026-11-25 由使用者定案（採用 design.md 建議原文）
 - **核准通知信**：延後到 SMTP 處理完成後（Q10 的條件）。
 - **版本預覽（D25）**：權限 `design.view`；TTL 30 分鐘；每位使用者每小時 6 次、每店每日 30 次；每個 site 同時 1 個；用量紀錄保留 90 天。
 
-### 待決（需要店主／擁有者；建議已有，等待擁有者確認）
+### 擁有者決定（2026-11-26，照建議；原待決項目）
 
-- **版本預覽唯讀模式**：是否停用 `ctx.actions`。建議：唯讀（recommended, awaiting owner）。
-- **Q9**：服務只推分支、由人工合併（建議；recommended, awaiting owner）。若確認，切片 3 的 publish grant 省略。
+- **版本預覽唯讀模式（已定案，使用者 2026-11-26）**：版本預覽與改版預覽皆停用所有寫入型 `ctx.actions`（唯讀）。
+- **Q9（已定案，使用者 2026-11-26）**：服務只推分支、由人工合併；切片 3 的 publish grant 依決定省略（日後服務取得 `main` 寫入權時須重新檢討）。
 
 本節未改動 `docs/` 下任何檔案。
