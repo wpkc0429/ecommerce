@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"ksdevworks/ecommerce/api/internal/ent"
@@ -70,36 +71,62 @@ func (s *RefreshService) IssueUser(ctx context.Context, userID int) (string, err
 }
 
 // RotateUser exchanges a valid refresh token for a new one. Reuse of an
-// already-rotated token revokes its entire chain and fails.
+// already-rotated token revokes its entire chain and fails. A read-only
+// preview token is refused here: it can never become a normal session.
 func (s *RefreshService) RotateUser(ctx context.Context, plain string) (int, string, error) {
+	if IsPreviewRefresh(plain) {
+		return 0, "", ErrRefreshInvalid
+	}
+	uid, newPlain, _, err := s.rotateUser(ctx, plain, "")
+	return uid, newPlain, err
+}
+
+// RotatePreviewUser rotates a read-only preview refresh token. The token must
+// carry the preview prefix AND the tag of the caller's preview origin; the new
+// token keeps the prefix and tag and the SAME absolute expiry (a preview
+// session is never extended by refreshing). It returns the session end.
+func (s *RefreshService) RotatePreviewUser(ctx context.Context, plain, originTag string) (int, string, time.Time, error) {
+	if !IsPreviewRefresh(plain) || PreviewRefreshTag(plain) != originTag {
+		return 0, "", time.Time{}, ErrRefreshInvalid
+	}
+	return s.rotateUser(ctx, plain, originTag)
+}
+
+// rotateUser rotates one token. previewTag "" = normal session.
+func (s *RefreshService) rotateUser(ctx context.Context, plain, previewTag string) (int, string, time.Time, error) {
 	row, err := s.client.UserRefreshToken.Query().
 		Where(userrefreshtoken.TokenHashEQ(hashToken(plain))).
 		Only(ctx)
 	if err != nil {
-		return 0, "", ErrRefreshInvalid
+		return 0, "", time.Time{}, ErrRefreshInvalid
 	}
 	now := s.now()
 	if row.RevokedAt != nil {
 		// Replay of a rotated/revoked token → kill the whole chain.
 		_ = s.revokeUserChain(ctx, row)
-		return 0, "", ErrRefreshInvalid
+		return 0, "", time.Time{}, ErrRefreshInvalid
 	}
 	if now.After(row.ExpiresAt) {
-		return 0, "", ErrRefreshInvalid
+		return 0, "", time.Time{}, ErrRefreshInvalid
 	}
 	// Disabled accounts cannot refresh (spec authentication/Disabled account rejection).
 	owner, err := s.client.User.Query().Where(user.IDEQ(row.UserID), user.StatusEQ(1)).Only(ctx)
 	if err != nil {
-		return 0, "", ErrRefreshInvalid
+		return 0, "", time.Time{}, ErrRefreshInvalid
 	}
 
 	newPlain, newHash, err := newOpaqueToken()
 	if err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
+	}
+	expires := now.Add(s.ttl)
+	if previewTag != "" {
+		newPlain, newHash = previewPrefix(previewTag)+newPlain, hashToken(previewPrefix(previewTag)+newPlain)
+		expires = row.ExpiresAt // absolute session end: never extended
 	}
 	tx, err := s.client.Tx(ctx)
 	if err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 	// Guard against concurrent rotation of the same token: only one rotation
 	// may flip revoked_at from NULL.
@@ -114,19 +141,66 @@ func (s *RefreshService) RotateUser(ctx context.Context, plain string) (int, str
 		_, err = tx.UserRefreshToken.Create().
 			SetUserID(owner.ID).
 			SetTokenHash(newHash).
-			SetExpiresAt(now.Add(s.ttl)).
+			SetExpiresAt(expires).
 			SetRotatedFrom(row.ID).
 			Save(ctx)
 	}
 	if err != nil {
 		_ = tx.Rollback()
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return 0, "", err
+		return 0, "", time.Time{}, err
 	}
-	return owner.ID, newPlain, nil
+	return owner.ID, newPlain, expires, nil
 }
+
+// ── read-only preview refresh tokens ──────────────────────────────
+
+const previewRefreshMarker = "pv1."
+
+func previewPrefix(tag string) string { return previewRefreshMarker + tag + "." }
+
+// IsPreviewRefresh reports whether a refresh token is a read-only preview one.
+func IsPreviewRefresh(plain string) bool { return strings.HasPrefix(plain, previewRefreshMarker) }
+
+// PreviewRefreshTag extracts the origin tag a preview refresh token is bound to.
+func PreviewRefreshTag(plain string) string {
+	rest, ok := strings.CutPrefix(plain, previewRefreshMarker)
+	if !ok {
+		return ""
+	}
+	tag, _, _ := strings.Cut(rest, ".")
+	return tag
+}
+
+// OriginTag is the short, non-reversible tag of a canonical preview origin
+// that is embedded in preview refresh tokens and written to audit logs (the
+// origin itself is never logged).
+func OriginTag(origin string) string {
+	sum := sha256.Sum256([]byte("preview-origin-v1:" + origin))
+	return hex.EncodeToString(sum[:8])
+}
+
+// IssuePreviewUser creates a read-only preview refresh token bound to the
+// origin tag, expiring after ttl (the whole session lifetime).
+func (s *RefreshService) IssuePreviewUser(ctx context.Context, userID int, originTag string, ttl time.Duration) (string, time.Time, error) {
+	rnd, _, err := newOpaqueToken()
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	plain := previewPrefix(originTag) + rnd
+	expires := s.now().Add(ttl)
+	if _, err := s.client.UserRefreshToken.Create().
+		SetUserID(userID).
+		SetTokenHash(hashToken(plain)).
+		SetExpiresAt(expires).
+		Save(ctx); err != nil {
+		return "", time.Time{}, fmt.Errorf("auth: store preview refresh token: %w", err)
+	}
+	return plain, expires, nil
+}
+
 
 // RevokeUser revokes the presented token (logout). Unknown tokens are a no-op.
 func (s *RefreshService) RevokeUser(ctx context.Context, plain string) error {

@@ -6,6 +6,8 @@ import "context"
 type AdminIdentity struct {
 	UserID int
 	SIDs   []int // shop membership hints from the token (UI only)
+	// PreviewRO marks a read-only preview session (scope=preview_ro).
+	PreviewRO bool
 }
 
 type adminKey struct{}
