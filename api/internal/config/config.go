@@ -195,6 +195,9 @@ type Config struct {
 	// headless content store (slice 3).
 	ContentOps ContentOpsConfig
 
+	// AdminPreview: read-only preview sessions (change preview-readonly-session).
+	AdminPreview AdminPreviewConfig
+
 	// Design: the design history (change design-history).
 	Design DesignConfig
 }
@@ -576,6 +579,9 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 	if err := loadDesign(cfg); err != nil {
+		return nil, err
+	}
+	if err := loadAdminPreview(cfg); err != nil {
 		return nil, err
 	}
 
