@@ -131,3 +131,24 @@ storefront 截圖只收匿名、`sandbox-v1`（sandbox 來源）或 `public-live
 - **常見狀況**：商家說「按了預覽一直在等」→ 服務沒有輪詢或沒有該店憑證（`GET …/version-previews?status=queued` 看佇列）；`failed(service_lost)` → 服務認領後沒有在 5 分鐘內回報；429 → 達每小時或每日上限，等 `Retry-After`；409 `revert_below_core_floor` → 該設計早於一次需要設計層跟著改的 core 同步，這是預期的拒絕。
 - **用量查詢**（誰在何時預覽過哪一版）：`SELECT created_at, requested_by_user_id, target_tag, status FROM design_version_previews WHERE shop_id = N ORDER BY created_at DESC;`——admin 的版本預覽會讓發起者看到他本來就有權看的真實資料，這張表是「誰開過」的紀錄。
 - 日誌只含預覽 id、shop、站台與狀態，**不含 origin**。
+
+## 12. 預覽 origin 與唯讀工作階段（2026-11-28，操作員步驟）
+
+預覽主機（AI 服務部署改版預覽／版本預覽的地方）必須使用**專屬的預覽 origin**，平台對從這些 origin 登入的工作階段在伺服器端強制唯讀。**沒有 schema 變更、不需 migration、不需 re-seed。**
+
+**為什麼要獨立的 origin 與 cookie 範圍**：預覽頁是 AI 產生的程式碼，不可信。若與商家的一般後台共用 origin，預覽頁就能使用（或從 localStorage／cookie 取得）能寫入的一般工作階段。獨立 origin 讓瀏覽器的同源政策替我們隔離權杖與 cookie：唯讀 refresh cookie（`__Secure-admin_preview_refresh`）是 host-only（沒有 `Domain`）、`Secure`、`HttpOnly`、`SameSite=Strict`，不會送到其他主機。**不要**把預覽放在商家一般後台的同一主機或其子路徑上，也不要設定 `Domain=` 涵蓋父網域的 cookie。
+
+**設定（`.env`）**
+
+| 鍵 | 預設 | 說明 |
+|---|---|---|
+| `ADMIN_PREVIEW_ORIGINS` | 空＝功能關閉 | 逗號分隔。精確：`https://p-3f9a.preview.example.test`；萬用字元（僅此一種形式）：`https://*.preview.example.test`。 |
+| `ADMIN_PREVIEW_SESSION_TTL` | `30m` | 1 分鐘～30 分鐘（且不超過 `DESIGN_VERSION_PREVIEW_TTL`）；工作階段的絕對壽命。 |
+
+**格式規則（啟動時嚴格驗證，不合就拒絕啟動，錯誤訊息只指出鍵與項目）**：必須小寫；`https://`（只有開發環境允許 `http://localhost|127.0.0.1|[::1]` 精確項目）；只有 scheme＋主機＋選填連接埠，不可有 userinfo、路徑、查詢、片段、結尾點；萬用字元只能是整個第一個標籤（`https://*.base`），**只匹配恰好一層**（`a.preview.example.test` 符合；`a.b.preview.example.test`、`preview.example.test` 本身、`evil-preview.example.test` 都不符），底網域至少兩個標籤（拒絕 `https://*.com`），被匹配的標籤只能是小寫英數與連字號、不得以 `xn--`（punycode）開頭；連接埠必須與設定逐字相同（設定沒寫連接埠＝只匹配預設連接埠）。**預覽 origin 不得與 `CORS_ALLOWED_ORIGINS`、`ADMIN_PUBLIC_URL`、`WEBSITE_URL`、`PLATFORM_ADMIN_HOSTS` 重疊**（啟動即失敗）；用 `POST …/allowed-origins` 登記 `purpose=admin` 的 origin 若符合預覽樣式會得到 422。
+
+**登記步驟**：①選一個你控制 DNS 的專屬網域（例如 `preview.<你的網域>`），把萬用字元記錄指向預覽主機；②在 `.env` 設 `ADMIN_PREVIEW_ORIGINS=https://*.preview.<你的網域>`；③重啟 API；④在 Cloudflare Access（若有）讓預覽網域的 `/api/v1/admin` 與一般後台使用相同或更嚴的政策（repo 外、人工）；⑤驗證：從預覽 origin 登入，回應含 `"scope":"preview_ro"`；對任何寫入路由回 403 `preview_read_only`。要關閉功能：清空 `ADMIN_PREVIEW_ORIGINS` 並重啟（既有唯讀權杖立即失效）。
+
+**行為摘要**：從預覽 origin 登入／換發 → 唯讀工作階段（`scope=preview_ro`，綁定該 origin，最長 `ADMIN_PREVIEW_SESSION_TTL`，換發不延長）；預覽 origin 的所有非安全請求（除 login／refresh／logout）→ 403 `preview_read_only`；明列的敏感 GET 也被拒；一般權杖從預覽 origin → 403；唯讀權杖從其他 origin → 401。CORS 對預覽 origin 只開放 `/admin/shops/{id}/…` 與共用的 auth／me／branding／media config。
+
+**AI 服務與預覽主機要做的事**見 `docs/design-service-contract.md` 第 12 節。**稽核**：日誌 `admin_preview_session`（登入／換發／登出）與 `admin_preview_denied`，只含使用者 id 與 origin 短標籤。**已知邊界**：預覽 origin 的辨識依 `Origin`（同源 GET 則依 `Host`）；非瀏覽器客戶端可以不送 `Origin`，那等於不是預覽請求；這不構成繞過，因為預覽頁是瀏覽器程式碼（瀏覽器一定附上正確的 `Origin`，且預覽頁只拿得到唯讀權杖），而唯讀權杖在沒有 `Origin` 時是 401。預覽 origin 上的儲存前端呼叫（`/api/v1/shop/**` 寫入，例如會員登入、購物車、結帳）同樣被拒，預覽只能瀏覽公開讀取。

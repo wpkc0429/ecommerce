@@ -185,3 +185,19 @@ curl -sS -X POST "$API/api/v1/design-service/shops/$SHOP/requests/$RID/published
 - 限流與保存由平台負責（每人每小時、每店每日上限；紀錄 90 天），服務不得用多個憑證或重送規避。
 - 日誌與工單不得寫入 `origin` 全文。
 - 錯誤：`404`＝不是這個店的預覽；`409 invalid_state`＝已 `superseded`／`expired`／`failed`（放棄，不重試）；`409 claim_conflict`＝他人持有租約；`422`＝格式（origin、`expires_at`、`code`）。服務應把未知的 `code` 當成不可重試的失敗。
+
+## 12. 預覽主機與唯讀工作階段（平台強制，2026-11-28）
+
+預覽（改版預覽與版本預覽）的唯讀不再只靠 template 的前端旗標：平台在伺服器端強制。**前端旗標（`read_only`／`preview_read_only`）從此只是使用者體驗**，不是安全邊界。
+
+**服務／預覽主機必須做的事**
+
+1. **預覽主機使用營運者登記的預覽 origin**（`ADMIN_PREVIEW_ORIGINS`，見操作員手冊第 12 節），與商家的一般後台 origin **不同**。同一個 origin 不得同時是兩者（設定拒絕啟動、登記 admin origin 時 422）。
+2. **預覽頁的登入打向預覽 origin**：瀏覽器從預覽 origin 呼叫 `POST /api/v1/admin/auth/login`（`Origin` 標頭由瀏覽器附上），回應會帶 `scope: "preview_ro"`。預覽頁**不得**使用一般後台的權杖、也不得把使用者導去一般 origin 取得權杖再帶回來——一般權杖從預覽 origin 使用一律 403 `preview_read_only`。
+3. 預覽頁只做讀取。所有非安全方法（POST／PUT／PATCH／DELETE）一律 403 `preview_read_only`，唯一例外是 `POST /admin/auth/refresh`（同一範圍換發）與 `POST /admin/auth/logout`（結束工作階段）。另有少數 GET 也被拒（預覽權杖、截圖簽名網址、金流憑證、發佈 hook、服務憑證、帳號與開店申請清單）。要編輯請回到一般後台。
+4. 預覽主機的 API 呼叫要嘛直接跨源打 API（CORS 只對預覽 origin 開放 `/admin/shops/{id}/…` 與 `/admin/auth|me|branding|media/config`，不含平台層路徑），要嘛由預覽主機同源反向代理並**保留 `Origin`／`Host`**；cookie 模式（`refresh_transport: "cookie"`）只在同源代理下可用，cookie 名為 `__Secure-admin_preview_refresh`、host-only。
+5. 工作階段壽命：`ADMIN_PREVIEW_SESSION_TTL`（預設且最長 30 分鐘，不超過版本預覽 TTL），**絕對上限，換發不延長**。到期要求使用者在預覽頁重新登入，並在預覽 `expires_at` 拆除部署。
+6. 不得記錄權杖或 `origin` 全文；平台的稽核日誌只記使用者 id 與 origin 的短標籤。
+7. 預覽 origin 呼叫 `/api/v1/design-service/**`（服務族）一律被拒；服務憑證只能由服務自己的後端持有，不得出現在預覽頁。
+
+**也就是說**：預覽頁拿不到能寫入的權杖——就算預覽頁的程式碼（AI 產生的設計層）被改壞或被注入，它能做的最大傷害是讀取使用者本來就看得到的資料，且 30 分鐘內失效。

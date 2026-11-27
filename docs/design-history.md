@@ -150,3 +150,14 @@ before 的 `commit_sha`＝`base_sha`、after＝目前 head；只在 `drafting`�
 
 publish grant（Q9）與通知信（Q10）（附條件決議）、sandbox 堆疊的部署（操作員手冊第 7 節）、template 後續任務 T1–T8
 （`openspec/changes/design-history/tasks.md` 列出每一項需要什麼）。
+
+## 預覽的唯讀工作階段（伺服器端強制，2026-11-28）
+
+`read_only: true`／`preview_read_only: true` 原本只是告訴 template「把寫入型 `ctx.actions` 關掉」。現在平台自己也擋：從**預覽 origin**（`ADMIN_PREVIEW_ORIGINS`）登入或換發得到的是**唯讀工作階段**——access token 與 refresh token 都帶 `scope=preview_ro` 並綁定該 origin。
+
+- **權杖**：access token `aud=admin-preview`、`scope=preview_ro`、`pvo=<預覽 origin>`，用同一把後台金鑰簽，但 audience 不同，所以所有只認一般後台權杖的地方（`VerifyAdmin`）天然拒絕它。refresh token 是 `pv1.<origin 標籤>.<隨機>`（只存整串的 SHA-256，不需要 schema 變更）。
+- **預設拒絕**（中介層集中強制，新路由自動被保護）：預覽 origin 的請求只允許安全方法，外加 `POST /admin/auth/{login,refresh,logout}`；其餘一律 403 `preview_read_only`。另有明列的 GET 拒絕清單（會鑄造憑證或簽名網址、或輸出敏感內容者）。測試從 router 列舉**每一條**非安全路由逐條驗證。
+- **綁定與混用**：唯讀權杖只在綁定的 origin 有效（別的 origin、無 Origin → 401）；一般權杖從預覽 origin 使用 → 403。唯讀工作階段**不能升級**（唯讀 refresh token 在一般 origin 換發 → 401；一般 refresh token 在預覽 origin → 401）。
+- **壽命**：`ADMIN_PREVIEW_SESSION_TTL`（預設與上限 30 分鐘，且不超過 `DESIGN_VERSION_PREVIEW_TTL`），access 與 refresh 合計的**絕對**上限，換發不延長。
+- **稽核**：結構化日誌 `admin_preview_session`（`event`＝login｜refresh｜logout、`user_id`、`origin_tag`、`scope`）與 `admin_preview_denied`；沒有 email、權杖或 origin 全文。
+- **template 端**：保留前端唯讀旗標作為 UX；預覽主機的登入改打預覽 origin（見 `docs/design-service-contract.md` 第 12 節）。
