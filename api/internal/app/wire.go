@@ -82,7 +82,8 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	refresh := auth.NewRefreshService(client, cfg.RefreshTokenTTL)
 
 	deps.MemberAuth = &httpapi.MemberAuthHandler{Client: client, Issuer: issuer, Refresh: refresh, Log: a.log}
-	deps.AdminMW = httpapi.NewAdminMiddleware(issuer)
+	deps.AdminMW = httpapi.NewAdminMiddleware(issuer, httpapi.WithPreviewSessions(cfg.AdminPreview.Set, a.log))
+	deps.PreviewGuardMW = httpapi.NewPreviewGuardMiddleware(cfg.AdminPreview.Set, a.log)
 	deps.MemberMW = httpapi.NewMemberMiddleware(issuer)
 	// change guest-checkout: a third token family (aud=order:{shop}) guarding
 	// only the routes that act on the one order it names.
@@ -110,7 +111,8 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	deps.AdminAuth = &httpapi.AdminAuthHandler{
 		Client: client, Issuer: issuer, Refresh: refresh, Engine: engine, Log: a.log,
 		RefreshTTL: cfg.RefreshTokenTTL,
-		Limiter:    limiter, LockoutFailures: cfg.RateLimit.LoginAccountFailures,
+		Preview:    cfg.AdminPreview.Set, PreviewTTL: cfg.AdminPreview.SessionTTL,
+		Limiter: limiter, LockoutFailures: cfg.RateLimit.LoginAccountFailures,
 		LockoutWindow: cfg.RateLimit.LoginAccountWindow, LockoutSecret: lockoutKey.Sum(nil),
 	}
 
@@ -175,7 +177,7 @@ func (a *App) wire(ctx context.Context, deps *httpapi.Deps) error {
 	}
 	deps.AdminHostMW = httpapi.NewAdminHostBindingMiddleware(resolver, cfg.PlatformAdminHosts)
 	deps.Branding = &httpapi.BrandingHandler{Client: client, Registry: resolver, Authz: authz, Log: a.log}
-	deps.ClientAuth = &httpapi.ClientAuthHandler{Client: client, Dispatcher: dispatcher, Authz: authz, Log: a.log}
+	deps.ClientAuth = &httpapi.ClientAuthHandler{Client: client, Dispatcher: dispatcher, Authz: authz, Log: a.log, PreviewOrigins: cfg.AdminPreview.Set}
 
 	// CMS engine + render pipeline (M5).
 	renderCache := render.NewCache(rdb, a.log)

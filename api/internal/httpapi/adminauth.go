@@ -18,6 +18,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/previeworigin"
 	"ksdevworks/ecommerce/api/internal/ratelimit"
 	"ksdevworks/ecommerce/api/internal/rbac"
 )
@@ -26,6 +27,15 @@ import (
 // cookie mode (change admin-api-public-exposure, design D5). The __Secure-
 // prefix makes browsers refuse it unless it is set with the Secure attribute.
 const RefreshCookieName = "__Secure-admin_refresh"
+
+// PreviewRefreshCookieName is the refresh cookie of a READ-ONLY preview session
+// (change preview-readonly-session). It is a different cookie from
+// RefreshCookieName and each is only honored for its own origin class: a
+// preview session's cookie is never read for a normal admin origin, and a
+// normal session's cookie is never read from a preview origin. It is
+// host-only (no Domain attribute), Secure, HttpOnly and SameSite=Strict, so
+// the browser does not send it to any other host.
+const PreviewRefreshCookieName = "__Secure-admin_preview_refresh"
 
 // refreshCookiePath confines the cookie to the auth endpoints, the only ones
 // that ever read it.
@@ -52,6 +62,13 @@ type AdminAuthHandler struct {
 	// RefreshTTL is the refresh token lifetime, used as the cookie Max-Age in
 	// cookie mode.
 	RefreshTTL time.Duration
+
+	// Preview / PreviewTTL: read-only preview sessions (change
+	// preview-readonly-session). A login or refresh from an origin matching
+	// Preview yields scope=preview_ro tokens living at most PreviewTTL in total.
+	// nil/empty Preview = feature off.
+	Preview    *previeworigin.Set
+	PreviewTTL time.Duration
 
 	// Account-level lockout (change admin-api-public-exposure, design D6).
 	// Limiter nil or LockoutFailures <= 0 disables it. LockoutSecret keys the
@@ -94,10 +111,28 @@ func (h *AdminAuthHandler) setRefreshCookie(w http.ResponseWriter, value string)
 	http.SetCookie(w, c)
 }
 
+// setPreviewRefreshCookie writes (or expires) the preview session cookie; it
+// lives exactly until the absolute end of the preview session.
+func (h *AdminAuthHandler) setPreviewRefreshCookie(w http.ResponseWriter, value string, expires time.Time) {
+	c := &http.Cookie{
+		Name:     PreviewRefreshCookieName,
+		Value:    value,
+		Path:     refreshCookiePath,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   int(time.Until(expires).Seconds()),
+	}
+	if value == "" || c.MaxAge <= 0 {
+		c.Value, c.MaxAge = "", -1
+	}
+	http.SetCookie(w, c)
+}
+
 // cookieRefreshToken reads the refresh token from the cookie. ok is false when
 // there is no cookie. The caller must also require X-Admin-Refresh.
-func cookieRefreshToken(r *http.Request) (string, bool) {
-	c, err := r.Cookie(RefreshCookieName)
+func cookieRefreshToken(r *http.Request, name string) (string, bool) {
+	c, err := r.Cookie(name)
 	if err != nil || c.Value == "" {
 		return "", false
 	}
@@ -112,6 +147,9 @@ type tokenResponse struct {
 	RefreshToken string `json:"refresh_token,omitempty"`
 	TokenType    string `json:"token_type"`
 	ExpiresIn    int    `json:"expires_in"`
+	// Scope is "preview_ro" for a read-only preview session and absent for a
+	// normal one (so normal responses are byte-for-byte what they were).
+	Scope string `json:"scope,omitempty"`
 }
 
 func (h *AdminAuthHandler) tokenResponse(access, refresh string) tokenResponse {
@@ -196,6 +234,10 @@ func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
+	if origin, fromPreview := requestPreviewOrigin(h.Preview, r); fromPreview {
+		h.loginPreview(w, r, u.ID, sids, origin, transport)
+		return
+	}
 	access, err := h.Issuer.IssueAdmin(u.ID, sids)
 	if err != nil {
 		h.Log.Error("login: issue access", "err", err)
@@ -216,40 +258,109 @@ func (h *AdminAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, h.tokenResponse(access, refresh))
 }
 
+// previewTokenResponse builds the response of a read-only preview session.
+func (h *AdminAuthHandler) previewTokenResponse(access, refresh string, accessTTL time.Duration) tokenResponse {
+	return tokenResponse{
+		AccessToken: access, RefreshToken: refresh, TokenType: "Bearer",
+		ExpiresIn: int(accessTTL.Seconds()), Scope: auth.ScopePreviewRO,
+	}
+}
+
+// previewAccessTTL is the access token lifetime of a preview session: the
+// normal access TTL, but never past the session's absolute end.
+func (h *AdminAuthHandler) previewAccessTTL(end time.Time) time.Duration {
+	ttl := min(h.Issuer.AccessTTL(), time.Until(end))
+	return ttl.Truncate(time.Second)
+}
+
+// loginPreview issues a READ-ONLY session bound to the preview origin the login
+// came from. No schema is involved: scope and origin live in the access token
+// claims and in the refresh token's (hash-protected) prefix.
+func (h *AdminAuthHandler) loginPreview(w http.ResponseWriter, r *http.Request, userID int, sids []int, origin, transport string) {
+	ctx := r.Context()
+	tag := auth.OriginTag(origin)
+	refresh, end, err := h.Refresh.IssuePreviewUser(ctx, userID, tag, h.PreviewTTL)
+	if err != nil {
+		h.Log.Error("login: issue preview refresh", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	accessTTL := h.previewAccessTTL(end)
+	access, err := h.Issuer.IssueAdminPreview(userID, sids, origin, accessTTL)
+	if err != nil {
+		h.Log.Error("login: issue preview access", "err", err)
+		httpx.Internal(w)
+		return
+	}
+	// Audit: ids and an origin tag only - no e-mail, no origin, no token.
+	h.Log.Info("admin_preview_session", "event", "login", "user_id", userID, "origin_tag", tag, "scope", auth.ScopePreviewRO)
+	if transport == refreshTransportCookie {
+		h.setPreviewRefreshCookie(w, refresh, end)
+		httpx.WriteJSON(w, http.StatusOK, h.previewTokenResponse(access, "", accessTTL))
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, h.previewTokenResponse(access, refresh, accessTTL))
+}
+
 // refreshInput resolves the refresh token of a refresh/logout request. A token
 // in the JSON body wins and keeps the original (body mode) behavior exactly.
 // Otherwise the HttpOnly cookie is used, and ONLY together with the
 // X-Admin-Refresh header (design D5): without it the request is refused with 401
 // before anything is rotated or revoked. ok=false means the response has been
 // written.
-func (h *AdminAuthHandler) refreshInput(w http.ResponseWriter, r *http.Request) (token string, viaCookie, ok bool) {
+func (h *AdminAuthHandler) refreshInput(w http.ResponseWriter, r *http.Request) (token string, viaCookie bool, previewOrigin string, ok bool) {
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
 	if !decodeJSON(w, r, &req) {
-		return "", false, false
+		return "", false, "", false
 	}
-	if req.RefreshToken != "" {
-		return req.RefreshToken, false, true
+	// Which class of origin is calling decides which session family is valid
+	// (and which cookie is even looked at): a read-only token is refused from a
+	// normal origin and an ordinary token from a preview origin - no upgrade,
+	// no confusion in either direction.
+	previewOrigin, fromPreview := requestPreviewOrigin(h.Preview, r)
+	cookieName := RefreshCookieName
+	if fromPreview {
+		cookieName = PreviewRefreshCookieName
 	}
-	if c, has := cookieRefreshToken(r); has {
+	token = req.RefreshToken
+	if token != "" {
+		viaCookie = false
+	} else if c, has := cookieRefreshToken(r, cookieName); has {
 		if r.Header.Get(AdminRefreshHeader) != "1" {
 			httpx.Unauthorized(w)
-			return "", true, false
+			return "", true, "", false
 		}
-		return c, true, true
+		token, viaCookie = c, true
+	} else {
+		return "", false, "", true // nothing supplied: let the body-mode path answer as before
 	}
-	return "", false, true // nothing supplied: let the body-mode path answer as before
+	if auth.IsPreviewRefresh(token) != fromPreview {
+		httpx.Unauthorized(w)
+		return "", viaCookie, "", false
+	}
+	return token, viaCookie, previewOrigin, true
 }
 
 func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) {
-	token, viaCookie, ok := h.refreshInput(w, r)
+	token, viaCookie, previewOrigin, ok := h.refreshInput(w, r)
 	if !ok {
 		return
 	}
 	ctx := r.Context()
 
-	uid, newRefresh, err := h.Refresh.RotateUser(ctx, token)
+	var (
+		uid        int
+		newRefresh string
+		err        error
+		end        time.Time
+	)
+	if previewOrigin != "" {
+		uid, newRefresh, end, err = h.Refresh.RotatePreviewUser(ctx, token, auth.OriginTag(previewOrigin))
+	} else {
+		uid, newRefresh, err = h.Refresh.RotateUser(ctx, token)
+	}
 	if err != nil {
 		httpx.Unauthorized(w)
 		return
@@ -261,6 +372,28 @@ func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		h.Log.Error("refresh: load sids", "err", err)
 		httpx.Internal(w)
+		return
+	}
+	if previewOrigin != "" {
+		accessTTL := h.previewAccessTTL(end)
+		if accessTTL <= 0 {
+			httpx.Unauthorized(w)
+			return
+		}
+		access, err := h.Issuer.IssueAdminPreview(uid, sids, previewOrigin, accessTTL)
+		if err != nil {
+			h.Log.Error("refresh: issue preview access", "err", err)
+			httpx.Internal(w)
+			return
+		}
+		h.Log.Info("admin_preview_session", "event", "refresh", "user_id", uid,
+			"origin_tag", auth.OriginTag(previewOrigin), "scope", auth.ScopePreviewRO)
+		if viaCookie {
+			h.setPreviewRefreshCookie(w, newRefresh, end)
+			httpx.WriteJSON(w, http.StatusOK, h.previewTokenResponse(access, "", accessTTL))
+			return
+		}
+		httpx.WriteJSON(w, http.StatusOK, h.previewTokenResponse(access, newRefresh, accessTTL))
 		return
 	}
 	access, err := h.Issuer.IssueAdmin(uid, sids)
@@ -278,7 +411,7 @@ func (h *AdminAuthHandler) RefreshToken(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *AdminAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
-	token, viaCookie, ok := h.refreshInput(w, r)
+	token, viaCookie, previewOrigin, ok := h.refreshInput(w, r)
 	if !ok {
 		return
 	}
@@ -287,7 +420,12 @@ func (h *AdminAuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		httpx.Internal(w)
 		return
 	}
-	if viaCookie {
+	if previewOrigin != "" {
+		h.Log.Info("admin_preview_session", "event", "logout", "origin_tag", auth.OriginTag(previewOrigin), "scope", auth.ScopePreviewRO)
+		if viaCookie {
+			h.setPreviewRefreshCookie(w, "", time.Time{})
+		}
+	} else if viaCookie {
 		h.setRefreshCookie(w, "")
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -14,6 +14,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/auth"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/previeworigin"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
@@ -168,7 +169,17 @@ func NewCORSMiddleware(allowedOrigins []string, registry OriginRegistry, opts ..
 // CORSOption customizes NewCORSMiddleware.
 type CORSOption func(*corsOptions)
 
-type corsOptions struct{ websiteOrigin string }
+type corsOptions struct {
+	websiteOrigin string
+	preview       *previeworigin.Set
+}
+
+// WithPreviewOrigins grants preview origins CORS on the shop-scoped and shared
+// admin paths only (never platform-level paths, never as an admin-purpose
+// registered origin). Read-only is enforced separately, on the server.
+func WithPreviewOrigins(set *previeworigin.Set) CORSOption {
+	return func(o *corsOptions) { o.preview = set }
+}
 
 // WithWebsiteOrigin names the marketing website's origin (WEBSITE_URL). It is
 // the ONLY origin granted CORS on the public application API
@@ -186,6 +197,17 @@ const publicPrefix = "/api/v1/public/"
 func corsAllows(r *http.Request, origin string, allowed map[string]bool, registry OriginRegistry, co corsOptions) bool {
 	if strings.HasPrefix(r.URL.Path, publicPrefix) {
 		return co.websiteOrigin != "" && origin == co.websiteOrigin
+	}
+	if _, isPreview := co.preview.Match(origin); isPreview {
+		kind, _ := classifyAdminPath(r.URL.Path)
+		switch kind {
+		case pathAdminShop, pathAdminShared:
+			return true
+		case pathAdminPlatform:
+			return false
+		}
+		// non-admin paths: only a storefront registration can allow it
+		return registryAllows(r, registry, origin)
 	}
 	return allowed[origin] || registryAllows(r, registry, origin)
 }
@@ -235,16 +257,51 @@ func bearerToken(r *http.Request) string {
 
 // NewAdminMiddleware authenticates back-office requests with admin JWTs
 // (aud=admin). Member tokens fail here by signature and audience.
-func NewAdminMiddleware(issuer *auth.TokenIssuer) func(http.Handler) http.Handler {
+//
+// With WithPreviewSessions it also accepts read-only preview tokens
+// (aud=admin-preview, scope=preview_ro), but only from the exact preview
+// origin they are bound to and only for requests the read-only policy allows;
+// and it refuses an ordinary admin token presented from a preview origin.
+func NewAdminMiddleware(issuer *auth.TokenIssuer, opts ...AdminMWOption) func(http.Handler) http.Handler {
+	var cfg adminMW
+	for _, o := range opts {
+		o(&cfg)
+	}
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			uid, sids, err := issuer.VerifyAdmin(bearerToken(r))
-			if err != nil {
-				httpx.Unauthorized(w)
+			tok := bearerToken(r)
+			if uid, sids, err := issuer.VerifyAdmin(tok); err == nil {
+				if _, fromPreview := requestPreviewOrigin(cfg.preview, r); fromPreview {
+					// Token confusion: an ordinary session is not valid from a preview origin.
+					writePreviewReadOnly(w)
+					return
+				}
+				ctx := auth.WithAdminIdentity(r.Context(), auth.AdminIdentity{UserID: uid, SIDs: sids})
+				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}
-			ctx := auth.WithAdminIdentity(r.Context(), auth.AdminIdentity{UserID: uid, SIDs: sids})
-			next.ServeHTTP(w, r.WithContext(ctx))
+			if cfg.preview.Enabled() {
+				if claims, uid, err := issuer.VerifyAdminPreview(tok); err == nil {
+					origin, fromPreview := requestPreviewOrigin(cfg.preview, r)
+					if !fromPreview || origin != claims.Origin {
+						// A read-only token only works from the origin it is bound to.
+						httpx.Unauthorized(w)
+						return
+					}
+					if previewBlocked(r) {
+						if cfg.log != nil {
+							cfg.log.Warn("admin_preview_denied", "user_id", uid,
+								"method", r.Method, "path", r.URL.Path, "origin_tag", auth.OriginTag(origin))
+						}
+						writePreviewReadOnly(w)
+						return
+					}
+					ctx := auth.WithAdminIdentity(r.Context(), auth.AdminIdentity{UserID: uid, SIDs: claims.SIDs, PreviewRO: true})
+					next.ServeHTTP(w, r.WithContext(ctx))
+					return
+				}
+			}
+			httpx.Unauthorized(w)
 		})
 	}
 }

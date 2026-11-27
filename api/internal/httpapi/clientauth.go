@@ -12,6 +12,7 @@ import (
 	"ksdevworks/ecommerce/api/internal/ent/shopallowedorigin"
 	"ksdevworks/ecommerce/api/internal/events"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/previeworigin"
 	"ksdevworks/ecommerce/api/internal/tenant"
 )
 
@@ -36,8 +37,11 @@ import (
 type ClientAuthHandler struct {
 	Client     *ent.Client
 	Dispatcher *events.Dispatcher
-	Authz      *AuthzMW
-	Log        *slog.Logger
+	// PreviewOrigins: an admin-purpose origin may never also be a preview origin
+	// (the two classes stay disjoint; change preview-readonly-session).
+	PreviewOrigins *previeworigin.Set
+	Authz          *AuthzMW
+	Log            *slog.Logger
 }
 
 // MountShopAdmin registers both resources under /admin/shops/{shopID}.
@@ -216,6 +220,12 @@ func (h *ClientAuthHandler) createOrigin(w http.ResponseWriter, r *http.Request)
 	if origin == "" {
 		httpx.Unprocessable(w, "invalid origin", []httpx.ValidationDetail{
 			{Pointer: "/origin", Message: "must be a scheme://host[:port] http(s) origin without path or wildcard"},
+		})
+		return
+	}
+	if req.Purpose == tenant.PurposeAdmin && h.PreviewOrigins.Overlaps(origin) {
+		httpx.Unprocessable(w, "origin is a preview origin", []httpx.ValidationDetail{
+			{Pointer: "/origin", Message: "matches ADMIN_PREVIEW_ORIGINS; a preview origin cannot be an admin origin"},
 		})
 		return
 	}

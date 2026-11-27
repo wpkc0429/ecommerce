@@ -1649,6 +1649,7 @@ ShopUser.user_id
 TokenResponse.access_token
 TokenResponse.expires_in
 TokenResponse.refresh_token
+TokenResponse.scope
 TokenResponse.token_type
 ValidationDetail.message
 ValidationDetail.pointer

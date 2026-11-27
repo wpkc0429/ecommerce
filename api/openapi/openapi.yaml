@@ -169,6 +169,16 @@ components:
         後台與前台是**兩套完全獨立的簽章金鑰與 audience**：會員權杖在此一律 401。
 
         失敗行為：無權杖／權杖無效／audience 不符 → **401**；通過認證但權限不足或跨商家存取 → **403**。
+
+        **唯讀預覽工作階段（change preview-readonly-session）**：從營運者以 `ADMIN_PREVIEW_ORIGINS`
+        登記的**預覽 origin**（設計預覽主機）登入或換發，簽出的是唯讀權杖：`aud=admin-preview`，
+        `scope=preview_ro`，並綁定該 origin。唯讀權杖 **只**在它所綁定的那個 origin 有效
+        （其他 origin／無 Origin → 401），且伺服器端拒絕：所有非安全方法（POST／PUT／PATCH／DELETE
+        與其他方法；唯一例外是 `/admin/auth/login`、`/refresh`、`/logout`）與少數有副作用或敏感輸出的 GET
+        （預覽權杖、截圖簽名網址、金流憑證、發佈 hook、服務憑證、帳號與開店申請清單）→ **403 `preview_read_only`**。
+        反過來，一般後台權杖從預覽 origin 送出一律 403 `preview_read_only`。唯讀工作階段不能升級為一般工作階段
+        （需改在一般後台 origin 重新登入）；總壽命為 `ADMIN_PREVIEW_SESSION_TTL`（預設且最長 30 分鐘），
+        換發不會延長。預覽 origin 未設定（預設）時此功能關閉，行為與過去完全相同。
     memberJWT:
       type: http
       scheme: bearer
@@ -318,7 +328,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
-      description: 已認證但權限不足，或跨商家存取。`code = forbidden`。
+      description: |
+        已認證但權限不足，或跨商家存取。`code = forbidden`。
+
+        **預覽 origin 的唯讀拒絕**：請求來自 `ADMIN_PREVIEW_ORIGINS` 登記的預覽 origin 且不被允許
+        （非安全方法、被列入拒絕清單的 GET，或從預覽 origin 使用一般權杖）時，`code = preview_read_only`
+        （change preview-readonly-session；任何路由都可能回此碼，只要請求的 Origin 是預覽 origin）。
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
@@ -528,6 +543,9 @@ components:
       description: |
         後台與前台共用的權杖回應形狀。
 
+        **`scope`**（後台，additive）：只在從預覽 origin 登入／換發時出現，值為 `preview_ro`，
+        表示這是**唯讀預覽工作階段**（見 `adminJWT`）；一般工作階段的回應沒有此鍵，位元組與過去相同。
+
         `refresh_token` 是**一次性**的：每次換發都會旋轉，舊值立即失效。
         重複使用同一個 refresh token 會得到 401。
 
@@ -543,6 +561,13 @@ components:
           description: |
             只用於 `.../auth/refresh` 與 `.../auth/logout`。**一次性，用過即換新**。
             後台 cookie 模式下不出現。
+        scope:
+          type: string
+          enum: [preview_ro]
+          description: |
+            只在後台唯讀預覽工作階段出現（從預覽 origin 登入／換發）。access token 的 `scope` 宣告與
+            refresh token 同值、同綁定該預覽 origin；`refresh` 只能由同一個預覽 origin 以同一範圍換發，
+            不能升級為一般工作階段。
         token_type: { type: string, examples: ["Bearer"] }
         expires_in:
           type: integer
@@ -4304,6 +4329,12 @@ paths:
       operationId: adminLogin
       summary: 後台登入
       description: |
+        **預覽 origin**（change preview-readonly-session）：請求的 `Origin` 符合 `ADMIN_PREVIEW_ORIGINS`
+        時，簽出**唯讀預覽工作階段**（回應帶 `scope: "preview_ro"`；總壽命 `ADMIN_PREVIEW_SESSION_TTL`，
+        預設與上限 30 分鐘）；cookie 模式使用另一個 cookie `__Secure-admin_preview_refresh`
+        （HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth；**無 Domain**，僅限該主機）。
+        一般 origin 的行為不變。
+
         失敗一律是同一個 401，**不區分**帳號不存在／密碼錯誤／帳號停用／尚未設定密碼。
 
         **帳號層級鎖定**（change admin-api-public-exposure）：同一個 email 在視窗內（預設 15
@@ -4357,6 +4388,10 @@ paths:
       operationId: adminRefresh
       summary: 換發後台權杖
       description: |
+        **唯讀預覽工作階段**：預覽 refresh token 只能由簽發它的預覽 origin 換發（結果仍是 `scope: "preview_ro"`，
+        到期時間不延長）；從其他 origin 使用 → `401`；從預覽 origin 使用一般 refresh token → `401`（不升級、不混用）。
+        cookie 模式下，預覽 origin 只讀 `__Secure-admin_preview_refresh`，一般 origin 只讀 `__Secure-admin_refresh`。
+
         refresh token 一次性，成功後舊值立即失效。
 
         主體帶 `refresh_token` ＝ body 模式（行為不變）。主體未帶時改讀
@@ -4394,6 +4429,8 @@ paths:
       operationId: adminLogout
       summary: 撤銷後台 refresh token
       description: |
+        預覽 origin 可以用此端點結束自己的唯讀預覽工作階段（同上，origin 類別必須與 token 相符，否則 `401`）。
+
         主體未帶 `refresh_token` 時改讀 cookie（cookie 模式），此時必須帶
         `X-Admin-Refresh: 1`（否則 `401`），並清除 cookie。
       security: []

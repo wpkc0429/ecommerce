@@ -12,6 +12,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/config"
 	"ksdevworks/ecommerce/api/internal/httpx"
+	"ksdevworks/ecommerce/api/internal/previeworigin"
 )
 
 // Deps carries the dependencies of the HTTP layer. Fields are added as
@@ -83,6 +84,10 @@ type Deps struct {
 	Branding *BrandingHandler
 
 	AdminMW func(http.Handler) http.Handler // admin JWT authentication
+	// PreviewGuardMW (change preview-readonly-session) enforces the read-only
+	// policy on every request from a configured preview origin; pass-through
+	// when ADMIN_PREVIEW_ORIGINS is empty. Mounted first on /api/v1.
+	PreviewGuardMW func(http.Handler) http.Handler
 	// change admin-api-public-exposure. All three are always mounted on the
 	// /admin group and are pass-through when their feature is not configured,
 	// so the route table never depends on settings.
@@ -155,7 +160,11 @@ func New(d Deps) http.Handler {
 		websiteURL = d.Cfg.WebsiteURL
 	}
 	if len(corsOrigins) > 0 || d.CORSOrigins != nil || websiteURL != "" {
-		r.Use(NewCORSMiddleware(corsOrigins, d.CORSOrigins, WithWebsiteOrigin(websiteURL)))
+		var previewSet *previeworigin.Set
+		if d.Cfg != nil {
+			previewSet = d.Cfg.AdminPreview.Set
+		}
+		r.Use(NewCORSMiddleware(corsOrigins, d.CORSOrigins, WithWebsiteOrigin(websiteURL), WithPreviewOrigins(previewSet)))
 	}
 
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
@@ -174,6 +183,7 @@ func New(d Deps) http.Handler {
 	})
 
 	r.Route("/api/v1", func(v1 chi.Router) {
+		v1.Use(orPassthrough(d.PreviewGuardMW))
 		v1.Use(orPassthrough(d.BaselineRateLimit))
 		// ── Admin (back office) ────────────────────────────────
 		v1.Route("/admin", func(ar chi.Router) {
