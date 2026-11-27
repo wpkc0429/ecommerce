@@ -134,6 +134,7 @@ before 的 `commit_sha`＝`base_sha`、after＝目前 head；只在 `drafting`�
 - `is_current`：此請求發佈的 tag 是否為該站台目前的設計。來源只有一個：`design_site_state.current_request_id`（與 `GET …/state` 的 `current_request_id`、還原的 `already_current` 檢查相同）。已發佈的請求詳情因此不會回 304（`ETag` 仍只看 `rev`）。
 - `revert_target_tag`：`kind=revert` 的請求要還原到的已發佈 tag，其餘為 `null`。
 - `GET …/state` 新增每站台的 `pending_approval_count` 與頂層 `pending_approval_count`（`awaiting_approval` 的請求數，兩次 COUNT，可用於導覽徽章）。
+- `GET …/state` 新增頂層布林 `design_enabled`（`design.view`）：此店有至少一把未撤銷且未過期的設計服務憑證，**或**有任何狀態的設計請求時為 `true`，否則 `false`。供 merchant admin 決定是否顯示「設計歷史」導覽項目（2026-11-27 核可）。兩次以 `shop_id` 索引的 EXISTS 查詢，不需要 migration，只回布林、不洩漏憑證資訊；既有欄位不變。
 
 ## 核准與預覽 TTL 的確切行為（2026-11-27 讀程式碼確認）
 

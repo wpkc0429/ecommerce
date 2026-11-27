@@ -162,6 +162,7 @@ curl -sS -X POST "$API/api/v1/design-service/shops/$SHOP/requests/$RID/published
 ## 10. 版本
 
 契約隨 `/api/v1` 只做 additive 變更；新的錯誤碼或選填欄位不會破壞既有服務，**服務應把未知的 `code` 當成「不可重試的失敗」處理**。
+人用的 `GET …/design/state` 另有頂層布林 `design_enabled`（有未撤銷且未過期的憑證，或有任何請求時為 true）：服務不需處理；它代表「這家店已啟用 AI edit」，**撤銷／過期服務憑證後只要已有請求仍為 true**。
 完整欄位與每個端點的回應在 `api/openapi/openapi.yaml`（標籤 `design-service`）。
 
 ## 11. 版本預覽（D25，拉取模型）
