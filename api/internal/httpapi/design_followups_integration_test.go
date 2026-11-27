@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 )
 
 // Follow-ups to the design history approved on 2026-11-27: shop-scoped display
@@ -250,4 +252,60 @@ func TestAdminScreenshotsCheckTheSandboxOriginList(t *testing.T) {
 	e.mustCode(e.machine(e.keyA, "POST", e.svcPath(e.shopA, "/requests/"+rid+"/failed"), map[string]any{"code": "service_error"}), 200, "free the site")
 	sf := id(e.mustCode(e.create(e.shopA, e.keyA, e.ownerA, "storefront", "bigger photos"), 201, "storefront request"))
 	e.mustCode(e.upload(e.keyA, sf, "before", "anon", 390, "home", img, "X-Capture-Manifest", b64Manifest("")), 201, "storefront ignores the list")
+}
+
+func TestDesignStateDesignEnabled(t *testing.T) {
+	e := newDesignEnv(t)
+	ctx := context.Background()
+	enabled := func(user, shop int) bool {
+		t.Helper()
+		r := e.mustCode(e.human(user, "GET", e.adminPath(shop, "/state"), nil), 200, "state")
+		e.val.AssertResponse(t, "/api/v1/admin/shops/{shopID}/design/state", "GET", 200, []byte(r.Raw))
+		v, ok := r.Body["design_enabled"].(bool)
+		if !ok {
+			t.Fatalf("design_enabled missing: %s", r.Raw)
+		}
+		if strings.Contains(r.Raw, "dsk_") || strings.Contains(r.Raw, "key_hash") {
+			t.Fatalf("credential detail leaked: %s", r.Raw)
+		}
+		return v
+	}
+	// Active credential (issued by the env) -> true; the other shop is independent.
+	if !enabled(e.editorA, e.shopA) || !enabled(e.ownerB, e.shopB) {
+		t.Fatal("active credential should enable")
+	}
+	// Revoked only -> false (shop A); shop B unaffected.
+	e.client.DesignServiceCredential.Update().Where(designservicecredential.ShopIDEQ(e.shopA)).SetRevokedAt(e.now).ExecX(ctx)
+	if enabled(e.editorA, e.shopA) {
+		t.Fatal("revoked-only must be false")
+	}
+	if !enabled(e.ownerB, e.shopB) {
+		t.Fatal("shop B must stay enabled")
+	}
+	// Expired only -> false.
+	if _, err := e.sqlDB.Exec(`UPDATE design_service_credentials SET revoked_at = NULL, created_at = now() - interval '3 days', expires_at = now() - interval '1 day' WHERE shop_id = $1`, e.shopA); err != nil {
+		t.Fatal(err)
+	}
+	if enabled(e.editorA, e.shopA) {
+		t.Fatal("expired-only must be false")
+	}
+	// Staff cannot read.
+	if r := e.human(e.staffA, "GET", e.adminPath(e.shopA, "/state"), nil); r.Code != 403 {
+		t.Fatalf("staff: %d", r.Code)
+	}
+	// One request (any status) -> true, even with no usable credential.
+	e.mustCode(e.create(e.shopA, e.keyA, e.ownerA, "admin", "x"), 401, "revoked key cannot create")
+	if _, err := e.sqlDB.Exec(`UPDATE design_service_credentials SET expires_at = now() + interval '1 day' WHERE shop_id = $1`, e.shopA); err != nil {
+		t.Fatal(err)
+	}
+	e.mustCode(e.create(e.shopA, e.keyA, e.ownerA, "admin", "x"), 201, "create")
+	e.client.DesignServiceCredential.Update().Where(designservicecredential.ShopIDEQ(e.shopA)).SetRevokedAt(e.now).ExecX(ctx)
+	if !enabled(e.editorA, e.shopA) {
+		t.Fatal("a request must enable")
+	}
+	// A request in shop A does not enable a credential-less shop B.
+	e.client.DesignServiceCredential.Update().Where(designservicecredential.ShopIDEQ(e.shopB)).SetRevokedAt(e.now).ExecX(ctx)
+	if enabled(e.ownerB, e.shopB) {
+		t.Fatal("shop A's request leaked into shop B")
+	}
 }

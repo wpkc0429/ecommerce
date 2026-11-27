@@ -399,13 +399,18 @@ func (h *DesignAdminHandler) state(w http.ResponseWriter, r *http.Request) {
 		writeDesignError(w, h.Log, err)
 		return
 	}
+	enabled, err := h.Service.DesignEnabled(r.Context(), shopID)
+	if err != nil {
+		writeDesignError(w, h.Log, err)
+		return
+	}
 	out := make([]map[string]any, 0, len(views))
 	for _, v := range views {
 		m := siteStateJSON(v)
 		m["pending_approval_count"] = perSite[v.Site]
 		out = append(out, m)
 	}
-	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sites": out, "pending_approval_count": total})
+	httpx.WriteJSON(w, http.StatusOK, map[string]any{"sites": out, "pending_approval_count": total, "design_enabled": enabled})
 }
 
 func untrackedJSON(u *ent.DesignUntrackedChange) map[string]any {

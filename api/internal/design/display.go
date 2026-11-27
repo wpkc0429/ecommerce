@@ -9,6 +9,7 @@ import (
 
 	"ksdevworks/ecommerce/api/internal/ent"
 	"ksdevworks/ecommerce/api/internal/ent/designrequest"
+	"ksdevworks/ecommerce/api/internal/ent/designservicecredential"
 	"ksdevworks/ecommerce/api/internal/ent/designsitestate"
 	"ksdevworks/ecommerce/api/internal/ent/shopuser"
 	"ksdevworks/ecommerce/api/internal/ent/user"
@@ -156,4 +157,17 @@ func (s *Service) PendingApprovalCounts(ctx context.Context, shopID int) (map[st
 		total += n
 	}
 	return out, total, nil
+}
+
+// DesignEnabled reports whether the shop uses AI design edits: it has a live
+// (not revoked, not expired) service credential or at least one request of any
+// status. Two indexed existence queries on shop_id; only a boolean leaves here.
+func (s *Service) DesignEnabled(ctx context.Context, shopID int) (bool, error) {
+	live, err := s.Client.DesignServiceCredential.Query().Where(
+		designservicecredential.ShopIDEQ(shopID), designservicecredential.RevokedAtIsNil(),
+		designservicecredential.ExpiresAtGT(s.now())).Exist(ctx)
+	if err != nil || live {
+		return live, err
+	}
+	return s.Client.DesignRequest.Query().Where(designrequest.ShopIDEQ(shopID)).Exist(ctx)
 }
