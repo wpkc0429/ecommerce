@@ -31,6 +31,7 @@ import {
   buildSandboxEnv,
   captureManifestHeader,
   sandboxOrigins,
+  sandboxPreviewOrigin,
   readMainStackFacts,
   resolvePorts,
 } from "./guard.mjs";
@@ -208,6 +209,8 @@ function describe(ports) {
     // capture's X-Capture-Manifest must carry one of them as "origin" (capture_origin is the usual one).
     design_sandbox_origins: sandboxOrigins(ports),
     capture_origin: `http://127.0.0.1:${ports.admin}`,
+    // Read-only preview sessions (ADMIN_PREVIEW_ORIGINS): nothing listens here; it is only an Origin value.
+    preview_origin: sandboxPreviewOrigin(ports),
     media_origin: `http://127.0.0.1:${ports.minio}`,
     database: SANDBOX_DB,
     redis_db: REDIS_DB_INDEX,
@@ -255,6 +258,8 @@ async function smoke() {
       E2E_ADMIN_PASSWORD: SANDBOX_PERSONAS.platform.password,
       E2E_REQUIRE_DESIGN_STORAGE: "1",
       E2E_SANDBOX_ORIGIN: `http://127.0.0.1:${ports.admin}`,
+      E2E_PREVIEW_ORIGIN: sandboxPreviewOrigin(ports),
+      E2E_API_LOG: join(logDir, "api.log"),
     },
   });
   const lines = (r.stdout + r.stderr).split(/\r?\n/).filter((l) => /sandbox|manifest|live data|✗|PASSED|FAILED|screenshot is stored|stored/i.test(l));

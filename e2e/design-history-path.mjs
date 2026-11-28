@@ -20,6 +20,7 @@ import { deflateSync } from "node:zlib";
 import { pathToFileURL } from "node:url";
 import { API, brief, check, fail, failureCount, req, runID, section } from "./lib.mjs";
 import { platformToken } from "./application-path.mjs";
+import { runVersionPreviewPath } from "./design-version-preview-path.mjs";
 
 // ── a tiny PNG encoder (RGB, filter 0) so the script needs no dependency ─────────────────
 const crcTable = (() => {
@@ -291,6 +292,32 @@ export async function runDesignHistoryPath() {
       mid.json?.status === "reverted" && mid.json?.reverted_by_request_id === rev.json.id, brief(mid));
     const now = await human("GET", A("/state"));
     check("the site's current design is the revert request", now.json?.sites?.find((x) => x.site === "admin")?.current_request_id === rev.json.id, brief(now));
+  }
+
+  // ── version previews (task 10.7): a request waits for approval while they run ───────────────
+  const driveToAwaiting = async (label) => {
+    const base = (await human("GET", A("/state"))).json?.sites?.find((x) => x.site === "admin")?.current_sha ?? hex(0xb3);
+    const c = await svc("POST", S("/requests"), { site: "admin", requested_by_user_id: ownerId, prompt: "Version preview companion", base_sha: base, core_version: "0.3.0", design_floor_version: "0.2.0" }, { "Idempotency-Key": idem() });
+    if (c.status !== 201) { fail(`${label}: create failed ${brief(c)}`); return null; }
+    const rid = c.json.id, head = hex(0xb4);
+    await svc("POST", S(`/requests/${rid}/claim`));
+    await svc("PUT", S(`/requests/${rid}/head`), { head_sha: head, diff_summary: { files_changed: 1, additions: 1, deletions: 0, files: [{ path: "admin/design/theme.css", status: "modified", additions: 1, deletions: 0 }] } });
+    await svc("POST", S(`/requests/${rid}/guard-runs`), { checked_sha: head, passed: true, rule_ids: [] });
+    await svc("PUT", S(`/requests/${rid}/preview`), { origin: "https://p-e2e3.preview.example", expires_at: new Date(Date.now() + 3 * 3600e3).toISOString() });
+    for (const vp of [390, 1280]) {
+      const a = await upload(rid, "before", "owner", vp, "home", makePng(vp, 20, 1));
+      const b = await upload(rid, "after", "owner", vp, "home", makePng(vp, 20, 2));
+      if (a.status !== 201 || b.status !== 201) { fail(`${label}: screenshot upload failed ${a.status} ${b.status}`); return null; }
+    }
+    const sub = await svc("POST", S(`/requests/${rid}/submit`));
+    if (sub.status !== 200) { fail(`${label}: submit failed ${brief(sub)}`); return null; }
+    return rid;
+  };
+  if (rev.status === 201) {
+    await runVersionPreviewPath({
+      platform, shop, owner, ownerEmail, ownerPassword, A, S, svc, human,
+      targetRid: rid1, currentRid: rev.json.id, driveToAwaiting, otherKey: other.json?.key,
+    });
   }
 
   // ── what is left behind ─────────────────────────────────────────────────────────

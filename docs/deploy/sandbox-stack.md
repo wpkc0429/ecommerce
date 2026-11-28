@@ -53,7 +53,7 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 `design.checkCaptureRules`（`api/internal/design/screenshots.go`）對 admin 截圖要求：`dataset=sandbox-v1`、`api_origin_class=sandbox`，**且** `capture_manifest.origin`（新的選填欄位，admin 必填）等於清單中的某一項，否則 422 `live_data_capture_refused`。
 - 清單為空：`APP_ENV` 為 production 類（含未設定，fail closed）時 **所有 admin 截圖一律被拒**；development／test 時只照 manifest 規則收（origin 可省略）。清單非空時任何環境都強制比對。
 - storefront 截圖不受清單影響（它拍的是公開資料）。上傳時 manifest 只保存已知欄位，`origin` 現在是其中之一。
-- 這仍然不是證明：manifest 是服務自己宣告的，清單擋住的是「宣告了不在清單內的 origin」與「production 忘了設定清單」。真正的邊界仍是 sandbox 的守衛與擷取腳本的 allowlist（template T6，**尚未實作**，且 T6 要在 manifest 帶上 `origin`＝實際截圖的 admin origin）。
+- 這仍然不是證明：manifest 是服務自己宣告的，清單擋住的是「宣告了不在清單內的 origin」與「production 忘了設定清單」。真正的邊界仍是 sandbox 的守衛與擷取腳本的 allowlist（template T6，`scripts/design-capture.mjs`，已實作，且 T6 要在 manifest 帶上 `origin`＝實際截圖的 admin origin）。
 - 平台部署要設的值：`make sandbox-env` 的 `design_sandbox_origins`（預設 `http://127.0.0.1:13001`、`http://localhost:13001`、`http://127.0.0.1:18080`、`http://localhost:18080`）；若 sandbox 搬到別的主機，填它的真實 https origin。sandbox 自己的 API 啟動時已由 `buildSandboxEnv` 設好同一份清單，所以 `make sandbox-smoke` 會實際走過這個檢查。
 產生標頭值：`node scripts/sandbox/sandbox.mjs manifest`（base64 的 `{"tool":"design-capture",…,"dataset":"sandbox-v1","api_origin_class":"sandbox","origin":"http://127.0.0.1:13001",…}`）。
 
@@ -61,7 +61,7 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 
 營運者在同一台機器啟動 sandbox（`make sandbox-up`）後，把 `make sandbox-env` 的輸出交給服務（環境變數或設定檔；內容只有 loopback origin 與上面的公開合成帳號，沒有任何真實資料或基礎設施密碼）：
 
-- `api_origin`（`http://127.0.0.1:18080`）、`admin_origin`（`http://127.0.0.1:13001`）、`allowed_api_origins`：擷取腳本（template T6，**尚未實作**）只可對這些 origin 啟動；admin SPA 的 API 位址由腳本寫進 localStorage `apiBase`。
+- `api_origin`（`http://127.0.0.1:18080`）、`admin_origin`（`http://127.0.0.1:13001`）、`allowed_api_origins`：擷取腳本（template T6，`scripts/design-capture.mjs`）只可對這些 origin 啟動；admin SPA 的 API 位址由腳本寫進 localStorage `apiBase`。
 - `logins.owner`／`logins.staff`：admin 的 owner／staff 截圖；`publishable_key`：storefront 的匿名截圖。
 - 服務上傳到**真正的平台**用的是平台簽發給它的 `dsk_` 憑證，與 sandbox 無關；sandbox 自己的設計歷史 bucket 只用來在本機做上傳煙霧測試。
 - sandbox origin 是**平台層設定**（`DESIGN_SANDBOX_ORIGINS`），不是每個商家登記的東西；預覽 origin 仍是每個請求用 `PUT …/preview` 登記的。擷取腳本的 allowlist 與平台清單應是同一份（取自 `make sandbox-env`）。
@@ -76,7 +76,7 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 |---|---|
 | R1 admin 只從 sandbox 截 | 這個堆疊是唯一合法來源；沒有真實資料可拍；平台上傳檢查 `sandbox-v1` |
 | R2 storefront 只拍公開資料、不登入 | sandbox 的 storefront 只有合成商品；匿名 key 是固定 demo key |
-| R3 遮罩個資 | 資料本來就是合成的；擷取腳本仍須對 `data-pii` 遮罩（T6／T7，未做）作為縱深 |
+| R3 遮罩個資 | 資料本來就是合成的；擷取腳本仍須對 `data-pii` 遮罩（T6 已做；T7 在核心標記 `data-pii` 未做）作為縱深 |
 | R4 截圖私有儲存、短效簽名網址 | 平台的設計歷史 bucket；sandbox 內的 bucket 為 `:none` 私有 |
 | R5 保存期限與清除 | 平台 `purge-design-history`；sandbox 本身 `down` 即全毀 |
 
@@ -91,3 +91,7 @@ node scripts/sandbox/sandbox.mjs selftest   # 守衛的單元測試（不需 doc
 ## 搬到平台上之後
 
 這份是「先放在同一台 Windows 機器上」的第一版。搬遷時保留三件事：獨立的 Postgres 實例（或至少獨立資料庫＋獨立帳號）、白名單環境、`ecommerce_sandbox` 名稱檢查；compose 檔與 `guard.mjs` 可直接沿用，改的只是埠與主機。
+
+## 預覽 origin（版本預覽 e2e 用）
+
+`make sandbox-up` 另外設定 `ADMIN_PREVIEW_ORIGINS`（`sandbox-env` 的 `preview_origin`，預設 `http://127.0.0.1:13002`）。**沒有任何東西在這個埠上監聽**；它只是 e2e 登入時送出的 `Origin` 值，用來驗證預覽 origin 的唯讀工作階段（`make sandbox-smoke` 會跑 `e2e/design-version-preview-path.mjs`）。

@@ -351,3 +351,17 @@ Q1–Q10 已於 2026-11-25 由使用者定案（採用 design.md 建議原文）
 - **Q9（已定案，使用者 2026-11-26）**：服務只推分支、由人工合併；切片 3 的 publish grant 依決定省略（日後服務取得 `main` 寫入權時須重新檢討）。
 
 本節未改動 `docs/` 下任何檔案。
+
+
+## T6 擷取腳本的契約選擇（2026-11-28，實作時的最小合理決定）
+
+T6 的任務文字（一行）沒有寫死下列細節；以下是為了不改任何 API、且與 D6／D7／D11／D12 一致而做的選擇。腳本在 template repo：`scripts/design-capture.mjs`（鎖定、列入 `lockedPaths`；`admin/e2e/parity.mjs` 一個字未改）。
+
+- **介面**：`capture --site admin|storefront --phase before|after --out DIR --sandbox-env FILE`、`upload --dir DIR --api URL --shop N --request UUID`、`views`、`selftest`。`FILE` 是 `make sandbox-env` 的輸出（含 origin 清單、公開的合成帳號、publishable key）。輸出 `{phase}-{role}-{viewport}-{view_key}.png` ＋ `manifest.json`（不含任何憑證）。`--diff-against <before 目錄>` 為每張 after 算 `diff_ppm`（演算法同 parity compare，每通道差總和 > 6）。
+- **允許清單**：`design_sandbox_origins` ∪ `allowed_api_origins`（來自 FILE）∪ 環境變數 `DESIGN_CAPTURE_ALLOWED_ORIGINS`；與平台的 `DESIGN_SANDBOX_ORIGINS` 是同一份來源。**admin、API、storefront 三種 origin 都必須在清單內**（storefront 不開放 `public-live`：第一版只拍 sandbox 資料；要拍公開來源需另議並改契約）。空清單＝拒絕；loopback 以外不得用明文 http；`:8080`、`:3001` 等主堆疊埠一律拒絕。拒絕＝結束碼 2，瀏覽器與任何網路請求都還沒開始。**瀏覽器本身也被圍起來**：對清單（加 sandbox 媒體 origin）以外的任何請求一律 abort。
+- **憑證**：登入只接受 `@example.com` 的合成帳號（FILE 的 `logins`，或環境變數覆寫但同樣檢查網域）；沒有任何旗標能傳入真實帳密。服務金鑰 `dsk_` **只**從環境變數 `DESIGN_SERVICE_KEY` 讀，argv 出現任何祕密類旗標即拒絕；所有輸出經過清洗器（已知祕密值、`dsk_…`、Bearer、簽名網址）。
+- **manifest 標頭**：`tool=design-capture`、`dataset=sandbox-v1`、`api_origin_class=sandbox`、`set_version=1`、`captured_at`、**`origin`＝實際擷取的 admin（或 storefront）origin**。
+- **視圖集 v1**：admin owner 八個（`login`〔登出狀態，role 記 owner，依 D6〕、`home`、`orders`、`order-detail`、`products`、`product-edit`、`members`、`reports`）＋ staff 兩個（`home`、`orders`）；storefront anon：`home`、`shop`、`product`、`cart`、`story`（網站沒有故事頁就略過並記入 manifest `skipped`）、`checkout`（只到第一步，不輸入、不送出）。購物車用核心商務層加一件合成 session，不建立帳號或訂單。視口 390×844 與 1280×860，`deviceScaleFactor 1`、`zh-TW`、`Asia/Taipei`、動畫關閉；高於 10,000 px 截斷並在 manifest 標 `truncated`。`data-pii` 與密碼欄以 Playwright `mask` 純黑遮罩。
+- **固定時鐘只用在 storefront**：後台核心在開機時凍結 JS 內建物件（D18），Playwright 的 clock 會讓它無法啟動；admin 的決定性來自固定的 sandbox 資料集。這是 D6「決定性」一節的已知例外。每個角色只登入一次（平台對登入限流），視口在同一個工作階段內切換。
+- **上傳與保留槽位規則**：路徑與標頭同 §4；上傳前在本地規劃——不同槽位 > 80 或（帳本累計＋待傳）> 240 次嘗試即拒絕（結束碼 3，不送任何請求）；帳本檔 `.upload-ledger.json` 記住已存槽位與嘗試數，重跑時位元組相同的槽位不再送出（所以重跑不會吃嘗試額度）；重拍既有槽位不佔槽位額度（平台規則）。回應處理依契約：201／200 成功；429／502／5xx／網路錯誤指數退避（1、2、4、8、16 秒＋抖動，遵守 `Retry-After`）最多 5 次後放棄（結束碼 4）；422 雜湊不符重傳一次；`slot_cap_exceeded`／`attempt_cap_exceeded`／`quota_exceeded`／`live_data_capture_refused`／`design_storage_not_configured`／`invalid_state`／413 一律放棄（結束碼 3，不重試）；409 `head_moved` 結束碼 5（請以新 head 重拍 after）。
+- **Playwright 是借來的**，不是依賴：`DESIGN_CAPTURE_PLAYWRIGHT_DIR`，否則本層的 `playwright`，否則並列的 ecommerce checkout 的 `e2e/node_modules`。

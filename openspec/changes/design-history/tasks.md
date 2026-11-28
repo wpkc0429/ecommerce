@@ -62,7 +62,7 @@
 - [ ] T3 `admin/ui/`：核心擁有的 `ctx.ui.beforeAfter`（並排與滑桿、鍵盤可操作）；**CSP 決定**：`img-src` 加入私有 bucket 簽名網址的主機（`admin/deploy/nginx.conf.template`、`checkCsp`、`deployChecks` 與測試同改，`docs/DECISIONS.md` 記錄），或改走同源代理（需另議）
 - [ ] T4 `admin/design-defaults/views/design-history.js`、`design-request.js`（列表、詳情：並排截圖、請求原文以 `textContent`、事件時間軸、守門員與 diff 摘要、核准／拒絕、還原按鈕、未追蹤變更標示）；`admin/core/routes.js` 新路由（`design`、`designRequest`，`design.view`）；`design/routes.js` 預設
 - [ ] T5 `admin/lib/public-api.json`（由守門員證明等於真實 `ctx`）、`admin/docs/DESIGN-LAYER.md` 第 4 節與範例、`admin/scripts/core.manifest.json`（**人工 `--update`**）、守門員 fixtures、`admin/e2e/`、`docs/CORE-CHANGELOG.md`（`Design-layer action:` 行：路由、copy 鍵、導覽項）、`template.json` 版本
-- [ ] T6 擷取腳本 `scripts/design-capture.mjs`（鎖定）：由 `admin/e2e/parity.mjs` 的 `capture` 泛化——固定視圖集 `set_version:1`、390／1280、owner／staff／anon、關閉動畫與固定時鐘、拒絕非 sandbox 的 API origin、對 `data-pii` 元素遮罩、輸出 `{phase}-{role}-{viewport}-{view_key}.png` 與 manifest、可選 `diff_ppm`（沿用 `compare` 的像素函式）；**不改 parity.mjs 現有 CLI**
+- [x] T6 擷取腳本 `scripts/design-capture.mjs`（鎖定）：由 `admin/e2e/parity.mjs` 的 `capture` 泛化——固定視圖集 `set_version:1`、390／1280、owner／staff／anon、關閉動畫與固定時鐘、拒絕非 sandbox 的 API origin、對 `data-pii` 元素遮罩、輸出 `{phase}-{role}-{viewport}-{view_key}.png` 與 manifest、可選 `diff_ppm`（沿用 `compare` 的像素函式）；**不改 parity.mjs 現有 CLI**（**2026-11-28 已在 template repo 實作**，分支 `core/design-capture`，本機提交、未推送：`scripts/design-capture.mjs` ＋ `tests/design-capture.test.mjs`；契約選擇見 design.md「T6 擷取腳本的契約選擇」；已對 sandbox 實跑）
 - [ ] T7 核心對會顯示個資的元素加 `data-pii`（訂單、顧客、成員畫面）
 - [ ] T8 `admin/docs/AI-EDIT-SERVICE-NOTES.md`：Audit 一節改為指向平台 API 與 `docs/design-service-contract.md`；`core-change` 與 `admin-design` skill 補上歷史畫面的說明
 
@@ -79,7 +79,7 @@
 - [x] 9.3 手動：第二個 bucket 以匿名請求讀取任何物件鍵必須 403／404（把結果寫進 runbook） （本機 MinIO 版已由 e2e 驗證：去掉簽名、竄改簽名、匿名列出 bucket 皆被拒。**真正的 R2 第二個 bucket 的匿名讀取驗證仍須由你在建立 bucket 後手動做**，步驟在操作員手冊第 6 節）
 - [x] 9.4 量測並記入 CLAUDE.md：每請求 DB 與儲存實際大小，對照 design D22 的估算 （量測，e2e 合成資料：每請求事件約 8.5 列〔平均 368 B/列〕、請求列約 1 KB、截圖列 4 張／請求；三張表的總關聯大小約 48 KB／請求，與 D22 的 50 KB 估計相符。**儲存大小無法在此量測**：e2e 的 PNG 是幾百位元組的合成漸層，真實的截圖大小要等 template 的擷取腳本 T6 與 sandbox 堆疊存在後才有意義；D22 的 6–20 MB／請求估計維持未驗證）
 
-## 10. 版本預覽（D25；**平台側 10.1–10.6、10.8 已完成（2026-11-26）；10.7 的 e2e 未做；T9–T12（template repo）未開始**；切片 4，選用，依賴切片 1；需服務實作拉取模型才有意義）
+## 10. 版本預覽（D25；**平台側 10.1–10.6、10.8 已完成（2026-11-26）；10.7 已完成；T9–T12（template repo）未開始**；切片 4，選用，依賴切片 1；需服務實作拉取模型才有意義）
 
 > 名詞：「改版預覽」＝既有核准前預覽；「版本預覽」＝本組，不屬於任何請求。UI 按鈕「預覽此版本」、CTA「改成這個版本」。design.md D25 中標「需使用者確認」的項目（權限 `design.view` 或 `design.revert`、預設 TTL 30 分鐘、限流數字、預覽模式唯讀已於 2026-11-26 定案）在開工前先確認其餘項目。
 
@@ -89,7 +89,7 @@
 - [x] 10.4 `api/internal/config/design.go`：`DESIGN_VERSION_PREVIEW_TTL`（預設 30m，上限 2h）、`DESIGN_VERSION_PREVIEW_HOURLY_CAP`（6）、`DESIGN_VERSION_PREVIEW_DAILY_CAP`（30）、`DESIGN_VERSION_PREVIEW_RETENTION`（90d）；含 min/max 檢查；`.env.example`
 - [x] 10.5 `cmd/design-sweep` 加入版本預覽逾時處理；`cmd/purge-design-history` 加入 `design_version_previews` 的保存期限清除與 `-export-shop` 輸出；測試仿既有（邊界、冪等、不碰他店與其他表）
 - [x] 10.6 OpenAPI：約 6 條新路由與 `DesignVersionPreview` schema，`v1-surface.txt` **只新增行**；`make openapi` 四道檢查全綠
-- [ ] 10.7（**整合測試已完成、e2e 與假服務腳本未做**）整合與 e2e：不佔名額（有 `awaiting_approval` 時仍可預覽）、不寫事件（事件數不變）、`revert_below_core_floor` 與 `already_current` 不建立列、`staff` 403、跨店 404、他人看不到 origin、服務不能建立、取代舊預覽、限流 429、origin 含路徑 422、slog buffer 證明日誌無 origin；假服務腳本加入拉取—認領—`ready`—到期流程；擴充 `design-history-path.mjs`
+- [x] 10.7（**整合測試與 e2e 皆已完成，2026-11-28**：`e2e/design-version-preview-path.mjs`，由 `design-history-path.mjs` 呼叫；在 sandbox 堆疊實跑通過，不在 CI）整合與 e2e：不佔名額（有 `awaiting_approval` 時仍可預覽）、不寫事件（事件數不變）、`revert_below_core_floor` 與 `already_current` 不建立列、`staff` 403、跨店 404、他人看不到 origin、服務不能建立、取代舊預覽、限流 429、origin 含路徑 422、slog buffer 證明日誌無 origin；假服務腳本加入拉取—認領—`ready`—到期流程；擴充 `design-history-path.mjs`
 - [x] 10.8 文件：`docs/design-service-contract.md`（D17 新增版本預覽步驟與錯誤處理，並寫明不得以版本預覽取代改版預覽）、`docs/design-history.md`、`docs/admin-frontend-integration.md`（按鈕、固定限制文字、`origin` 僅發起者、CTA 走既有還原）、`docs/deploy/design-history-operations.md`（新設定與清除）、`CLAUDE.md`
 - [ ] T9 `admin/core/data.js`／`actions.js`：`ctx.actions.requestVersionPreview(requestId)`（先檢查 `design.view`；非不可逆動作，不需 `WARNED_CONFIRM_IDS`）與 `ctx.data.getVersionPreview(pid)`；`409 revert_below_core_floor`／`already_current`／`429` 對應到 `ActionError` 並以 `copy.js` 顯示原因；新增 `ctx` 函式是人工審查的核心變更（`.claude/skills/core-change`）
 - [ ] T10 `admin/design-defaults/views/design-history.js`、`design-request.js`：每個已發佈設計的「預覽此版本」按鈕、等待／失敗／到期狀態、固定限制說明（非核准當時紀錄、截圖為準）、「改成這個版本」（僅 `design.revert`，導向既有還原確認）；copy 鍵同步 `design/copy.js` 與 `design-defaults/copy.js`

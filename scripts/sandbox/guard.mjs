@@ -149,6 +149,15 @@ export function sandboxOrigins(ports) {
   ];
 }
 
+/**
+ * The origin the sandbox API treats as a read-only PREVIEW origin (ADMIN_PREVIEW_ORIGINS). Nothing
+ * listens there: the e2e only sends it as the Origin header of a login, the way a browser on a
+ * preview host would. Distinct from every admin/CORS origin (the config refuses an overlap).
+ */
+export function sandboxPreviewOrigin(ports) {
+  return `http://127.0.0.1:${ports.admin + 1}`;
+}
+
 export function buildSandboxEnv({ secrets, ports, systemEnv = {} }) {
   const adminOrigins = `http://127.0.0.1:${ports.admin},http://localhost:${ports.admin}`;
   const env = {
@@ -183,6 +192,7 @@ export function buildSandboxEnv({ secrets, ports, systemEnv = {} }) {
     DESIGN_R2_ACCESS_KEY_ID: secrets.minioUser,
     DESIGN_R2_SECRET_ACCESS_KEY: secrets.minioPassword,
     DESIGN_SANDBOX_ORIGINS: sandboxOrigins(ports).join(","),
+    ADMIN_PREVIEW_ORIGINS: sandboxPreviewOrigin(ports),
     // SMTP_* is deliberately absent: no credentials = the API sends no mail at all (the e-mail sink).
     // ECPAY_* is deliberately absent: the mock provider is the default and ECPay stays unconfigured.
   };

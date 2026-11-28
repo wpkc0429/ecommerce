@@ -16,6 +16,7 @@ import {
   buildSandboxEnv,
   captureManifestHeader,
   sandboxOrigins,
+  sandboxPreviewOrigin,
   resolvePorts,
 } from "./guard.mjs";
 
@@ -100,4 +101,12 @@ test("the sandbox env lists the sandbox origins for DESIGN_SANDBOX_ORIGINS", () 
   assert.ok(list.includes("http://127.0.0.1:13001"));
   assert.ok(list.every((o) => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)));
   assert.deepEqual(list, sandboxOrigins(ports));
+});
+
+test("the sandbox env registers a preview origin that overlaps no admin origin", () => {
+  const env = buildSandboxEnv({ secrets, ports });
+  assert.equal(env.ADMIN_PREVIEW_ORIGINS, sandboxPreviewOrigin(ports));
+  assert.match(env.ADMIN_PREVIEW_ORIGINS, /^http:\/\/127\.0\.0\.1:\d+$/);
+  assert.ok(!env.CORS_ALLOWED_ORIGINS.split(",").includes(env.ADMIN_PREVIEW_ORIGINS));
+  assert.ok(!sandboxOrigins(ports).includes(env.ADMIN_PREVIEW_ORIGINS));
 });
